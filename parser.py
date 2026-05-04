@@ -79,6 +79,16 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
     col = SHOPBOX_PIPE_COLS
     transaktioner = []
 
+    # Debug første datarække
+    if alle_rækker:
+        r = alle_rækker[0]
+        print(f"[DEBUG] Antal kolonner: {len(r)}")
+        if len(r) > col['dato']:
+            print(f"[DEBUG] dato_raw={repr(r[col['dato']])}, varenavn_raw={repr(r[col['varenavn']])}, omsa_raw={repr(r[col['omsaetning']])}")
+        else:
+            print(f"[DEBUG] For fa kolonner: {len(r)}, forventer mindst {col['dato']+1}")
+            print(f"[DEBUG] Hele raden: {r}")
+
     for row in alle_rækker:
         if not row or len(row) <= col["dato"]:
             continue

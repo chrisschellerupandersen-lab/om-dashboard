@@ -5,18 +5,21 @@ from typing import List, Dict, Any
 import openpyxl
 
 # Shopbox varesalgsrapport pipe-format (type=1, fileType=txt)
-# Kolonne-indekser er kendte fra Shopbox API
+# Datarækker starter med en tom celle (+1 offset fra header).
+# "External Reference" (header col 16) kan indeholde | som skaber variable ekstra kolonner.
+# Løsning: faste positioner for felter FØR ExtRef, relative fra slutningen for felter EFTER.
 SHOPBOX_PIPE_COLS = {
-    "antal":      6,   # Maengde
-    "omsaetning": 7,   # Total amount
-    "kostpris":   10,  # Cost of goods sold
-    "avance":     11,  # Gross profit
-    "avance_pct": 12,  # Gross Profit Margin
-    "varenavn":   14,  # Item name
-    "varenummer": 15,  # Item Sku Code
-    "kategori":   17,  # Category name
-    "dato":       18,  # Dato
+    "antal":      7,   # Mængde:            header col 6  + 1 offset
+    "omsaetning": 8,   # Total amount:      header col 7  + 1
+    "kostpris":   11,  # Cost of goods sold: header col 10 + 1
+    "avance":     12,  # Gross profit:      header col 11 + 1
+    "avance_pct": 13,  # Gross Profit Margin: header col 12 + 1
+    "varenavn":   15,  # Item name:         header col 14 + 1 (før ExtRef)
+    "varenummer": 16,  # Item Sku Code:     header col 15 + 1 (før ExtRef)
 }
+# Dato og kategori er EFTER ExtRef — brug position fra slutningen
+DATO_FRA_SLUT     = 2   # row[-2] = Dato
+KATEGORI_FRA_SLUT = 3   # row[-3] = Category name
 
 KOLONNE_MAP = {
     "varenummer": ["item sku code", "item sku", "varenr", "varenummer", "sku"],
@@ -75,31 +78,22 @@ def _er_shopbox_pipe_format(headers: List[str]) -> bool:
 
 
 def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
-    """Parser med kendte Shopbox kolonnepositioner."""
+    """Parser med Shopbox kolonnepositioner — fast for tal, relativt fra slutning for dato/kategori."""
     col = SHOPBOX_PIPE_COLS
     transaktioner = []
-
-    # Debug første datarække
-    if alle_rækker:
-        r = alle_rækker[0]
-        print(f"[DEBUG] Antal kolonner: {len(r)}")
-        if len(r) > col['dato']:
-            print(f"[DEBUG] dato_raw={repr(r[col['dato']])}, varenavn_raw={repr(r[col['varenavn']])}, omsa_raw={repr(r[col['omsaetning']])}")
-        else:
-            print(f"[DEBUG] For fa kolonner: {len(r)}, forventer mindst {col['dato']+1}")
-            print(f"[DEBUG] Hele raden: {r}")
+    min_cols = max(col.values()) + 1  # mindst 17 kolonner kræves
 
     for row in alle_rækker:
-        if not row or len(row) <= col["dato"]:
+        n = len(row)
+        if n < min_cols or n < DATO_FRA_SLUT + 1:
             continue
 
         varenavn = str(row[col["varenavn"]]).strip() if row[col["varenavn"]] else ""
-        dato     = _dato(row[col["dato"]])
+        dato     = _dato(row[n - DATO_FRA_SLUT])
 
         if not varenavn or not dato:
             continue
 
-        # Spring header-rækken over
         if varenavn.lower() in ("item name", "varenavn"):
             continue
 
@@ -107,7 +101,7 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "dato":       dato,
             "varenummer": str(row[col["varenummer"]]).strip(),
             "varenavn":   varenavn,
-            "kategori":   str(row[col["kategori"]]).strip(),
+            "kategori":   str(row[n - KATEGORI_FRA_SLUT]).strip() if n >= KATEGORI_FRA_SLUT + 1 else "",
             "antal":      _tal(row[col["antal"]]),
             "omsætning":  _tal(row[col["omsaetning"]]),
             "kostpris":   _tal(row[col["kostpris"]]),

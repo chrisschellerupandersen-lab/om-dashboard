@@ -62,6 +62,10 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
     headers = [str(c).strip() if c else "" for c in alle_rækker[header_idx]]
     col = {felt: _find_col(headers, kandidater) for felt, kandidater in KOLONNE_MAP.items()}
 
+    print(f"[DEBUG] Kolonner fundet: { {k:v for k,v in col.items() if v >= 0} }")
+    if len(alle_rækker) > header_idx + 1:
+        print(f"[DEBUG] Første datarække: {alle_rækker[header_idx + 1]}")
+
     transaktioner = []
     for row in alle_rækker[header_idx + 1:]:
         if not row or sum(1 for c in row if c and str(c).strip()) < 2:
@@ -73,9 +77,12 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 
         varenavn  = str(get("varenavn", "")).strip()
         omsætning = _tal(get("omsætning"))
-        dato      = _dato(get("dato"))
+        dato_rå   = get("dato")
+        dato      = _dato(dato_rå)
 
         if not varenavn or not dato:
+            if len(transaktioner) == 0:
+                print(f"[DEBUG] Filtreret: varenavn={repr(varenavn)} dato_rå={repr(dato_rå)} dato={dato}")
             continue
 
         transaktioner.append({

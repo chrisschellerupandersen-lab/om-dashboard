@@ -130,6 +130,14 @@ async def opdater_rapport(request: Request):
 
     try:
         fil_bytes = base64.b64decode(encoded)
+
+        # Log første 300 tegn så vi kan se filformatet i Railway logs
+        try:
+            preview = fil_bytes.decode("utf-8-sig", errors="replace")[:300]
+        except Exception:
+            preview = repr(fil_bytes[:100])
+        print(f"[DEBUG] Fil preview: {preview}")
+
         produkter = xlsx_parser.parse_shopbox_xlsx(fil_bytes)
 
         if not produkter:

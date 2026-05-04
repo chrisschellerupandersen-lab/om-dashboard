@@ -186,8 +186,14 @@ def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
     else:
         sep = ";"
 
-    reader      = csv.reader(io.StringIO(tekst), delimiter=sep)
-    alle_rækker = [[cell.strip() for cell in row] for row in reader]
+    # splitlines() håndterer \r\n, \r og \n korrekt
+    linjer      = [l for l in tekst.splitlines() if l.strip()]
+    alle_rækker = [[cell.strip() for cell in linje.split(sep)] for linje in linjer]
+
+    print(f"[DEBUG] Linjer: {len(alle_rækker)}, sep={repr(sep)}")
+    if len(alle_rækker) > 1:
+        print(f"[DEBUG] Header[:5]: {alle_rækker[0][:5]}")
+        print(f"[DEBUG] Rk1[:5]: {alle_rækker[1][:5]}")
 
     if not alle_rækker:
         return []

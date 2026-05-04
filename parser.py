@@ -4,11 +4,25 @@ from datetime import datetime
 from typing import List, Dict, Any
 import openpyxl
 
+# Shopbox varesalgsrapport pipe-format (type=1, fileType=txt)
+# Kolonne-indekser er kendte fra Shopbox API
+SHOPBOX_PIPE_COLS = {
+    "antal":      6,   # Maengde
+    "omsaetning": 7,   # Total amount
+    "kostpris":   10,  # Cost of goods sold
+    "avance":     11,  # Gross profit
+    "avance_pct": 12,  # Gross Profit Margin
+    "varenavn":   14,  # Item name
+    "varenummer": 15,  # Item Sku Code
+    "kategori":   17,  # Category name
+    "dato":       18,  # Dato
+}
+
 KOLONNE_MAP = {
     "varenummer": ["item sku code", "item sku", "varenr", "varenummer", "sku"],
     "varenavn":   ["item name", "varenavn", "varebetegnelse", "navn"],
-    "antal":      ["mængde", "antal", "qty", "quantity"],
-    "omsætning":  ["total amount", "omsætning", "omsaetning", "total salg"],
+    "antal":      ["maengde", "mængde", "antal", "qty", "quantity"],
+    "omsaetning": ["total amount", "omsaetning", "omsætning", "total salg"],
     "kostpris":   ["cost of goods sold", "kostpris", "cost"],
     "avance":     ["gross profit", "avance", "profit"],
     "avance_pct": ["gross profit margin", "avance %", "avance%", "margin"],
@@ -19,10 +33,17 @@ KOLONNE_MAP = {
 
 def _find_col(headers: List[str], kandidater: List[str]) -> int:
     lower = [h.lower().strip() if h else "" for h in headers]
+    # 1. Eksakt match
     for k in kandidater:
         k_lower = k.lower().strip()
         for i, h in enumerate(lower):
-            if k_lower == h or k_lower in h or h in k_lower:
+            if k_lower == h:
+                return i
+    # 2. Kandidat er indeholdt i header
+    for k in kandidater:
+        k_lower = k.lower().strip()
+        for i, h in enumerate(lower):
+            if h and k_lower in h:
                 return i
     return -1
 
@@ -48,11 +69,47 @@ def _dato(val) -> str | None:
     return None
 
 
-def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
-    if not alle_rækker:
-        return []
+def _er_shopbox_pipe_format(headers: List[str]) -> bool:
+    joined = "|".join(h.lower() for h in headers)
+    return "item name" in joined and "total amount" in joined and "dato" in joined
 
-    # Find header-rækken
+
+def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
+    """Parser med kendte Shopbox kolonnepositioner."""
+    col = SHOPBOX_PIPE_COLS
+    transaktioner = []
+
+    for row in alle_rækker:
+        if not row or len(row) <= col["dato"]:
+            continue
+
+        varenavn = str(row[col["varenavn"]]).strip() if row[col["varenavn"]] else ""
+        dato     = _dato(row[col["dato"]])
+
+        if not varenavn or not dato:
+            continue
+
+        # Spring header-rækken over
+        if varenavn.lower() in ("item name", "varenavn"):
+            continue
+
+        transaktioner.append({
+            "dato":       dato,
+            "varenummer": str(row[col["varenummer"]]).strip(),
+            "varenavn":   varenavn,
+            "kategori":   str(row[col["kategori"]]).strip(),
+            "antal":      _tal(row[col["antal"]]),
+            "omsætning":  _tal(row[col["omsaetning"]]),
+            "kostpris":   _tal(row[col["kostpris"]]),
+            "avance":     _tal(row[col["avance"]]),
+            "avance_pct": _tal(row[col["avance_pct"]]),
+        })
+
+    return transaktioner
+
+
+def _parse_rækker_generisk(alle_rækker: List[List]) -> List[Dict[str, Any]]:
+    """Generisk parser med automatisk kolonnedetektion."""
     header_idx = 0
     for i, row in enumerate(alle_rækker):
         if sum(1 for c in row if c and str(c).strip()) >= 3:
@@ -61,10 +118,6 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 
     headers = [str(c).strip() if c else "" for c in alle_rækker[header_idx]]
     col = {felt: _find_col(headers, kandidater) for felt, kandidater in KOLONNE_MAP.items()}
-
-    print(f"[DEBUG] Kolonner fundet: { {k:v for k,v in col.items() if v >= 0} }")
-    if len(alle_rækker) > header_idx + 1:
-        print(f"[DEBUG] Første datarække: {alle_rækker[header_idx + 1]}")
 
     transaktioner = []
     for row in alle_rækker[header_idx + 1:]:
@@ -76,13 +129,9 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             return row[idx] if 0 <= idx < len(row) else default
 
         varenavn  = str(get("varenavn", "")).strip()
-        omsætning = _tal(get("omsætning"))
-        dato_rå   = get("dato")
-        dato      = _dato(dato_rå)
+        dato      = _dato(get("dato"))
 
         if not varenavn or not dato:
-            if len(transaktioner) == 0:
-                print(f"[DEBUG] Filtreret: varenavn={repr(varenavn)} dato_rå={repr(dato_rå)} dato={dato}")
             continue
 
         transaktioner.append({
@@ -91,7 +140,7 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "varenavn":   varenavn,
             "kategori":   str(get("kategori", "")).strip(),
             "antal":      _tal(get("antal")),
-            "omsætning":  omsætning,
+            "omsætning":  _tal(get("omsaetning")),
             "kostpris":   _tal(get("kostpris")),
             "avance":     _tal(get("avance")),
             "avance_pct": _tal(get("avance_pct")),
@@ -103,7 +152,8 @@ def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 def _parse_xlsx(file_bytes: bytes) -> List[Dict[str, Any]]:
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     ws = wb.active
-    return _parse_rækker([list(row) for row in ws.iter_rows(values_only=True)])
+    rows = [list(row) for row in ws.iter_rows(values_only=True)]
+    return _parse_rækker_generisk(rows)
 
 
 def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
@@ -126,9 +176,26 @@ def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
     else:
         sep = ";"
 
-    reader    = csv.reader(io.StringIO(tekst), delimiter=sep)
+    reader      = csv.reader(io.StringIO(tekst), delimiter=sep)
     alle_rækker = [[cell.strip() for cell in row] for row in reader]
-    return _parse_rækker(alle_rækker)
+
+    if not alle_rækker:
+        return []
+
+    # Find header-rækken
+    header_idx = 0
+    for i, row in enumerate(alle_rækker):
+        if sum(1 for c in row if c and str(c).strip()) >= 3:
+            header_idx = i
+            break
+
+    headers = alle_rækker[header_idx]
+
+    if sep == "|" and _er_shopbox_pipe_format(headers):
+        print(f"[INFO] Shopbox pipe-format detekteret, bruger kendte kolonnepositioner")
+        return _parse_rækker_shopbox(alle_rækker[header_idx + 1:])
+
+    return _parse_rækker_generisk(alle_rækker)
 
 
 def parse_shopbox_xlsx(file_bytes: bytes) -> List[Dict[str, Any]]:

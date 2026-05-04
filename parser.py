@@ -1,16 +1,19 @@
 import io
 import csv
+from datetime import datetime
 from typing import List, Dict, Any
 import openpyxl
 
 KOLONNE_MAP = {
-    "varenummer": ["varenr", "varenr.", "varenummer", "item no", "sku"],
-    "varenavn":   ["varenavn", "varebetegnelse", "betegnelse", "navn", "description"],
-    "antal":      ["antal", "qty", "quantity", "solgt antal"],
-    "omsætning":  ["omsætning", "omsaetning", "salgspris", "salg i alt", "revenue"],
-    "kostpris":   ["kostpris", "kost", "kostbeløb", "cost"],
-    "avance":     ["avance", "profit", "db", "dækningsbidrag"],
-    "avance_pct": ["avance %", "avance%", "avanceprocent", "db %", "margin"],
+    "varenummer": ["item sku code", "item sku", "varenr", "varenummer", "sku"],
+    "varenavn":   ["item name", "varenavn", "varebetegnelse", "navn"],
+    "antal":      ["mængde", "antal", "qty", "quantity"],
+    "omsætning":  ["total amount", "omsætning", "omsaetning", "total salg"],
+    "kostpris":   ["cost of goods sold", "kostpris", "cost"],
+    "avance":     ["gross profit", "avance", "profit"],
+    "avance_pct": ["gross profit margin", "avance %", "avance%", "margin"],
+    "dato":       ["dato", "date"],
+    "kategori":   ["category name", "kategori", "category"],
 }
 
 
@@ -28,32 +31,40 @@ def _tal(val) -> float:
     if val is None:
         return 0.0
     try:
-        return float(str(val).replace(",", ".").replace(" ", "").replace("\xa0", "").replace("\t", ""))
+        return float(str(val).replace(",", ".").replace(" ", "").replace("\xa0", "").strip())
     except (ValueError, TypeError):
         return 0.0
 
 
-def _rækker_til_produkter(alle_rækker: List[List[str]]) -> List[Dict[str, Any]]:
+def _dato(val) -> str | None:
+    if not val:
+        return None
+    s = str(val).strip()
+    for fmt in ("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(s[:10], fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_rækker(alle_rækker: List[List]) -> List[Dict[str, Any]]:
     if not alle_rækker:
         return []
 
-    # Find header-rækken (første række med mindst 3 ikke-tomme celler)
+    # Find header-rækken
     header_idx = 0
     for i, row in enumerate(alle_rækker):
         if sum(1 for c in row if c and str(c).strip()) >= 3:
             header_idx = i
             break
 
-    headers = [str(c).strip() if c is not None else "" for c in alle_rækker[header_idx]]
+    headers = [str(c).strip() if c else "" for c in alle_rækker[header_idx]]
     col = {felt: _find_col(headers, kandidater) for felt, kandidater in KOLONNE_MAP.items()}
 
-    produkter = []
+    transaktioner = []
     for row in alle_rækker[header_idx + 1:]:
         if not row or sum(1 for c in row if c and str(c).strip()) < 2:
-            continue
-
-        første = str(row[0]).lower().strip() if row[0] else ""
-        if any(w in første for w in ["total", "i alt", "sum", "subtotal"]):
             continue
 
         def get(felt: str, default=""):
@@ -62,13 +73,16 @@ def _rækker_til_produkter(alle_rækker: List[List[str]]) -> List[Dict[str, Any]
 
         varenavn  = str(get("varenavn", "")).strip()
         omsætning = _tal(get("omsætning"))
+        dato      = _dato(get("dato"))
 
-        if not varenavn and omsætning == 0:
+        if not varenavn or not dato:
             continue
 
-        produkter.append({
+        transaktioner.append({
+            "dato":       dato,
             "varenummer": str(get("varenummer", "")).strip(),
             "varenavn":   varenavn,
+            "kategori":   str(get("kategori", "")).strip(),
             "antal":      _tal(get("antal")),
             "omsætning":  omsætning,
             "kostpris":   _tal(get("kostpris")),
@@ -76,18 +90,16 @@ def _rækker_til_produkter(alle_rækker: List[List[str]]) -> List[Dict[str, Any]
             "avance_pct": _tal(get("avance_pct")),
         })
 
-    return produkter
+    return transaktioner
 
 
 def _parse_xlsx(file_bytes: bytes) -> List[Dict[str, Any]]:
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True)
     ws = wb.active
-    alle_rækker = [list(row) for row in ws.iter_rows(values_only=True)]
-    return _rækker_til_produkter(alle_rækker)
+    return _parse_rækker([list(row) for row in ws.iter_rows(values_only=True)])
 
 
 def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
-    # Prøv UTF-8 med BOM, derefter latin-1
     for encoding in ("utf-8-sig", "utf-8", "latin-1"):
         try:
             tekst = file_bytes.decode(encoding)
@@ -95,19 +107,24 @@ def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
         except UnicodeDecodeError:
             continue
 
-    # Detekter separator (tab eller semikolon eller komma)
     sample = tekst[:2000]
-    tabs   = sample.count("\t")
-    semis  = sample.count(";")
-    sep    = "\t" if tabs >= semis else ";"
+    pipes = sample.count("|")
+    tabs  = sample.count("\t")
+    semis = sample.count(";")
 
-    reader = csv.reader(io.StringIO(tekst), delimiter=sep)
-    alle_rækker = [row for row in reader]
-    return _rækker_til_produkter(alle_rækker)
+    if pipes >= max(tabs, semis) and pipes > 5:
+        sep = "|"
+    elif tabs >= semis:
+        sep = "\t"
+    else:
+        sep = ";"
+
+    reader    = csv.reader(io.StringIO(tekst), delimiter=sep)
+    alle_rækker = [[cell.strip() for cell in row] for row in reader]
+    return _parse_rækker(alle_rækker)
 
 
 def parse_shopbox_xlsx(file_bytes: bytes) -> List[Dict[str, Any]]:
-    # Forsøg xlsx først, derefter txt/csv
     try:
         return _parse_xlsx(file_bytes)
     except Exception:

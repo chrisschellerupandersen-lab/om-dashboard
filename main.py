@@ -129,22 +129,14 @@ async def opdater_rapport(request: Request):
     rapport_dato = dato_str[:10]
 
     try:
-        fil_bytes = base64.b64decode(encoded)
+        fil_bytes     = base64.b64decode(encoded)
+        transaktioner = xlsx_parser.parse_shopbox_xlsx(fil_bytes)
 
-        # Log første 300 tegn så vi kan se filformatet i Railway logs
-        try:
-            preview = fil_bytes.decode("utf-8-sig", errors="replace")[:300]
-        except Exception:
-            preview = repr(fil_bytes[:100])
-        print(f"[DEBUG] Fil preview: {preview}")
+        if not transaktioner:
+            raise HTTPException(status_code=422, detail="Ingen transaktioner fundet i filen")
 
-        produkter = xlsx_parser.parse_shopbox_xlsx(fil_bytes)
-
-        if not produkter:
-            raise HTTPException(status_code=422, detail="Ingen produkter fundet i filen")
-
-        snapshot_id = database.gem_snapshot(rapport_dato, produkter)
-        return {"ok": True, "snapshot_id": snapshot_id, "rækker": len(produkter), "dato": rapport_dato}
+        upload_id = database.gem_transaktioner(rapport_dato, transaktioner)
+        return {"ok": True, "upload_id": upload_id, "rækker": len(transaktioner), "dato": rapport_dato}
 
     except HTTPException:
         raise

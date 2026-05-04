@@ -17,74 +17,76 @@ def _conn() -> sqlite3.Connection:
 def init_db():
     with _conn() as conn:
         conn.executescript("""
-            CREATE TABLE IF NOT EXISTS snapshots (
+            CREATE TABLE IF NOT EXISTS uploads (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                indlæst_dato TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-                rapport_dato TEXT    NOT NULL
+                indlæst_dato TEXT    DEFAULT (datetime('now', 'localtime')),
+                rapport_dato TEXT
             );
 
-            CREATE TABLE IF NOT EXISTS produkter (
+            CREATE TABLE IF NOT EXISTS transaktioner (
                 id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                snapshot_id INTEGER NOT NULL,
+                dato        TEXT    NOT NULL,
                 varenummer  TEXT    DEFAULT '',
                 varenavn    TEXT    DEFAULT '',
+                kategori    TEXT    DEFAULT '',
                 antal       REAL    DEFAULT 0,
                 omsætning   REAL    DEFAULT 0,
                 kostpris    REAL    DEFAULT 0,
                 avance      REAL    DEFAULT 0,
-                avance_pct  REAL    DEFAULT 0,
-                FOREIGN KEY (snapshot_id) REFERENCES snapshots(id)
+                avance_pct  REAL    DEFAULT 0
             );
 
-            CREATE INDEX IF NOT EXISTS idx_produkter_snapshot ON produkter(snapshot_id);
-            CREATE INDEX IF NOT EXISTS idx_snapshots_dato     ON snapshots(rapport_dato);
+            CREATE INDEX IF NOT EXISTS idx_trans_dato ON transaktioner(dato);
+            CREATE INDEX IF NOT EXISTS idx_trans_vare ON transaktioner(varenavn);
         """)
 
 
-def gem_snapshot(rapport_dato: str, produkter: List[Dict]) -> int:
+def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
     with _conn() as conn:
+        # Filen er kumulativ fra startdato — erstat alt eksisterende data
+        conn.execute("DELETE FROM transaktioner")
+        conn.execute("DELETE FROM uploads")
+
         cur = conn.execute(
-            "INSERT INTO snapshots (rapport_dato) VALUES (?)",
+            "INSERT INTO uploads (rapport_dato) VALUES (?)",
             (rapport_dato,)
         )
-        snapshot_id = cur.lastrowid
+        upload_id = cur.lastrowid
 
         conn.executemany("""
-            INSERT INTO produkter
-                (snapshot_id, varenummer, varenavn, antal, omsætning, kostpris, avance, avance_pct)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO transaktioner
+                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
-                snapshot_id,
-                p.get("varenummer", ""),
-                p.get("varenavn", ""),
-                p.get("antal", 0),
-                p.get("omsætning", 0),
-                p.get("kostpris", 0),
-                p.get("avance", 0),
-                p.get("avance_pct", 0),
+                t["dato"],
+                t.get("varenummer", ""),
+                t.get("varenavn", ""),
+                t.get("kategori", ""),
+                t.get("antal", 0),
+                t.get("omsætning", 0),
+                t.get("kostpris", 0),
+                t.get("avance", 0),
+                t.get("avance_pct", 0),
             )
-            for p in produkter
+            for t in transaktioner
         ])
 
-    return snapshot_id
+    return upload_id
 
 
 def hent_seneste_snapshot_info() -> Optional[Dict]:
     with _conn() as conn:
         row = conn.execute(
-            "SELECT id, rapport_dato, indlæst_dato FROM snapshots ORDER BY id DESC LIMIT 1"
+            "SELECT id, rapport_dato, indlæst_dato FROM uploads ORDER BY id DESC LIMIT 1"
         ).fetchone()
     return dict(row) if row else None
 
 
 def hent_dashboard_data() -> Dict:
     with _conn() as conn:
-        snapshots = conn.execute(
-            "SELECT id, rapport_dato FROM snapshots ORDER BY id ASC"
-        ).fetchall()
-
-        if not snapshots:
+        count = conn.execute("SELECT COUNT(*) FROM transaktioner").fetchone()[0]
+        if count == 0:
             return {
                 "daglig_omsætning": [],
                 "top_produkter": [],
@@ -92,67 +94,70 @@ def hent_dashboard_data() -> Dict:
                 "senest_opdateret": None,
             }
 
-        # Daglige deltas: hvert snapshot er kumulativt fra startdato → rapport_dato
-        daglig = []
-        forrige_total = 0.0
+        # Daglig omsætning — direkte fra transaktionsdatoer
+        daglig = conn.execute("""
+            SELECT dato, SUM(omsætning) AS omsætning
+            FROM   transaktioner
+            GROUP  BY dato
+            ORDER  BY dato ASC
+        """).fetchall()
 
-        for snap in snapshots:
-            total = conn.execute(
-                "SELECT COALESCE(SUM(omsætning), 0) FROM produkter WHERE snapshot_id = ?",
-                (snap["id"],)
-            ).fetchone()[0]
-
-            delta = max(0.0, total - forrige_total)
-            daglig.append({"dato": snap["rapport_dato"], "omsætning": round(delta, 2)})
-            forrige_total = total
-
-        seneste_id = snapshots[-1]["id"]
-
-        # Top 10 produkter fra seneste snapshot
+        # Top 10 produkter
         top = conn.execute("""
             SELECT varenavn,
                    SUM(omsætning) AS total_omsætning,
                    SUM(antal)     AS total_antal
-            FROM   produkter
-            WHERE  snapshot_id = ?
+            FROM   transaktioner
             GROUP  BY varenavn
             ORDER  BY total_omsætning DESC
             LIMIT  10
-        """, (seneste_id,)).fetchall()
+        """).fetchall()
 
-        # Totaler fra seneste snapshot til KPI
+        # Seneste dag
+        seneste_dato = conn.execute(
+            "SELECT MAX(dato) FROM transaktioner"
+        ).fetchone()[0]
+
+        seneste_dag_omsætning = conn.execute(
+            "SELECT COALESCE(SUM(omsætning), 0) FROM transaktioner WHERE dato = ?",
+            (seneste_dato,)
+        ).fetchone()[0]
+
+        # Totaler
         totaler = conn.execute("""
-            SELECT COALESCE(SUM(omsætning), 0) AS omsætning,
-                   COALESCE(SUM(avance),    0) AS avance,
-                   COUNT(*)                    AS antal_varer
-            FROM   produkter
-            WHERE  snapshot_id = ?
-        """, (seneste_id,)).fetchone()
+            SELECT COALESCE(SUM(omsætning), 0)        AS omsætning,
+                   COALESCE(SUM(avance),    0)        AS avance,
+                   COUNT(DISTINCT varenavn)           AS antal_varer
+            FROM   transaktioner
+        """).fetchone()
 
         avance_pct = 0.0
         if totaler["omsætning"] > 0:
             avance_pct = (totaler["avance"] / totaler["omsætning"]) * 100
 
-        senest_opdateret = conn.execute(
-            "SELECT indlæst_dato FROM snapshots ORDER BY id DESC LIMIT 1"
-        ).fetchone()["indlæst_dato"]
+        senest = conn.execute(
+            "SELECT indlæst_dato FROM uploads ORDER BY id DESC LIMIT 1"
+        ).fetchone()
 
     return {
-        "daglig_omsætning": daglig,
+        "daglig_omsætning": [
+            {"dato": r["dato"], "omsætning": round(r["omsætning"], 2)}
+            for r in daglig
+        ],
         "top_produkter": [
             {
-                "varenavn":  row["varenavn"] or "Ukendt",
-                "omsætning": round(row["total_omsætning"], 2),
-                "antal":     round(row["total_antal"], 1),
+                "varenavn":  r["varenavn"] or "Ukendt",
+                "omsætning": round(r["total_omsætning"], 2),
+                "antal":     round(r["total_antal"], 1),
             }
-            for row in top
+            for r in top
         ],
         "kpi": {
-            "seneste_dag_omsætning": daglig[-1]["omsætning"] if daglig else 0,
+            "seneste_dag_omsætning": round(seneste_dag_omsætning, 2),
             "total_omsætning":       round(totaler["omsætning"], 2),
             "avance_pct":            round(avance_pct, 1),
             "antal_varer":           totaler["antal_varer"],
-            "seneste_rapport_dato":  snapshots[-1]["rapport_dato"],
+            "seneste_rapport_dato":  seneste_dato,
         },
-        "senest_opdateret": senest_opdateret,
+        "senest_opdateret": senest["indlæst_dato"] if senest else None,
     }

@@ -83,6 +83,14 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
     transaktioner = []
     min_cols = max(col.values()) + 1  # mindst 17 kolonner kræves
 
+    # Debug første datarække
+    if alle_rækker:
+        r = alle_rækker[0]
+        n0 = len(r)
+        v = repr(r[col["varenavn"]]) if n0 > col["varenavn"] else "N/A"
+        d = repr(r[n0 - DATO_FRA_SLUT]) if n0 >= DATO_FRA_SLUT else "N/A"
+        print(f"[DEBUG2] n={n0}, varenavn={v}, dato_ny={d}")
+
     for row in alle_rækker:
         n = len(row)
         if n < min_cols or n < DATO_FRA_SLUT + 1:

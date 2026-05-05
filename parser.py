@@ -17,9 +17,6 @@ SHOPBOX_PIPE_COLS = {
     "varenavn":   15,  # Item name:         header col 14 + 1 (før ExtRef)
     "varenummer": 16,  # Item Sku Code:     header col 15 + 1 (før ExtRef)
 }
-# Dato og kategori er EFTER ExtRef — brug position fra slutningen
-DATO_FRA_SLUT     = 2   # row[-2] = Dato
-KATEGORI_FRA_SLUT = 3   # row[-3] = Category name
 
 KOLONNE_MAP = {
     "varenummer": ["item sku code", "item sku", "varenr", "varenummer", "sku"],
@@ -78,44 +75,61 @@ def _er_shopbox_pipe_format(headers: List[str]) -> bool:
 
 
 def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
-    """Parser med Shopbox kolonnepositioner — fast for tal, relativt fra slutning for dato/kategori."""
+    """Parser med Shopbox kolonnepositioner.
+    Tal-kolonner: faste positioner. Dato/kategori: søges fra slutningen per række,
+    fordi External Reference kan indeholde variable antal | tegn.
+    """
     col = SHOPBOX_PIPE_COLS
     transaktioner = []
-    min_cols = max(col.values()) + 1  # mindst 17 kolonner kræves
-
-    # Debug første datarække
-    if alle_rækker:
-        r = alle_rækker[0]
-        n0 = len(r)
-        v = repr(r[col["varenavn"]]) if n0 > col["varenavn"] else "N/A"
-        d = repr(r[n0 - DATO_FRA_SLUT]) if n0 >= DATO_FRA_SLUT else "N/A"
-        print(f"[DEBUG2] n={n0}, varenavn={v}, dato_ny={d}")
+    min_cols = max(col.values()) + 1
 
     for row in alle_rækker:
         n = len(row)
-        if n < min_cols or n < DATO_FRA_SLUT + 1:
+        if n < min_cols:
             continue
 
         varenavn = str(row[col["varenavn"]]).strip() if row[col["varenavn"]] else ""
-        dato     = _dato(row[n - DATO_FRA_SLUT])
-
-        if not varenavn or not dato:
+        if not varenavn or varenavn.lower() in ("item name", "varenavn"):
             continue
 
-        if varenavn.lower() in ("item name", "varenavn"):
+        # Søg dato fra slutningen — springer tomme celler og tidsfelter over
+        dato = None
+        dato_idx = -1
+        for i in range(1, min(12, n)):
+            d = _dato(row[n - i])
+            if d is not None:
+                dato = d
+                dato_idx = n - i
+                break
+
+        if not dato:
             continue
+
+        # Kategori er feltet umiddelbart før dato i kolonnerækkefølgen
+        kategori = str(row[dato_idx - 1]).strip() if dato_idx > 0 else ""
 
         transaktioner.append({
             "dato":       dato,
             "varenummer": str(row[col["varenummer"]]).strip(),
             "varenavn":   varenavn,
-            "kategori":   str(row[n - KATEGORI_FRA_SLUT]).strip() if n >= KATEGORI_FRA_SLUT + 1 else "",
+            "kategori":   kategori,
             "antal":      _tal(row[col["antal"]]),
             "omsætning":  _tal(row[col["omsaetning"]]),
             "kostpris":   _tal(row[col["kostpris"]]),
             "avance":     _tal(row[col["avance"]]),
             "avance_pct": _tal(row[col["avance_pct"]]),
         })
+
+    print(f"[INFO] Shopbox parser: {len(transaktioner)} transaktioner parsed")
+    if transaktioner:
+        t0 = transaktioner[0]
+        print(f"[INFO] Første transaktion: dato={t0['dato']}, varenavn={repr(t0['varenavn'])}, kategori={repr(t0['kategori'])}")
+    else:
+        if alle_rækker:
+            for r in alle_rækker[:5]:
+                if len(r) >= min_cols and str(r[col["varenavn"]]).strip():
+                    print(f"[WARN] Ingen dato fundet i række: varenavn={repr(r[col['varenavn']])}, sidste 8: {r[-8:]}")
+                    break
 
     return transaktioner
 

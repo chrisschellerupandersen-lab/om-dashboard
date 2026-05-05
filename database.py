@@ -282,6 +282,44 @@ def hent_dage_detaljer(n: int = 8) -> List[Dict]:
     return result
 
 
+def hent_aarsdata(aar: int = None) -> Dict:
+    from datetime import datetime
+    if aar is None:
+        aar = datetime.now().year
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                CAST(strftime('%m', dato) AS INTEGER) AS maaned,
+                COUNT(DISTINCT dato)                   AS faktiske_dage,
+                ROUND(SUM(omsætning), 2)               AS omsaetning,
+                ROUND(SUM(kostpris),  2)               AS kostpris,
+                ROUND(SUM(avance),    2)               AS avance,
+                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+            FROM transaktioner
+            WHERE strftime('%Y', dato) = ?
+            GROUP BY maaned
+            ORDER BY maaned
+        """, (str(aar),)).fetchall()
+
+        seneste = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        base_row = None
+        if seneste:
+            base_row = conn.execute("""
+                SELECT
+                    ROUND(SUM(omsætning)/NULLIF(COUNT(DISTINCT dato),0), 2) AS kr_pr_dag,
+                    ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)      AS gpm
+                FROM transaktioner
+                WHERE dato >= date(?, '-28 days')
+            """, (seneste,)).fetchone()
+
+    return {
+        "aar":           aar,
+        "maaneder":      [dict(r) for r in rows],
+        "base_kr_pr_dag": base_row["kr_pr_dag"] if base_row else None,
+        "base_gpm":       base_row["gpm"]       if base_row else None,
+    }
+
+
 def hent_trend_analyse(periode_dage: int = 21) -> Dict:
     """Sammenlign seneste periode mod forrige periode (dagsnormaliseret)."""
     from datetime import datetime, timedelta

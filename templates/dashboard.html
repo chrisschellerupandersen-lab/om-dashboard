@@ -157,6 +157,55 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .dag-prod-antal{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
 .dag-prod-kr{font-family:'DM Mono',monospace;font-size:11px;font-weight:400;color:var(--forest);white-space:nowrap;text-align:right;min-width:52px;}
 
+/* SHARED: missing aliases used by dynamic panels */
+.tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.tbl th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
+.tbl td{padding:9px 12px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
+.tbl tr:last-child td{border-bottom:none;}
+.tbl tr:hover td{background:var(--cream);}
+.kpi-card{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
+.kpi-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
+.kpi-val{font-size:24px;font-weight:300;color:var(--forest);line-height:1;}
+.kpi-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
+
+/* ÅRSPLAN */
+.aar-pills{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+.aar-pill{font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border-radius:2px;border:1px solid rgba(30,58,30,.15);color:var(--ash);background:var(--white);}
+.aar-pill.ok{color:#2d5a2d;background:rgba(74,124,74,.08);border-color:rgba(74,124,74,.2);}
+.aar-pill.est{color:#7a5c00;background:rgba(200,168,75,.1);border-color:rgba(200,168,75,.25);}
+.aar-pill.warn{color:#9b3420;background:rgba(180,60,40,.07);border-color:rgba(180,60,40,.18);}
+.aar-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
+.aar-kpi-row .kpi-card:first-child{background:var(--forest);border-color:var(--forest);}
+.aar-kpi-row .kpi-card:first-child .kpi-label{color:rgba(200,168,75,.7);}
+.aar-kpi-row .kpi-card:first-child .kpi-val{color:var(--amber);font-size:30px;}
+.aar-kpi-row .kpi-card:first-child .kpi-sub{color:rgba(255,255,255,.5);}
+.aar-kpi-row .kpi-card:last-child{border-color:var(--amber);}
+.aar-kpi-row .kpi-card:last-child .kpi-val{color:var(--amber);}
+.aar-cfg{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;margin-bottom:18px;overflow:hidden;}
+.aar-cfg-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;user-select:none;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);}
+.aar-cfg-hdr:hover{background:var(--cream);}
+.aar-cfg-body{padding:16px 18px 14px;border-top:1px solid rgba(30,58,30,.08);}
+.aar-cfg-main{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.aar-cfg-lbl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
+.aar-cfg-inp{width:100%;border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:6px 8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--charcoal);background:var(--parchment);box-sizing:border-box;}
+.aar-cfg-inp:focus{outline:none;border-color:var(--forest);}
+.aar-saeson-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
+.aar-saeson-cell{text-align:center;}
+.aar-saeson-cell label{font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);display:block;margin-bottom:2px;}
+.aar-saeson-cell input{width:100%;border:1px solid rgba(30,58,30,.15);border-radius:2px;padding:4px 4px;font-family:'DM Mono',monospace;font-size:11px;text-align:center;background:var(--parchment);color:var(--charcoal);box-sizing:border-box;}
+.aar-saeson-cell input:focus{outline:none;border-color:var(--forest);}
+.aar-tbl{width:100%;border-collapse:collapse;font-size:13px;}
+.aar-tbl th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:9px 12px;border-bottom:2px solid rgba(30,58,30,.15);text-align:left;background:var(--parchment);}
+.aar-tbl th.num{text-align:right;}
+.aar-tbl td{padding:10px 12px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
+.aar-tbl tr.est-row td{color:var(--charcoal);opacity:.85;}
+.aar-tbl tfoot td{padding:11px 12px;border-top:2px solid rgba(30,58,30,.15);border-bottom:none;background:rgba(30,58,30,.03);}
+.aar-tbl tr:hover td{background:var(--cream);}
+.faktisk-badge{display:inline-block;background:var(--forest);color:var(--amber);font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;padding:2px 8px;border-radius:2px;}
+.ok-tag{font-family:'DM Mono',monospace;font-size:8px;color:var(--moss);margin-left:4px;vertical-align:middle;}
+.saeson-factor{font-family:'DM Mono',monospace;font-size:12px;color:var(--ash);}
+.aar-note{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);padding:12px 0 0;line-height:1.7;border-top:1px solid rgba(30,58,30,.08);margin-top:8px;}
+
 /* TREND PANEL */
 .saeson-banner{display:flex;align-items:center;gap:12px;background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.25);border-radius:3px;padding:12px 16px;margin-bottom:20px;font-size:13px;}
 .saeson-icon{font-size:22px;line-height:1;}
@@ -254,6 +303,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="nav-item" onclick="showPanel('dagedetaljer',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
         Dage · produkter
+      </div>
+
+      <div class="nav-group-label" style="margin-top:12px;">Økonomi</div>
+      <div class="nav-item" onclick="showPanel('aar',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 14V5l6-4 6 4v9H2zm5-1h2V9H7v4zm-3 0h2v-3H4v3zm6 0h2v-3h-2v3z"/></svg>
+        Årsplan
       </div>
 
       <div class="nav-group-label" style="margin-top:12px;">Specialrapporter</div>
@@ -453,6 +508,62 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div style="overflow-x:auto;">
           <div class="dag-grid" id="dag-grid" style="align-items:start;"></div>
+        </div>
+      </div>
+
+      <!-- ÅRSPLAN -->
+      <div class="panel" id="p-aar">
+        <div class="page-hdr">
+          <h2 id="aar-titel">Årsplan — Omsætning, DB og Resultat</h2>
+          <p>Faktiske måneder kombineret med sæsonbaserede estimater</p>
+        </div>
+        <div id="aar-no-data" class="empty" style="display:none;">Ingen data — upload en rapport først</div>
+        <div id="aar-content">
+          <!-- Konfiguration -->
+          <div class="aar-cfg">
+            <div class="aar-cfg-hdr" onclick="toggleAarCfg()">
+              <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;opacity:.5;"><path d="M7 1h2l.5 2 1.5.9 2-.5 1 2-1.5 1.4v1.4L14 9.6l-1 2-2-.5-1.5.9L9 14H7l-.5-2-1.5-.9-2 .5-1-2 1.5-1.4V7.2L2 5.8l1-2 2 .5 1.5-.9L7 1zm1 4a3 3 0 100 6 3 3 0 000-6z"/></svg>
+              Indstillinger &amp; sæsonfaktorer
+              <span id="aar-cfg-arrow" style="margin-left:auto;">▶</span>
+            </div>
+            <div class="aar-cfg-body" id="aar-cfg-body" style="display:none;">
+              <div class="aar-cfg-main">
+                <div><div class="aar-cfg-lbl">Basisrate (kr/dag)</div><input class="aar-cfg-inp" id="cfg-base" type="number" min="0" step="100" oninput="recalcAar()"></div>
+                <div><div class="aar-cfg-lbl">Vækst %</div><input class="aar-cfg-inp" id="cfg-vaekst" type="number" min="-50" max="200" step="0.5" oninput="recalcAar()"></div>
+                <div><div class="aar-cfg-lbl">GPM estimat %</div><input class="aar-cfg-inp" id="cfg-gpm" type="number" min="0" max="100" step="0.1" oninput="recalcAar()"></div>
+                <div><div class="aar-cfg-lbl">Faste omk. kr/mdr</div><input class="aar-cfg-inp" id="cfg-faste" type="number" min="0" step="500" oninput="recalcAar()"></div>
+              </div>
+              <div class="aar-cfg-lbl" style="margin-bottom:8px;">Sæsonfaktorer — relativ til basisrate (Sep=1.00 er typisk neutral)</div>
+              <div class="aar-saeson-grid" id="aar-saeson-grid"></div>
+            </div>
+          </div>
+          <!-- Pills -->
+          <div class="aar-pills" id="aar-pills"></div>
+          <!-- KPI -->
+          <div class="aar-kpi-row" id="aar-kpi-row"></div>
+          <!-- Tabel -->
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div style="padding:16px 22px 12px;border-bottom:1px solid rgba(30,58,30,.08);">
+              <span style="font-size:10px;font-family:'DM Mono',monospace;color:var(--ash);letter-spacing:.1em;text-transform:uppercase;">01 &nbsp;</span>
+              <span id="aar-tbl-titel" style="font-size:16px;font-weight:300;color:var(--charcoal);">Komplet årsplan — Omsætning, DB og Resultat</span>
+            </div>
+            <table class="aar-tbl" id="aar-tbl">
+              <thead><tr>
+                <th>Måned</th>
+                <th class="num">Dage</th>
+                <th>SI/TYPE</th>
+                <th class="num">Total omsat</th>
+                <th class="num">Varekøb</th>
+                <th class="num">DB</th>
+                <th class="num">GPM</th>
+                <th class="num">Faste omk.</th>
+                <th class="num">Resultat</th>
+              </tr></thead>
+              <tbody id="aar-tbody"></tbody>
+              <tfoot id="aar-tfoot"></tfoot>
+            </table>
+            <div class="aar-note" id="aar-note" style="padding:12px 22px 14px;border-top:1px solid rgba(30,58,30,.08);margin:0;"></div>
+          </div>
         </div>
       </div>
 
@@ -894,6 +1005,173 @@ function setDageN(n, el) {
   loadDageDetaljer(n);
 }
 
+// ── ÅRSPLAN ───────────────────────────────────────────────────────────────────
+const AAR_MND_NAVNE = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
+const AAR_MND_KORT  = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+const AAR_DEFAULT_SAESON = [0.93,0.88,0.95,0.97,1.12,1.15,1.08,1.10,1.00,0.97,0.95,1.85];
+
+let _aarLoaded = false;
+let _aarRaw    = null;
+let _aarCfg    = null;
+
+function isLeapYear(y){ return (y%4===0&&y%100!==0)||y%400===0; }
+function mndDage(y,m){ return [31,isLeapYear(y)?29:28,31,30,31,30,31,31,30,31,30,31][m-1]; }
+
+function defaultAarCfg(base, gpm) {
+  return {
+    base:   Math.round(base||5000),
+    vaekst: 0,
+    gpm:    gpm ? Math.round(gpm*10)/10 : 35.4,
+    faste:  12150,
+    saeson: [...AAR_DEFAULT_SAESON],
+  };
+}
+
+async function loadAar() {
+  if (_aarLoaded) return;
+  _aarLoaded = true;
+  document.getElementById('aar-tbody').innerHTML =
+    '<tr><td colspan="9" style="padding:28px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
+  const data = await api('/api/salg/aarsdata');
+  if (!data) return;
+  _aarRaw = data;
+  const saved = localStorage.getItem('aar_cfg_v2');
+  _aarCfg = saved ? JSON.parse(saved) : defaultAarCfg(data.base_kr_pr_dag, data.base_gpm);
+  buildAarInputs();
+  buildAar();
+}
+
+function buildAarInputs() {
+  const c = _aarCfg;
+  document.getElementById('cfg-base').value   = c.base;
+  document.getElementById('cfg-vaekst').value = c.vaekst;
+  document.getElementById('cfg-gpm').value    = c.gpm;
+  document.getElementById('cfg-faste').value  = c.faste;
+  document.getElementById('aar-saeson-grid').innerHTML = AAR_MND_KORT.map((mn,i) =>
+    `<div class="aar-saeson-cell">
+       <label>${mn}</label>
+       <input type="number" step="0.01" min="0" max="5" id="cfg-s${i+1}" value="${c.saeson[i]}" oninput="recalcAar()">
+     </div>`
+  ).join('');
+}
+
+function recalcAar() {
+  _aarCfg = {
+    base:   parseFloat(document.getElementById('cfg-base').value)   || 5000,
+    vaekst: parseFloat(document.getElementById('cfg-vaekst').value) || 0,
+    gpm:    parseFloat(document.getElementById('cfg-gpm').value)    || 35.4,
+    faste:  parseFloat(document.getElementById('cfg-faste').value)  || 0,
+    saeson: Array.from({length:12}, (_,i) => parseFloat(document.getElementById('cfg-s'+(i+1))?.value) || 1),
+  };
+  localStorage.setItem('aar_cfg_v2', JSON.stringify(_aarCfg));
+  buildAar();
+}
+
+function toggleAarCfg() {
+  const body = document.getElementById('aar-cfg-body');
+  const arrow = document.getElementById('aar-cfg-arrow');
+  const open = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  arrow.textContent  = open ? '▼' : '▶';
+}
+
+function buildAar() {
+  const d = _aarRaw; const c = _aarCfg; const aar = d.aar;
+  if (!d.maaneder) { document.getElementById('aar-no-data').style.display=''; document.getElementById('aar-content').style.display='none'; return; }
+  document.getElementById('aar-no-data').style.display='none';
+  document.getElementById('aar-content').style.display='';
+  document.getElementById('aar-titel').textContent = `Årsplan ${aar} — Omsætning, DB og Resultat`;
+  document.getElementById('aar-tbl-titel').textContent = `Komplet ${aar} — Omsætning, DB og Resultat`;
+
+  const faktisk = {};
+  d.maaneder.forEach(m => faktisk[m.maaned] = m);
+
+  // Build all 12 months
+  const maaneder = Array.from({length:12}, (_,i) => {
+    const m = i+1, dage = mndDage(aar, m);
+    if (faktisk[m]) {
+      const f = faktisk[m];
+      return { m, dage, faktDage:f.faktiske_dage, type:'faktisk',
+               omsat:f.omsaetning, kost:f.kostpris, avance:f.avance, gpm:f.gpm,
+               faste:c.faste, res:f.avance - c.faste };
+    }
+    const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
+    const avance = Math.round(omsat * c.gpm / 100);
+    return { m, dage, type:'estimat', sf:c.saeson[i],
+             omsat, kost:omsat-avance, avance, gpm:c.gpm,
+             faste:c.faste, res:avance - c.faste };
+  });
+
+  const totOmsat  = maaneder.reduce((s,r) => s+r.omsat,  0);
+  const totAvance = maaneder.reduce((s,r) => s+r.avance, 0);
+  const totRes    = maaneder.reduce((s,r) => s+r.res,    0);
+  const totKost   = maaneder.reduce((s,r) => s+r.kost,   0);
+  const fMaaneder = maaneder.filter(r => r.type==='faktisk');
+  const fOmsat    = fMaaneder.reduce((s,r) => s+r.omsat,  0);
+  const fAvance   = fMaaneder.reduce((s,r) => s+r.avance, 0);
+  const faktGPM   = fOmsat > 0 ? fAvance/fOmsat*100 : null;
+  const stoerste  = [...maaneder].sort((a,b) => b.res-a.res)[0];
+  const svageste  = [...maaneder].sort((a,b) => a.res-b.res)[0];
+
+  // Pills
+  const gpmDiff = faktGPM != null ? faktGPM - c.gpm : null;
+  document.getElementById('aar-pills').innerHTML = [
+    faktGPM != null ? `<div class="aar-pill ok">Faktisk GPM: ${faktGPM.toFixed(1)}%</div>` : '',
+    `<div class="aar-pill est">Est. GPM: ${c.gpm.toFixed(1)}%</div>`,
+    gpmDiff != null ? `<div class="aar-pill ${Math.abs(gpmDiff)<2?'ok':'warn'}">Forskel: ${gpmDiff>=0?'+':''}${gpmDiff.toFixed(1)}%</div>` : '',
+    fMaaneder.length > 0 ? `<div class="aar-pill ok">✓ ${fMaaneder.length} ${fMaaneder.length===1?'måned':'måneder'} faktisk</div>` : '',
+  ].join('');
+
+  // KPI
+  const dk = v => Math.round(v).toLocaleString('da-DK');
+  document.getElementById('aar-kpi-row').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Total omsat ${aar}</div><div class="kpi-val">${Math.round(totOmsat/1000)}t</div><div class="kpi-sub">kr hele året</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total DB ${aar}</div><div class="kpi-val">${Math.round(totAvance/1000)}t</div><div class="kpi-sub">kr dækning · ${(totAvance/totOmsat*100).toFixed(1)}%</div></div>
+    <div class="kpi-card"><div class="kpi-label">Total resultat ${aar}</div><div class="kpi-val">${Math.round(totRes/1000)}t</div><div class="kpi-sub">kr efter faste omk.</div></div>
+    <div class="kpi-card"><div class="kpi-label">Faktisk bekræftet</div><div class="kpi-val">${Math.round(fOmsat/1000)}t</div><div class="kpi-sub">kr · ${fMaaneder.length} mdr. faktisk</div></div>
+    <div class="kpi-card"><div class="kpi-label">Bedste måned</div><div class="kpi-val" style="font-size:20px;">${AAR_MND_NAVNE[stoerste.m-1]}</div><div class="kpi-sub">${dk(stoerste.res)} kr resultat</div></div>
+    <div class="kpi-card"><div class="kpi-label">Svageste måned</div><div class="kpi-val" style="font-size:20px;">${AAR_MND_NAVNE[svageste.m-1]}</div><div class="kpi-sub">${dk(svageste.res)} kr resultat</div></div>`;
+
+  // Table rows
+  document.getElementById('aar-tbody').innerHTML = maaneder.map(r => {
+    const res = Math.round(r.res);
+    const resCls = res >= 30000 ? '#2d5a2d' : res >= 0 ? '#c8a84b' : '#9b3420';
+    const typeTd = r.type==='faktisk'
+      ? `<span class="faktisk-badge">faktisk</span>`
+      : `<span class="saeson-factor">${r.sf.toFixed(2)}</span>`;
+    const okTag = r.type==='faktisk' ? ' <span class="ok-tag">ok</span>' : '';
+    return `<tr class="${r.type==='estimat'?'est-row':''}">
+      <td><strong>${AAR_MND_NAVNE[r.m-1]}</strong>${okTag}</td>
+      <td class="num">${r.dage}</td>
+      <td>${typeTd}</td>
+      <td class="num">${dk(r.omsat)} kr</td>
+      <td class="num" style="color:var(--ash);">${dk(r.kost)} kr</td>
+      <td class="num">${dk(r.avance)} kr</td>
+      <td class="num">${r.gpm!=null ? r.gpm.toFixed(1)+'%' : '—'}</td>
+      <td class="num" style="color:var(--ash);">${dk(r.faste)} kr</td>
+      <td class="num" style="color:${resCls};font-weight:400;">${dk(res)} kr</td>
+    </tr>`;
+  }).join('');
+
+  // Total row
+  const totResCls = totRes >= 0 ? '#2d5a2d' : '#9b3420';
+  document.getElementById('aar-tfoot').innerHTML = `<tr>
+    <td><strong>TOTAL ${aar}</strong></td>
+    <td></td><td></td>
+    <td class="num"><strong>${dk(totOmsat)} kr</strong></td>
+    <td></td>
+    <td class="num"><strong>${dk(totAvance)} kr</strong></td>
+    <td class="num">${(totAvance/totOmsat*100).toFixed(1)}%</td>
+    <td></td>
+    <td class="num"><strong style="color:${totResCls};">${dk(totRes)} kr</strong></td>
+  </tr>`;
+
+  // Note
+  const noteBase = `${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst`;
+  document.getElementById('aar-note').innerHTML =
+    `ok = faktiske tal fra kassesystem. &nbsp;Estimater baseret på ${noteBase}. &nbsp;GPM estimat: ${c.gpm}%. &nbsp;Faste omkostninger: ${dk(c.faste)} kr/mdr. &nbsp;Resultat = DB − faste omkostninger.`;
+}
+
 // ── TREND ANALYSE ─────────────────────────────────────────────────────────────
 let _trendLoaded = false;
 let _trendDage   = 21;
@@ -1134,6 +1412,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
   if (id === 'kaffe') loadKaffe();
   if (id === 'trend' && !_trendLoaded) loadTrend(_trendDage);
+  if (id === 'aar'   && !_aarLoaded)   loadAar();
 };
 
 loadAll();

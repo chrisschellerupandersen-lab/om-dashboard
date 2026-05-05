@@ -143,6 +143,12 @@ async def api_top(request: Request, n: int = 20):
     return database.hent_top_produkter(min(n, 100))
 
 
+@app.get("/api/salg/aarsdata")
+async def api_aarsdata(request: Request, aar: int = None):
+    _kræv_login(request)
+    return database.hent_aarsdata(aar)
+
+
 @app.get("/api/salg/trend")
 async def api_trend(request: Request, dage: int = 21):
     _kræv_login(request)

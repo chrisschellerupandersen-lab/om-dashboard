@@ -441,12 +441,32 @@ def hent_kaffe_analyse() -> Dict:
             ORDER BY time_start
         """).fetchall()
 
+        timer_produkter = conn.execute("""
+            SELECT time_start, varenavn,
+                   ROUND(SUM(antal), 0) AS total_antal
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
+            GROUP BY time_start, varenavn
+            ORDER BY time_start, total_antal DESC
+        """).fetchall()
+
+        dage_produkter = conn.execute("""
+            SELECT dato, varenavn,
+                   ROUND(SUM(antal), 0) AS total_antal
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            GROUP BY dato, varenavn
+            ORDER BY dato DESC, total_antal DESC
+        """).fetchall()
+
     return {
-        "kpi":           dict(kpi) if kpi else {},
-        "total_omsat":   total_omsat,
-        "produkter":     [dict(r) for r in produkter],
-        "dage":          [dict(r) for r in reversed(list(dage_rows))],
-        "timer":         [dict(r) for r in timer],
+        "kpi":              dict(kpi) if kpi else {},
+        "total_omsat":      total_omsat,
+        "produkter":        [dict(r) for r in produkter],
+        "dage":             [dict(r) for r in reversed(list(dage_rows))],
+        "timer":            [dict(r) for r in timer],
+        "timer_produkter":  [dict(r) for r in timer_produkter],
+        "dage_produkter":   [dict(r) for r in dage_produkter],
     }
 
 

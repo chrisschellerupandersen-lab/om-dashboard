@@ -690,8 +690,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <!-- Daglig trend -->
           <div class="card">
-            <div class="card-title">Daglig kaffesalg — antal kopper (seneste 30 dage)</div>
+            <div class="card-title">Daglig kaffesalg — antal kopper (seneste 30 dage) <span style="font-size:9px;color:var(--ash);font-weight:300;margin-left:6px;">klik på dag for detaljer</span></div>
             <div style="height:200px;position:relative;"><canvas id="c-kaffe-dage"></canvas></div>
+          </div>
+          <!-- Drill-down -->
+          <div id="kaffe-drill" class="card" style="display:none;margin-top:0;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+              <div class="card-title" id="kaffe-drill-title" style="margin:0;"></div>
+              <button onclick="document.getElementById('kaffe-drill').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--ash);line-height:1;padding:0 2px;">✕</button>
+            </div>
+            <div id="kaffe-drill-body"></div>
           </div>
         </div>
       </div>
@@ -1533,7 +1541,29 @@ async function loadKaffe() {
   if (data) buildKaffe(data);
 }
 
+let _kaffeData = null;
+
+function kaffeShowDrill(title, rows) {
+  const max = Math.max(...rows.map(r => r.antal), 1);
+  document.getElementById('kaffe-drill-title').textContent = title;
+  document.getElementById('kaffe-drill-body').innerHTML = rows.map(r => {
+    const w = Math.max(3, Math.round(r.antal / max * 100));
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
+      <div style="width:180px;font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.label}">${r.label}</div>
+      <div style="flex:1;background:rgba(30,58,30,.07);border-radius:2px;height:18px;overflow:hidden;">
+        <div style="width:${w}%;height:100%;background:var(--forest);border-radius:2px;transition:width .3s;"></div>
+      </div>
+      <div style="width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink);">${Math.round(r.antal)} stk</div>
+      <div style="width:38px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--amber);">${r.pct}%</div>
+    </div>`;
+  }).join('');
+  const el = document.getElementById('kaffe-drill');
+  el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function buildKaffe(d) {
+  _kaffeData = d;
   const kpi = d.kpi || {};
   if (!kpi.total_antal) {
     document.getElementById('kaffe-no-data').style.display = '';
@@ -1552,10 +1582,10 @@ function buildKaffe(d) {
     <div class="kpi-card"><div class="kpi-label">DB%</div><div class="kpi-val">${kpi.db_pct != null ? kpi.db_pct.toFixed(1) + '%' : '—'}</div><div class="kpi-sub">${Math.round(kpi.total_avance).toLocaleString('da-DK')} kr dækningsbidrag</div></div>
   `;
 
-  document.getElementById('kaffe-tbody').innerHTML = (d.produkter || []).map(r => {
+  document.getElementById('kaffe-tbody').innerHTML = (d.produkter || []).map((r, i) => {
     const pill = r.db_pct >= 35 ? 'pill-g' : r.db_pct >= 28 ? 'pill-a' : 'pill-r';
-    return `<tr>
-      <td>${r.varenavn}</td>
+    return `<tr style="cursor:pointer;" title="Klik for timeprofil" onclick="kaffeVisProduktTimer(${i})">
+      <td>${r.varenavn} <span style="font-size:9px;color:var(--ash);">↗</span></td>
       <td class="num">${Math.round(r.antal).toLocaleString('da-DK')}</td>
       <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
       <td class="num"><span class="pill ${pill}">${r.db_pct != null ? r.db_pct.toFixed(1) + '%' : '—'}</span></td>
@@ -1569,7 +1599,16 @@ function buildKaffe(d) {
          backgroundColor: d.timer.map(r => periodeColor(r.time_start) + 'cc'),
          borderColor:     d.timer.map(r => periodeColor(r.time_start)),
          borderWidth: 1, borderRadius: 2 }],
-      { scales: {
+      { onClick: (evt, els) => {
+          if (!els.length) return;
+          const hour = d.timer[els[0].index];
+          const prods = (d.timer_produkter || []).filter(r => r.time_start === hour.time_start);
+          if (!prods.length) return;
+          const tot = prods.reduce((s, r) => s + r.total_antal, 0);
+          kaffeShowDrill(`Kl. ${hour.time_start}:00 — ${hour.total_antal} kopper (${hour.pct}% af dags­salget)`,
+            prods.map(r => ({ label: r.varenavn, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
+        },
+        scales: {
           x: { ticks: { font: { size: 9 } } },
           y: { ticks: { font: { size: 9 }, callback: v => v + '%' } }
         },
@@ -1588,11 +1627,33 @@ function buildKaffe(d) {
       [{ data: d.dage.map(r => Math.round(r.antal)),
          backgroundColor: 'rgba(200,168,75,.55)', borderColor: '#c8a84b',
          borderWidth: 1, borderRadius: 2 }],
-      { scales: {
+      { onClick: (evt, els) => {
+          if (!els.length) return;
+          const dag = d.dage[els[0].index];
+          const prods = (d.dage_produkter || []).filter(r => r.dato === dag.dato);
+          if (!prods.length) return;
+          const tot = prods.reduce((s, r) => s + r.total_antal, 0);
+          kaffeShowDrill(`${fmtDato(dag.dato)} — ${dag.antal} kopper i alt`,
+            prods.map(r => ({ label: r.varenavn, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
+        },
+        scales: {
           x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
           y: { ticks: { font: { size: 9 }, callback: v => v + ' kop' } }
-      }});
+        }
+      });
   }
+}
+
+function kaffeVisProduktTimer(idx) {
+  const d = _kaffeData;
+  if (!d) return;
+  const produkt = d.produkter[idx];
+  const timerForProdukt = (d.timer_produkter || []).filter(r => r.varenavn === produkt.varenavn);
+  if (!timerForProdukt.length) return;
+  const tot = timerForProdukt.reduce((s, r) => s + r.total_antal, 0);
+  kaffeShowDrill(`Timeprofil — ${produkt.varenavn} (${Math.round(produkt.antal)} kopper i alt)`,
+    timerForProdukt.map(r => ({ label: `Kl. ${r.time_start}:00`, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
+}
 }
 
 // Indlæs dage-detaljer når panelet vises første gang

@@ -4,6 +4,20 @@ from typing import List, Dict, Any, Optional
 
 DB_PATH = os.environ.get("DB_PATH", "dashboard.db")
 
+# Alle kaffedrikke — fanger kaffe, flat white, cappuccino, americano osv.
+_KAFFE_WHERE = """(
+    LOWER(varenavn) LIKE '%kaffe%'
+    OR LOWER(varenavn) LIKE '%flat white%'
+    OR LOWER(varenavn) LIKE '%cappuccino%'
+    OR LOWER(varenavn) LIKE '%americano%'
+    OR LOWER(varenavn) LIKE '%latte%'
+    OR LOWER(varenavn) LIKE '%espresso%'
+    OR LOWER(varenavn) LIKE '%macchiato%'
+    OR LOWER(varenavn) LIKE '%cortado%'
+    OR LOWER(varenavn) LIKE '%lungo%'
+    OR LOWER(varenavn) LIKE '%mocha%'
+)"""
+
 
 def _conn() -> sqlite3.Connection:
     db_dir = os.path.dirname(DB_PATH)
@@ -393,7 +407,7 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
 
 def hent_kaffe_analyse() -> Dict:
     with _conn() as conn:
-        kpi = conn.execute("""
+        kpi = conn.execute(f"""
             SELECT
                 ROUND(SUM(antal), 0)                                      AS total_antal,
                 ROUND(SUM(omsætning), 2)                                  AS total_omsaetning,
@@ -401,60 +415,60 @@ def hent_kaffe_analyse() -> Dict:
                 ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
                 ROUND(SUM(omsætning)/NULLIF(SUM(antal),0), 2)            AS gns_pris
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            WHERE {_KAFFE_WHERE}
         """).fetchone()
 
         total_omsat = conn.execute(
             "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner"
         ).fetchone()[0]
 
-        produkter = conn.execute("""
+        produkter = conn.execute(f"""
             SELECT varenavn,
                    ROUND(SUM(antal), 0)                                   AS antal,
                    ROUND(SUM(omsætning), 2)                               AS omsaetning,
                    ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            WHERE {_KAFFE_WHERE}
             GROUP BY varenavn
             ORDER BY omsaetning DESC
         """).fetchall()
 
-        dage_rows = conn.execute("""
+        dage_rows = conn.execute(f"""
             SELECT dato,
                    ROUND(SUM(antal), 0)    AS antal,
                    ROUND(SUM(omsætning), 2) AS omsaetning
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            WHERE {_KAFFE_WHERE}
             GROUP BY dato
             ORDER BY dato DESC
             LIMIT 30
         """).fetchall()
 
-        timer = conn.execute("""
+        timer = conn.execute(f"""
             SELECT time_start,
                    ROUND(SUM(antal), 0)      AS total_antal,
                    ROUND(SUM(omsætning), 2)  AS total_omsaetning,
                    ROUND(SUM(antal) * 100.0 / NULLIF(SUM(SUM(antal)) OVER (), 0), 1) AS pct
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
+            WHERE {_KAFFE_WHERE} AND time_start >= 0
             GROUP BY time_start
             ORDER BY time_start
         """).fetchall()
 
-        timer_produkter = conn.execute("""
+        timer_produkter = conn.execute(f"""
             SELECT time_start, varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
+            WHERE {_KAFFE_WHERE} AND time_start >= 0
             GROUP BY time_start, varenavn
             ORDER BY time_start, total_antal DESC
         """).fetchall()
 
-        dage_produkter = conn.execute("""
+        dage_produkter = conn.execute(f"""
             SELECT dato, varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
-            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            WHERE {_KAFFE_WHERE}
             GROUP BY dato, varenavn
             ORDER BY dato DESC, total_antal DESC
         """).fetchall()

@@ -277,7 +277,7 @@ def hent_dage_detaljer(n: int = 8) -> List[Dict]:
             'omsaetning':     dag['omsaetning'],
             'linjer':         dag['linjer'],
             'snit_per_linje': round(dag['omsaetning'] / dag['linjer'], 0) if dag['linjer'] > 0 else 0,
-            'produkter':      prod_by_dato.get(dato, [])[:15],
+            'produkter':      prod_by_dato.get(dato, []),
         })
     return result
 

@@ -668,38 +668,54 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-kaffe">
         <div class="page-hdr">
           <h2>Kaffesalg — analyse</h2>
-          <p>Kaffe, BMO med kaffe, Wienerbrød med kaffe og øvrige kaffeprodukter</p>
+          <p>Kaffe, espresso, cappuccino, flat white, americano og øvrige kaffedrikke</p>
         </div>
         <div id="kaffe-no-data" class="empty" style="display:none;">Ingen kaffeprodukter fundet i data</div>
         <div id="kaffe-content">
           <!-- KPI -->
-          <div class="kpi-row" id="kaffe-kpi-row"></div>
-          <!-- Produkt tabel + timeprofil -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
-            <div class="card">
-              <div class="card-title">Produkter</div>
-              <table class="tbl" style="margin-top:0;">
-                <thead><tr><th>Produkt</th><th class="num">Antal</th><th class="num">Omsætning</th><th class="num">DB%</th></tr></thead>
-                <tbody id="kaffe-tbody"></tbody>
-              </table>
+          <div id="kaffe-kpi-row" style="display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+          <!-- Charts side-by-side -->
+          <div class="aar2-charts" style="margin-bottom:14px;">
+            <div class="card" style="margin-bottom:0;">
+              <div class="aar2-chart-hdr">
+                <span class="aar2-chart-ttl">Hvornår købes kaffe — fordeling</span>
+                <span class="aar2-chart-sub">klik på time for detaljer</span>
+              </div>
+              <div style="height:240px;position:relative;"><canvas id="c-kaffe-time"></canvas></div>
             </div>
-            <div class="card">
-              <div class="card-title">Hvornår købes kaffe — fordeling af salg</div>
-              <div style="height:220px;position:relative;"><canvas id="c-kaffe-time"></canvas></div>
+            <div class="card" style="margin-bottom:0;">
+              <div class="aar2-chart-hdr">
+                <span class="aar2-chart-ttl">Dagligt kaffesalg — seneste 30 dage</span>
+                <span class="aar2-chart-sub">klik på dag for detaljer</span>
+              </div>
+              <div style="height:240px;position:relative;"><canvas id="c-kaffe-dage"></canvas></div>
             </div>
           </div>
-          <!-- Daglig trend -->
-          <div class="card">
-            <div class="card-title">Daglig kaffesalg — antal kopper (seneste 30 dage) <span style="font-size:9px;color:var(--ash);font-weight:300;margin-left:6px;">klik på dag for detaljer</span></div>
-            <div style="height:200px;position:relative;"><canvas id="c-kaffe-dage"></canvas></div>
+          <!-- Produkter tabel -->
+          <div class="aar2-tbl-wrap" style="margin-bottom:14px;">
+            <div class="aar2-tbl-hdr">
+              <span class="aar2-tbl-hdr-l">Produkter</span>
+              <span class="aar2-tbl-hdr-r">klik på produkt for timeprofil ↗</span>
+            </div>
+            <table class="aar2-tbl">
+              <thead><tr>
+                <th>Produkt</th>
+                <th class="num">Antal</th>
+                <th class="num">Omsætning</th>
+                <th class="num">DB%</th>
+              </tr></thead>
+              <tbody id="kaffe-tbody"></tbody>
+            </table>
           </div>
           <!-- Drill-down -->
-          <div id="kaffe-drill" class="card" style="display:none;margin-top:0;">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-              <div class="card-title" id="kaffe-drill-title" style="margin:0;"></div>
-              <button onclick="document.getElementById('kaffe-drill').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--ash);line-height:1;padding:0 2px;">✕</button>
+          <div id="kaffe-drill" style="display:none;margin-bottom:14px;">
+            <div class="aar2-tbl-wrap" style="margin-bottom:0;">
+              <div class="aar2-tbl-hdr">
+                <span class="aar2-tbl-hdr-l" id="kaffe-drill-title">—</span>
+                <button onclick="document.getElementById('kaffe-drill').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:16px;color:rgba(200,168,75,.7);line-height:1;padding:0;">✕</button>
+              </div>
+              <div id="kaffe-drill-body" style="padding:16px 20px;background:var(--white);"></div>
             </div>
-            <div id="kaffe-drill-body"></div>
           </div>
         </div>
       </div>
@@ -1547,14 +1563,14 @@ function kaffeShowDrill(title, rows) {
   const max = Math.max(...rows.map(r => r.antal), 1);
   document.getElementById('kaffe-drill-title').textContent = title;
   document.getElementById('kaffe-drill-body').innerHTML = rows.map(r => {
-    const w = Math.max(3, Math.round(r.antal / max * 100));
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:7px;">
-      <div style="width:180px;font-size:11px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.label}">${r.label}</div>
-      <div style="flex:1;background:rgba(30,58,30,.07);border-radius:2px;height:18px;overflow:hidden;">
+    const w = Math.max(2, Math.round(r.antal / max * 100));
+    return `<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+      <div style="width:200px;font-size:13px;color:var(--charcoal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${r.label}">${r.label}</div>
+      <div style="flex:1;background:rgba(30,58,30,.07);border-radius:2px;height:22px;overflow:hidden;">
         <div style="width:${w}%;height:100%;background:var(--forest);border-radius:2px;transition:width .3s;"></div>
       </div>
-      <div style="width:52px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--ink);">${Math.round(r.antal)} stk</div>
-      <div style="width:38px;text-align:right;font-family:'DM Mono',monospace;font-size:10px;color:var(--amber);">${r.pct}%</div>
+      <div style="width:64px;text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--charcoal);">${Math.round(r.antal)} stk</div>
+      <div style="width:42px;text-align:right;font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--amber);">${r.pct}%</div>
     </div>`;
   }).join('');
   const el = document.getElementById('kaffe-drill');
@@ -1576,19 +1592,36 @@ function buildKaffe(d) {
   const kaffe_pct = d.total_omsat > 0 ? (kpi.total_omsaetning / d.total_omsat * 100).toFixed(1) : '—';
 
   document.getElementById('kaffe-kpi-row').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">Kopper solgt</div><div class="kpi-val">${Math.round(kpi.total_antal).toLocaleString('da-DK')}</div><div class="kpi-sub">samlet periode</div></div>
-    <div class="kpi-card"><div class="kpi-label">Kaffeomsætning</div><div class="kpi-val">${Math.round(kpi.total_omsaetning).toLocaleString('da-DK')} kr</div><div class="kpi-sub">${kaffe_pct}% af total</div></div>
-    <div class="kpi-card"><div class="kpi-label">Gns. pris / kop</div><div class="kpi-val">${kpi.gns_pris ? kpi.gns_pris.toFixed(2).replace('.',',') + ' kr' : '—'}</div><div class="kpi-sub">inkl. kombinationer</div></div>
-    <div class="kpi-card"><div class="kpi-label">DB%</div><div class="kpi-val">${kpi.db_pct != null ? kpi.db_pct.toFixed(1) + '%' : '—'}</div><div class="kpi-sub">${Math.round(kpi.total_avance).toLocaleString('da-DK')} kr dækningsbidrag</div></div>
+    <div class="kpi-card" style="background:var(--forest);border-color:var(--forest);">
+      <div class="kpi-label" style="color:rgba(200,168,75,.7);">Kaffedrikke solgt</div>
+      <div class="kpi-val" style="color:var(--amber);font-size:30px;">${Math.round(kpi.total_antal).toLocaleString('da-DK')}</div>
+      <div class="kpi-sub" style="color:rgba(255,255,255,.45);">stk samlet periode</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Kaffeomsætning</div>
+      <div class="kpi-val">${Math.round(kpi.total_omsaetning).toLocaleString('da-DK')} kr</div>
+      <div class="kpi-sub">${kaffe_pct}% af butikkens total</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Gns. pris / kop</div>
+      <div class="kpi-val">${kpi.gns_pris ? kpi.gns_pris.toFixed(2).replace('.',',') + ' kr' : '—'}</div>
+      <div class="kpi-sub">inkl. kombinationer</div>
+    </div>
+    <div class="kpi-card" style="border-color:var(--amber);">
+      <div class="kpi-label">Dækningsbidrag %</div>
+      <div class="kpi-val" style="color:var(--amber);">${kpi.db_pct != null ? kpi.db_pct.toFixed(1) + '%' : '—'}</div>
+      <div class="kpi-sub">${Math.round(kpi.total_avance).toLocaleString('da-DK')} kr DB i alt</div>
+    </div>
   `;
 
   document.getElementById('kaffe-tbody').innerHTML = (d.produkter || []).map((r, i) => {
-    const pill = r.db_pct >= 35 ? 'pill-g' : r.db_pct >= 28 ? 'pill-a' : 'pill-r';
+    const dbColor = r.db_pct >= 35 ? '#2d5a2d' : r.db_pct >= 28 ? '#7a5c00' : '#9b3420';
+    const dbBg    = r.db_pct >= 35 ? 'rgba(74,124,74,.1)' : r.db_pct >= 28 ? 'rgba(200,168,75,.15)' : 'rgba(155,52,32,.1)';
     return `<tr style="cursor:pointer;" title="Klik for timeprofil" onclick="kaffeVisProduktTimer(${i})">
-      <td>${r.varenavn} <span style="font-size:9px;color:var(--ash);">↗</span></td>
-      <td class="num">${Math.round(r.antal).toLocaleString('da-DK')}</td>
-      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
-      <td class="num"><span class="pill ${pill}">${r.db_pct != null ? r.db_pct.toFixed(1) + '%' : '—'}</span></td>
+      <td style="font-size:14px;">${r.varenavn} <span style="font-size:10px;color:var(--amber);margin-left:4px;">↗</span></td>
+      <td class="num" style="font-size:14px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
+      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct != null ? r.db_pct.toFixed(1) + '%' : '—'}</span></td>
     </tr>`;
   }).join('');
 
@@ -1609,8 +1642,8 @@ function buildKaffe(d) {
             prods.map(r => ({ label: r.varenavn, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
         },
         scales: {
-          x: { ticks: { font: { size: 9 } } },
-          y: { ticks: { font: { size: 9 }, callback: v => v + '%' } }
+          x: { ticks: { font: { size: 11 } } },
+          y: { ticks: { font: { size: 11 }, callback: v => v + '%' } }
         },
         plugins: { tooltip: { callbacks: {
           label: ctx => {
@@ -1637,8 +1670,8 @@ function buildKaffe(d) {
             prods.map(r => ({ label: r.varenavn, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
         },
         scales: {
-          x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
-          y: { ticks: { font: { size: 9 }, callback: v => v + ' kop' } }
+          x: { ticks: { font: { size: 11 }, maxRotation: 45 } },
+          y: { ticks: { font: { size: 11 }, callback: v => v + ' kop' } }
         }
       });
   }

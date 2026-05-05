@@ -156,6 +156,45 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .dag-prod-navn{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--charcoal);}
 .dag-prod-antal{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
 .dag-prod-kr{font-family:'DM Mono',monospace;font-size:11px;font-weight:400;color:var(--forest);white-space:nowrap;text-align:right;min-width:52px;}
+
+/* TREND PANEL */
+.saeson-banner{display:flex;align-items:center;gap:12px;background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.25);border-radius:3px;padding:12px 16px;margin-bottom:20px;font-size:13px;}
+.saeson-icon{font-size:22px;line-height:1;}
+.saeson-text{flex:1;}
+.saeson-text strong{color:var(--forest);}
+.saeson-text span{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);display:block;margin-top:2px;}
+.trend-summary{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;}
+.ts-chip{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:2px;font-family:'DM Mono',monospace;font-size:11px;font-weight:400;}
+.ts-chip.op {background:rgba(74,124,74,.10);color:#2d5a2d;border:1px solid rgba(74,124,74,.2);}
+.ts-chip.ned{background:rgba(180,60,40,.08);color:#8b2a1a;border:1px solid rgba(180,60,40,.18);}
+.ts-chip.ny {background:rgba(200,168,75,.12);color:#7a5c00;border:1px solid rgba(200,168,75,.25);}
+.ts-chip.vaek{background:rgba(100,100,100,.07);color:#555;border:1px solid rgba(100,100,100,.15);}
+.ts-chip.stabil{background:rgba(30,58,30,.05);color:var(--ash);border:1px solid rgba(30,58,30,.1);}
+.ts-num{font-size:18px;font-weight:300;line-height:1;}
+.rec-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;}
+.rec-card{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;overflow:hidden;}
+.rec-card-hdr{padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(30,58,30,.08);}
+.rec-card-hdr.op {background:rgba(74,124,74,.07);}
+.rec-card-hdr.ned{background:rgba(180,60,40,.06);}
+.rec-card-hdr.ny {background:rgba(200,168,75,.07);}
+.rec-card-ttl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:400;}
+.rec-card-ttl.op {color:#2d5a2d;}
+.rec-card-ttl.ned{color:#8b2a1a;}
+.rec-card-ttl.ny {color:#7a5c00;}
+.rec-item{display:flex;align-items:baseline;gap:8px;padding:8px 16px;border-bottom:1px solid rgba(30,58,30,.04);}
+.rec-item:last-child{border-bottom:none;}
+.rec-navn{flex:1;font-size:12px;color:var(--charcoal);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.rec-pct{font-family:'DM Mono',monospace;font-size:11px;font-weight:400;white-space:nowrap;}
+.rec-pct.op {color:#2d5a2d;}
+.rec-pct.ned{color:#9b3420;}
+.rec-kr{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
+.tbadge{display:inline-block;font-family:'DM Mono',monospace;font-size:9px;padding:2px 7px;border-radius:2px;white-space:nowrap;}
+.tbadge.op  {background:rgba(74,124,74,.12);color:#2d5a2d;}
+.tbadge.ned {background:rgba(180,60,40,.10);color:#8b2a1a;}
+.tbadge.stabil{background:rgba(30,58,30,.06);color:var(--ash);}
+.tbadge.ny  {background:rgba(200,168,75,.15);color:#7a5c00;}
+.tbadge.vaek{background:rgba(100,100,100,.08);color:#666;}
+.trend-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;}
 </style>
 </head>
 <body>
@@ -221,6 +260,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="nav-item" onclick="showPanel('kaffe',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/></svg>
         Kaffe
+      </div>
+      <div class="nav-item" onclick="showPanel('trend',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/></svg>
+        Trend &amp; bestilling
       </div>
     </nav>
 
@@ -410,6 +453,59 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div style="overflow-x:auto;">
           <div class="dag-grid" id="dag-grid" style="align-items:start;"></div>
+        </div>
+      </div>
+
+      <!-- TREND & BESTILLING -->
+      <div class="panel" id="p-trend">
+        <div class="page-hdr">
+          <h2>Trend &amp; bestillingsanalyse</h2>
+          <p>Sammenligner seneste periode med forrige periode — dagsnormaliseret</p>
+        </div>
+        <div id="trend-no-data" class="empty" style="display:none;">Ikke nok data til trendanalyse</div>
+        <div id="trend-content">
+          <!-- Sæsonbanner -->
+          <div class="saeson-banner" id="saeson-banner"></div>
+          <!-- Periode-tabs + total change -->
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+            <div class="periode-tabs" style="margin-bottom:0;" id="trend-tabs">
+              <div class="ptab" onclick="setTrendDage(14,this)">14 dage</div>
+              <div class="ptab active" onclick="setTrendDage(21,this)">21 dage</div>
+              <div class="ptab" onclick="setTrendDage(28,this)">28 dage</div>
+            </div>
+            <div id="trend-periode-lbl" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></div>
+          </div>
+          <!-- Summary chips -->
+          <div class="trend-summary" id="trend-summary"></div>
+          <!-- Anbefalinger -->
+          <div class="rec-grid" id="rec-grid"></div>
+          <!-- Fuld tabel -->
+          <div class="card">
+            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
+              <div class="card-title" style="margin-bottom:0;">Alle produkter</div>
+              <div class="trend-tabs" id="trend-filter-tabs" style="margin-bottom:0;">
+                <div class="ptab active" onclick="filterTrend('alle',this)">Alle</div>
+                <div class="ptab" onclick="filterTrend('op',this)">↑ Stiger</div>
+                <div class="ptab" onclick="filterTrend('ned',this)">↓ Falder</div>
+                <div class="ptab" onclick="filterTrend('ny',this)">★ Nye</div>
+                <div class="ptab" onclick="filterTrend('vaek',this)">✕ Udgåede</div>
+              </div>
+            </div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Produkt</th>
+                  <th>Kategori</th>
+                  <th class="num">Kr/dag nu</th>
+                  <th class="num">Kr/dag før</th>
+                  <th class="num">Ændring</th>
+                  <th class="num">DB%</th>
+                  <th>Signal</th>
+                </tr>
+              </thead>
+              <tbody id="trend-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -798,6 +894,174 @@ function setDageN(n, el) {
   loadDageDetaljer(n);
 }
 
+// ── TREND ANALYSE ─────────────────────────────────────────────────────────────
+let _trendLoaded = false;
+let _trendDage   = 21;
+let _trendData   = null;
+let _trendFilter = 'alle';
+
+async function loadTrend(dage) {
+  dage = dage || _trendDage;
+  _trendLoaded = true;
+  document.getElementById('trend-tbody').innerHTML =
+    '<tr><td colspan="7" style="padding:24px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
+  const data = await api('/api/salg/trend?dage=' + dage);
+  if (data) { _trendData = data; buildTrend(data); }
+}
+
+function setTrendDage(n, el) {
+  document.querySelectorAll('#trend-tabs .ptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _trendDage = n;
+  _trendData = null;
+  loadTrend(n);
+}
+
+function filterTrend(f, el) {
+  document.querySelectorAll('#trend-filter-tabs .ptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _trendFilter = f;
+  if (_trendData) renderTrendTabel(_trendData._computed, f);
+}
+
+function saeson() {
+  const m = new Date().getMonth() + 1;
+  if (m >= 3 && m <= 5) return { navn:'Forår',  naeste:'Sommer',  icon:'🌱', maaneder:'marts–maj',    tip:'Kolde drikke, friske råvarer og lette retter begynder at stige. Vinterens tunge varer falder.' };
+  if (m >= 6 && m <= 8) return { navn:'Sommer', naeste:'Efterår', icon:'☀️', maaneder:'juni–august',  tip:'Højsæson. Kolde drikke, is, salater og take-away topper. Bestil hjem i god tid.' };
+  if (m >= 9 && m <= 11)return { navn:'Efterår',naeste:'Vinter',  icon:'🍂', maaneder:'sep–nov',      tip:'Varme drikke og comfort food stiger. Sommervarer falder markant.' };
+  return                        { navn:'Vinter', naeste:'Forår',   icon:'❄️', maaneder:'dec–feb',      tip:'Varm chokolade, supper og bagte varer topper. Hold øje med kaffesalg.' };
+}
+
+function buildTrend(d) {
+  if (!d.produkter || !d.produkter.length) {
+    document.getElementById('trend-no-data').style.display = '';
+    document.getElementById('trend-content').style.display = 'none';
+    return;
+  }
+  document.getElementById('trend-no-data').style.display = 'none';
+  document.getElementById('trend-content').style.display = '';
+
+  const p   = d.perioder;
+  const nyD = p.ny_dage || 1;
+  const glD = p.gl_dage || 1;
+
+  // Sæson banner
+  const s = saeson();
+  document.getElementById('saeson-banner').innerHTML = `
+    <div class="saeson-icon">${s.icon}</div>
+    <div class="saeson-text">
+      <strong>${s.navn} → ${s.naeste}</strong> &nbsp;·&nbsp; ${s.maaneder}
+      <span>${s.tip}</span>
+    </div>`;
+
+  // Periode label
+  document.getElementById('trend-periode-lbl').textContent =
+    `Ny: ${fmtDato(p.ny_fra)}–${fmtDato(p.ny_til)} (${nyD} dage)  ·  Gl: ${fmtDato(p.gl_fra)}–${fmtDato(p.gl_til)} (${glD} dage)`;
+
+  // Compute trend per product
+  const prod = d.produkter.map(r => {
+    const ny = r.ny_omsat / nyD;
+    const gl = r.gl_omsat / glD;
+    let pct, signal;
+    if (r.gl_omsat === 0 && r.ny_omsat > 0)       { pct = null; signal = 'ny';    }
+    else if (r.ny_omsat === 0 && r.gl_omsat > 0)  { pct = null; signal = 'vaek'; }
+    else {
+      pct = gl > 0 ? (ny - gl) / gl * 100 : 0;
+      if      (pct >=  20) signal = 'op';
+      else if (pct <= -20) signal = 'ned';
+      else                  signal = 'stabil';
+    }
+    return { ...r, ny_snit: ny, gl_snit: gl, pct, signal };
+  });
+  d._computed = prod;
+
+  // Summary chips
+  const cnt = { op:0, ned:0, stabil:0, ny:0, vaek:0 };
+  prod.forEach(r => cnt[r.signal]++);
+  const totalPct = d.gl_total > 0 ? ((d.ny_total - d.gl_total) / d.gl_total * 100) : 0;
+  const totalArrow = totalPct >= 0 ? '▲' : '▼';
+  const totalCls   = totalPct >= 0 ? 'op' : 'ned';
+  document.getElementById('trend-summary').innerHTML = `
+    <div class="ts-chip ${totalCls}"><span class="ts-num">${totalArrow} ${Math.abs(totalPct).toFixed(1)}%</span>Total omsætning ift. forrige periode</div>
+    <div class="ts-chip op">  <span class="ts-num">${cnt.op}</span>   stiger ↑</div>
+    <div class="ts-chip ned"> <span class="ts-num">${cnt.ned}</span>  falder ↓</div>
+    <div class="ts-chip ny">  <span class="ts-num">${cnt.ny}</span>   nye varer</div>
+    <div class="ts-chip vaek"><span class="ts-num">${cnt.vaek}</span> udgåede</div>
+    <div class="ts-chip stabil"><span class="ts-num">${cnt.stabil}</span> stabile</div>`;
+
+  // Recommendations
+  const bestilMere  = prod.filter(r => r.signal === 'op'  && (r.db_pct == null || r.db_pct >= 25) && r.ny_antal >= 3)
+                          .sort((a,b) => b.pct - a.pct).slice(0, 8);
+  const nyeMedPot   = prod.filter(r => r.signal === 'ny'  && r.ny_omsat >= 50)
+                          .sort((a,b) => b.ny_omsat - a.ny_omsat).slice(0, 5);
+  const opmærksom   = prod.filter(r => r.signal === 'ned' && (r.db_pct == null || r.db_pct >= 25))
+                          .sort((a,b) => a.pct - b.pct).slice(0, 8);
+  const lavSalg     = prod.filter(r => r.signal === 'ned' && r.db_pct != null && r.db_pct < 25)
+                          .sort((a,b) => a.pct - b.pct).slice(0, 5);
+
+  function recItems(list, cls) {
+    if (!list.length) return '<div style="padding:12px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Ingen i denne periode</div>';
+    return list.map(r => {
+      const pctTxt = r.pct != null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(0) + '%' : 'Ny';
+      const krTxt  = Math.round(r.ny_snit).toLocaleString('da-DK') + ' kr/dag';
+      const dbTxt  = r.db_pct != null ? ' · ' + r.db_pct.toFixed(1) + '% DB' : '';
+      return `<div class="rec-item">
+        <span class="rec-navn">${r.varenavn}</span>
+        <span class="rec-pct ${cls}">${pctTxt}</span>
+        <span class="rec-kr">${krTxt}${dbTxt}</span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('rec-grid').innerHTML = `
+    <div class="rec-card">
+      <div class="rec-card-hdr op"><span class="rec-card-ttl op">✦ Bestil mere — stiger med god margin</span></div>
+      ${recItems(bestilMere, 'op')}
+    </div>
+    <div class="rec-card">
+      <div class="rec-card-hdr ned"><span class="rec-card-ttl ned">⚠ Vær opmærksom — falder med god margin</span></div>
+      ${recItems(opmærksom, 'ned')}
+    </div>
+    <div class="rec-card">
+      <div class="rec-card-hdr ny"><span class="rec-card-ttl ny">★ Nye varer — undersøg potentiale</span></div>
+      ${recItems(nyeMedPot, 'op')}
+    </div>
+    <div class="rec-card">
+      <div class="rec-card-hdr ned"><span class="rec-card-ttl ned">↓ Falder + lav margin — overvej sortiment</span></div>
+      ${recItems(lavSalg, 'ned')}
+    </div>`;
+
+  renderTrendTabel(prod, _trendFilter);
+}
+
+function renderTrendTabel(prod, filter) {
+  if (!prod) return;
+  const vis = filter === 'alle' ? prod : prod.filter(r => r.signal === filter);
+  const sorted = [...vis].sort((a,b) => {
+    if (a.signal === 'op'   && b.signal !== 'op')   return -1;
+    if (b.signal === 'op'   && a.signal !== 'op')   return  1;
+    if (a.signal === 'ned'  && b.signal !== 'ned')  return -1;
+    if (b.signal === 'ned'  && a.signal !== 'ned')  return  1;
+    return b.ny_omsat - a.ny_omsat;
+  });
+
+  const signalLabel = { op:'↑ Stiger', ned:'↓ Falder', stabil:'→ Stabil', ny:'★ Ny', vaek:'✕ Udgået' };
+  document.getElementById('trend-tbody').innerHTML = sorted.map(r => {
+    const pctTxt = r.pct != null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(1) + '%' : '—';
+    const pctCls = r.pct == null ? '' : (r.pct >= 0 ? 'color:#2d5a2d;' : 'color:#9b3420;');
+    const pill   = r.db_pct >= 35 ? 'pill-g' : r.db_pct >= 28 ? 'pill-a' : r.db_pct != null ? 'pill-r' : '';
+    return `<tr>
+      <td>${r.varenavn}</td>
+      <td style="font-size:11px;color:var(--ash);">${r.kategori || '—'}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.ny_snit).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${Math.round(r.gl_snit).toLocaleString('da-DK')}</td>
+      <td class="num" style="${pctCls}font-family:'DM Mono',monospace;font-weight:400;">${pctTxt}</td>
+      <td class="num">${r.db_pct != null ? '<span class="pill '+pill+'">'+r.db_pct.toFixed(1)+'%</span>' : '—'}</td>
+      <td><span class="tbadge ${r.signal}">${signalLabel[r.signal]}</span></td>
+    </tr>`;
+  }).join('');
+}
+
 // ── KAFFE ANALYSE ─────────────────────────────────────────────────────────────
 let _kaffeLoaded = false;
 
@@ -869,6 +1133,7 @@ window.showPanel = function(id, el) {
   _origShowPanel(id, el);
   if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
   if (id === 'kaffe') loadKaffe();
+  if (id === 'trend' && !_trendLoaded) loadTrend(_trendDage);
 };
 
 loadAll();

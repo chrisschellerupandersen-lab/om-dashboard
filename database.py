@@ -282,6 +282,67 @@ def hent_dage_detaljer(n: int = 8) -> List[Dict]:
     return result
 
 
+def hent_trend_analyse(periode_dage: int = 21) -> Dict:
+    """Sammenlign seneste periode mod forrige periode (dagsnormaliseret)."""
+    from datetime import datetime, timedelta
+    with _conn() as conn:
+        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        tidligste_dato = conn.execute("SELECT MIN(dato) FROM transaktioner").fetchone()[0]
+        if not seneste_dato:
+            return {}
+
+        slut  = datetime.strptime(seneste_dato, '%Y-%m-%d')
+        midt  = slut  - timedelta(days=periode_dage)
+        start = midt  - timedelta(days=periode_dage)
+        midt_str  = midt.strftime('%Y-%m-%d')
+        start_str = start.strftime('%Y-%m-%d')
+
+        rows = conn.execute("""
+            SELECT
+                varenavn, kategori,
+                ROUND(SUM(CASE WHEN dato > ? THEN antal      ELSE 0 END), 1) AS ny_antal,
+                ROUND(SUM(CASE WHEN dato > ? THEN omsætning  ELSE 0 END), 2) AS ny_omsat,
+                ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN antal      ELSE 0 END), 1) AS gl_antal,
+                ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN omsætning  ELSE 0 END), 2) AS gl_omsat,
+                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+            FROM transaktioner
+            WHERE dato > ? AND varenavn != ''
+            GROUP BY varenavn
+            HAVING ny_omsat > 0 OR gl_omsat > 0
+        """, (midt_str, midt_str,
+              start_str, midt_str,
+              start_str, midt_str,
+              start_str)).fetchall()
+
+        ny_dage = conn.execute(
+            "SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ?", (midt_str,)
+        ).fetchone()[0] or 1
+        gl_dage = conn.execute(
+            "SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ? AND dato <= ?",
+            (start_str, midt_str)
+        ).fetchone()[0] or 1
+
+        ny_total = conn.execute(
+            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ?", (midt_str,)
+        ).fetchone()[0]
+        gl_total = conn.execute(
+            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ? AND dato <= ?",
+            (start_str, midt_str)
+        ).fetchone()[0]
+
+    return {
+        "perioder": {
+            "ny_fra":  midt_str,   "ny_til":  seneste_dato,
+            "gl_fra":  start_str,  "gl_til":  midt_str,
+            "ny_dage": ny_dage,    "gl_dage": gl_dage,
+            "data_fra": tidligste_dato,
+        },
+        "ny_total": ny_total,
+        "gl_total": gl_total,
+        "produkter": [dict(r) for r in rows],
+    }
+
+
 def hent_kaffe_analyse() -> Dict:
     with _conn() as conn:
         kpi = conn.execute("""

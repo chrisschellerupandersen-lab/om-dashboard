@@ -75,13 +75,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .page-hdr p{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:3px;}
 
 /* KPI */
-.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-row{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
 .kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
-.kpi-v{font-size:24px;font-weight:300;color:var(--forest);line-height:1;}
+.kpi-v{font-size:28px;font-weight:300;color:var(--forest);line-height:1;}
 .kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
 .kpi-s.up{color:var(--moss);}
 .kpi-s.dn{color:var(--danger);}
+.kpi-row .kpi:first-child{background:var(--forest);border-color:var(--forest);}
+.kpi-row .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
+.kpi-row .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
+.kpi-row .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 
 /* CARD */
 .card{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:20px 22px;margin-bottom:14px;}
@@ -382,11 +386,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="two-col">
           <div class="card">
-            <div class="card-title">Daglig omsætning · seneste 30 dage</div>
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Daglig omsætning · seneste 30 dage</span></div>
             <div style="position:relative;height:200px;"><canvas id="c-forside"></canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Bruttoavance per uge · %</div>
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Bruttoavance per uge · %</span></div>
             <div style="position:relative;height:200px;"><canvas id="c-db"></canvas></div>
           </div>
         </div>
@@ -421,7 +425,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
         </div>
         <div class="card">
-          <div class="card-title">Salg per time</div>
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Salg per time</span></div>
           <div id="dag-chart-wrap" style="position:relative;height:220px;"><canvas id="c-dag"></canvas></div>
           <div id="dag-no-time" class="empty" style="display:none;">Tidsdata ikke tilgængeligt i denne rapport</div>
         </div>
@@ -434,12 +438,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p>Omsætning og avance per uge</p>
         </div>
         <div class="card">
-          <div class="card-title">Ugeomsætning</div>
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Ugeomsætning</span></div>
           <div style="position:relative;height:200px;"><canvas id="c-uge"></canvas></div>
         </div>
-        <div class="card">
-          <div class="card-title">Nøgletal per uge</div>
-          <table class="om-table">
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Nøgletal per uge</span>
+          </div>
+          <table class="aar2-tbl">
             <thead>
               <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
@@ -456,19 +462,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div id="time-no-data" class="empty" style="display:none;">Tidsdata ikke tilgængeligt — uploades ved næste rapport</div>
         <div id="time-content">
-          <!-- Periode KPI -->
           <div class="tp-kpi-grid" id="tp-kpi-grid"></div>
-          <!-- Søjlediagram -->
           <div class="card">
-            <div class="card-title">01 &nbsp;Samlet omsætning pr. time (alle normaluger)</div>
-            <p style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-bottom:12px;">
-              OMSÆTNING PR. TIME – FARVET EFTER PERIODE (AMBER=MORGEN, GRØN=FORMIDDAG, MØRKGRØN=EFTERMIDDAG)
-            </p>
+            <div class="aar2-chart-hdr">
+              <span class="aar2-chart-ttl">Omsætning pr. time — alle uger</span>
+              <span class="aar2-chart-sub">Amber = morgen · Grøn = formiddag · Mørkgrøn = eftermiddag</span>
+            </div>
             <div class="hbar-wrap" id="hbar-wrap"></div>
           </div>
-          <!-- Heatmap -->
           <div class="card">
-            <div class="card-title">02 &nbsp;Heatmap — Dag × Time (gns. kr pr. dag)</div>
+            <div class="aar2-chart-hdr">
+              <span class="aar2-chart-ttl">Heatmap — Dag × Time</span>
+              <span class="aar2-chart-sub">Gns. kr pr. dag</span>
+            </div>
             <div class="heatmap-wrap"><table class="heatmap" id="heatmap-table"></table></div>
           </div>
         </div>
@@ -482,17 +488,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="two-col">
           <div class="card">
-            <div class="card-title">Omsætning per kategori</div>
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Omsætning per kategori</span></div>
             <div style="position:relative;height:280px;"><canvas id="c-vare"></canvas></div>
           </div>
           <div class="card">
-            <div class="card-title">Andel af total</div>
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Andel af total</span></div>
             <div style="position:relative;height:280px;"><canvas id="c-vare-pie"></canvas></div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-title">Kategori-nøgletal</div>
-          <table class="om-table">
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Kategori-nøgletal</span>
+          </div>
+          <table class="aar2-tbl">
             <thead><tr><th>Kategori</th><th class="num">Omsætning</th><th class="num">DB%</th></tr></thead>
             <tbody id="kat-tbody"></tbody>
           </table>
@@ -510,9 +518,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div class="ptab" onclick="setTopN(50,this)">Top 50</div>
           <div class="ptab" onclick="setTopN(100,this)">Top 100</div>
         </div>
-        <div class="card" style="margin-bottom:0;">
-          <div class="card-title" id="top-card-title">Top 20 produkter</div>
-          <table class="om-table">
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l" id="top-card-title">Top 20 produkter</span>
+          </div>
+          <table class="aar2-tbl">
             <thead>
               <tr><th>#</th><th>Produkt</th><th class="num">Omsætning</th><th class="num">Antal solgt</th><th class="num">DB%</th></tr>
             </thead>
@@ -816,7 +826,7 @@ function buildForside(kpi, dage, uger) {
   if (dage && dage.length) {
     mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
       [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth: 1, borderRadius: 2 }],
-      { scales:{ x:{ ticks:{ font:{ size:9 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:11 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}}});
 
     const seneste = dage[dage.length - 1];
     if (seneste) {
@@ -832,7 +842,7 @@ function buildForside(kpi, dage, uger) {
   if (uger && uger.length) {
     mk('c-db','line', uger.map(r => `U${r.uge}`),
       [{ data: uger.map(r => r.db_pct), borderColor: G, backgroundColor: GL, fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:G }],
-      { scales:{ x:{ ticks:{ font:{ size:9 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:9 }, callback: v => v+'%' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:11 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:11 }, callback: v => v+'%' }}}});
   }
 }
 
@@ -861,7 +871,7 @@ function buildDag(kpi, timer) {
     document.getElementById('dag-no-time').style.display = 'none';
     mk('c-dag','bar', timer.map(r => r.time_start+':00'),
       [{ data: timer.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
-      { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:11 }}}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v)+' kr' }}}});
   } else {
     document.getElementById('dag-chart-wrap').style.display = 'none';
     document.getElementById('dag-no-time').style.display = '';
@@ -872,20 +882,21 @@ function buildUge(uger) {
   if (!uger || !uger.length) return;
   mk('c-uge','bar', uger.map(r => `U${r.uge}`),
     [{ data: uger.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
-    { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}}});
+    { scales:{ x:{ ticks:{ font:{ size:11 }}}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}}});
 
   const snitOmsat = uger.reduce((a,r) => a + r.omsaetning, 0) / uger.length;
   document.getElementById('uge-tbody').innerHTML = uger.slice().reverse().slice(0,16).map(r => {
     const pct = snitOmsat > 0 ? ((r.omsaetning/snitOmsat-1)*100).toFixed(0) : 0;
-    const pill = r.db_pct>=35.5?'pill-g':r.db_pct>=33?'pill-a':'pill-r';
-    const status = r.db_pct>=35.5?'God':r.db_pct>=33?'Ok':'Lav';
+    const dbColor = r.db_pct>=35.5?'#2d5a2d':r.db_pct>=33?'#7a5c00':'#9b3420';
+    const dbBg    = r.db_pct>=35.5?'rgba(74,124,74,.1)':r.db_pct>=33?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
+    const status  = r.db_pct>=35.5?'God':r.db_pct>=33?'Ok':'Lav';
     return `<tr>
-      <td>Uge ${r.uge} <small style="color:var(--ash);font-size:10px;">${r.aar}</small></td>
-      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
-      <td class="num">${r.db_pct.toFixed(1)}%</td>
-      <td class="num" style="color:${pct>=0?'var(--moss)':'var(--danger)'}">${pct>=0?'+':''}${pct}%</td>
-      <td class="num">${r.antal_dage}</td>
-      <td><span class="pill ${pill}">${status}</span></td>
+      <td style="font-size:14px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
+      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
+      <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>
+      <td class="num" style="font-size:14px;">${r.antal_dage}</td>
+      <td><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${status}</span></td>
     </tr>`;
   }).join('');
 }
@@ -986,7 +997,7 @@ function buildKategorier(kategorier) {
   const vData = kategorier.map(r => Math.round(r.omsaetning));
   mk('c-vare','bar', vKat,
     [{ data:vData, backgroundColor:vColors.map(c=>c+'cc'), borderColor:vColors, borderWidth:1, borderRadius:2 }],
-    { indexAxis:'y', scales:{ x:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}, y:{ ticks:{ font:{ size:10 }}}}});
+    { indexAxis:'y', scales:{ x:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}, y:{ ticks:{ font:{ size:11 }}}}});
   if (_charts['c-vare-pie']) _charts['c-vare-pie'].destroy();
   _charts['c-vare-pie'] = new Chart(document.getElementById('c-vare-pie'), {
     type:'doughnut',
@@ -994,8 +1005,13 @@ function buildKategorier(kategorier) {
     options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ font:{ size:10 }, boxWidth:10, padding:10 }}}}
   });
   document.getElementById('kat-tbody').innerHTML = kategorier.map(r => {
-    const pill = r.db_pct>=35?'pill-g':r.db_pct>=30?'pill-a':'pill-r';
-    return `<tr><td>${r.kategori}</td><td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td><td class="num"><span class="pill ${pill}">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td></tr>`;
+    const dbColor = r.db_pct>=35?'#2d5a2d':r.db_pct>=30?'#7a5c00':'#9b3420';
+    const dbBg    = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=30?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
+    return `<tr>
+      <td style="font-size:14px;">${r.kategori}</td>
+      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
+    </tr>`;
   }).join('');
 }
 
@@ -1015,13 +1031,14 @@ function renderTop(top, n) {
   if (!top) return;
   document.getElementById('top-card-title').textContent = `Top ${n} produkter · samlet periode`;
   document.getElementById('top-tbody').innerHTML = top.map((r,i) => {
-    const pill = r.db_pct>=35?'pill-g':r.db_pct>=28?'pill-a':'pill-r';
+    const dbColor = r.db_pct>=35?'#2d5a2d':r.db_pct>=28?'#7a5c00':'#9b3420';
+    const dbBg    = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
     return `<tr>
-      <td style="color:var(--ash);font-family:'DM Mono',monospace;font-size:11px;">${i+1}</td>
-      <td>${r.varenavn}</td>
-      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
-      <td class="num">${Math.round(r.antal).toLocaleString('da-DK')}</td>
-      <td class="num"><span class="pill ${pill}">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
+      <td style="color:var(--amber);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;">${i+1}</td>
+      <td style="font-size:14px;">${r.varenavn}</td>
+      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:14px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
+      <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
     </tr>`;
   }).join('');
 }

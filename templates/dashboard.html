@@ -107,6 +107,37 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 .empty{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);padding:24px 0;text-align:center;}
 
+/* TIMEPROFIL */
+.tp-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid rgba(30,58,30,.12);border-radius:3px;overflow:hidden;margin-bottom:20px;}
+.tp-kpi{padding:14px 18px;border-right:1px solid rgba(30,58,30,.1);}
+.tp-kpi:last-child{border-right:none;}
+.tp-kpi.morgen{background:var(--forest);color:var(--amber);}
+.tp-kpi.formiddag,.tp-kpi.eftermiddag,.tp-kpi.aften{background:var(--white);}
+.tp-kpi-lbl{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;opacity:.7;}
+.tp-kpi.morgen .tp-kpi-lbl{color:rgba(232,192,104,.8);}
+.tp-kpi:not(.morgen) .tp-kpi-lbl{color:var(--ash);}
+.tp-kpi-val{font-size:28px;font-weight:300;line-height:1;}
+.tp-kpi.morgen .tp-kpi-val{color:var(--amber);}
+.tp-kpi:not(.morgen) .tp-kpi-val{color:var(--forest);}
+.tp-kpi-sub{font-family:'DM Mono',monospace;font-size:8px;margin-top:4px;color:var(--ash);}
+/* Horisontalt søjlediagram */
+.hbar-wrap{padding:4px 0;}
+.hbar-row{display:flex;align-items:center;gap:10px;padding:2px 0;}
+.hbar-time{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);width:40px;flex-shrink:0;text-align:right;}
+.hbar-outer{flex:1;background:rgba(30,58,30,.05);border-radius:1px;height:20px;position:relative;overflow:hidden;}
+.hbar-inner{height:100%;border-radius:1px;display:flex;align-items:center;padding:0 8px;min-width:4px;transition:width .3s;}
+.hbar-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--white);white-space:nowrap;}
+.hbar-end{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);width:48px;flex-shrink:0;text-align:right;}
+/* Heatmap */
+.heatmap-wrap{overflow-x:auto;}
+.heatmap{border-collapse:collapse;font-size:11px;width:100%;}
+.heatmap th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);padding:6px 8px;text-align:center;border-bottom:1px solid rgba(30,58,30,.12);}
+.heatmap th:first-child{text-align:left;}
+.heatmap td{padding:5px 6px;text-align:center;font-family:'DM Mono',monospace;font-size:10px;border-bottom:1px solid rgba(30,58,30,.04);min-width:34px;}
+.heatmap td:first-child{font-size:11px;font-weight:400;text-align:left;padding-left:8px;color:var(--charcoal);}
+.heatmap td.top-col{font-weight:400;color:var(--gold);}
+.heatmap tr:last-child td{border-bottom:none;}
+
 /* DAGE-DETALJER PANEL */
 .dage-hdr{display:flex;align-items:baseline;gap:16px;margin-bottom:20px;}
 .dage-hdr h2{font-size:20px;font-weight:300;color:var(--forest);}
@@ -288,25 +319,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <!-- TIMEPROFIL -->
       <div class="panel" id="p-time">
         <div class="page-hdr">
-          <h2>Timeprofil</h2>
-          <p>Gennemsnitlig omsætning per time og ugedag</p>
+          <h2>Timeprofil — Hvornår handler kunderne</h2>
+          <p>Gennemsnitlig omsætning per time baseret på alle uger i datasættet</p>
         </div>
-        <div class="card">
-          <div class="card-title">Gennemsnitlig timeprofil · alle dage</div>
-          <div id="time-chart-wrap" style="position:relative;height:220px;"><canvas id="c-time"></canvas></div>
-          <div id="time-no-data" class="empty" style="display:none;">Tidsdata ikke tilgængeligt — uploades ved næste rapport</div>
-        </div>
-        <div class="two-col">
+        <div id="time-no-data" class="empty" style="display:none;">Tidsdata ikke tilgængeligt — uploades ved næste rapport</div>
+        <div id="time-content">
+          <!-- Periode KPI -->
+          <div class="tp-kpi-grid" id="tp-kpi-grid"></div>
+          <!-- Søjlediagram -->
           <div class="card">
-            <div class="card-title">Mandag vs. lørdag</div>
-            <div style="position:relative;height:200px;"><canvas id="c-ugedag"></canvas></div>
+            <div class="card-title">01 &nbsp;Samlet omsætning pr. time (alle normaluger)</div>
+            <p style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-bottom:12px;">
+              OMSÆTNING PR. TIME – FARVET EFTER PERIODE (AMBER=MORGEN, GRØN=FORMIDDAG, MØRKGRØN=EFTERMIDDAG)
+            </p>
+            <div class="hbar-wrap" id="hbar-wrap"></div>
           </div>
+          <!-- Heatmap -->
           <div class="card">
-            <div class="card-title">Bedste timer per ugedag</div>
-            <table class="om-table">
-              <thead><tr><th>Dag</th><th>Peak-time</th><th class="num">Snit-salg</th></tr></thead>
-              <tbody id="peak-tbody"></tbody>
-            </table>
+            <div class="card-title">02 &nbsp;Heatmap — Dag × Time (gns. kr pr. dag)</div>
+            <div class="heatmap-wrap"><table class="heatmap" id="heatmap-table"></table></div>
           </div>
         </div>
       </div>
@@ -543,34 +574,94 @@ function buildUge(uger) {
   }).join('');
 }
 
+function periodeColor(h) {
+  if (h >= 7  && h < 10) return '#c8a84b';
+  if (h >= 10 && h < 13) return '#4a7c4a';
+  if (h >= 13 && h < 17) return '#2d5a2d';
+  if (h >= 17 && h < 21) return '#6b7c6b';
+  return '#b5c4a8';
+}
+function ttusind(v) { return v >= 1000 ? (v/1000).toFixed(1) + 't' : Math.round(v) + ''; }
+
 function buildTime(timerSnit) {
   if (!timerSnit || !timerSnit.length) {
-    document.getElementById('time-chart-wrap').style.display = 'none';
     document.getElementById('time-no-data').style.display = '';
+    document.getElementById('time-content').style.display = 'none';
     return;
   }
   document.getElementById('time-no-data').style.display = 'none';
-  const hrs = [...new Set(timerSnit.map(r => r.time_start))].sort((a,b) => a-b);
+  document.getElementById('time-content').style.display = '';
+
+  // Aggregate hourly totals across all weekdays
   const hMap = {};
-  timerSnit.forEach(r => { if (!hMap[r.time_start]) hMap[r.time_start]={sum:0,n:0}; hMap[r.time_start].sum+=r.snit_omsaetning; hMap[r.time_start].n++; });
-  mk('c-time','line', hrs.map(h => h+':00'),
-    [{ data: hrs.map(h => Math.round(hMap[h].sum/hMap[h].n)), borderColor:F, backgroundColor:FL, fill:true, tension:0.4, pointRadius:2 }],
-    { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
+  timerSnit.forEach(r => {
+    if (!hMap[r.time_start]) hMap[r.time_start] = 0;
+    hMap[r.time_start] += r.snit_omsaetning;
+  });
+  const hrs = Object.keys(hMap).map(Number).sort((a,b) => a-b);
+  const maxVal = Math.max(...hrs.map(h => hMap[h]));
 
-  const manData = hrs.map(h => { const r=timerSnit.find(x=>x.time_start==h&&x.ugedag==1); return r?Math.round(r.snit_omsaetning):0; });
-  const lorData = hrs.map(h => { const r=timerSnit.find(x=>x.time_start==h&&x.ugedag==6); return r?Math.round(r.snit_omsaetning):0; });
-  mk('c-ugedag','bar', hrs.map(h => h+':00'), [
-    { label:'Man', data:manData, backgroundColor:'rgba(30,58,30,.45)', borderRadius:2 },
-    { label:'Lør', data:lorData, backgroundColor:'rgba(200,168,75,.55)', borderRadius:2 }
-  ],{ plugins:{ legend:{ display:true, position:'top', labels:{ font:{ size:9 }, boxWidth:8 }}},
-     scales:{ x:{ ticks:{ font:{ size:9 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
-
-  document.getElementById('peak-tbody').innerHTML = [1,2,3,4,5,6].map(dag => {
-    const dagData = timerSnit.filter(r => r.ugedag==dag);
-    if (!dagData.length) return '';
-    const peak = dagData.reduce((b,r) => r.snit_omsaetning>b.snit_omsaetning?r:b, dagData[0]);
-    return `<tr><td>${dagNavne[dag]}</td><td>${peak.time_start}:00–${peak.time_start+1}:00</td><td class="num">${Math.round(peak.snit_omsaetning)} kr</td></tr>`;
+  // ── Periode KPI boxes ────────────────────────────────────────────────────
+  const perioder = [
+    { id:'morgen',       label:'Morgenpeak',   range:[7,10],  cls:'morgen'      },
+    { id:'formiddag',    label:'Formiddag',    range:[10,13], cls:'formiddag'   },
+    { id:'eftermiddag',  label:'Eftermiddag',  range:[13,17], cls:'eftermiddag' },
+    { id:'aften',        label:'Aften',        range:[17,21], cls:'aften'       },
+  ];
+  const totalAll = hrs.reduce((s,h) => s + hMap[h], 0);
+  document.getElementById('tp-kpi-grid').innerHTML = perioder.map(p => {
+    const [fra, til] = p.range;
+    const sum = hrs.filter(h => h >= fra && h < til).reduce((s,h) => s + hMap[h], 0);
+    const pct = totalAll > 0 ? Math.round(sum / totalAll * 100) : 0;
+    const tidsLabel = `${fra}:00 – ${til}:00`;
+    return `<div class="tp-kpi ${p.cls}">
+      <div class="tp-kpi-lbl">${p.label}</div>
+      <div class="tp-kpi-val">${pct}%</div>
+      <div class="tp-kpi-sub">${tidsLabel} · ${Math.round(sum/1000)}k kr</div>
+    </div>`;
   }).join('');
+
+  // ── Horizontal bar chart ─────────────────────────────────────────────────
+  document.getElementById('hbar-wrap').innerHTML = hrs.map(h => {
+    const val = hMap[h];
+    const w = maxVal > 0 ? Math.max(2, Math.round(val / maxVal * 100)) : 2;
+    const color = periodeColor(h);
+    return `<div class="hbar-row">
+      <div class="hbar-time">${h}:00</div>
+      <div class="hbar-outer">
+        <div class="hbar-inner" style="width:${w}%;background:${color};">
+          <span class="hbar-lbl">${ttusind(val)} kr</span>
+        </div>
+      </div>
+      <div class="hbar-end">${ttusind(val)}</div>
+    </div>`;
+  }).join('');
+
+  // ── Heatmap Dag × Time ───────────────────────────────────────────────────
+  const dagLabels = ['','Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const dagNums = [1,2,3,4,5,6,7];
+  // cell value: snit_omsaetning for (ugedag, time_start)
+  const cell = {};
+  timerSnit.forEach(r => { cell[`${r.ugedag}_${r.time_start}`] = r.snit_omsaetning; });
+  const allVals = timerSnit.map(r => r.snit_omsaetning);
+  const maxCell = allVals.length ? Math.max(...allVals) : 1;
+
+  let thead = '<thead><tr><th></th>' + hrs.map(h => `<th>${h}</th>`).join('') + '<th>Peak</th></tr></thead>';
+  let tbody = '<tbody>' + dagNums.map(dag => {
+    const dagVals = hrs.map(h => cell[`${dag}_${h}`] || 0);
+    if (dagVals.every(v => v === 0)) return '';
+    const peakH = hrs[dagVals.indexOf(Math.max(...dagVals))];
+    const cells = hrs.map((h,i) => {
+      const v = dagVals[i];
+      const op = maxCell > 0 ? v / maxCell : 0;
+      const bg = `rgba(30,58,30,${(op * 0.75).toFixed(2)})`;
+      const fg = op > 0.5 ? '#fafaf8' : 'var(--charcoal)';
+      return `<td style="background:${bg};color:${fg};">${v > 0 ? ttusind(v) : ''}</td>`;
+    }).join('');
+    return `<tr><td>${dagLabels[dag]}</td>${cells}<td class="top-col">${peakH}:00</td></tr>`;
+  }).join('') + '</tbody>';
+
+  document.getElementById('heatmap-table').innerHTML = thead + tbody;
 }
 
 function buildKategorier(kategorier) {

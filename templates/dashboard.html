@@ -106,6 +106,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ptab.active{background:var(--forest);color:var(--amber);border-color:var(--forest);}
 
 .empty{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);padding:24px 0;text-align:center;}
+
+/* DAGE-DETALJER PANEL */
+.dage-hdr{display:flex;align-items:baseline;gap:16px;margin-bottom:20px;}
+.dage-hdr h2{font-size:20px;font-weight:300;color:var(--forest);}
+.dage-hdr p{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);}
+.dag-grid{display:grid;grid-auto-columns:minmax(220px,1fr);grid-auto-flow:column;border:1px solid rgba(30,58,30,.1);border-radius:3px;overflow:hidden;background:var(--white);}
+.dag-col{border-right:1px solid rgba(30,58,30,.08);}
+.dag-col:last-child{border-right:none;}
+.dag-col-hdr{background:var(--parchment);padding:14px 16px;border-bottom:2px solid var(--forest);}
+.dag-col-dato{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
+.dag-col-omsat{font-size:22px;font-weight:400;color:var(--forest);line-height:1.1;margin-bottom:4px;}
+.dag-col-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);}
+.dag-prod-hdr{display:flex;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid rgba(30,58,30,.1);}
+.dag-prod-hdr span{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);}
+.dag-prod-row{display:flex;align-items:baseline;gap:6px;padding:5px 16px;border-bottom:1px solid rgba(30,58,30,.04);font-size:12px;}
+.dag-prod-row:last-child{border-bottom:none;}
+.dag-prod-navn{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--charcoal);}
+.dag-prod-antal{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
+.dag-prod-kr{font-family:'DM Mono',monospace;font-size:11px;font-weight:400;color:var(--forest);white-space:nowrap;text-align:right;min-width:52px;}
 </style>
 </head>
 <body>
@@ -161,6 +180,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="nav-item" onclick="showPanel('top',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/></svg>
         Top produkter
+      </div>
+      <div class="nav-item" onclick="showPanel('dagedetaljer',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
+        Dage · produkter
       </div>
     </nav>
 
@@ -332,6 +355,24 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </thead>
             <tbody id="top-tbody"><tr><td colspan="5" class="empty">Indlæser…</td></tr></tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- DAGE · PRODUKTER -->
+      <div class="panel" id="p-dagedetaljer">
+        <div class="dage-hdr">
+          <div>
+            <h2>Produkt &middot; stk &middot; omsætning pr. dag</h2>
+            <p id="dage-sub">Indlæser…</p>
+          </div>
+          <div class="periode-tabs" style="margin-bottom:0;" id="dage-tabs">
+            <div class="ptab active" onclick="setDageN(8,this)">8 dage</div>
+            <div class="ptab" onclick="setDageN(14,this)">14 dage</div>
+            <div class="ptab" onclick="setDageN(30,this)">30 dage</div>
+          </div>
+        </div>
+        <div style="overflow-x:auto;">
+          <div class="dag-grid" id="dag-grid"></div>
         </div>
       </div>
 
@@ -577,6 +618,63 @@ function renderTop(top, n) {
     </tr>`;
   }).join('');
 }
+
+// ── DAGE DETALJER ────────────────────────────────────────────────────────────
+const _dageCache = {};
+let _dageN = 8;
+
+async function loadDageDetaljer(n) {
+  if (_dageCache[n]) { renderDageDetaljer(_dageCache[n], n); return; }
+  document.getElementById('dag-grid').innerHTML =
+    '<div style="padding:32px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</div>';
+  const data = await api('/api/salg/dage-detaljer?n=' + n);
+  if (data) { _dageCache[n] = data; renderDageDetaljer(data, n); }
+}
+
+function renderDageDetaljer(dage, n) {
+  document.getElementById('dage-sub').textContent = 'Seneste ' + n + ' dage · produkt · stk · omsætning';
+  const grid = document.getElementById('dag-grid');
+  if (!dage || !dage.length) {
+    grid.innerHTML = '<div class="empty" style="padding:40px;">Ingen data</div>';
+    return;
+  }
+  grid.style.gridTemplateColumns = `repeat(${dage.length}, minmax(200px, 1fr))`;
+  grid.innerHTML = dage.map(dag => {
+    const prods = dag.produkter.map(p =>
+      `<div class="dag-prod-row">
+        <span class="dag-prod-navn">${p.varenavn}</span>
+        <span class="dag-prod-antal">${p.antal} stk</span>
+        <span class="dag-prod-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+      </div>`
+    ).join('');
+    return `<div class="dag-col">
+      <div class="dag-col-hdr">
+        <div class="dag-col-dato">${dag.dato_label}</div>
+        <div class="dag-col-omsat">${Math.round(dag.omsaetning).toLocaleString('da-DK')} kr</div>
+        <div class="dag-col-sub">${dag.linjer} linjer &middot; ${Math.round(dag.snit_per_linje)} kr/linje</div>
+      </div>
+      <div class="dag-prod-hdr">
+        <span>Produkt</span>
+        <span>Stk &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Kr</span>
+      </div>
+      ${prods}
+    </div>`;
+  }).join('');
+}
+
+function setDageN(n, el) {
+  document.querySelectorAll('#dage-tabs .ptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  _dageN = n;
+  loadDageDetaljer(n);
+}
+
+// Indlæs dage-detaljer når panelet vises første gang
+const _origShowPanel = showPanel;
+window.showPanel = function(id, el) {
+  _origShowPanel(id, el);
+  if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
+};
 
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);

@@ -143,6 +143,12 @@ async def api_top(request: Request, n: int = 20):
     return database.hent_top_produkter(min(n, 100))
 
 
+@app.get("/api/salg/dage-detaljer")
+async def api_dage_detaljer(request: Request, n: int = 8):
+    _kræv_login(request)
+    return database.hent_dage_detaljer(min(n, 30))
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

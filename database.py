@@ -226,6 +226,62 @@ def hent_kategorier() -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def hent_dage_detaljer(n: int = 8) -> List[Dict]:
+    from datetime import datetime
+    DAG_NAVNE    = ['Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag','Søndag']
+    MAANED_NAVNE = {1:'januar',2:'februar',3:'marts',4:'april',5:'maj',6:'juni',
+                    7:'juli',8:'august',9:'september',10:'oktober',11:'november',12:'december'}
+
+    with _conn() as conn:
+        dage = conn.execute("""
+            SELECT dato,
+                   ROUND(SUM(omsætning), 2) AS omsaetning,
+                   COUNT(*)                  AS linjer
+            FROM transaktioner
+            GROUP BY dato
+            ORDER BY dato DESC
+            LIMIT ?
+        """, (n,)).fetchall()
+
+        if not dage:
+            return []
+
+        dato_list    = [r['dato'] for r in dage]
+        placeholders = ','.join('?' * len(dato_list))
+
+        produkter = conn.execute(f"""
+            SELECT dato, varenavn,
+                   ROUND(SUM(antal), 0)    AS antal,
+                   ROUND(SUM(omsætning), 2) AS omsaetning
+            FROM transaktioner
+            WHERE dato IN ({placeholders})
+            GROUP BY dato, varenavn
+            ORDER BY dato DESC, omsaetning DESC
+        """, dato_list).fetchall()
+
+    prod_by_dato: Dict[str, list] = {}
+    for p in produkter:
+        prod_by_dato.setdefault(p['dato'], []).append({
+            'varenavn':  p['varenavn'],
+            'antal':     int(p['antal']),
+            'omsaetning': p['omsaetning'],
+        })
+
+    result = []
+    for dag in dage:
+        dato = dag['dato']
+        d    = datetime.strptime(dato, '%Y-%m-%d')
+        result.append({
+            'dato':           dato,
+            'dato_label':     f"{DAG_NAVNE[d.weekday()]} {d.day}. {MAANED_NAVNE[d.month]}",
+            'omsaetning':     dag['omsaetning'],
+            'linjer':         dag['linjer'],
+            'snit_per_linje': round(dag['omsaetning'] / dag['linjer'], 0) if dag['linjer'] > 0 else 0,
+            'produkter':      prod_by_dato.get(dato, [])[:15],
+        })
+    return result
+
+
 def hent_top_produkter(n: int = 20) -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""

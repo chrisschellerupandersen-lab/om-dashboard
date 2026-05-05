@@ -1078,8 +1078,9 @@ function defaultAarCfg(base, gpm) {
 async function loadAar() {
   if (_aarLoaded) return;
   _aarLoaded = true;
-  document.getElementById('aar-tbody').innerHTML =
-    '<tr><td colspan="9" style="padding:28px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
+  const aarTbody = document.getElementById('aar2-tbody');
+  if (aarTbody) aarTbody.innerHTML =
+    '<tr><td colspan="6" style="padding:28px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
   const data = await api('/api/salg/aarsdata');
   if (!data) return;
   _aarRaw = data;

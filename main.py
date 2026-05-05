@@ -1,6 +1,7 @@
 import os
 import base64
 from datetime import datetime
+from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -144,7 +145,7 @@ async def api_top(request: Request, n: int = 20):
 
 
 @app.get("/api/salg/aarsdata")
-async def api_aarsdata(request: Request, aar: int = None):
+async def api_aarsdata(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
     return database.hent_aarsdata(aar)
 

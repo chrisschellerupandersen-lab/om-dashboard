@@ -432,16 +432,11 @@ def hent_kaffe_analyse() -> Dict:
 
         timer = conn.execute("""
             SELECT time_start,
-                   ROUND(AVG(dag_antal), 2)      AS snit_antal,
-                   ROUND(AVG(dag_omsaetning), 2) AS snit_omsaetning
-            FROM (
-                SELECT time_start, dato,
-                       SUM(antal)     AS dag_antal,
-                       SUM(omsætning) AS dag_omsaetning
-                FROM transaktioner
-                WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
-                GROUP BY time_start, dato
-            )
+                   ROUND(SUM(antal), 0)      AS total_antal,
+                   ROUND(SUM(omsætning), 2)  AS total_omsaetning,
+                   ROUND(SUM(antal) * 100.0 / NULLIF(SUM(SUM(antal)) OVER (), 0), 1) AS pct
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
             GROUP BY time_start
             ORDER BY time_start
         """).fetchall()

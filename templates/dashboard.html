@@ -684,7 +684,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </table>
             </div>
             <div class="card">
-              <div class="card-title">Hvornår købes kaffe</div>
+              <div class="card-title">Hvornår købes kaffe — fordeling af salg</div>
               <div style="height:220px;position:relative;"><canvas id="c-kaffe-time"></canvas></div>
             </div>
           </div>
@@ -1565,14 +1565,21 @@ function buildKaffe(d) {
   if (d.timer && d.timer.length) {
     mk('c-kaffe-time', 'bar',
       d.timer.map(r => r.time_start + ':00'),
-      [{ data: d.timer.map(r => Math.round(r.snit_antal)),
+      [{ data: d.timer.map(r => r.pct),
          backgroundColor: d.timer.map(r => periodeColor(r.time_start) + 'cc'),
          borderColor:     d.timer.map(r => periodeColor(r.time_start)),
          borderWidth: 1, borderRadius: 2 }],
       { scales: {
           x: { ticks: { font: { size: 9 } } },
-          y: { ticks: { font: { size: 9 }, callback: v => v + ' kop' } }
-      }});
+          y: { ticks: { font: { size: 9 }, callback: v => v + '%' } }
+        },
+        plugins: { tooltip: { callbacks: {
+          label: ctx => {
+            const r = d.timer[ctx.dataIndex];
+            return `${r.pct}% af salg — ${r.total_antal} kopper i alt`;
+          }
+        }}}
+      });
   }
 
   if (d.dage && d.dage.length) {

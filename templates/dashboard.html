@@ -1,608 +1,585 @@
 <!DOCTYPE html>
 <html lang="da">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Organic Market Greve — Dashboard</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Organic Market Greve — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+:root {
+  --forest:#1e3a1e; --moss:#2d5a2d; --sage:#4a7c4a; --mint:#8fbc8f;
+  --cream:#f5f0e8; --parchment:#ede8dc; --gold:#c8a84b; --amber:#e8c068;
+  --clay:#8b4513; --ash:#6b7c6b; --charcoal:#2a2e2a; --white:#fafaf8;
+  --danger:#c0392b; --success:#2d5a2d;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-serif;font-weight:300;line-height:1.6;}
 
-    :root {
-      --grøn:      #2d5a3d;
-      --grøn-mørk: #1a3a2a;
-      --grøn-lys:  #e8f5ee;
-      --grå:       #6b7280;
-      --kant:      #e5e7eb;
-      --bg:        #f3f4f6;
-    }
+#app{display:flex;height:100%;flex-direction:column;}
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg);
-      color: #111827;
-      min-height: 100vh;
-    }
+/* TOPBAR */
+.topbar{
+  background:var(--forest);height:52px;padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.tb-left{display:flex;align-items:center;gap:14px;}
+.tb-logo{display:flex;align-items:center;gap:10px;}
+.tb-logo svg{width:24px;height:24px;opacity:.9;}
+.tb-brand{display:flex;flex-direction:column;line-height:1.15;}
+.tb-brand strong{font-size:13px;font-weight:400;color:var(--amber);}
+.tb-brand span{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;color:rgba(232,192,104,.5);text-transform:uppercase;}
+.tb-divider{width:1px;height:20px;background:rgba(255,255,255,.1);}
+.tb-week{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:rgba(232,192,104,.6);text-transform:uppercase;}
+.tb-right{display:flex;align-items:center;gap:8px;}
+.tb-sync{font-family:'DM Mono',monospace;font-size:9px;color:rgba(143,188,143,.7);}
+.tb-btn{
+  font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
+  background:rgba(255,255,255,.08);color:rgba(232,192,104,.7);
+  border:1px solid rgba(232,192,104,.2);border-radius:2px;
+  padding:4px 10px;cursor:pointer;text-decoration:none;
+}
+.tb-btn:hover{background:rgba(255,255,255,.14);}
 
-    /* ── HEADER ── */
-    header {
-      background: var(--grøn-mørk);
-      color: #fff;
-      padding: 0 24px;
-      height: 60px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
+/* SIDEBAR */
+.body-wrap{display:flex;flex:1;overflow:hidden;}
+.sidebar{
+  width:200px;background:var(--parchment);flex-shrink:0;
+  border-right:1px solid rgba(30,58,30,.1);
+  padding:20px 0;overflow-y:auto;
+}
+.nav-group-label{
+  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ash);padding:4px 20px 8px;
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 20px;cursor:pointer;font-size:13px;font-weight:300;
+  color:var(--charcoal);border-left:2px solid transparent;transition:all .12s;
+}
+.nav-item:hover{background:rgba(30,58,30,.05);}
+.nav-item.active{background:rgba(30,58,30,.06);border-left-color:var(--forest);color:var(--forest);font-weight:400;}
+.nav-item svg{width:14px;height:14px;opacity:.6;flex-shrink:0;}
+.nav-item.active svg{opacity:1;}
 
-    .header-venstre {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 17px;
-    }
+/* CONTENT */
+.content{flex:1;overflow-y:auto;background:var(--cream);}
+.panel{display:none;padding:28px 28px 40px;}
+.panel.active{display:block;}
 
-    .header-venstre span { font-size: 22px; }
+/* PAGE HEADER */
+.page-hdr{margin-bottom:20px;}
+.page-hdr h2{font-size:20px;font-weight:300;color:var(--forest);}
+.page-hdr p{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:3px;}
 
-    header nav { display: flex; align-items: center; gap: 20px; }
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
+.kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
+.kpi-v{font-size:24px;font-weight:300;color:var(--forest);line-height:1;}
+.kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
+.kpi-s.up{color:var(--moss);}
+.kpi-s.dn{color:var(--danger);}
 
-    .senest-opdateret {
-      font-size: 12px;
-      color: rgba(255,255,255,0.6);
-    }
+/* CARD */
+.card{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:20px 22px;margin-bottom:14px;}
+.card-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:16px;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 
-    .logout-knap {
-      background: rgba(255,255,255,0.12);
-      color: #fff;
-      border: 1px solid rgba(255,255,255,0.25);
-      border-radius: 6px;
-      padding: 6px 14px;
-      font-size: 13px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: background 0.15s;
-    }
+/* TABLE */
+.om-table{width:100%;border-collapse:collapse;font-size:13px;}
+.om-table th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
+.om-table td{padding:9px 12px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
+.om-table tr:last-child td{border-bottom:none;}
+.om-table tr:hover td{background:var(--cream);}
+.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px;}
+.pill{display:inline-block;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.05em;padding:3px 8px;border-radius:2px;}
+.pill-g{background:#dcfce7;color:#15803d;}
+.pill-a{background:#fef9c3;color:#854d0e;}
+.pill-r{background:#fce7f3;color:#9d174d;}
 
-    .logout-knap:hover { background: rgba(255,255,255,0.22); }
+/* TABS */
+.periode-tabs{display:flex;gap:6px;margin-bottom:16px;}
+.ptab{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:2px;cursor:pointer;background:var(--white);color:var(--ash);}
+.ptab.active{background:var(--forest);color:var(--amber);border-color:var(--forest);}
 
-    /* ── MAIN ── */
-    main {
-      max-width: 1280px;
-      margin: 0 auto;
-      padding: 28px 24px;
-    }
-
-    /* ── PERIODE-VÆLGER ── */
-    .periode-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-    }
-
-    .periode-bar span { font-size: 13px; color: var(--grå); font-weight: 600; }
-
-    .periode-knap {
-      padding: 6px 16px;
-      border-radius: 20px;
-      border: 1.5px solid var(--kant);
-      background: #fff;
-      font-size: 13px;
-      cursor: pointer;
-      transition: all 0.15s;
-      font-weight: 500;
-      color: #374151;
-    }
-
-    .periode-knap:hover { border-color: var(--grøn); color: var(--grøn); }
-    .periode-knap.aktiv { background: var(--grøn); border-color: var(--grøn); color: #fff; }
-
-    /* ── KPI KORT ── */
-    .kpi-gitter {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .kpi-kort {
-      background: #fff;
-      border-radius: 12px;
-      padding: 22px 24px;
-      border: 1px solid var(--kant);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .kpi-kort::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 3px;
-      background: var(--grøn);
-      border-radius: 12px 12px 0 0;
-    }
-
-    .kpi-label {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--grå);
-      margin-bottom: 8px;
-    }
-
-    .kpi-værdi {
-      font-size: 28px;
-      font-weight: 700;
-      color: #111827;
-      line-height: 1;
-    }
-
-    .kpi-sub {
-      font-size: 12px;
-      color: var(--grå);
-      margin-top: 6px;
-    }
-
-    .kpi-ikon {
-      position: absolute;
-      right: 20px;
-      top: 50%;
-      transform: translateY(-50%);
-      font-size: 32px;
-      opacity: 0.12;
-    }
-
-    /* ── GRAFER ── */
-    .grafer-gitter {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    @media (max-width: 900px) {
-      .grafer-gitter { grid-template-columns: 1fr; }
-    }
-
-    .kort {
-      background: #fff;
-      border-radius: 12px;
-      border: 1px solid var(--kant);
-      padding: 24px;
-    }
-
-    .kort-titel {
-      font-size: 14px;
-      font-weight: 700;
-      color: #374151;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .kort-badge {
-      font-size: 11px;
-      font-weight: 600;
-      background: var(--grøn-lys);
-      color: var(--grøn);
-      padding: 3px 10px;
-      border-radius: 20px;
-    }
-
-    .chart-wrapper { position: relative; }
-
-    /* ── TABEL ── */
-    .tabel-wrapper { overflow-x: auto; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    thead th {
-      text-align: left;
-      padding: 8px 12px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      color: var(--grå);
-      border-bottom: 1.5px solid var(--kant);
-      white-space: nowrap;
-    }
-
-    tbody tr { transition: background 0.1s; }
-    tbody tr:hover { background: var(--grøn-lys); }
-
-    tbody td {
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--kant);
-      color: #374151;
-    }
-
-    tbody tr:last-child td { border-bottom: none; }
-
-    .tal-celle { text-align: right; font-variant-numeric: tabular-nums; }
-
-    .rang {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      background: var(--grøn-lys);
-      color: var(--grøn);
-      border-radius: 50%;
-      font-size: 11px;
-      font-weight: 700;
-    }
-
-    /* ── LOADING / FEJL ── */
-    .spinner {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 200px;
-      color: var(--grå);
-      font-size: 14px;
-      gap: 10px;
-    }
-
-    .spinner::before {
-      content: '';
-      width: 20px;
-      height: 20px;
-      border: 2px solid var(--kant);
-      border-top-color: var(--grøn);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .ingen-data {
-      text-align: center;
-      padding: 48px;
-      color: var(--grå);
-      font-size: 14px;
-    }
-  </style>
+.empty{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);padding:24px 0;text-align:center;}
+</style>
 </head>
 <body>
+<div id="app">
 
-<header>
-  <div class="header-venstre">
-    <span>🌿</span>
-    Organic Market Greve
-  </div>
-  <nav>
-    <span class="senest-opdateret" id="senest-opdateret">Henter data…</span>
-    <a class="logout-knap" href="/logout">Log ud</a>
-  </nav>
-</header>
-
-<main>
-
-  <!-- Periode-vælger -->
-  <div class="periode-bar">
-    <span>Vis:</span>
-    <button class="periode-knap" data-dage="7">7 dage</button>
-    <button class="periode-knap aktiv" data-dage="30">30 dage</button>
-    <button class="periode-knap" data-dage="90">90 dage</button>
-    <button class="periode-knap" data-dage="0">Alt</button>
-  </div>
-
-  <!-- KPI kort -->
-  <div class="kpi-gitter">
-    <div class="kpi-kort">
-      <div class="kpi-label">Seneste dag omsætning</div>
-      <div class="kpi-værdi" id="kpi-dag">—</div>
-      <div class="kpi-sub" id="kpi-dag-dato">Afventer data</div>
-      <span class="kpi-ikon">📅</span>
-    </div>
-    <div class="kpi-kort">
-      <div class="kpi-label">Total omsætning (periode)</div>
-      <div class="kpi-værdi" id="kpi-total">—</div>
-      <div class="kpi-sub">Fra startdato til nu</div>
-      <span class="kpi-ikon">💰</span>
-    </div>
-    <div class="kpi-kort">
-      <div class="kpi-label">Gennemsnit avance</div>
-      <div class="kpi-værdi" id="kpi-avance">—</div>
-      <div class="kpi-sub">Beregnet fra seneste rapport</div>
-      <span class="kpi-ikon">📈</span>
-    </div>
-    <div class="kpi-kort">
-      <div class="kpi-label">Aktive varenumre</div>
-      <div class="kpi-værdi" id="kpi-varer">—</div>
-      <div class="kpi-sub">I seneste rapport</div>
-      <span class="kpi-ikon">🛒</span>
-    </div>
-  </div>
-
-  <!-- Grafer -->
-  <div class="grafer-gitter">
-
-    <div class="kort">
-      <div class="kort-titel">
-        Daglig omsætning
-        <span class="kort-badge" id="linje-badge">kr.</span>
+  <div class="topbar">
+    <div class="tb-left">
+      <div class="tb-logo">
+        <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="15" stroke="#c8a84b" stroke-width="0.8" opacity="0.6"/>
+          <path d="M9 20 Q16 10 23 20" stroke="#c8a84b" stroke-width="1.2" fill="none"/>
+          <circle cx="16" cy="14" r="2" fill="#c8a84b" opacity="0.9"/>
+        </svg>
+        <div class="tb-brand">
+          <strong>Organic Market</strong>
+          <span>Greve · Dashboard</span>
+        </div>
       </div>
-      <div class="chart-wrapper" style="height:260px">
-        <canvas id="linje-chart"></canvas>
-      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-week" id="tb-week">Uge — · —</div>
     </div>
-
-    <div class="kort">
-      <div class="kort-titel">
-        Top 10 varer
-        <span class="kort-badge">Seneste rapport</span>
-      </div>
-      <div class="chart-wrapper" style="height:260px">
-        <canvas id="bar-chart"></canvas>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Top-tabel -->
-  <div class="kort">
-    <div class="kort-titel">Top varer — detaljer</div>
-    <div class="tabel-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Varenavn</th>
-            <th class="tal-celle">Antal solgt</th>
-            <th class="tal-celle">Omsætning</th>
-          </tr>
-        </thead>
-        <tbody id="top-tabel-body">
-          <tr><td colspan="4"><div class="spinner">Henter data</div></td></tr>
-        </tbody>
-      </table>
+    <div class="tb-right">
+      <span class="tb-sync" id="tb-sync">● Indlæser…</span>
+      <a class="tb-btn" href="/logout">Log ud</a>
     </div>
   </div>
 
-</main>
+  <div class="body-wrap">
+    <nav class="sidebar">
+      <div class="nav-group-label">Overblik</div>
+      <div class="nav-item active" onclick="showPanel('forside',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/></svg>
+        Forside
+      </div>
+      <div class="nav-item" onclick="showPanel('dag',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.5 7.5V4h-1v5l3.5 2 .5-.87L8.5 8.5z"/></svg>
+        Seneste dag
+      </div>
+
+      <div class="nav-group-label" style="margin-top:12px;">Analyse</div>
+      <div class="nav-item" onclick="showPanel('uge',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 11h2v3H1zm3-4h2v7H4zm3-3h2v10H7zm3 2h2v8h-2zm3-4h2v12h-2z"/></svg>
+        Ugeoversigt
+      </div>
+      <div class="nav-item" onclick="showPanel('time',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 2 4-6 3 4H1z"/></svg>
+        Timeprofil
+      </div>
+      <div class="nav-item" onclick="showPanel('kategori',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2l5 3-5 3-5-3 5-3zM3 9.5l4 2.3v2.7l-4-2.3V9.5zm6 2.3l4-2.3v2.7l-4 2.3v-2.7z"/></svg>
+        Kategorier
+      </div>
+      <div class="nav-item" onclick="showPanel('top',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/></svg>
+        Top produkter
+      </div>
+    </nav>
+
+    <div class="content">
+
+      <!-- FORSIDE -->
+      <div class="panel active" id="p-forside">
+        <div class="page-hdr">
+          <h2>Overblik</h2>
+          <p id="hdr-forside-sub">Organic Market Greve</p>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-l">Seneste dag</div>
+            <div class="kpi-v" id="kpi-dag-omsat">—</div>
+            <div class="kpi-s" id="kpi-dag-vs">indlæser…</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Bruttoavance</div>
+            <div class="kpi-v" id="kpi-dag-db">—</div>
+            <div class="kpi-s" id="kpi-dag-db-sub">DB%</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Denne uge</div>
+            <div class="kpi-v" id="kpi-uge-omsat">—</div>
+            <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Transaktioner</div>
+            <div class="kpi-v" id="kpi-dag-transak">—</div>
+            <div class="kpi-s">seneste dag</div>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Daglig omsætning · seneste 30 dage</div>
+            <div style="position:relative;height:200px;"><canvas id="c-forside"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Bruttoavance per uge · %</div>
+            <div style="position:relative;height:200px;"><canvas id="c-db"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SENESTE DAG -->
+      <div class="panel" id="p-dag">
+        <div class="page-hdr">
+          <h2>Seneste dag</h2>
+          <p id="hdr-dag-sub">Timeopdelt salg</p>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-l">Omsætning</div>
+            <div class="kpi-v" id="dag-omsat">—</div>
+            <div class="kpi-s">ekskl. moms</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Transaktioner</div>
+            <div class="kpi-v" id="dag-transak">—</div>
+            <div class="kpi-s" id="dag-snit-kurv">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Bruttoavance</div>
+            <div class="kpi-v" id="dag-db">—</div>
+            <div class="kpi-s" id="dag-db-pct">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">vs. ugesnit</div>
+            <div class="kpi-v" id="dag-vs-snit">—</div>
+            <div class="kpi-s" id="dag-vs-sub">pr. dag</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Salg per time</div>
+          <div id="dag-chart-wrap" style="position:relative;height:220px;"><canvas id="c-dag"></canvas></div>
+          <div id="dag-no-time" class="empty" style="display:none;">Tidsdata ikke tilgængeligt i denne rapport</div>
+        </div>
+      </div>
+
+      <!-- UGEOVERSIGT -->
+      <div class="panel" id="p-uge">
+        <div class="page-hdr">
+          <h2>Ugeoversigt</h2>
+          <p>Omsætning og avance per uge</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Ugeomsætning</div>
+          <div style="position:relative;height:200px;"><canvas id="c-uge"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Nøgletal per uge</div>
+          <table class="om-table">
+            <thead>
+              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+            </thead>
+            <tbody id="uge-tbody"><tr><td colspan="6" class="empty">Indlæser…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TIMEPROFIL -->
+      <div class="panel" id="p-time">
+        <div class="page-hdr">
+          <h2>Timeprofil</h2>
+          <p>Gennemsnitlig omsætning per time og ugedag</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Gennemsnitlig timeprofil · alle dage</div>
+          <div id="time-chart-wrap" style="position:relative;height:220px;"><canvas id="c-time"></canvas></div>
+          <div id="time-no-data" class="empty" style="display:none;">Tidsdata ikke tilgængeligt — uploades ved næste rapport</div>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Mandag vs. lørdag</div>
+            <div style="position:relative;height:200px;"><canvas id="c-ugedag"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Bedste timer per ugedag</div>
+            <table class="om-table">
+              <thead><tr><th>Dag</th><th>Peak-time</th><th class="num">Snit-salg</th></tr></thead>
+              <tbody id="peak-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- KATEGORIER -->
+      <div class="panel" id="p-kategori">
+        <div class="page-hdr">
+          <h2>Kategorier</h2>
+          <p>Omsætning og avance per varekategori</p>
+        </div>
+        <div class="two-col">
+          <div class="card">
+            <div class="card-title">Omsætning per kategori</div>
+            <div style="position:relative;height:280px;"><canvas id="c-vare"></canvas></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Andel af total</div>
+            <div style="position:relative;height:280px;"><canvas id="c-vare-pie"></canvas></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Kategori-nøgletal</div>
+          <table class="om-table">
+            <thead><tr><th>Kategori</th><th class="num">Omsætning</th><th class="num">DB%</th></tr></thead>
+            <tbody id="kat-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TOP PRODUKTER -->
+      <div class="panel" id="p-top">
+        <div class="page-hdr">
+          <h2>Top produkter</h2>
+          <p>Mest solgte varer målt på omsætning · samlet periode</p>
+        </div>
+        <div class="periode-tabs" id="top-tabs">
+          <div class="ptab active" onclick="setTopN(20,this)">Top 20</div>
+          <div class="ptab" onclick="setTopN(50,this)">Top 50</div>
+          <div class="ptab" onclick="setTopN(100,this)">Top 100</div>
+        </div>
+        <div class="card" style="margin-bottom:0;">
+          <div class="card-title" id="top-card-title">Top 20 produkter</div>
+          <table class="om-table">
+            <thead>
+              <tr><th>#</th><th>Produkt</th><th class="num">Omsætning</th><th class="num">Antal solgt</th><th class="num">DB%</th></tr>
+            </thead>
+            <tbody id="top-tbody"><tr><td colspan="5" class="empty">Indlæser…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
 
 <script>
-  const GRØN        = '#2d5a3d';
-  const GRØN_LYS    = '#e8f5ee';
-  const GRØN_RGBA   = 'rgba(45,90,61,0.12)';
+const F = '#1e3a1e', G = '#c8a84b';
+const FL = 'rgba(30,58,30,.12)', GL = 'rgba(200,168,75,.15)';
+const vColors = [F,'#2d5a2d','#4a7c4a','#6b9e6b','#8fbc8f','#c8a84b','#b5c4a8','#9eb89e','#d4bc6c','#a8b89e'];
+const dagNavne = {1:'Mandag',2:'Tirsdag',3:'Onsdag',4:'Torsdag',5:'Fredag',6:'Lørdag',7:'Søndag'};
 
-  let alleData      = null;
-  let aktiveDage    = 30;
-  let linjeChart    = null;
-  let barChart      = null;
+function showPanel(id, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('p-' + id).classList.add('active');
+  el.classList.add('active');
+}
 
-  // ── FORMAT HELPERS ──────────────────────────────────────────────────────────
+async function api(path) {
+  try {
+    const r = await fetch(path);
+    if (r.status === 401) { window.location.href = '/login'; return null; }
+    if (!r.ok) return null;
+    return r.json();
+  } catch { return null; }
+}
 
-  function kr(tal) {
-    return new Intl.NumberFormat('da-DK', {
-      style: 'currency', currency: 'DKK',
-      minimumFractionDigits: 0, maximumFractionDigits: 0,
-    }).format(tal);
-  }
+function kr(v) { return Math.round(v).toLocaleString('da-DK') + ' kr'; }
+function fmtDato(iso) {
+  if (!iso) return '—';
+  const [,m,d] = iso.split('-');
+  return `${parseInt(d)}/${parseInt(m)}`;
+}
 
-  function dato(str) {
-    if (!str) return '—';
-    const [y, m, d] = str.split('-');
-    return `${d}/${m}/${y}`;
-  }
-
-  // ── DATA FETCH ──────────────────────────────────────────────────────────────
-
-  async function hentData() {
-    try {
-      const svar = await fetch('/api/data');
-      if (svar.status === 401) { location.href = '/login'; return; }
-      if (!svar.ok) throw new Error('HTTP ' + svar.status);
-      alleData = await svar.json();
-      opdaterAlt();
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
-  // ── FILTRER EFTER PERIODE ────────────────────────────────────────────────────
-
-  function filtrerDaglig(dage) {
-    const alle = alleData.daglig_omsætning || [];
-    if (!dage || dage === 0) return alle;
-    return alle.slice(-dage);
-  }
-
-  // ── OPDATER ALLE ELEMENTER ───────────────────────────────────────────────────
-
-  function opdaterAlt() {
-    if (!alleData) return;
-    opdaterKPI();
-    opdaterLinjeChart();
-    opdaterBarChart();
-    opdaterTabel();
-    opdaterSenestOpdateret();
-  }
-
-  function opdaterKPI() {
-    const kpi = alleData.kpi || {};
-    document.getElementById('kpi-dag').textContent    = kr(kpi.seneste_dag_omsætning ?? 0);
-    document.getElementById('kpi-dag-dato').textContent = kpi.seneste_rapport_dato
-      ? 'Pr. ' + dato(kpi.seneste_rapport_dato)
-      : 'Ingen data';
-    document.getElementById('kpi-total').textContent   = kr(kpi.total_omsætning ?? 0);
-    document.getElementById('kpi-avance').textContent  = (kpi.avance_pct ?? 0).toFixed(1) + ' %';
-    document.getElementById('kpi-varer').textContent   = kpi.antal_varer ?? '—';
-  }
-
-  function opdaterLinjeChart() {
-    const rækker  = filtrerDaglig(aktiveDage);
-    const labels  = rækker.map(r => dato(r.dato));
-    const værdier = rækker.map(r => r.omsætning);
-    const total   = værdier.reduce((a, b) => a + b, 0);
-
-    document.getElementById('linje-badge').textContent = kr(total);
-
-    const config = {
-      type: 'line',
-      data: {
-        labels,
-        datasets: [{
-          data: værdier,
-          borderColor: GRØN,
-          backgroundColor: GRØN_RGBA,
-          borderWidth: 2,
-          pointRadius: rækker.length > 60 ? 0 : 3,
-          pointHoverRadius: 5,
-          fill: true,
-          tension: 0.3,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ' ' + kr(ctx.parsed.y),
-            },
-          },
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: { maxTicksLimit: 8, font: { size: 11 } },
-          },
-          y: {
-            grid: { color: '#f0f0f0' },
-            ticks: {
-              font: { size: 11 },
-              callback: v => kr(v),
-            },
-          },
-        },
-      },
-    };
-
-    if (linjeChart) {
-      linjeChart.data   = config.data;
-      linjeChart.update();
-    } else {
-      linjeChart = new Chart(document.getElementById('linje-chart'), config);
-    }
-  }
-
-  function opdaterBarChart() {
-    const top    = (alleData.top_produkter || []).slice(0, 10);
-    const labels = top.map(p => p.varenavn.length > 20 ? p.varenavn.slice(0, 18) + '…' : p.varenavn);
-    const værdier = top.map(p => p.omsætning);
-
-    const config = {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [{
-          data: værdier,
-          backgroundColor: GRØN,
-          borderRadius: 4,
-          borderSkipped: false,
-        }],
-      },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: { label: ctx => ' ' + kr(ctx.parsed.x) },
-          },
-        },
-        scales: {
-          x: {
-            grid: { color: '#f0f0f0' },
-            ticks: { font: { size: 10 }, callback: v => kr(v) },
-          },
-          y: {
-            grid: { display: false },
-            ticks: { font: { size: 11 } },
-          },
-        },
-      },
-    };
-
-    if (barChart) {
-      barChart.data = config.data;
-      barChart.update();
-    } else {
-      barChart = new Chart(document.getElementById('bar-chart'), config);
-    }
-  }
-
-  function opdaterTabel() {
-    const top  = (alleData.top_produkter || []).slice(0, 10);
-    const tbody = document.getElementById('top-tabel-body');
-
-    if (!top.length) {
-      tbody.innerHTML = '<tr><td colspan="4"><div class="ingen-data">Ingen data endnu — afventer første rapport fra Shopbox</div></td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = top.map((p, i) => `
-      <tr>
-        <td><span class="rang">${i + 1}</span></td>
-        <td>${escHtml(p.varenavn)}</td>
-        <td class="tal-celle">${new Intl.NumberFormat('da-DK').format(Math.round(p.antal))}</td>
-        <td class="tal-celle">${kr(p.omsætning)}</td>
-      </tr>
-    `).join('');
-  }
-
-  function opdaterSenestOpdateret() {
-    const el = document.getElementById('senest-opdateret');
-    if (alleData.senest_opdateret) {
-      const d = new Date(alleData.senest_opdateret);
-      el.textContent = 'Opdateret ' + d.toLocaleDateString('da-DK') + ' ' + d.toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit' });
-    } else {
-      el.textContent = 'Ingen data';
-    }
-  }
-
-  function escHtml(s) {
-    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
-
-  // ── PERIODE-KNAPPER ──────────────────────────────────────────────────────────
-
-  document.querySelectorAll('.periode-knap').forEach(knap => {
-    knap.addEventListener('click', () => {
-      document.querySelectorAll('.periode-knap').forEach(k => k.classList.remove('aktiv'));
-      knap.classList.add('aktiv');
-      aktiveDage = parseInt(knap.dataset.dage, 10);
-      if (alleData) {
-        opdaterLinjeChart();
-      }
-    });
+const _charts = {};
+function mk(id, type, labels, datasets, extra={}) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (_charts[id]) _charts[id].destroy();
+  _charts[id] = new Chart(el, {
+    type, data: { labels, datasets },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{ legend:{ display:false } }, ...extra }
   });
+}
 
-  // ── INIT ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const [kpi, dage, uger, timer, timerSnit, kategorier, top] = await Promise.all([
+    api('/api/kpi'),
+    api('/api/salg/dage?n=30'),
+    api('/api/salg/uger'),
+    api('/api/salg/timer'),
+    api('/api/salg/timer/snit'),
+    api('/api/salg/kategorier'),
+    api('/api/salg/top?n=20'),
+  ]);
 
-  hentData();
-  // Opdater automatisk hvert 5. minut
-  setInterval(hentData, 5 * 60 * 1000);
+  buildForside(kpi, dage, uger);
+  buildDag(kpi, timer);
+  buildUge(uger);
+  buildTime(timerSnit);
+  buildKategorier(kategorier);
+  buildTop(top);
+
+  if (kpi) setSyncNow();
+}
+
+function setSyncNow() {
+  const t = new Date().toLocaleTimeString('da-DK', {hour:'2-digit',minute:'2-digit'});
+  document.getElementById('tb-sync').textContent = '● Opdateret ' + t;
+}
+
+function buildForside(kpi, dage, uger) {
+  if (kpi) {
+    const dag = kpi.dag || {};
+    const uge = kpi.uge || {};
+    document.getElementById('kpi-dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    document.getElementById('kpi-dag-transak').textContent = dag.transak != null ? dag.transak : '—';
+    document.getElementById('kpi-dag-db').textContent      = dag.db_pct != null ? dag.db_pct.toFixed(1) + '%' : '—';
+    document.getElementById('kpi-uge-omsat').textContent   = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
+    document.getElementById('kpi-uge-dage').textContent    = uge.antal_dage != null ? uge.antal_dage + ' dage denne uge' : '—';
+
+    if (kpi.snit_uge && dag.omsaetning) {
+      const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
+      const el = document.getElementById('kpi-dag-vs');
+      el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. dagsnit';
+      el.className = 'kpi-s ' + (pct >= 0 ? 'up' : 'dn');
+    }
+    if (dag.db_pct != null) {
+      const el = document.getElementById('kpi-dag-db-sub');
+      el.textContent = 'bruttoavance seneste dag';
+      el.className = 'kpi-s ' + (dag.db_pct >= 35 ? 'up' : dag.db_pct >= 30 ? '' : 'dn');
+    }
+  }
+
+  if (dage && dage.length) {
+    mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
+      [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth: 1, borderRadius: 2 }],
+      { scales:{ x:{ ticks:{ font:{ size:9 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}}});
+
+    const seneste = dage[dage.length - 1];
+    if (seneste) {
+      const jan1 = new Date(seneste.dato.slice(0,4)+'-01-01');
+      const d = new Date(seneste.dato);
+      const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+      document.getElementById('tb-week').textContent = `Uge ${week} · ${d.getFullYear()}`;
+      document.getElementById('hdr-forside-sub').textContent =
+        'Organic Market Greve · seneste dag: ' + d.toLocaleDateString('da-DK', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    }
+  }
+
+  if (uger && uger.length) {
+    mk('c-db','line', uger.map(r => `U${r.uge}`),
+      [{ data: uger.map(r => r.db_pct), borderColor: G, backgroundColor: GL, fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:G }],
+      { scales:{ x:{ ticks:{ font:{ size:9 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:9 }, callback: v => v+'%' }}}});
+  }
+}
+
+function buildDag(kpi, timer) {
+  if (kpi && kpi.dag) {
+    const dag = kpi.dag;
+    document.getElementById('dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    document.getElementById('dag-transak').textContent = dag.transak != null ? dag.transak : '—';
+    document.getElementById('dag-db').textContent      = dag.db_kr != null ? kr(dag.db_kr) : '—';
+    document.getElementById('dag-db-pct').textContent  = dag.db_pct != null ? dag.db_pct.toFixed(1) + '% DB' : '—';
+    if (dag.transak > 0 && dag.omsaetning > 0)
+      document.getElementById('dag-snit-kurv').textContent = 'snit ' + Math.round(dag.omsaetning / dag.transak) + ' kr/kunde';
+    if (kpi.snit_uge && dag.omsaetning) {
+      const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
+      const el = document.getElementById('dag-vs-snit');
+      el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+      el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+    }
+  }
+
+  if (timer && timer.length > 0) {
+    document.getElementById('dag-chart-wrap').style.display = '';
+    document.getElementById('dag-no-time').style.display = 'none';
+    mk('c-dag','bar', timer.map(r => r.time_start+':00'),
+      [{ data: timer.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
+      { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
+  } else {
+    document.getElementById('dag-chart-wrap').style.display = 'none';
+    document.getElementById('dag-no-time').style.display = '';
+  }
+}
+
+function buildUge(uger) {
+  if (!uger || !uger.length) return;
+  mk('c-uge','bar', uger.map(r => `U${r.uge}`),
+    [{ data: uger.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}}});
+
+  const snitOmsat = uger.reduce((a,r) => a + r.omsaetning, 0) / uger.length;
+  document.getElementById('uge-tbody').innerHTML = uger.slice().reverse().slice(0,16).map(r => {
+    const pct = snitOmsat > 0 ? ((r.omsaetning/snitOmsat-1)*100).toFixed(0) : 0;
+    const pill = r.db_pct>=35.5?'pill-g':r.db_pct>=33?'pill-a':'pill-r';
+    const status = r.db_pct>=35.5?'God':r.db_pct>=33?'Ok':'Lav';
+    return `<tr>
+      <td>Uge ${r.uge} <small style="color:var(--ash);font-size:10px;">${r.aar}</small></td>
+      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num">${r.db_pct.toFixed(1)}%</td>
+      <td class="num" style="color:${pct>=0?'var(--moss)':'var(--danger)'}">${pct>=0?'+':''}${pct}%</td>
+      <td class="num">${r.antal_dage}</td>
+      <td><span class="pill ${pill}">${status}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function buildTime(timerSnit) {
+  if (!timerSnit || !timerSnit.length) {
+    document.getElementById('time-chart-wrap').style.display = 'none';
+    document.getElementById('time-no-data').style.display = '';
+    return;
+  }
+  document.getElementById('time-no-data').style.display = 'none';
+  const hrs = [...new Set(timerSnit.map(r => r.time_start))].sort((a,b) => a-b);
+  const hMap = {};
+  timerSnit.forEach(r => { if (!hMap[r.time_start]) hMap[r.time_start]={sum:0,n:0}; hMap[r.time_start].sum+=r.snit_omsaetning; hMap[r.time_start].n++; });
+  mk('c-time','line', hrs.map(h => h+':00'),
+    [{ data: hrs.map(h => Math.round(hMap[h].sum/hMap[h].n)), borderColor:F, backgroundColor:FL, fill:true, tension:0.4, pointRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{ size:10 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
+
+  const manData = hrs.map(h => { const r=timerSnit.find(x=>x.time_start==h&&x.ugedag==1); return r?Math.round(r.snit_omsaetning):0; });
+  const lorData = hrs.map(h => { const r=timerSnit.find(x=>x.time_start==h&&x.ugedag==6); return r?Math.round(r.snit_omsaetning):0; });
+  mk('c-ugedag','bar', hrs.map(h => h+':00'), [
+    { label:'Man', data:manData, backgroundColor:'rgba(30,58,30,.45)', borderRadius:2 },
+    { label:'Lør', data:lorData, backgroundColor:'rgba(200,168,75,.55)', borderRadius:2 }
+  ],{ plugins:{ legend:{ display:true, position:'top', labels:{ font:{ size:9 }, boxWidth:8 }}},
+     scales:{ x:{ ticks:{ font:{ size:9 }}}, y:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v)+' kr' }}}});
+
+  document.getElementById('peak-tbody').innerHTML = [1,2,3,4,5,6].map(dag => {
+    const dagData = timerSnit.filter(r => r.ugedag==dag);
+    if (!dagData.length) return '';
+    const peak = dagData.reduce((b,r) => r.snit_omsaetning>b.snit_omsaetning?r:b, dagData[0]);
+    return `<tr><td>${dagNavne[dag]}</td><td>${peak.time_start}:00–${peak.time_start+1}:00</td><td class="num">${Math.round(peak.snit_omsaetning)} kr</td></tr>`;
+  }).join('');
+}
+
+function buildKategorier(kategorier) {
+  if (!kategorier || !kategorier.length) return;
+  const vKat  = kategorier.map(r => r.kategori);
+  const vData = kategorier.map(r => Math.round(r.omsaetning));
+  mk('c-vare','bar', vKat,
+    [{ data:vData, backgroundColor:vColors.map(c=>c+'cc'), borderColor:vColors, borderWidth:1, borderRadius:2 }],
+    { indexAxis:'y', scales:{ x:{ ticks:{ font:{ size:9 }, callback: v => Math.round(v/1000)+'k' }}, y:{ ticks:{ font:{ size:10 }}}}});
+  if (_charts['c-vare-pie']) _charts['c-vare-pie'].destroy();
+  _charts['c-vare-pie'] = new Chart(document.getElementById('c-vare-pie'), {
+    type:'doughnut',
+    data:{ labels:vKat, datasets:[{ data:vData, backgroundColor:vColors, borderWidth:2, borderColor:'#fafaf8' }]},
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ font:{ size:10 }, boxWidth:10, padding:10 }}}}
+  });
+  document.getElementById('kat-tbody').innerHTML = kategorier.map(r => {
+    const pill = r.db_pct>=35?'pill-g':r.db_pct>=30?'pill-a':'pill-r';
+    return `<tr><td>${r.kategori}</td><td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td><td class="num"><span class="pill ${pill}">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td></tr>`;
+  }).join('');
+}
+
+const _topCache = {};
+function buildTop(top) {
+  if (!top) return;
+  _topCache[20] = top;
+  renderTop(top, 20);
+}
+function setTopN(n, el) {
+  document.querySelectorAll('#top-tabs .ptab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  if (_topCache[n]) { renderTop(_topCache[n], n); return; }
+  api('/api/salg/top?n='+n).then(d => { _topCache[n]=d; renderTop(d,n); });
+}
+function renderTop(top, n) {
+  if (!top) return;
+  document.getElementById('top-card-title').textContent = `Top ${n} produkter · samlet periode`;
+  document.getElementById('top-tbody').innerHTML = top.map((r,i) => {
+    const pill = r.db_pct>=35?'pill-g':r.db_pct>=28?'pill-a':'pill-r';
+    return `<tr>
+      <td style="color:var(--ash);font-family:'DM Mono',monospace;font-size:11px;">${i+1}</td>
+      <td>${r.varenavn}</td>
+      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num">${Math.round(r.antal).toLocaleString('da-DK')}</td>
+      <td class="num"><span class="pill ${pill}">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+loadAll();
+setInterval(loadAll, 10 * 60 * 1000);
 </script>
-
 </body>
 </html>

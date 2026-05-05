@@ -90,11 +90,57 @@ async def dashboard(request: Request):
 
 # ── API ───────────────────────────────────────────────────────────────────────
 
-@app.get("/api/data")
-async def api_data(request: Request):
+def _kræv_login(request: Request):
     if not get_session(request):
         raise HTTPException(status_code=401, detail="Ikke logget ind")
+
+
+@app.get("/api/data")
+async def api_data(request: Request):
+    _kræv_login(request)
     return database.hent_dashboard_data()
+
+
+@app.get("/api/kpi")
+async def api_kpi(request: Request):
+    _kræv_login(request)
+    return database.hent_kpi()
+
+
+@app.get("/api/salg/dage")
+async def api_dage(request: Request, n: int = 14):
+    _kræv_login(request)
+    return database.hent_dage(min(n, 365))
+
+
+@app.get("/api/salg/uger")
+async def api_uger(request: Request):
+    _kræv_login(request)
+    return database.hent_uger()
+
+
+@app.get("/api/salg/timer")
+async def api_timer(request: Request):
+    _kræv_login(request)
+    return database.hent_timer_idag()
+
+
+@app.get("/api/salg/timer/snit")
+async def api_timer_snit(request: Request):
+    _kræv_login(request)
+    return database.hent_timer_snit()
+
+
+@app.get("/api/salg/kategorier")
+async def api_kategorier(request: Request):
+    _kræv_login(request)
+    return database.hent_kategorier()
+
+
+@app.get("/api/salg/top")
+async def api_top(request: Request, n: int = 20):
+    _kræv_login(request)
+    return database.hent_top_produkter(min(n, 100))
 
 
 @app.get("/api/rapport-status")

@@ -301,6 +301,15 @@ def hent_aarsdata(aar: int = None) -> Dict:
             ORDER BY maaned
         """, (str(aar),)).fetchall()
 
+        prev_dec = conn.execute("""
+            SELECT COUNT(DISTINCT dato) AS faktiske_dage,
+                   ROUND(SUM(omsætning), 2) AS omsaetning,
+                   ROUND(SUM(kostpris),  2) AS kostpris,
+                   ROUND(SUM(avance),    2) AS avance,
+                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+            FROM transaktioner WHERE strftime('%Y-%m', dato) = ?
+        """, (f"{aar-1}-12",)).fetchone()
+
         seneste = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
         base_row = None
         if seneste:
@@ -313,8 +322,9 @@ def hent_aarsdata(aar: int = None) -> Dict:
             """, (seneste,)).fetchone()
 
     return {
-        "aar":           aar,
-        "maaneder":      [dict(r) for r in rows],
+        "aar":            aar,
+        "maaneder":       [dict(r) for r in rows],
+        "prev_dec":       dict(prev_dec) if prev_dec and prev_dec["omsaetning"] else None,
         "base_kr_pr_dag": base_row["kr_pr_dag"] if base_row else None,
         "base_gpm":       base_row["gpm"]       if base_row else None,
     }

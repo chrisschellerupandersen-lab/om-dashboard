@@ -216,6 +216,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
         Dage · produkter
       </div>
+
+      <div class="nav-group-label" style="margin-top:12px;">Specialrapporter</div>
+      <div class="nav-item" onclick="showPanel('kaffe',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/></svg>
+        Kaffe
+      </div>
     </nav>
 
     <div class="content">
@@ -404,6 +410,38 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div style="overflow-x:auto;">
           <div class="dag-grid" id="dag-grid" style="align-items:start;"></div>
+        </div>
+      </div>
+
+      <!-- KAFFE -->
+      <div class="panel" id="p-kaffe">
+        <div class="page-hdr">
+          <h2>Kaffesalg — analyse</h2>
+          <p>Kaffe, BMO med kaffe, Wienerbrød med kaffe og øvrige kaffeprodukter</p>
+        </div>
+        <div id="kaffe-no-data" class="empty" style="display:none;">Ingen kaffeprodukter fundet i data</div>
+        <div id="kaffe-content">
+          <!-- KPI -->
+          <div class="kpi-row" id="kaffe-kpi-row"></div>
+          <!-- Produkt tabel + timeprofil -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div class="card">
+              <div class="card-title">Produkter</div>
+              <table class="tbl" style="margin-top:0;">
+                <thead><tr><th>Produkt</th><th class="num">Antal</th><th class="num">Omsætning</th><th class="num">DB%</th></tr></thead>
+                <tbody id="kaffe-tbody"></tbody>
+              </table>
+            </div>
+            <div class="card">
+              <div class="card-title">Hvornår købes kaffe</div>
+              <div style="height:220px;position:relative;"><canvas id="c-kaffe-time"></canvas></div>
+            </div>
+          </div>
+          <!-- Daglig trend -->
+          <div class="card">
+            <div class="card-title">Daglig kaffesalg — antal kopper (seneste 30 dage)</div>
+            <div style="height:200px;position:relative;"><canvas id="c-kaffe-dage"></canvas></div>
+          </div>
         </div>
       </div>
 
@@ -760,11 +798,77 @@ function setDageN(n, el) {
   loadDageDetaljer(n);
 }
 
+// ── KAFFE ANALYSE ─────────────────────────────────────────────────────────────
+let _kaffeLoaded = false;
+
+async function loadKaffe() {
+  if (_kaffeLoaded) return;
+  _kaffeLoaded = true;
+  const data = await api('/api/salg/kaffe');
+  if (data) buildKaffe(data);
+}
+
+function buildKaffe(d) {
+  const kpi = d.kpi || {};
+  if (!kpi.total_antal) {
+    document.getElementById('kaffe-no-data').style.display = '';
+    document.getElementById('kaffe-content').style.display = 'none';
+    return;
+  }
+  document.getElementById('kaffe-no-data').style.display = 'none';
+  document.getElementById('kaffe-content').style.display = '';
+
+  const kaffe_pct = d.total_omsat > 0 ? (kpi.total_omsaetning / d.total_omsat * 100).toFixed(1) : '—';
+
+  document.getElementById('kaffe-kpi-row').innerHTML = `
+    <div class="kpi-card"><div class="kpi-label">Kopper solgt</div><div class="kpi-val">${Math.round(kpi.total_antal).toLocaleString('da-DK')}</div><div class="kpi-sub">samlet periode</div></div>
+    <div class="kpi-card"><div class="kpi-label">Kaffeomsætning</div><div class="kpi-val">${Math.round(kpi.total_omsaetning).toLocaleString('da-DK')} kr</div><div class="kpi-sub">${kaffe_pct}% af total</div></div>
+    <div class="kpi-card"><div class="kpi-label">Gns. pris / kop</div><div class="kpi-val">${kpi.gns_pris ? kpi.gns_pris.toFixed(2).replace('.',',') + ' kr' : '—'}</div><div class="kpi-sub">inkl. kombinationer</div></div>
+    <div class="kpi-card"><div class="kpi-label">DB%</div><div class="kpi-val">${kpi.db_pct != null ? kpi.db_pct.toFixed(1) + '%' : '—'}</div><div class="kpi-sub">${Math.round(kpi.total_avance).toLocaleString('da-DK')} kr dækningsbidrag</div></div>
+  `;
+
+  document.getElementById('kaffe-tbody').innerHTML = (d.produkter || []).map(r => {
+    const pill = r.db_pct >= 35 ? 'pill-g' : r.db_pct >= 28 ? 'pill-a' : 'pill-r';
+    return `<tr>
+      <td>${r.varenavn}</td>
+      <td class="num">${Math.round(r.antal).toLocaleString('da-DK')}</td>
+      <td class="num">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span class="pill ${pill}">${r.db_pct != null ? r.db_pct.toFixed(1) + '%' : '—'}</span></td>
+    </tr>`;
+  }).join('');
+
+  if (d.timer && d.timer.length) {
+    mk('c-kaffe-time', 'bar',
+      d.timer.map(r => r.time_start + ':00'),
+      [{ data: d.timer.map(r => Math.round(r.snit_antal)),
+         backgroundColor: d.timer.map(r => periodeColor(r.time_start) + 'cc'),
+         borderColor:     d.timer.map(r => periodeColor(r.time_start)),
+         borderWidth: 1, borderRadius: 2 }],
+      { scales: {
+          x: { ticks: { font: { size: 9 } } },
+          y: { ticks: { font: { size: 9 }, callback: v => v + ' kop' } }
+      }});
+  }
+
+  if (d.dage && d.dage.length) {
+    mk('c-kaffe-dage', 'bar',
+      d.dage.map(r => fmtDato(r.dato)),
+      [{ data: d.dage.map(r => Math.round(r.antal)),
+         backgroundColor: 'rgba(200,168,75,.55)', borderColor: '#c8a84b',
+         borderWidth: 1, borderRadius: 2 }],
+      { scales: {
+          x: { ticks: { font: { size: 9 }, maxRotation: 45 } },
+          y: { ticks: { font: { size: 9 }, callback: v => v + ' kop' } }
+      }});
+  }
+}
+
 // Indlæs dage-detaljer når panelet vises første gang
 const _origShowPanel = showPanel;
 window.showPanel = function(id, el) {
   _origShowPanel(id, el);
   if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
+  if (id === 'kaffe') loadKaffe();
 };
 
 loadAll();

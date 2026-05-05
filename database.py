@@ -282,6 +282,70 @@ def hent_dage_detaljer(n: int = 8) -> List[Dict]:
     return result
 
 
+def hent_kaffe_analyse() -> Dict:
+    with _conn() as conn:
+        kpi = conn.execute("""
+            SELECT
+                ROUND(SUM(antal), 0)                                      AS total_antal,
+                ROUND(SUM(omsætning), 2)                                  AS total_omsaetning,
+                ROUND(SUM(avance), 2)                                     AS total_avance,
+                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
+                ROUND(SUM(omsætning)/NULLIF(SUM(antal),0), 2)            AS gns_pris
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%'
+        """).fetchone()
+
+        total_omsat = conn.execute(
+            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner"
+        ).fetchone()[0]
+
+        produkter = conn.execute("""
+            SELECT varenavn,
+                   ROUND(SUM(antal), 0)                                   AS antal,
+                   ROUND(SUM(omsætning), 2)                               AS omsaetning,
+                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            GROUP BY varenavn
+            ORDER BY omsaetning DESC
+        """).fetchall()
+
+        dage_rows = conn.execute("""
+            SELECT dato,
+                   ROUND(SUM(antal), 0)    AS antal,
+                   ROUND(SUM(omsætning), 2) AS omsaetning
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%kaffe%'
+            GROUP BY dato
+            ORDER BY dato DESC
+            LIMIT 30
+        """).fetchall()
+
+        timer = conn.execute("""
+            SELECT time_start,
+                   ROUND(AVG(dag_antal), 2)      AS snit_antal,
+                   ROUND(AVG(dag_omsaetning), 2) AS snit_omsaetning
+            FROM (
+                SELECT time_start, dato,
+                       SUM(antal)     AS dag_antal,
+                       SUM(omsætning) AS dag_omsaetning
+                FROM transaktioner
+                WHERE LOWER(varenavn) LIKE '%kaffe%' AND time_start >= 0
+                GROUP BY time_start, dato
+            )
+            GROUP BY time_start
+            ORDER BY time_start
+        """).fetchall()
+
+    return {
+        "kpi":           dict(kpi) if kpi else {},
+        "total_omsat":   total_omsat,
+        "produkter":     [dict(r) for r in produkter],
+        "dage":          [dict(r) for r in reversed(list(dage_rows))],
+        "timer":         [dict(r) for r in timer],
+    }
+
+
 def hent_top_produkter(n: int = 20) -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""

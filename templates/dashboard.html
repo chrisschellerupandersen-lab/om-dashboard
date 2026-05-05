@@ -347,9 +347,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Transaktioner</div>
+            <div class="kpi-l">Kunder</div>
             <div class="kpi-v" id="kpi-dag-transak">—</div>
-            <div class="kpi-s">seneste dag</div>
+            <div class="kpi-s" id="kpi-dag-kurv">seneste dag</div>
           </div>
         </div>
         <div class="two-col">
@@ -377,7 +377,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s">ekskl. moms</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Transaktioner</div>
+            <div class="kpi-l">Kunder</div>
             <div class="kpi-v" id="dag-transak">—</div>
             <div class="kpi-s" id="dag-snit-kurv">—</div>
           </div>
@@ -775,8 +775,11 @@ function buildDag(kpi, timer) {
     document.getElementById('dag-transak').textContent = dag.transak != null ? dag.transak : '—';
     document.getElementById('dag-db').textContent      = dag.db_kr != null ? kr(dag.db_kr) : '—';
     document.getElementById('dag-db-pct').textContent  = dag.db_pct != null ? dag.db_pct.toFixed(1) + '% DB' : '—';
-    if (dag.transak > 0 && dag.omsaetning > 0)
-      document.getElementById('dag-snit-kurv').textContent = 'snit ' + Math.round(dag.omsaetning / dag.transak) + ' kr/kunde';
+    if (dag.transak > 0 && dag.omsaetning > 0) {
+      const kurv = Math.round(dag.omsaetning / dag.transak);
+      document.getElementById('dag-snit-kurv').textContent = kurv + ' kr/kurv';
+      document.getElementById('kpi-dag-kurv').textContent  = kurv + ' kr/kurv';
+    }
     if (kpi.snit_uge && dag.omsaetning) {
       const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
       const el = document.getElementById('dag-vs-snit');
@@ -987,7 +990,7 @@ function renderDageDetaljer(dage, n) {
       <div class="dag-col-hdr">
         <div class="dag-col-dato">${dag.dato_label}</div>
         <div class="dag-col-omsat">${Math.round(dag.omsaetning).toLocaleString('da-DK')} kr</div>
-        <div class="dag-col-sub">${dag.linjer} linjer &middot; ${Math.round(dag.snit_per_linje)} kr/linje</div>
+        <div class="dag-col-sub">${dag.linjer} kunder &middot; ${Math.round(dag.snit_per_linje)} kr/kurv</div>
       </div>
       <div class="dag-prod-hdr">
         <span>Produkt</span>

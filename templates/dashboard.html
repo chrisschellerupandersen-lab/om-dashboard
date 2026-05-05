@@ -1654,7 +1654,6 @@ function kaffeVisProduktTimer(idx) {
   kaffeShowDrill(`Timeprofil — ${produkt.varenavn} (${Math.round(produkt.antal)} kopper i alt)`,
     timerForProdukt.map(r => ({ label: `Kl. ${r.time_start}:00`, antal: r.total_antal, pct: Math.round(r.total_antal / tot * 100) })));
 }
-}
 
 // Indlæs dage-detaljer når panelet vises første gang
 const _origShowPanel = showPanel;

@@ -645,9 +645,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <!-- Anbefalinger -->
           <div class="rec-grid" id="rec-grid"></div>
           <!-- Fuld tabel -->
-          <div class="card">
-            <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-              <div class="card-title" style="margin-bottom:0;">Alle produkter</div>
+          <div class="aar2-tbl-wrap">
+            <div class="aar2-tbl-hdr">
+              <span class="aar2-tbl-hdr-l">Alle produkter</span>
               <div class="trend-tabs" id="trend-filter-tabs" style="margin-bottom:0;">
                 <div class="ptab active" onclick="filterTrend('alle',this)">Alle</div>
                 <div class="ptab" onclick="filterTrend('op',this)">↑ Stiger</div>
@@ -656,16 +656,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <div class="ptab" onclick="filterTrend('vaek',this)">✕ Udgåede</div>
               </div>
             </div>
-            <table class="tbl">
+            <table class="aar2-tbl">
               <thead>
                 <tr>
-                  <th>Produkt</th>
-                  <th>Kategori</th>
-                  <th class="num">Kr/dag nu</th>
-                  <th class="num">Kr/dag før</th>
-                  <th class="num">Ændring</th>
-                  <th class="num">DB%</th>
-                  <th>Signal</th>
+                  <th style="width:35%;">Produkt</th>
+                  <th style="width:20%;">Kategori</th>
+                  <th class="num" style="width:12%;">Stk/dag nu</th>
+                  <th class="num" style="width:12%;">Stk/dag før</th>
+                  <th class="num" style="width:9%;">Ændring</th>
+                  <th class="num" style="width:7%;">DB%</th>
+                  <th style="width:5%;">Signal</th>
                 </tr>
               </thead>
               <tbody id="trend-tbody"></tbody>
@@ -1462,11 +1462,11 @@ function buildTrend(d) {
 
   // Compute trend per product
   const prod = d.produkter.map(r => {
-    const ny = r.ny_omsat / nyD;
-    const gl = r.gl_omsat / glD;
+    const ny = r.ny_antal / nyD;
+    const gl = r.gl_antal / glD;
     let pct, signal;
-    if (r.gl_omsat === 0 && r.ny_omsat > 0)       { pct = null; signal = 'ny';    }
-    else if (r.ny_omsat === 0 && r.gl_omsat > 0)  { pct = null; signal = 'vaek'; }
+    if (r.gl_antal === 0 && r.ny_antal > 0)       { pct = null; signal = 'ny';    }
+    else if (r.ny_antal === 0 && r.gl_antal > 0)  { pct = null; signal = 'vaek'; }
     else {
       pct = gl > 0 ? (ny - gl) / gl * 100 : 0;
       if      (pct >=  20) signal = 'op';
@@ -1494,7 +1494,7 @@ function buildTrend(d) {
   // Recommendations
   const bestilMere  = prod.filter(r => r.signal === 'op'  && (r.db_pct == null || r.db_pct >= 25) && r.ny_antal >= 3)
                           .sort((a,b) => b.pct - a.pct).slice(0, 8);
-  const nyeMedPot   = prod.filter(r => r.signal === 'ny'  && r.ny_omsat >= 50)
+  const nyeMedPot   = prod.filter(r => r.signal === 'ny'  && r.ny_antal >= 1)
                           .sort((a,b) => b.ny_omsat - a.ny_omsat).slice(0, 5);
   const opmærksom   = prod.filter(r => r.signal === 'ned' && (r.db_pct == null || r.db_pct >= 25))
                           .sort((a,b) => a.pct - b.pct).slice(0, 8);
@@ -1505,7 +1505,7 @@ function buildTrend(d) {
     if (!list.length) return '<div style="padding:12px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Ingen i denne periode</div>';
     return list.map(r => {
       const pctTxt = r.pct != null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(0) + '%' : 'Ny';
-      const krTxt  = Math.round(r.ny_snit).toLocaleString('da-DK') + ' kr/dag';
+      const krTxt  = r.ny_snit.toFixed(1) + ' stk/dag';
       const dbTxt  = r.db_pct != null ? ' · ' + r.db_pct.toFixed(1) + '% DB' : '';
       return `<div class="rec-item">
         <span class="rec-navn">${r.varenavn}</span>
@@ -1555,8 +1555,8 @@ function renderTrendTabel(prod, filter) {
     return `<tr>
       <td>${r.varenavn}</td>
       <td style="font-size:11px;color:var(--ash);">${r.kategori || '—'}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.ny_snit).toLocaleString('da-DK')}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${Math.round(r.gl_snit).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${r.ny_snit.toFixed(1)}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${r.gl_snit > 0 ? r.gl_snit.toFixed(1) : '—'}</td>
       <td class="num" style="${pctCls}font-family:'DM Mono',monospace;font-weight:400;">${pctTxt}</td>
       <td class="num">${r.db_pct != null ? '<span class="pill '+pill+'">'+r.db_pct.toFixed(1)+'%</span>' : '—'}</td>
       <td><span class="tbadge ${r.signal}">${signalLabel[r.signal]}</span></td>

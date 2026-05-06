@@ -360,6 +360,43 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .aar2-forecast{grid-template-columns:1fr 1fr 1fr;}
   .aar2-tbl th, .aar2-tbl td{padding:8px 10px;font-size:12px;}
 }
+
+/* BESTILLINGSBEREGNER */
+.bern-uge-card{
+  background:var(--white);border:1px solid rgba(30,58,30,.12);
+  border-radius:6px;padding:16px 20px;margin-bottom:12px;
+}
+.bern-uge-hdr{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;
+}
+.bern-uge-nr{font-size:16px;font-weight:500;color:var(--forest);}
+.bern-dato{font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);}
+.bern-evt-badge{
+  background:rgba(200,160,30,.15);color:#7a4a00;border-radius:3px;
+  padding:2px 8px;font-size:11px;font-weight:500;
+}
+.bern-brutto{
+  margin-left:auto;font-size:18px;font-weight:600;
+  font-family:'DM Mono',monospace;color:var(--forest);
+}
+.bern-evt-note{
+  font-size:11px;color:#7a4a00;
+  background:rgba(200,128,30,.08);
+  border-left:3px solid var(--gold);
+  padding:5px 10px;border-radius:0 3px 3px 0;margin-bottom:8px;
+}
+.bern-faktorer{
+  font-family:'DM Mono',monospace;font-size:10px;
+  color:var(--ash);margin-top:8px;line-height:1.7;
+}
+.bern-tgtg-bar{
+  display:flex;align-items:center;gap:8px;
+  margin-top:4px;font-size:11px;
+}
+.bern-tgtg-track{
+  flex:1;height:6px;background:var(--parchment);border-radius:3px;overflow:hidden;max-width:200px;
+}
+.bern-tgtg-fill{height:100%;border-radius:3px;}
 </style>
 </head>
 <body>
@@ -449,6 +486,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="nav-item" onclick="showPanel('svind',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/></svg>
         Svind &amp; økonomi
+      </div>
+      <div class="nav-item" onclick="showPanel('beregner',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/></svg>
+        Bestillingsberegner
       </div>
 
       <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
@@ -963,6 +1004,37 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </table>
           </div>
         </div>
+      </div>
+
+      <!-- BESTILLINGSBEREGNER -->
+      <div class="panel" id="p-beregner">
+        <div class="page-hdr">
+          <h2>Bestillingsberegner</h2>
+          <p>Anbefaling: basis (3-ugers snit) × buffer 5% × sæsonindeks × begivenhedsfaktor × TGTG-korrektion × væksttrend</p>
+        </div>
+        <div class="kpi-row" id="bern-kpi-row">
+          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Basis/uge</div>
+            <div class="kpi-v" id="bern-basis" style="color:var(--amber);font-size:28px;">—</div>
+            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-basis-sub">effektivt solgt stk</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Væksttrend</div>
+            <div class="kpi-v" id="bern-vaekst">—</div>
+            <div class="kpi-s" id="bern-vaekst-sub">vs. forrige periode</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">TGTG seneste uge</div>
+            <div class="kpi-v" id="bern-tgtg">—</div>
+            <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr/uge</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Kategorimix (bestilt)</div>
+            <div class="kpi-v" id="bern-kat" style="font-size:13px;line-height:1.5;">—</div>
+            <div class="kpi-s">seneste 4 uger</div>
+          </div>
+        </div>
+        <div id="beregner-uger"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
       </div>
 
       <!-- MANGLER KOSTPRIS -->
@@ -2136,6 +2208,132 @@ async function loadSvind() {
   }).join('');
 }
 
+// ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
+let _bernLoaded = false;
+
+async function loadBeregner() {
+  if (_bernLoaded) return;
+  _bernLoaded = true;
+  const d = await api('/api/bestilling/anbefaling');
+  if (!d) return;
+
+  // KPI
+  document.getElementById('bern-basis').textContent =
+    d.basis_snit.toLocaleString('da-DK') + ' stk';
+  document.getElementById('bern-basis-sub').textContent =
+    'snit af ' + d.basis_uger + ' uger · effektivt solgt';
+
+  const vp = d.vaekst_pct;
+  const vaekstEl = document.getElementById('bern-vaekst');
+  vaekstEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
+  vaekstEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
+  document.getElementById('bern-vaekst-sub').textContent =
+    vp > 3 ? 'Salget stiger — justér op' :
+    vp < -3 ? 'Salget falder — vær forsigtig' : 'Stabilt niveau';
+
+  const tgtgEl = document.getElementById('bern-tgtg');
+  tgtgEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
+  tgtgEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
+  document.getElementById('bern-tgtg-sub').textContent =
+    d.tgtg_advarsel ? '⚠ For høj — reducer bestilling (-5% auto)' :
+    d.tgtg_ok       ? '✓ Sundt niveau (under 800 kr)' :
+                      '800–1.200 kr — hold øje';
+  if (d.tgtg_kr > 1000) {
+    document.getElementById('bern-tgtg-sub').textContent += ' · auto -5%';
+  }
+
+  const katEl = document.getElementById('bern-kat');
+  const katSorted = Object.entries(d.kat_fordeling).sort((a,b) => b[1]-a[1]);
+  katEl.innerHTML = katSorted
+    .filter(([,v]) => v > 0)
+    .map(([k,v]) => `<span style="display:block;font-size:12px;">${k}: <b>${v}%</b></span>`)
+    .join('');
+
+  // Uge-kort
+  const KAT_ORDER = ['Boller','Wiener','Brød','Kage','Rugbrød','Flute'];
+  const KAT_LBL   = {Boller:'Boller',Wiener:'Wienerbrød',Brød:'Brød',
+                     Kage:'Kage',Rugbrød:'Rugbrød',Flute:'Flute'};
+  const MND = ['','jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+  const mono = "font-family:'DM Mono',monospace;";
+
+  const html = d.uger.map(u => {
+    const evtBadge = u.event
+      ? `<span class="bern-evt-badge">⚑ ${u.event.navn} ×${u.event.factor.toFixed(2)}</span>`
+      : '';
+    const evtNote = u.event
+      ? `<div class="bern-evt-note">⚑ ${u.event.note}</div>`
+      : '';
+
+    // TGTG-bar (seneste kendte TGTG som reference)
+    const tgtgPct = Math.min(100, Math.round(d.tgtg_kr / 12));
+    const tgtgBarClr = d.tgtg_advarsel ? '#c0392b' : d.tgtg_ok ? '#2d7a3c' : '#c8a84b';
+
+    const katRows = KAT_ORDER.map(kat => {
+      const k = u.kategorier[kat];
+      if (!k || k.brutto === 0) return '';
+      const returTxt = k.retur > 0
+        ? `<span style="color:var(--ash);">${k.retur}</span>`
+        : '<span style="color:var(--parchment);">—</span>';
+      return `<tr>
+        <td>${KAT_LBL[kat]}</td>
+        <td class="num" style="${mono}">${k.netto.toLocaleString('da-DK')}</td>
+        <td class="num" style="${mono}font-size:11px;">${returTxt}</td>
+        <td class="num" style="${mono}font-weight:600;">${k.brutto.toLocaleString('da-DK')}</td>
+      </tr>`;
+    }).join('');
+
+    const retTotal = u.brutto_stk - u.netto_stk;
+
+    const faktorer = [
+      `Basis ${d.basis_snit.toLocaleString('da-DK')} stk`,
+      `× buffer 1,05`,
+      `× SI ${u.si.toFixed(2)} (${MND[u.maaned]})`,
+      u.event                ? `× begivenhed ${u.event.factor.toFixed(2)}` : null,
+      u.tgtg_korrektion < 1  ? `× TGTG-korr. 0,95 (TGTG>${d.tgtg_kr} kr)` : null,
+      u.vaekst_pct !== 0     ? `× vækst ${u.vaekst_pct >= 0 ? '+' : ''}${u.vaekst_pct}%` : null,
+      `= faktor ${u.total_faktor.toFixed(3)}`,
+    ].filter(Boolean).join('  ');
+
+    const bruttoClr = u.event && u.event.factor > 1.2
+      ? 'color:var(--clay);'
+      : u.event && u.event.factor < 0.95
+      ? 'color:var(--ash);'
+      : 'color:var(--forest);';
+
+    return `
+    <div class="bern-uge-card">
+      <div class="bern-uge-hdr">
+        <span class="bern-uge-nr">Uge ${u.uge}</span>
+        <span class="bern-dato">${u.dato_range} · ${u.aar}</span>
+        ${evtBadge}
+        <span class="bern-brutto" style="${bruttoClr}">Bestil: ${u.brutto_stk.toLocaleString('da-DK')} stk</span>
+      </div>
+      ${evtNote}
+      <div style="overflow-x:auto;">
+        <table class="aar2-tbl" style="min-width:380px;margin-top:6px;">
+          <thead><tr>
+            <th>Kategori</th>
+            <th class="num" title="Forventede salg (netto)">Netto</th>
+            <th class="num" title="Bestilles ekstra — sendes retur usolgt">Returret</th>
+            <th class="num" title="Skriv dette på bestillingssedlen">Bestil</th>
+          </tr></thead>
+          <tbody>${katRows}</tbody>
+          <tfoot><tr>
+            <td>Total</td>
+            <td class="num" style="${mono}">${u.netto_stk.toLocaleString('da-DK')}</td>
+            <td class="num" style="${mono}">${retTotal.toLocaleString('da-DK')}</td>
+            <td class="num" style="${mono}font-weight:700;">${u.brutto_stk.toLocaleString('da-DK')}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+      <div class="bern-faktorer">${faktorer}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('beregner-uger').innerHTML = html ||
+    '<div style="padding:20px;color:var(--ash);">Ingen bestillingsdata endnu — kør bestilling_sync.py</div>';
+}
+
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────
 let _kostprisLoaded = false;
 
@@ -2183,7 +2381,8 @@ window.showPanel = function(id, el) {
   if (id === 'aar'       && !_aarLoaded)   loadAar();
   if (id === 'kostpris')    loadKostpris();
   if (id === 'bestilling') loadBestilling();
-  if (id === 'svind')     loadSvind();
+  if (id === 'svind')      loadSvind();
+  if (id === 'beregner')   loadBeregner();
 };
 
 loadAll();

@@ -765,3 +765,194 @@ def hent_mangler_kostpris() -> Dict:
         "mangler_omsaetning": round(mangler_omsat, 2),
         "total_omsaetning":   round(total_omsat, 2),
     }
+
+
+# ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
+
+_SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,
+              7:1.08, 8:1.10, 9:1.00, 10:.97, 11:.95, 12:1.85}
+
+_EVENTS: Dict = {
+    (7,  2026): {"factor": 1.20, "navn": "Fastelavn",                    "note": "Mere wienerbrød og boller — bestil fastelavnsboller"},
+    (14, 2026): {"factor": 1.15, "navn": "Påskeuge (2.–5. apr.)",        "note": "Lang weekend — ekstra på torsdag og fredag"},
+    (15, 2026): {"factor": 0.90, "navn": "Påske — mandag lukket",        "note": "Reducer mandag-leverancen (2. påskedag)"},
+    (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",       "note": "+10% — fridag i ugen"},
+    (20, 2026): {"factor": 1.15, "navn": "Kr. Himmelfart + brofridag",   "note": "Fredag 15. maj er brofridag — bestil 45% ekstra fredag"},
+    (21, 2026): {"factor": 1.15, "navn": "Pinse (søn. 24. maj)",         "note": "Søndagsleverance dækker søndag + mandag"},
+    (22, 2026): {"factor": 0.88, "navn": "2. Pinsedag — mandag lukket",  "note": "Reducer første leverance mandag"},
+    (23, 2026): {"factor": 1.25, "navn": "Grundlovsdag (fre. 5. jun.)",  "note": "Fredag er årets bedste bagværksdag — bestil 60% ekstra fredag"},
+    (52, 2026): {"factor": 1.85, "navn": "Juleugen",                     "note": "Årets travleste uge — planlæg indkøb i oktober"},
+    (1,  2027): {"factor": 0.45, "navn": "Nytårsuge",                    "note": "Halv bestilling — butik lukket/kort uge"},
+}
+
+_RB = 0.10    # returrate boller (10% sendes retur)
+_RW = 0.135   # returrate wienerbrød (13.5%)
+_BUFFER = 1.05
+
+
+def _kat(varenavn: str) -> str:
+    n = (varenavn or '').lower()
+    if 'rugbrød' in n or 'rugbrod' in n:
+        return 'Rugbrød'
+    if 'flute' in n or 'flûte' in n:
+        return 'Flute'
+    if 'bolle' in n:
+        return 'Boller'
+    if ('brød' in n or 'brod' in n) and 'wiener' not in n:
+        return 'Brød'
+    if 'kage' in n or 'tærte' in n or 'muffin' in n:
+        return 'Kage'
+    return 'Wiener'
+
+
+def _dato_range(iso_uge: int, aar: int) -> str:
+    from datetime import date, timedelta
+    MND = ['', 'jan.', 'feb.', 'mar.', 'apr.', 'maj', 'jun.',
+           'jul.', 'aug.', 'sep.', 'okt.', 'nov.', 'dec.']
+    jan4 = date(aar, 1, 4)
+    w1_mon = jan4 - timedelta(days=jan4.weekday())
+    mon = w1_mon + timedelta(weeks=iso_uge - 1)
+    sun = mon + timedelta(days=6)
+    if mon.month == sun.month:
+        return f"{mon.day}.–{sun.day}. {MND[mon.month]}"
+    return f"{mon.day}. {MND[mon.month]}–{sun.day}. {MND[sun.month]}"
+
+
+def hent_bestillings_anbefaling() -> Dict:
+    """Anbefalede bestillinger for næste 5 uger.
+    Formel: basis × buffer × SI × begivenhedsfaktor × TGTG-korrektion × vækstfaktor
+    """
+    from datetime import date, timedelta
+    TGTG_PR_POSE = 38.0
+
+    today = date.today()
+    t_iso = today.isocalendar()
+
+    with _conn() as conn:
+        # Kategorifordeling fra seneste 4 ugers bestillinger
+        kat_rows = conn.execute("""
+            WITH top4 AS (
+                SELECT DISTINCT uge, aar FROM ugebestillinger
+                ORDER BY aar DESC, uge DESC LIMIT 4
+            )
+            SELECT varenavn, SUM(total_antal) AS stk
+            FROM ugebestillinger JOIN top4 USING (uge, aar)
+            GROUP BY varenavn
+        """).fetchall()
+
+        kat_sum = {"Boller": 0.0, "Wiener": 0.0, "Brød": 0.0,
+                   "Kage": 0.0, "Rugbrød": 0.0, "Flute": 0.0}
+        for r in kat_rows:
+            kat_sum[_kat(r["varenavn"])] += (r["stk"] or 0)
+        grand = sum(kat_sum.values()) or 1
+        kat_pct = {k: v / grand for k, v in kat_sum.items()}
+
+        # Effektivt solgt seneste 8 uger (kassesalg + KW + TGTG)
+        salg_rows = conn.execute("""
+            WITH kasse AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
+                )
+                GROUP BY uw, uy
+            ),
+            kw AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
+                   OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
+                GROUP BY uw, uy
+            )
+            SELECT CAST(k.uw AS INTEGER) AS uge,
+                   CAST(k.uy AS INTEGER) AS aar,
+                   k.stk + COALESCE(kw.stk,0) AS kasse_stk,
+                   br.tgtg AS tgtg_kr
+            FROM kasse k
+            LEFT JOIN kw ON kw.uw=k.uw AND kw.uy=k.uy
+            LEFT JOIN bager_regnskab br
+                ON br.uge=CAST(k.uw AS INTEGER) AND br.aar=CAST(k.uy AS INTEGER)
+            ORDER BY aar DESC, uge DESC
+            LIMIT 8
+        """).fetchall()
+
+    # Beregn effektivt solgt pr. uge
+    eff = []
+    for r in salg_rows:
+        tgtg_stk = round((r["tgtg_kr"] or 0) / TGTG_PR_POSE)
+        eff.append({
+            "uge": r["uge"], "aar": r["aar"],
+            "v": (r["kasse_stk"] or 0) + tgtg_stk,
+            "tgtg_kr": r["tgtg_kr"] or 0,
+        })
+
+    # Basis: snit af seneste 3 uger med data
+    basis3 = [e["v"] for e in eff[:3] if e["v"] > 0]
+    basis  = sum(basis3) / len(basis3) if basis3 else 1000.0
+
+    # Vækst: seneste 3 vs. forrige 3 (cap ±15%)
+    prev3 = [e["v"] for e in eff[3:6] if e["v"] > 0]
+    prev  = sum(prev3) / len(prev3) if prev3 else basis
+    vaekst = max(-0.15, min(0.15, basis / prev - 1)) if prev > 0 else 0.0
+
+    # TGTG-korrektion baseret på seneste tilgængelige uge
+    tgtg_kr = next((e["tgtg_kr"] for e in eff if e["tgtg_kr"] > 0), 0)
+    tgtg_korr = 0.95 if tgtg_kr > 1000 else 1.0
+
+    # Beregn anbefaling for næste 5 uger
+    uger_list = []
+    for i in range(1, 6):
+        tgt = today + timedelta(weeks=i)
+        u_iso = tgt.isocalendar()
+        u_uge, u_aar = u_iso[1], u_iso[0]
+        mon_dato = date.fromisocalendar(u_aar, u_uge, 1)
+        u_mdr = mon_dato.month
+
+        si   = _SI_MAANED.get(u_mdr, 1.0)
+        evt  = _EVENTS.get((u_uge, u_aar))
+        efak = evt["factor"] if evt else 1.0
+        tot_fak = si * efak * tgtg_korr * (1 + vaekst)
+
+        netto = round(basis * _BUFFER * tot_fak)
+
+        kats: Dict = {}
+        for kat, pct in kat_pct.items():
+            n = round(netto * pct)
+            if kat == "Boller":  r_stk = round(n * _RB / (1 - _RB))
+            elif kat == "Wiener": r_stk = round(n * _RW / (1 - _RW))
+            else:                 r_stk = 0
+            kats[kat] = {"netto": n, "retur": r_stk, "brutto": n + r_stk}
+
+        brutto_total = sum(v["brutto"] for v in kats.values())
+
+        uger_list.append({
+            "uge":            u_uge,
+            "aar":            u_aar,
+            "dato_range":     _dato_range(u_uge, u_aar),
+            "maaned":         u_mdr,
+            "si":             round(si, 2),
+            "event":          evt,
+            "tgtg_korrektion": round(tgtg_korr, 2),
+            "vaekst_pct":     round(vaekst * 100, 1),
+            "total_faktor":   round(tot_fak, 3),
+            "netto_stk":      netto,
+            "brutto_stk":     brutto_total,
+            "kategorier":     kats,
+        })
+
+    return {
+        "basis_snit":   round(basis),
+        "basis_uger":   len(basis3),
+        "vaekst_pct":   round(vaekst * 100, 1),
+        "tgtg_kr":      round(tgtg_kr),
+        "tgtg_ok":      tgtg_kr < 800,
+        "tgtg_advarsel": tgtg_kr > 1200,
+        "tgtg_korrektion": round(tgtg_korr, 2),
+        "kat_fordeling": {k: round(v * 100, 1) for k, v in kat_pct.items()},
+        "uger":          uger_list,
+    }

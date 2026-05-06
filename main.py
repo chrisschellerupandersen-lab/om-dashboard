@@ -225,6 +225,12 @@ async def api_bager_svind(request: Request):
     return database.hent_svind_data()
 
 
+@app.get("/api/bestilling/anbefaling")
+async def api_bestillings_anbefaling(request: Request):
+    _kræv_login(request)
+    return database.hent_bestillings_anbefaling()
+
+
 @app.post("/api/bager/retur-opdater")
 async def bager_retur_opdater(request: Request):
     try:

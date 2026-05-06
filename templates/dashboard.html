@@ -1010,31 +1010,43 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-beregner">
         <div class="page-hdr">
           <h2>Bestillingsberegner</h2>
-          <p>Anbefaling: basis (3-ugers snit) × buffer 5% × sæsonindeks × begivenhedsfaktor × TGTG-korrektion × væksttrend</p>
+          <p>Udgangspunkt: senest indlæste Excel-bestilling × sæsonindeks × begivenhedsfaktor × TGTG-korrektion × vækst</p>
         </div>
-        <div class="kpi-row" id="bern-kpi-row">
+
+        <!-- Uge-vælger -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+          <button onclick="bernPrev()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">←</button>
+          <span id="bern-uge-label" style="font-size:20px;font-weight:500;color:var(--forest);">Uge —</span>
+          <span id="bern-dato-label" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);"></span>
+          <button onclick="bernNext()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">→</button>
+          <span id="bern-basis-label" style="font-size:11px;color:var(--ash);margin-left:8px;"></span>
+        </div>
+
+        <!-- KPI-række -->
+        <div class="kpi-row" style="margin-bottom:16px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
-            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Basis/uge</div>
-            <div class="kpi-v" id="bern-basis" style="color:var(--amber);font-size:28px;">—</div>
-            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-basis-sub">effektivt solgt stk</div>
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
+            <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
+            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-total-sub">stk · kr ex moms</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Væksttrend</div>
-            <div class="kpi-v" id="bern-vaekst">—</div>
-            <div class="kpi-s" id="bern-vaekst-sub">vs. forrige periode</div>
+            <div class="kpi-l">Sæsonindeks</div>
+            <div class="kpi-v" id="bern-si">—</div>
+            <div class="kpi-s" id="bern-si-sub"></div>
           </div>
           <div class="kpi">
             <div class="kpi-l">TGTG seneste uge</div>
             <div class="kpi-v" id="bern-tgtg">—</div>
-            <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr/uge</div>
+            <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Kategorimix (bestilt)</div>
-            <div class="kpi-v" id="bern-kat" style="font-size:13px;line-height:1.5;">—</div>
-            <div class="kpi-s">seneste 4 uger</div>
+            <div class="kpi-l">Væksttrend</div>
+            <div class="kpi-v" id="bern-vaekst">—</div>
+            <div class="kpi-s" id="bern-vaekst-sub"></div>
           </div>
         </div>
-        <div id="beregner-uger"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
+
+        <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
       </div>
 
       <!-- MANGLER KOSTPRIS -->
@@ -2209,129 +2221,165 @@ async function loadSvind() {
 }
 
 // ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
-let _bernLoaded = false;
+let _bernUge = null, _bernAar = null, _bernBusy = false;
 
-async function loadBeregner() {
-  if (_bernLoaded) return;
-  _bernLoaded = true;
-  const d = await api('/api/bestilling/anbefaling');
+function _isoUgeIdag() {
+  const d = new Date();
+  const thu = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 4 - (d.getDay() || 7));
+  const y1  = new Date(thu.getFullYear(), 0, 1);
+  return { uge: Math.ceil(((thu - y1) / 86400000 + 1) / 7), aar: thu.getFullYear() };
+}
+
+async function loadBernUge(uge, aar) {
+  if (_bernBusy) return;
+  _bernBusy = true;
+  _bernUge = uge; _bernAar = aar;
+  document.getElementById('bern-uge-label').textContent = 'Uge ' + uge;
+  document.getElementById('beregner-tabel').innerHTML =
+    '<div style="padding:20px;color:var(--ash);">Indlæser…</div>';
+
+  const d = await api('/api/bestilling/anbefaling?uge=' + uge + '&aar=' + aar);
+  _bernBusy = false;
   if (!d) return;
-
-  // KPI
-  document.getElementById('bern-basis').textContent =
-    d.basis_snit.toLocaleString('da-DK') + ' stk';
-  document.getElementById('bern-basis-sub').textContent =
-    'snit af ' + d.basis_uger + ' uger · effektivt solgt';
-
-  const vp = d.vaekst_pct;
-  const vaekstEl = document.getElementById('bern-vaekst');
-  vaekstEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
-  vaekstEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
-  document.getElementById('bern-vaekst-sub').textContent =
-    vp > 3 ? 'Salget stiger — justér op' :
-    vp < -3 ? 'Salget falder — vær forsigtig' : 'Stabilt niveau';
-
-  const tgtgEl = document.getElementById('bern-tgtg');
-  tgtgEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
-  tgtgEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
-  document.getElementById('bern-tgtg-sub').textContent =
-    d.tgtg_advarsel ? '⚠ For høj — reducer bestilling (-5% auto)' :
-    d.tgtg_ok       ? '✓ Sundt niveau (under 800 kr)' :
-                      '800–1.200 kr — hold øje';
-  if (d.tgtg_kr > 1000) {
-    document.getElementById('bern-tgtg-sub').textContent += ' · auto -5%';
+  if (d.error) {
+    document.getElementById('beregner-tabel').innerHTML =
+      '<div style="padding:20px;color:var(--danger);">' + d.error + '</div>';
+    return;
   }
 
-  const katEl = document.getElementById('bern-kat');
-  const katSorted = Object.entries(d.kat_fordeling).sort((a,b) => b[1]-a[1]);
-  katEl.innerHTML = katSorted
-    .filter(([,v]) => v > 0)
-    .map(([k,v]) => `<span style="display:block;font-size:12px;">${k}: <b>${v}%</b></span>`)
-    .join('');
-
-  // Uge-kort
-  const KAT_ORDER = ['Boller','Wiener','Brød','Kage','Rugbrød','Flute'];
-  const KAT_LBL   = {Boller:'Boller',Wiener:'Wienerbrød',Brød:'Brød',
-                     Kage:'Kage',Rugbrød:'Rugbrød',Flute:'Flute'};
-  const MND = ['','jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+  const MND  = ['','jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
   const mono = "font-family:'DM Mono',monospace;";
 
-  const html = d.uger.map(u => {
-    const evtBadge = u.event
-      ? `<span class="bern-evt-badge">⚑ ${u.event.navn} ×${u.event.factor.toFixed(2)}</span>`
-      : '';
-    const evtNote = u.event
-      ? `<div class="bern-evt-note">⚑ ${u.event.note}</div>`
-      : '';
+  // Header
+  document.getElementById('bern-uge-label').textContent   = 'Uge ' + d.maal_uge;
+  document.getElementById('bern-dato-label').textContent  = d.dato_range + ' · ' + d.maal_aar;
+  document.getElementById('bern-basis-label').textContent =
+    'Udgangspunkt: uge ' + d.basis_uge + ' ' + d.basis_aar;
 
-    // TGTG-bar (seneste kendte TGTG som reference)
-    const tgtgPct = Math.min(100, Math.round(d.tgtg_kr / 12));
-    const tgtgBarClr = d.tgtg_advarsel ? '#c0392b' : d.tgtg_ok ? '#2d7a3c' : '#c8a84b';
+  // KPI
+  document.getElementById('bern-total').textContent     = d.total_stk.toLocaleString('da-DK') + ' stk';
+  document.getElementById('bern-total-sub').textContent = Math.round(d.total_kr).toLocaleString('da-DK') + ' kr ex moms';
 
-    const katRows = KAT_ORDER.map(kat => {
-      const k = u.kategorier[kat];
-      if (!k || k.brutto === 0) return '';
-      const returTxt = k.retur > 0
-        ? `<span style="color:var(--ash);">${k.retur}</span>`
-        : '<span style="color:var(--parchment);">—</span>';
-      return `<tr>
-        <td>${KAT_LBL[kat]}</td>
-        <td class="num" style="${mono}">${k.netto.toLocaleString('da-DK')}</td>
-        <td class="num" style="${mono}font-size:11px;">${returTxt}</td>
-        <td class="num" style="${mono}font-weight:600;">${k.brutto.toLocaleString('da-DK')}</td>
-      </tr>`;
+  const siEl = document.getElementById('bern-si');
+  siEl.textContent = 'x' + d.si.toFixed(2);
+  siEl.style.color = d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'inherit';
+  document.getElementById('bern-si-sub').textContent =
+    MND[d.maaned] + (d.si >= 1 ? ' (+' : ' (') + Math.round((d.si - 1) * 100) + '%)';
+
+  const tEl = document.getElementById('bern-tgtg');
+  tEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
+  tEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
+  document.getElementById('bern-tgtg-sub').textContent =
+    d.tgtg_advarsel ? '⚠ For høj — -5% auto' :
+    d.tgtg_ok       ? '✓ Sundt (under 800 kr)' : 'Hold øje';
+
+  const vp = d.vaekst_pct;
+  const vEl = document.getElementById('bern-vaekst');
+  vEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
+  vEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
+  document.getElementById('bern-vaekst-sub').textContent =
+    vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt';
+
+  // Produkt-tabel
+  const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
+  const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+  const WEEKEND = new Set(['fre','loe','son']);
+
+  const thDage = DAGE.map(dag =>
+    `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
+  ).join('');
+
+  const rows = d.produkter.map(p => {
+    const dagCells = DAGE.map(dag => {
+      const v    = p.anbefalet[dag] || 0;
+      const base = p.basis[dag]     || 0;
+      const diff = v - base;
+      const diffHtml = diff !== 0
+        ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};">${diff>0?'+':''}${diff}</span>`
+        : '';
+      return `<td class="num" style="${mono}${WEEKEND.has(dag)?'background:rgba(45,74,45,.04);':''}${v===0?'color:var(--ash);':''}">${v}${diffHtml}</td>`;
     }).join('');
 
-    const retTotal = u.brutto_stk - u.netto_stk;
+    const diffTotal  = p.total_anbefalet - p.total_basis;
+    const diffTotHtml = diffTotal !== 0
+      ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
+      : '';
 
-    const faktorer = [
-      `Basis ${d.basis_snit.toLocaleString('da-DK')} stk`,
-      `× buffer 1,05`,
-      `× SI ${u.si.toFixed(2)} (${MND[u.maaned]})`,
-      u.event                ? `× begivenhed ${u.event.factor.toFixed(2)}` : null,
-      u.tgtg_korrektion < 1  ? `× TGTG-korr. 0,95 (TGTG>${d.tgtg_kr} kr)` : null,
-      u.vaekst_pct !== 0     ? `× vækst ${u.vaekst_pct >= 0 ? '+' : ''}${u.vaekst_pct}%` : null,
-      `= faktor ${u.total_faktor.toFixed(3)}`,
-    ].filter(Boolean).join('  ');
+    return `<tr>
+      <td style="font-size:12px;max-width:180px;">${p.varenavn}</td>
+      ${dagCells}
+      <td class="num" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
+      <td class="num" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
+    </tr>`;
+  }).join('');
 
-    const bruttoClr = u.event && u.event.factor > 1.2
-      ? 'color:var(--clay);'
-      : u.event && u.event.factor < 0.95
-      ? 'color:var(--ash);'
-      : 'color:var(--forest);';
+  const footDage = DAGE.map(dag => {
+    const t    = d.produkter.reduce((s,p) => s + (p.anbefalet[dag]||0), 0);
+    const base = d.produkter.reduce((s,p) => s + (p.basis[dag]||0), 0);
+    const diff = t - base;
+    const diffHtml = diff !== 0
+      ? `<br><span style="font-size:9px;opacity:.7;">${diff>0?'+':''}${diff}</span>` : '';
+    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}</td>`;
+  }).join('');
 
-    return `
-    <div class="bern-uge-card">
-      <div class="bern-uge-hdr">
-        <span class="bern-uge-nr">Uge ${u.uge}</span>
-        <span class="bern-dato">${u.dato_range} · ${u.aar}</span>
-        ${evtBadge}
-        <span class="bern-brutto" style="${bruttoClr}">Bestil: ${u.brutto_stk.toLocaleString('da-DK')} stk</span>
+  const evtNote = d.event
+    ? `<div class="bern-evt-note" style="margin-bottom:10px;">⚑ <b>${d.event.navn}</b> — ${d.event.note}</div>`
+    : '';
+
+  const faktorer = [
+    `Uge ${d.basis_uge} som udgangspunkt`,
+    `× SI ${d.si.toFixed(2)} (${MND[d.maaned]})`,
+    d.event               ? `× ${d.event.navn} (${d.event.factor.toFixed(2)})` : null,
+    d.tgtg_korrektion < 1 ? `× TGTG-korr. 0,95` : null,
+    vp !== 0              ? `× vækst ${vp>=0?'+':''}${vp}%` : null,
+    `= faktor ${d.total_faktor.toFixed(3)}`,
+  ].filter(Boolean).join('  ·  ');
+
+  document.getElementById('beregner-tabel').innerHTML = `
+    ${evtNote}
+    <div class="aar2-tbl-wrap">
+      <div class="aar2-tbl-hdr">
+        <span class="aar2-tbl-hdr-l">Baseret på uge ${d.basis_uge} · grøn/rød = forskel vs. udgangspunkt</span>
+        <span class="aar2-tbl-hdr-r">${d.total_stk.toLocaleString('da-DK')} stk · ${Math.round(d.total_kr).toLocaleString('da-DK')} kr</span>
       </div>
-      ${evtNote}
       <div style="overflow-x:auto;">
-        <table class="aar2-tbl" style="min-width:380px;margin-top:6px;">
+        <table class="aar2-tbl" style="min-width:780px;">
           <thead><tr>
-            <th>Kategori</th>
-            <th class="num" title="Forventede salg (netto)">Netto</th>
-            <th class="num" title="Bestilles ekstra — sendes retur usolgt">Returret</th>
-            <th class="num" title="Skriv dette på bestillingssedlen">Bestil</th>
+            <th style="min-width:160px;">Produkt</th>${thDage}
+            <th class="num">Total</th>
+            <th class="num">Kr/stk</th>
+            <th class="num">Kr total</th>
           </tr></thead>
-          <tbody>${katRows}</tbody>
-          <tfoot><tr>
-            <td>Total</td>
-            <td class="num" style="${mono}">${u.netto_stk.toLocaleString('da-DK')}</td>
-            <td class="num" style="${mono}">${retTotal.toLocaleString('da-DK')}</td>
-            <td class="num" style="${mono}font-weight:700;">${u.brutto_stk.toLocaleString('da-DK')}</td>
+          <tbody>${rows || '<tr><td colspan="12" class="empty">Ingen produkter — kør bestilling_sync.py</td></tr>'}</tbody>
+          <tfoot><tr><td>Total</td>${footDage}
+            <td class="num" style="font-weight:700;">${d.total_stk.toLocaleString('da-DK')}</td>
+            <td class="num">—</td>
+            <td class="num" style="font-weight:700;">${Math.round(d.total_kr).toLocaleString('da-DK')}</td>
           </tr></tfoot>
         </table>
       </div>
-      <div class="bern-faktorer">${faktorer}</div>
-    </div>`;
-  }).join('');
+    </div>
+    <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
+}
 
-  document.getElementById('beregner-uger').innerHTML = html ||
-    '<div style="padding:20px;color:var(--ash);">Ingen bestillingsdata endnu — kør bestilling_sync.py</div>';
+async function loadBeregner() {
+  const iso = _isoUgeIdag();
+  // Default: næste uge (den vi skal bestille til)
+  let uge = iso.uge + 1, aar = iso.aar;
+  if (uge > 52) { uge = 1; aar++; }
+  await loadBernUge(uge, aar);
+}
+
+function bernPrev() {
+  let u = _bernUge - 1, a = _bernAar;
+  if (u < 1) { u = 52; a--; }
+  loadBernUge(u, a);
+}
+function bernNext() {
+  let u = _bernUge + 1, a = _bernAar;
+  if (u > 52) { u = 1; a++; }
+  loadBernUge(u, a);
 }
 
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────

@@ -773,16 +773,36 @@ _SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,
               7:1.08, 8:1.10, 9:1.00, 10:.97, 11:.95, 12:1.85}
 
 _EVENTS: Dict = {
-    (7,  2026): {"factor": 1.20, "navn": "Fastelavn",                    "note": "Mere wienerbrød og boller — bestil fastelavnsboller"},
-    (14, 2026): {"factor": 1.15, "navn": "Påskeuge (2.–5. apr.)",        "note": "Lang weekend — ekstra på torsdag og fredag"},
-    (15, 2026): {"factor": 0.90, "navn": "Påske — mandag lukket",        "note": "Reducer mandag-leverancen (2. påskedag)"},
-    (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",       "note": "+10% — fridag i ugen"},
-    (20, 2026): {"factor": 1.15, "navn": "Kr. Himmelfart + brofridag",   "note": "Fredag 15. maj er brofridag — bestil 45% ekstra fredag"},
-    (21, 2026): {"factor": 1.15, "navn": "Pinse (søn. 24. maj)",         "note": "Søndagsleverance dækker søndag + mandag"},
-    (22, 2026): {"factor": 0.88, "navn": "2. Pinsedag — mandag lukket",  "note": "Reducer første leverance mandag"},
-    (23, 2026): {"factor": 1.25, "navn": "Grundlovsdag (fre. 5. jun.)",  "note": "Fredag er årets bedste bagværksdag — bestil 60% ekstra fredag"},
-    (52, 2026): {"factor": 1.85, "navn": "Juleugen",                     "note": "Årets travleste uge — planlæg indkøb i oktober"},
-    (1,  2027): {"factor": 0.45, "navn": "Nytårsuge",                    "note": "Halv bestilling — butik lukket/kort uge"},
+    (7,  2026): {"factor": 1.20, "navn": "Fastelavn",
+                 "note": "Mere wienerbrød og boller — bestil fastelavnsboller",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.3,"son":1.0}},
+    (14, 2026): {"factor": 1.15, "navn": "Påskeuge (2.–5. apr.)",
+                 "note": "Lang weekend — ekstra på torsdag og fredag",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.3,"fre":1.4,"loe":1.2,"son":1.0}},
+    (15, 2026): {"factor": 0.90, "navn": "Påske — mandag lukket",
+                 "note": "Reducer mandag-leverancen (2. påskedag)",
+                 "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0}},
+    (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",
+                 "note": "+10% — fridag i ugen",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.2,"loe":1.2,"son":1.0}},
+    (20, 2026): {"factor": 1.15, "navn": "Kr. Himmelfart + brofridag",
+                 "note": "Fredag 15. maj er brofridag — bestil 45% ekstra fredag",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.45,"loe":1.2,"son":1.0}},
+    (21, 2026): {"factor": 1.15, "navn": "Pinse (søn. 24. maj)",
+                 "note": "Søndagsleverance dækker søndag + mandag",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.1,"loe":1.2,"son":1.4}},
+    (22, 2026): {"factor": 0.88, "navn": "2. Pinsedag — mandag lukket",
+                 "note": "Reducer første leverance mandag",
+                 "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0}},
+    (23, 2026): {"factor": 1.25, "navn": "Grundlovsdag (fre. 5. jun.)",
+                 "note": "Fredag er årets bedste bagværksdag — bestil 60% ekstra fredag",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.2,"son":1.0}},
+    (52, 2026): {"factor": 1.85, "navn": "Juleugen",
+                 "note": "Årets travleste uge — planlæg indkøb i oktober",
+                 "dag_fak": {"man":1.2,"tir":1.3,"ons":1.4,"tor":1.5,"fre":1.6,"loe":1.4,"son":1.0}},
+    (1,  2027): {"factor": 0.45, "navn": "Nytårsuge",
+                 "note": "Halv bestilling — butik lukket/kort uge",
+                 "dag_fak": {"man":0.0,"tir":0.5,"ons":0.5,"tor":0.5,"fre":0.5,"loe":0.5,"son":0.0}},
 }
 
 _RB = 0.10    # returrate boller (10% sendes retur)
@@ -955,4 +975,149 @@ def hent_bestillings_anbefaling() -> Dict:
         "tgtg_korrektion": round(tgtg_korr, 2),
         "kat_fordeling": {k: round(v * 100, 1) for k, v in kat_pct.items()},
         "uger":          uger_list,
+    }
+
+
+def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
+    """Produktniveau bestillingsanbefaling for mål-uge.
+
+    Basis: senest indlæste ugebestilling før mål-ugen.
+    Formel pr. dag: basis_dag × SI × dag_fak × TGTG-korr × (1 + vækst)
+    """
+    from datetime import date, timedelta
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    TGTG_PR_POSE = 38.0
+
+    with _conn() as conn:
+        # Find seneste bestillingsuge der er ældre end (eller lig) mål-ugen
+        basis_row = conn.execute("""
+            SELECT uge, aar FROM ugebestillinger
+            WHERE (aar < ? OR (aar = ? AND uge < ?))
+            ORDER BY aar DESC, uge DESC
+            LIMIT 1
+        """, (maal_aar, maal_aar, maal_uge)).fetchone()
+
+        if not basis_row:
+            # Fallback: seneste uge overhovedet
+            basis_row = conn.execute("""
+                SELECT uge, aar FROM ugebestillinger
+                ORDER BY aar DESC, uge DESC LIMIT 1
+            """).fetchone()
+
+        if not basis_row:
+            return {"fejl": "Ingen ugebestillinger indlæst endnu"}
+
+        basis_uge = basis_row["uge"]
+        basis_aar = basis_row["aar"]
+
+        # Hent alle produkter fra basis-ugen
+        prod_rows = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms,
+                   man, tir, ons, tor, fre, loe, son, total_antal
+            FROM ugebestillinger
+            WHERE uge=? AND aar=?
+            ORDER BY varenavn
+        """, (basis_uge, basis_aar)).fetchall()
+
+        # Effektivt solgt seneste 8 uger til vækst+TGTG
+        salg_rows = conn.execute("""
+            WITH kasse AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
+                )
+                GROUP BY uw, uy
+            ),
+            kw AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
+                   OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
+                GROUP BY uw, uy
+            )
+            SELECT CAST(k.uw AS INTEGER) AS uge,
+                   CAST(k.uy AS INTEGER) AS aar,
+                   k.stk + COALESCE(kw.stk,0) AS kasse_stk,
+                   br.tgtg AS tgtg_kr
+            FROM kasse k
+            LEFT JOIN kw ON kw.uw=k.uw AND kw.uy=k.uy
+            LEFT JOIN bager_regnskab br
+                ON br.uge=CAST(k.uw AS INTEGER) AND br.aar=CAST(k.uy AS INTEGER)
+            ORDER BY aar DESC, uge DESC
+            LIMIT 8
+        """).fetchall()
+
+    # Vækst: seneste 3 vs forrige 3 uger, cap ±15%
+    eff = [(r["kasse_stk"] or 0) + round((r["tgtg_kr"] or 0) / TGTG_PR_POSE)
+           for r in salg_rows]
+    basis3 = [v for v in eff[:3] if v > 0]
+    prev3  = [v for v in eff[3:6] if v > 0]
+    basis_avg = sum(basis3) / len(basis3) if basis3 else 1.0
+    prev_avg  = sum(prev3)  / len(prev3)  if prev3  else basis_avg
+    vaekst = max(-0.15, min(0.15, basis_avg / prev_avg - 1)) if prev_avg > 0 else 0.0
+
+    # TGTG-korrektion
+    tgtg_kr = next((r["tgtg_kr"] for r in salg_rows if (r["tgtg_kr"] or 0) > 0), 0) or 0
+    tgtg_korr = 0.95 if tgtg_kr > 1000 else 1.0
+
+    # Sæsonindeks for mål-ugens mandag
+    mon_dato = date.fromisocalendar(maal_aar, maal_uge, 1)
+    si = _SI_MAANED.get(mon_dato.month, 1.0)
+
+    # Event / helligdage
+    evt = _EVENTS.get((maal_uge, maal_aar))
+    dag_fak = evt["dag_fak"] if evt else {d: 1.0 for d in DAGE}
+    total_faktor = si * (evt["factor"] if evt else 1.0) * tgtg_korr * (1 + vaekst)
+
+    # Byg produkttabel
+    produkter = []
+    for r in prod_rows:
+        basis_dag = {d: float(r[d] or 0) for d in DAGE}
+        anb_dag = {}
+        for d in DAGE:
+            raw = basis_dag[d] * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
+            anb_dag[d] = int(round(raw))
+
+        total_basis = sum(basis_dag[d] for d in DAGE)
+        total_anb   = sum(anb_dag[d]   for d in DAGE)
+        pris = float(r["pris_ex_moms"] or 0)
+
+        produkter.append({
+            "varenummer":    r["varenummer"] or "",
+            "varenavn":      r["varenavn"],
+            "pris_ex_moms":  round(pris, 2),
+            "basis":         {d: int(basis_dag[d]) for d in DAGE},
+            "anbefalet":     anb_dag,
+            "total_basis":   int(total_basis),
+            "total_anbefalet": total_anb,
+            "total_pris":    round(total_anb * pris, 2),
+        })
+
+    total_stk = sum(p["total_anbefalet"] for p in produkter)
+    total_kr  = sum(p["total_pris"]      for p in produkter)
+
+    return {
+        "maal_uge":        maal_uge,
+        "maal_aar":        maal_aar,
+        "dato_range":      _dato_range(maal_uge, maal_aar),
+        "basis_uge":       basis_uge,
+        "basis_aar":       basis_aar,
+        "maaned":          mon_dato.month,
+        "si":              round(si, 2),
+        "event":           evt,
+        "tgtg_kr":         round(tgtg_kr),
+        "tgtg_ok":         tgtg_kr < 800,
+        "tgtg_advarsel":   tgtg_kr > 1200,
+        "tgtg_korrektion": round(tgtg_korr, 2),
+        "vaekst_pct":      round(vaekst * 100, 1),
+        "total_faktor":    round(total_faktor, 3),
+        "produkter":       produkter,
+        "total_stk":       total_stk,
+        "total_kr":        round(total_kr, 2),
     }

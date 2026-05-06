@@ -226,9 +226,24 @@ async def api_bager_svind(request: Request):
 
 
 @app.get("/api/bestilling/anbefaling")
-async def api_bestillings_anbefaling(request: Request):
+async def api_bestillings_anbefaling(
+    request: Request,
+    uge: Optional[int] = None,
+    aar: Optional[int] = None,
+):
     _kræv_login(request)
-    return database.hent_bestillings_anbefaling()
+    if uge is None:
+        from datetime import date
+        iso = date.today().isocalendar()
+        uge = iso[1] + 1
+        aar = iso[0]
+        if uge > 52:
+            uge = 1
+            aar += 1
+    if aar is None:
+        from datetime import date
+        aar = date.today().year
+    return database.hent_bestillings_uge(int(uge), int(aar))
 
 
 @app.post("/api/bager/retur-opdater")

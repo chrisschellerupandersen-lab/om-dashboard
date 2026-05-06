@@ -219,6 +219,28 @@ async def bestilling_opdater(request: Request):
     return {"ok": True, "uge": uge, "aar": aar, "linjer": antal}
 
 
+@app.get("/api/bager/svind")
+async def api_bager_svind(request: Request):
+    _kræv_login(request)
+    return database.hent_svind_data()
+
+
+@app.post("/api/bager/retur-opdater")
+async def bager_retur_opdater(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    antal = database.gem_bager_regnskab(linjer)
+    return {"ok": True, "linjer": antal}
+
+
 @app.get("/api/salg/mangler-kostpris")
 async def api_mangler_kostpris(request: Request):
     _kræv_login(request)

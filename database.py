@@ -74,6 +74,20 @@ def init_db():
                 UNIQUE(uge, aar, varenavn) ON CONFLICT REPLACE
             );
             CREATE INDEX IF NOT EXISTS idx_bestil_uge ON ugebestillinger(uge, aar);
+
+            CREATE TABLE IF NOT EXISTS bager_regnskab (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                uge           INTEGER NOT NULL,
+                aar           INTEGER NOT NULL,
+                retur_wiener  REAL DEFAULT 0,
+                retur_boller  REAL DEFAULT 0,
+                tgtg          REAL DEFAULT 0,
+                b_kvali       REAL DEFAULT 0,
+                retur_ialt    REAL DEFAULT 0,
+                faktura       REAL DEFAULT 0,
+                indlæst       TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(uge, aar) ON CONFLICT REPLACE
+            );
         """)
         # Migration: tilføj time_start til eksisterende tabeller
         try:
@@ -620,6 +634,68 @@ def hent_bestilling_uge(uge: int, aar: int) -> List[Dict]:
             ORDER BY total_pris DESC
         """, (uge, aar)).fetchall()
     return [dict(r) for r in rows]
+
+
+def gem_bager_regnskab(linjer: List[Dict]) -> int:
+    with _conn() as conn:
+        for r in linjer:
+            conn.execute("""
+                INSERT INTO bager_regnskab
+                    (uge, aar, retur_wiener, retur_boller, tgtg, b_kvali, retur_ialt, faktura)
+                VALUES (?,?,?,?,?,?,?,?)
+            """, (r["uge"], r["aar"], r.get("retur_wiener", 0), r.get("retur_boller", 0),
+                  r.get("tgtg", 0), r.get("b_kvali", 0), r.get("retur_ialt", 0), r.get("faktura", 0)))
+    return len(linjer)
+
+
+def hent_svind_data() -> List[Dict]:
+    """Kombinerer bestilling, bager_regnskab og kassesalg per uge."""
+    with _conn() as conn:
+        # Kassesalg bagværk per uge — matcher varenummer fra bestillinger
+        # Shopbox gemmer varenummer som tekst; renser .0-suffix begge steder
+        kasse = conn.execute("""
+            SELECT
+                CAST(CAST(strftime('%W', dato) AS INTEGER) AS TEXT) AS uge_nr,
+                strftime('%Y', dato) AS aar_str,
+                ROUND(SUM(antal), 0) AS kassesalg_stk
+            FROM transaktioner
+            WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                FROM ugebestillinger
+                WHERE varenummer != '' AND varenummer != '0'
+            )
+            GROUP BY uge_nr, aar_str
+        """).fetchall()
+        kasse_map = {(int(r["uge_nr"]), int(r["aar_str"])): r["kassesalg_stk"] for r in kasse}
+
+        rows = conn.execute("""
+            SELECT
+                b.uge, b.aar,
+                ROUND(SUM(u.total_antal), 0) AS bestilt_stk,
+                ROUND(SUM(u.total_pris),  2) AS bestilt_kr,
+                b.faktura,
+                b.retur_wiener, b.retur_boller, b.tgtg, b.b_kvali, b.retur_ialt,
+                ROUND(b.faktura - b.retur_ialt, 2) AS netto_kr
+            FROM bager_regnskab b
+            LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
+            GROUP BY b.uge, b.aar
+            ORDER BY b.aar DESC, b.uge DESC
+        """).fetchall()
+
+    result = []
+    for r in rows:
+        d = dict(r)
+        kassesalg = kasse_map.get((d["uge"], d["aar"]))
+        d["kassesalg_stk"] = kassesalg
+        if kassesalg is not None and d["bestilt_stk"]:
+            svind = d["bestilt_stk"] - kassesalg
+            d["svind_stk"] = svind
+            d["svind_pct"] = round(svind / d["bestilt_stk"] * 100, 1)
+        else:
+            d["svind_stk"] = None
+            d["svind_pct"] = None
+        result.append(d)
+    return result
 
 
 def hent_mangler_kostpris() -> Dict:

@@ -65,8 +65,18 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
         if (man + tir + ons + tor + fre + loe + son) == 0 and total_antal == 0:
             continue
 
+        # Varenummer: gem som rent heltal-streng (undgår "10040.0")
+        vnr = row[1]
+        if vnr is not None:
+            try:
+                vnr = str(int(float(vnr)))
+            except (ValueError, TypeError):
+                vnr = str(vnr).strip()
+        else:
+            vnr = ""
+
         linjer.append({
-            "varenummer":   str(row[1]).strip() if row[1] else "",
+            "varenummer":   vnr,
             "varenavn":     varenavn,
             "pris_ex_moms": _tal(row[3]),
             "man": man, "tir": tir, "ons": ons, "tor": tor,

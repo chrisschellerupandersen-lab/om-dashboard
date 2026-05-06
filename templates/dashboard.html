@@ -446,6 +446,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/></svg>
         Ugebestilling
       </div>
+      <div class="nav-item" onclick="showPanel('svind',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/></svg>
+        Svind &amp; økonomi
+      </div>
 
       <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
       <div class="nav-item" onclick="showPanel('kostpris',this)">
@@ -900,6 +904,60 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <tbody id="bestilling-detalje-tbody"></tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SVIND & ØKONOMI -->
+      <div class="panel" id="p-svind">
+        <div class="page-hdr">
+          <h2>Svind &amp; bageriøkonomi</h2>
+          <p>Bestilt vs. kassesalg · faktura · retur (wienerbrød, boller, TGTG, b-kvali) per uge</p>
+        </div>
+        <div class="kpi-row" id="svind-kpi-row">
+          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Gns. svind</div>
+            <div class="kpi-v" id="svind-gns-pct" style="color:var(--amber);font-size:30px;">—</div>
+            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="svind-gns-sub">normaluger</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Total faktura</div>
+            <div class="kpi-v" id="svind-faktura">—</div>
+            <div class="kpi-s" id="svind-faktura-sub">inkl. moms</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Total retur inkl. TGTG</div>
+            <div class="kpi-v" id="svind-retur">—</div>
+            <div class="kpi-s" id="svind-retur-sub">krediteres på faktura</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Netto bagerregning</div>
+            <div class="kpi-v" id="svind-netto">—</div>
+            <div class="kpi-s" id="svind-netto-sub">faktura − retur</div>
+          </div>
+        </div>
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Uge for uge — bestilt, kassesalg, svind &amp; økonomi</span>
+            <span class="aar2-tbl-hdr-r" id="svind-tbl-lbl"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="min-width:900px;">
+              <thead><tr>
+                <th style="width:7%;">Uge</th>
+                <th class="num" style="width:10%;">Bestilt stk</th>
+                <th class="num" style="width:10%;">Kassesalg stk</th>
+                <th class="num" style="width:8%;">Svind stk</th>
+                <th class="num" style="width:8%;">Svind %</th>
+                <th class="num" style="width:11%;">Faktura kr</th>
+                <th class="num" style="width:10%;">TGTG kr</th>
+                <th class="num" style="width:10%;">Retur i alt</th>
+                <th class="num" style="width:11%;">Netto kr</th>
+              </tr></thead>
+              <tbody id="svind-tbody">
+                <tr><td colspan="9" class="empty">Indlæser…</td></tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -2015,6 +2073,59 @@ async function visBestillingDetalje(uge, aar) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
+let _svindLoaded = false;
+
+async function loadSvind() {
+  if (_svindLoaded) return;
+  _svindLoaded = true;
+  const data = await api('/api/bager/svind');
+  if (!data || !data.length) {
+    document.getElementById('svind-tbody').innerHTML =
+      '<tr><td colspan="9" class="empty">Ingen data — kør bager_retur_sync.py og bestilling_sync.py</td></tr>';
+    return;
+  }
+
+  // KPI totaler (alle uger)
+  const totFaktura = data.reduce((s, r) => s + (r.faktura || 0), 0);
+  const totRetur   = data.reduce((s, r) => s + (r.retur_ialt || 0), 0);
+  const totNetto   = data.reduce((s, r) => s + (r.netto_kr || 0), 0);
+
+  // Gennemsnitlig svind kun for uger hvor vi har begge tal
+  const svindUger = data.filter(r => r.svind_pct != null);
+  const gnsSvind  = svindUger.length
+    ? (svindUger.reduce((s, r) => s + r.svind_pct, 0) / svindUger.length).toFixed(1)
+    : '—';
+
+  document.getElementById('svind-gns-pct').textContent  = gnsSvind + (gnsSvind !== '—' ? '%' : '');
+  document.getElementById('svind-gns-sub').textContent  = svindUger.length + ' uger med data';
+  document.getElementById('svind-faktura').textContent  = Math.round(totFaktura).toLocaleString('da-DK') + ' kr';
+  document.getElementById('svind-retur').textContent    = Math.round(totRetur).toLocaleString('da-DK') + ' kr';
+  document.getElementById('svind-netto').textContent    = Math.round(totNetto).toLocaleString('da-DK') + ' kr';
+  document.getElementById('svind-tbl-lbl').textContent  = data.length + ' uger';
+
+  document.getElementById('svind-tbody').innerHTML = data.map(r => {
+    const svindPct = r.svind_pct;
+    const svindCls = svindPct == null ? '' : svindPct > 25 ? 'color:#9b3420;font-weight:500;'
+                                           : svindPct > 15 ? 'color:#7a5c00;'
+                                           : 'color:#2d5a2d;';
+    const svindTxt = svindPct != null ? svindPct.toFixed(1) + '%' : '—';
+    const svindStk = r.svind_stk != null ? Math.round(r.svind_stk) : '—';
+    const kasseTxt = r.kassesalg_stk != null ? Math.round(r.kassesalg_stk).toLocaleString('da-DK') : '—';
+    return `<tr>
+      <td style="font-size:14px;font-weight:400;">Uge ${r.uge} <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">${r.aar}</span></td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${r.bestilt_stk != null ? Math.round(r.bestilt_stk).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${kasseTxt}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${svindStk}</td>
+      <td class="num" style="${svindCls}font-family:'DM Mono',monospace;">${svindTxt}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.faktura).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${Math.round(r.retur_ialt).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;font-weight:500;">${Math.round(r.netto_kr).toLocaleString('da-DK')}</td>
+    </tr>`;
+  }).join('');
+}
+
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────
 let _kostprisLoaded = false;
 
@@ -2062,6 +2173,7 @@ window.showPanel = function(id, el) {
   if (id === 'aar'       && !_aarLoaded)   loadAar();
   if (id === 'kostpris')    loadKostpris();
   if (id === 'bestilling') loadBestilling();
+  if (id === 'svind')     loadSvind();
 };
 
 loadAll();

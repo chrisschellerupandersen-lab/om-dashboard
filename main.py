@@ -180,6 +180,12 @@ async def rapport_status():
 
 # ── WEBHOOK ───────────────────────────────────────────────────────────────────
 
+@app.get("/api/salg/mangler-kostpris")
+async def api_mangler_kostpris(request: Request):
+    _kræv_login(request)
+    return database.hent_mangler_kostpris()
+
+
 @app.post("/api/opdater-rapport")
 async def opdater_rapport(request: Request):
     header_secret = request.headers.get("X-Webhook-Secret", "")

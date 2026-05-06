@@ -440,6 +440,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/></svg>
         Trend &amp; bestilling
       </div>
+
+      <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
+      <div class="nav-item" onclick="showPanel('kostpris',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/></svg>
+        Mangler kostpris
+      </div>
     </nav>
 
     <div class="content">
@@ -815,6 +821,50 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <div id="kaffe-drill-body" style="padding:16px 20px;background:var(--white);"></div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- MANGLER KOSTPRIS -->
+      <div class="panel" id="p-kostpris">
+        <div class="page-hdr">
+          <h2>Varer uden kostpris</h2>
+          <p>Produkter der er solgt men aldrig har haft kostpris registreret — DB% kan ikke beregnes</p>
+        </div>
+        <div class="kpi-row" id="kostpris-kpi-row" style="margin-bottom:20px;">
+          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Varer uden kostpris</div>
+            <div class="kpi-v" id="kostpris-antal" style="color:var(--amber);font-size:30px;">—</div>
+            <div class="kpi-s" style="color:rgba(255,255,255,.45);">produkter mangler</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Omsætning uden DB</div>
+            <div class="kpi-v" id="kostpris-omsat">—</div>
+            <div class="kpi-s" id="kostpris-pct">— af total</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Status</div>
+            <div class="kpi-v" id="kostpris-status" style="font-size:14px;margin-top:4px;">—</div>
+            <div class="kpi-s">opdater i Shopbox</div>
+          </div>
+        </div>
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Produkter der mangler kostpris</span>
+            <span class="aar2-tbl-hdr-r" id="kostpris-tbl-lbl"></span>
+          </div>
+          <table class="aar2-tbl">
+            <thead><tr>
+              <th style="width:40%;">Varenavn</th>
+              <th style="width:18%;">Kategori</th>
+              <th class="num" style="width:14%;">Omsætning</th>
+              <th class="num" style="width:10%;">Antal stk</th>
+              <th class="num" style="width:10%;">Salgs­dage</th>
+              <th style="width:8%;">Seneste salg</th>
+            </tr></thead>
+            <tbody id="kostpris-tbody">
+              <tr><td colspan="6" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1806,13 +1856,52 @@ function kaffeVisProduktTimer(idx) {
 }
 
 // Indlæs dage-detaljer når panelet vises første gang
+// ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────
+let _kostprisLoaded = false;
+
+async function loadKostpris() {
+  if (_kostprisLoaded) return;
+  _kostprisLoaded = true;
+  const d = await api('/api/salg/mangler-kostpris');
+  if (!d) return;
+
+  document.getElementById('kostpris-antal').textContent = d.antal;
+  document.getElementById('kostpris-omsat').textContent =
+    Math.round(d.mangler_omsaetning).toLocaleString('da-DK') + ' kr';
+  const pct = d.total_omsaetning > 0
+    ? (d.mangler_omsaetning / d.total_omsaetning * 100).toFixed(1)
+    : '0';
+  document.getElementById('kostpris-pct').textContent = pct + '% af butikkens total';
+  document.getElementById('kostpris-status').textContent =
+    d.antal === 0 ? '✓ Alle varer har kostpris' : '⚠ ' + d.antal + ' varer mangler';
+  document.getElementById('kostpris-status').style.color =
+    d.antal === 0 ? 'var(--moss)' : 'var(--clay)';
+  document.getElementById('kostpris-tbl-lbl').textContent =
+    d.antal + ' produkter · ' + pct + '% af omsætning uden DB-beregning';
+
+  const tbody = document.getElementById('kostpris-tbody');
+  if (!d.produkter.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">Alle varer har kostpris registreret ✓</td></tr>';
+    return;
+  }
+  tbody.innerHTML = d.produkter.map((r, i) => `<tr>
+    <td style="font-size:14px;">${r.varenavn}</td>
+    <td style="font-size:12px;color:var(--ash);">${r.kategori || '—'}</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.total_omsaetning).toLocaleString('da-DK')} kr</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.total_antal)}</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${r.salgs_dage}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);">${fmtDato(r.seneste_dato)}</td>
+  </tr>`).join('');
+}
+
 const _origShowPanel = showPanel;
 window.showPanel = function(id, el) {
   _origShowPanel(id, el);
   if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
-  if (id === 'kaffe') loadKaffe();
-  if (id === 'trend' && !_trendLoaded) loadTrend(_trendDage);
-  if (id === 'aar'   && !_aarLoaded)   loadAar();
+  if (id === 'kaffe')    loadKaffe();
+  if (id === 'trend'     && !_trendLoaded) loadTrend(_trendDage);
+  if (id === 'aar'       && !_aarLoaded)   loadAar();
+  if (id === 'kostpris') loadKostpris();
 };
 
 loadAll();

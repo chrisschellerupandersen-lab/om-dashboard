@@ -549,3 +549,35 @@ def hent_dashboard_data() -> Dict:
         },
         "senest_opdateret": senest["indlæst_dato"] if senest else None,
     }
+
+
+def hent_mangler_kostpris() -> Dict:
+    """Produkter hvor total kostpris = 0 på tværs af alle transaktioner."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT
+                varenavn,
+                kategori,
+                ROUND(SUM(antal), 0)      AS total_antal,
+                ROUND(SUM(omsætning), 2)  AS total_omsaetning,
+                MAX(dato)                 AS seneste_dato,
+                COUNT(DISTINCT dato)      AS salgs_dage
+            FROM transaktioner
+            WHERE varenavn != ''
+            GROUP BY varenavn, kategori
+            HAVING SUM(kostpris) = 0 AND SUM(omsætning) > 0
+            ORDER BY total_omsaetning DESC
+        """).fetchall()
+
+        total_omsat = conn.execute(
+            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner"
+        ).fetchone()[0]
+
+    produkter = [dict(r) for r in rows]
+    mangler_omsat = sum(p["total_omsaetning"] for p in produkter)
+    return {
+        "produkter": produkter,
+        "antal":     len(produkter),
+        "mangler_omsaetning": round(mangler_omsat, 2),
+        "total_omsaetning":   round(total_omsat, 2),
+    }

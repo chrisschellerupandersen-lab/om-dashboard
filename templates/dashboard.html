@@ -912,7 +912,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-svind">
         <div class="page-hdr">
           <h2>Svind &amp; bageriøkonomi</h2>
-          <p>Bestilt vs. kassesalg · faktura · retur (wienerbrød, boller, TGTG, b-kvali) per uge</p>
+          <p>Effektivt solgt = kassesalg + Kaffe/wiener-kombo + TGTG (à 38 kr/pose) · faktura &amp; retur per uge</p>
         </div>
         <div class="kpi-row" id="svind-kpi-row">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
@@ -942,20 +942,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <span class="aar2-tbl-hdr-r" id="svind-tbl-lbl"></span>
           </div>
           <div style="overflow-x:auto;">
-            <table class="aar2-tbl" style="min-width:900px;">
+            <table class="aar2-tbl" style="min-width:1050px;">
               <thead><tr>
                 <th style="width:7%;">Uge</th>
-                <th class="num" style="width:10%;">Bestilt stk</th>
-                <th class="num" style="width:10%;">Kassesalg stk</th>
-                <th class="num" style="width:8%;">Svind stk</th>
-                <th class="num" style="width:8%;">Svind %</th>
-                <th class="num" style="width:11%;">Indkøb kr</th>
-                <th class="num" style="width:10%;">TGTG kr</th>
-                <th class="num" style="width:10%;">Retur i alt</th>
-                <th class="num" style="width:11%;">Netto kr</th>
+                <th class="num" style="width:8%;">Bestilt stk</th>
+                <th class="num" style="width:8%;">Kassesalg</th>
+                <th class="num" style="width:6%;" title="Kaffe+Wienerbrød kombination — tæller som bagværk solgt">KW stk</th>
+                <th class="num" style="width:6%;" title="Too Good To Go — estimeret à 38 kr/pose">TGTG stk</th>
+                <th class="num" style="width:8%;">Effektivt solgt</th>
+                <th class="num" style="width:7%;">Svind stk</th>
+                <th class="num" style="width:7%;">Svind %</th>
+                <th class="num" style="width:9%;">Indkøb kr</th>
+                <th class="num" style="width:8%;">TGTG kr</th>
+                <th class="num" style="width:8%;">Retur i alt</th>
+                <th class="num" style="width:9%;">Netto kr</th>
               </tr></thead>
               <tbody id="svind-tbody">
-                <tr><td colspan="9" class="empty">Indlæser…</td></tr>
+                <tr><td colspan="12" class="empty">Indlæser…</td></tr>
               </tbody>
             </table>
           </div>
@@ -2082,7 +2085,7 @@ async function loadSvind() {
   const data = await api('/api/bager/svind');
   if (!data || !data.length) {
     document.getElementById('svind-tbody').innerHTML =
-      '<tr><td colspan="9" class="empty">Ingen data — kør bager_retur_sync.py og bestilling_sync.py</td></tr>';
+      '<tr><td colspan="12" class="empty">Ingen data — kør bager_retur_sync.py og bestilling_sync.py</td></tr>';
     return;
   }
 
@@ -2110,18 +2113,25 @@ async function loadSvind() {
                                            : svindPct > 15 ? 'color:#7a5c00;'
                                            : 'color:#2d5a2d;';
     const svindTxt = svindPct != null ? svindPct.toFixed(1) + '%' : '—';
-    const svindStk = r.svind_stk != null ? Math.round(r.svind_stk) : '—';
+    const svindStk = r.svind_stk != null ? Math.round(r.svind_stk).toLocaleString('da-DK') : '—';
     const kasseTxt = r.kassesalg_stk != null ? Math.round(r.kassesalg_stk).toLocaleString('da-DK') : '—';
+    const kwTxt    = r.kw_stk > 0 ? r.kw_stk : '—';
+    const tgtgStkTxt = r.tgtg_stk > 0 ? r.tgtg_stk : '—';
+    const effTxt   = r.effektivt_solgt != null ? Math.round(r.effektivt_solgt).toLocaleString('da-DK') : '—';
+    const mono     = "font-family:'DM Mono',monospace;";
     return `<tr>
-      <td style="font-size:14px;font-weight:400;">Uge ${r.uge} <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">${r.aar}</span></td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${r.bestilt_stk != null ? Math.round(r.bestilt_stk).toLocaleString('da-DK') : '—'}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${kasseTxt}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${svindStk}</td>
-      <td class="num" style="${svindCls}font-family:'DM Mono',monospace;">${svindTxt}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${Math.round(r.retur_ialt).toLocaleString('da-DK')}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;font-weight:500;">${Math.round(r.netto_kr).toLocaleString('da-DK')}</td>
+      <td style="font-size:14px;font-weight:400;">Uge ${r.uge} <span style="${mono}font-size:10px;color:var(--ash);">${r.aar}</span></td>
+      <td class="num" style="${mono}">${r.bestilt_stk != null ? Math.round(r.bestilt_stk).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}">${kasseTxt}</td>
+      <td class="num" style="${mono}color:var(--ash);">${kwTxt}</td>
+      <td class="num" style="${mono}color:var(--moss);">${tgtgStkTxt}</td>
+      <td class="num" style="${mono}font-weight:500;">${effTxt}</td>
+      <td class="num" style="${mono}">${svindStk}</td>
+      <td class="num" style="${svindCls}${mono}">${svindTxt}</td>
+      <td class="num" style="${mono}">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}color:var(--ash);">${Math.round(r.retur_ialt || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}font-weight:500;">${Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
     </tr>`;
   }).join('');
 }

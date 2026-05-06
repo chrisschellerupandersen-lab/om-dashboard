@@ -649,10 +649,13 @@ def gem_bager_regnskab(linjer: List[Dict]) -> int:
 
 
 def hent_svind_data() -> List[Dict]:
-    """Kombinerer bestilling, bager_regnskab og kassesalg per uge."""
+    """Kombinerer bestilling, bager_regnskab og kassesalg per uge.
+    Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk (tgtg_kr ÷ 38 kr/pose).
+    """
+    TGTG_KR_PR_POSE = 38.0
+
     with _conn() as conn:
         # Kassesalg bagværk per uge — matcher varenummer fra bestillinger
-        # Shopbox gemmer varenummer som tekst; renser .0-suffix begge steder
         kasse = conn.execute("""
             SELECT
                 CAST(CAST(strftime('%W', dato) AS INTEGER) AS TEXT) AS uge_nr,
@@ -667,6 +670,19 @@ def hent_svind_data() -> List[Dict]:
             GROUP BY uge_nr, aar_str
         """).fetchall()
         kasse_map = {(int(r["uge_nr"]), int(r["aar_str"])): r["kassesalg_stk"] for r in kasse}
+
+        # KW stk: Kaffe+Wienerbrød-kombination — hvert salg tæller som 1 bagværk solgt
+        kw = conn.execute("""
+            SELECT
+                CAST(CAST(strftime('%W', dato) AS INTEGER) AS TEXT) AS uge_nr,
+                strftime('%Y', dato) AS aar_str,
+                ROUND(SUM(antal), 0) AS kw_stk
+            FROM transaktioner
+            WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
+               OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
+            GROUP BY uge_nr, aar_str
+        """).fetchall()
+        kw_map = {(int(r["uge_nr"]), int(r["aar_str"])): r["kw_stk"] for r in kw}
 
         rows = conn.execute("""
             SELECT
@@ -698,14 +714,23 @@ def hent_svind_data() -> List[Dict]:
     for r in rows:
         d = dict(r)
         kassesalg = kasse_map.get((d["uge"], d["aar"]))
+        kw_stk    = int(kw_map.get((d["uge"], d["aar"]), 0) or 0)
+        tgtg_stk  = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0
+
         d["kassesalg_stk"] = kassesalg
+        d["kw_stk"]        = kw_stk
+        d["tgtg_stk"]      = tgtg_stk
+
         if kassesalg is not None and d["bestilt_stk"]:
-            svind = d["bestilt_stk"] - kassesalg
-            d["svind_stk"] = svind
-            d["svind_pct"] = round(svind / d["bestilt_stk"] * 100, 1)
+            effektivt = kassesalg + kw_stk + tgtg_stk
+            svind     = d["bestilt_stk"] - effektivt
+            d["effektivt_solgt"] = effektivt
+            d["svind_stk"]  = svind
+            d["svind_pct"]  = round(svind / d["bestilt_stk"] * 100, 1)
         else:
-            d["svind_stk"] = None
-            d["svind_pct"] = None
+            d["effektivt_solgt"] = None
+            d["svind_stk"]  = None
+            d["svind_pct"]  = None
         result.append(d)
     return result
 

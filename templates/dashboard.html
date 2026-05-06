@@ -921,7 +921,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="svind-gns-sub">normaluger</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Total faktura</div>
+            <div class="kpi-l">Total indkøb ex moms</div>
             <div class="kpi-v" id="svind-faktura">—</div>
             <div class="kpi-s" id="svind-faktura-sub">inkl. moms</div>
           </div>
@@ -949,7 +949,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th class="num" style="width:10%;">Kassesalg stk</th>
                 <th class="num" style="width:8%;">Svind stk</th>
                 <th class="num" style="width:8%;">Svind %</th>
-                <th class="num" style="width:11%;">Faktura kr</th>
+                <th class="num" style="width:11%;">Indkøb kr</th>
                 <th class="num" style="width:10%;">TGTG kr</th>
                 <th class="num" style="width:10%;">Retur i alt</th>
                 <th class="num" style="width:11%;">Netto kr</th>
@@ -2087,7 +2087,7 @@ async function loadSvind() {
   }
 
   // KPI totaler (alle uger)
-  const totFaktura = data.reduce((s, r) => s + (r.faktura || 0), 0);
+  const totFaktura = data.reduce((s, r) => s + (r.bestilt_kr || 0), 0);
   const totRetur   = data.reduce((s, r) => s + (r.retur_ialt || 0), 0);
   const totNetto   = data.reduce((s, r) => s + (r.netto_kr || 0), 0);
 
@@ -2118,7 +2118,7 @@ async function loadSvind() {
       <td class="num" style="font-family:'DM Mono',monospace;">${kasseTxt}</td>
       <td class="num" style="font-family:'DM Mono',monospace;">${svindStk}</td>
       <td class="num" style="${svindCls}font-family:'DM Mono',monospace;">${svindTxt}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.faktura).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
       <td class="num" style="font-family:'DM Mono',monospace;color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
       <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${Math.round(r.retur_ialt).toLocaleString('da-DK')}</td>
       <td class="num" style="font-family:'DM Mono',monospace;font-weight:500;">${Math.round(r.netto_kr).toLocaleString('da-DK')}</td>

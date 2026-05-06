@@ -671,15 +671,27 @@ def hent_svind_data() -> List[Dict]:
         rows = conn.execute("""
             SELECT
                 b.uge, b.aar,
-                ROUND(SUM(u.total_antal), 0) AS bestilt_stk,
-                ROUND(SUM(u.total_pris),  2) AS bestilt_kr,
-                b.faktura,
+                ROUND(SUM(u.total_antal), 0)                   AS bestilt_stk,
+                ROUND(SUM(u.total_pris),  2)                   AS bestilt_kr,
                 b.retur_wiener, b.retur_boller, b.tgtg, b.b_kvali, b.retur_ialt,
-                ROUND(b.faktura - b.retur_ialt, 2) AS netto_kr
+                ROUND(SUM(u.total_pris) - b.retur_ialt, 2)    AS netto_kr
             FROM bager_regnskab b
             LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
             GROUP BY b.uge, b.aar
-            ORDER BY b.aar DESC, b.uge DESC
+            UNION ALL
+            -- Uger med bestilling men uden bager_regnskab endnu
+            SELECT
+                u.uge, u.aar,
+                ROUND(SUM(u.total_antal), 0) AS bestilt_stk,
+                ROUND(SUM(u.total_pris),  2) AS bestilt_kr,
+                0, 0, 0, 0, 0,
+                ROUND(SUM(u.total_pris), 2)  AS netto_kr
+            FROM ugebestillinger u
+            WHERE NOT EXISTS (
+                SELECT 1 FROM bager_regnskab b WHERE b.uge = u.uge AND b.aar = u.aar
+            )
+            GROUP BY u.uge, u.aar
+            ORDER BY aar DESC, uge DESC
         """).fetchall()
 
     result = []

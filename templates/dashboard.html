@@ -313,7 +313,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* KPI rows: 2 columns, first card full width */
   .kpi-row{grid-template-columns:1fr 1fr;}
-  .kpi-row .kpi:first-child{grid-column:1/-1;}
+  .kpi-row > *:first-child{grid-column:1/-1;}
   .aar-kpi-row{grid-template-columns:1fr 1fr;}
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
@@ -771,7 +771,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div id="kaffe-no-data" class="empty" style="display:none;">Ingen kaffeprodukter fundet i data</div>
         <div id="kaffe-content">
           <!-- KPI -->
-          <div id="kaffe-kpi-row" style="display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:16px;"></div>
+          <div id="kaffe-kpi-row" class="kpi-row"></div>
           <!-- Charts side-by-side -->
           <div class="aar2-charts" style="margin-bottom:14px;">
             <div class="card" style="margin-bottom:0;">
@@ -1604,7 +1604,8 @@ function buildTrend(d) {
     if (!list.length) return '<div style="padding:12px 16px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Ingen i denne periode</div>';
     return list.map(r => {
       const pctTxt = r.pct != null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(0) + '%' : 'Ny';
-      const krTxt  = Math.round(r.ny_snit) + ' stk';
+      const glTxt  = r.gl_snit > 0 ? ' → før: ' + Math.round(r.gl_snit) + ' stk' : '';
+      const krTxt  = Math.round(r.ny_snit) + ' stk' + glTxt;
       const dbTxt  = r.db_pct != null ? ' · ' + r.db_pct.toFixed(1) + '% DB' : '';
       return `<div class="rec-item">
         <span class="rec-navn">${r.varenavn}</span>

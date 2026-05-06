@@ -1976,7 +1976,10 @@ async function loadBestilling() {
 
 async function visBestillingDetalje(uge, aar) {
   const linjer = await api(`/api/bestilling/uge/${uge}?aar=${aar}`);
-  if (!linjer || !linjer.length) return;
+  if (!linjer || !linjer.length) {
+    alert(`Ingen data for uge ${uge} — kør bestilling_sync.py igen`);
+    return;
+  }
 
   document.getElementById('bestilling-detalje-titel').textContent =
     `Uge ${uge} · ${aar} — ${linjer.length} varelinjer`;

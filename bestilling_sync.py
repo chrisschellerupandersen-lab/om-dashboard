@@ -19,7 +19,7 @@ from bestilling_parser import parse_bestilling_xlsx
 MAPPE = Path(r"G:\Mit drev\Organic Marked\Organic Market\Indkøb\Uge bestilling")
 
 # Find fra miljøvariabel eller rediger direkte her
-RAILWAY_URL    = os.environ.get("RAILWAY_URL", "https://INDSÆT-DIN-RAILWAY-URL.up.railway.app")
+RAILWAY_URL    = os.environ.get("RAILWAY_URL", "https://om-dashboard-production-0f3a.up.railway.app")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "OM-Greve-2026-Hemlig")
 
 STATE_FIL = Path(__file__).parent / "bestilling_sync_state.json"
@@ -60,7 +60,7 @@ def synk(tvang: bool = False):
             sprunget += 1
             continue
 
-        print(f"  ↑ {fil.name}", end="  ", flush=True)
+        print(f"  ^ {fil.name}", end="  ", flush=True)
         try:
             data = parse_bestilling_xlsx(str(fil))
         except Exception as e:

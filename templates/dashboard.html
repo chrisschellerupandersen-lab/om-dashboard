@@ -276,6 +276,90 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .tbadge.ny  {background:rgba(200,168,75,.15);color:#7a5c00;}
 .tbadge.vaek{background:rgba(100,100,100,.08);color:#666;}
 .trend-tabs{display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;}
+
+/* ── MOBILE ───────────────────────────────────────────────────────────────── */
+.tb-menu-btn{
+  display:none;
+  background:none;border:none;cursor:pointer;padding:6px 8px;
+  flex-direction:column;gap:4px;align-items:center;
+}
+.tb-menu-btn span{display:block;width:18px;height:2px;background:var(--amber);border-radius:1px;transition:all .2s;}
+.sidebar-backdrop{display:none;position:fixed;inset:0;top:52px;background:rgba(0,0,0,.35);z-index:99;}
+.sidebar-backdrop.open{display:block;}
+
+@media (max-width: 768px) {
+  html,body{overflow:auto;height:auto;}
+  #app{height:auto;min-height:100vh;}
+
+  /* Topbar */
+  .topbar{padding:0 12px;}
+  .tb-week{display:none;}
+  .tb-sync{display:none;}
+  .tb-divider{display:none;}
+  .tb-menu-btn{display:flex;}
+
+  /* Sidebar → slide-in overlay */
+  .body-wrap{display:block;overflow:visible;}
+  .sidebar{
+    position:fixed;top:52px;left:-210px;height:calc(100vh - 52px);
+    z-index:100;transition:left .2s ease;width:200px;
+    box-shadow:2px 0 12px rgba(0,0,0,.2);
+  }
+  .sidebar.open{left:0;}
+
+  /* Content full width */
+  .content{overflow:visible;min-height:calc(100vh - 52px);}
+  .panel{padding:14px 12px 32px;}
+
+  /* KPI rows: 2 columns, first card full width */
+  .kpi-row{grid-template-columns:1fr 1fr;}
+  .kpi-row .kpi:first-child{grid-column:1/-1;}
+  .aar-kpi-row{grid-template-columns:1fr 1fr;}
+  .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
+  .tp-kpi-grid{grid-template-columns:1fr 1fr;}
+
+  /* Two-column → single */
+  .two-col{grid-template-columns:1fr;}
+  .aar2-mid{grid-template-columns:1fr;}
+  .aar2-charts{grid-template-columns:1fr;}
+  .rec-grid{grid-template-columns:1fr;}
+  .aar2-top{grid-template-columns:1fr 1fr;}
+  .aar2-top .kpi-card:first-child{grid-column:1/-1;}
+  .aar2-mnd-stats{grid-template-columns:1fr 1fr;}
+  .aar2-forecast{grid-template-columns:1fr 1fr;}
+  .aar-cfg-main{grid-template-columns:1fr 1fr;}
+  .aar-saeson-grid{grid-template-columns:repeat(3,1fr);}
+
+  /* Dag-grid: horizontal scroll */
+  .dag-grid{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .dag-col{min-width:180px;flex-shrink:0;}
+
+  /* Tables: horizontal scroll */
+  .aar2-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .aar2-minibar-bg{display:none;}
+
+  /* Heatmap */
+  .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* Trend recommendations */
+  .trend-summary{gap:6px;}
+  .ts-chip{padding:6px 10px;}
+
+  /* Page header */
+  .page-hdr h2{font-size:17px;}
+
+  /* Kaffe drill panel */
+  #kaffe-drill .aar2-tbl-wrap{overflow-x:auto;}
+}
+
+@media (max-width: 480px) {
+  .kpi-v{font-size:22px;}
+  .aar2-top{grid-template-columns:1fr;}
+  .aar-kpi-row{grid-template-columns:1fr 1fr;}
+  .aar2-mnd-stats{grid-template-columns:1fr 1fr 1fr;}
+  .aar2-forecast{grid-template-columns:1fr 1fr 1fr;}
+  .aar2-tbl th, .aar2-tbl td{padding:8px 10px;font-size:12px;}
+}
 </style>
 </head>
 <body>
@@ -300,11 +384,15 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
     <div class="tb-right">
       <span class="tb-sync" id="tb-sync">● Indlæser…</span>
       <a class="tb-btn" href="/logout">Log ud</a>
+      <button class="tb-menu-btn" onclick="toggleSidebar()" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </div>
 
+  <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
   <div class="body-wrap">
-    <nav class="sidebar">
+    <nav class="sidebar" id="sidebar">
       <div class="nav-group-label">Overblik</div>
       <div class="nav-item active" onclick="showPanel('forside',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/></svg>
@@ -740,11 +828,21 @@ const FL = 'rgba(30,58,30,.12)', GL = 'rgba(200,168,75,.15)';
 const vColors = [F,'#2d5a2d','#4a7c4a','#6b9e6b','#8fbc8f','#c8a84b','#b5c4a8','#9eb89e','#d4bc6c','#a8b89e'];
 const dagNavne = {1:'Mandag',2:'Tirsdag',3:'Onsdag',4:'Torsdag',5:'Fredag',6:'Lørdag',7:'Søndag'};
 
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop').classList.toggle('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+
 function showPanel(id, el) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('p-' + id).classList.add('active');
   el.classList.add('active');
+  closeSidebar();
 }
 
 async function api(path) {

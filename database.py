@@ -53,6 +53,27 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_trans_dato ON transaktioner(dato);
             CREATE INDEX IF NOT EXISTS idx_trans_vare ON transaktioner(varenavn);
+
+            CREATE TABLE IF NOT EXISTS ugebestillinger (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                uge           INTEGER NOT NULL,
+                aar           INTEGER NOT NULL,
+                varenummer    TEXT    DEFAULT '',
+                varenavn      TEXT    NOT NULL,
+                pris_ex_moms  REAL    DEFAULT 0,
+                man           REAL    DEFAULT 0,
+                tir           REAL    DEFAULT 0,
+                ons           REAL    DEFAULT 0,
+                tor           REAL    DEFAULT 0,
+                fre           REAL    DEFAULT 0,
+                loe           REAL    DEFAULT 0,
+                son           REAL    DEFAULT 0,
+                total_antal   REAL    DEFAULT 0,
+                total_pris    REAL    DEFAULT 0,
+                indlæst       TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(uge, aar, varenavn) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_bestil_uge ON ugebestillinger(uge, aar);
         """)
         # Migration: tilføj time_start til eksisterende tabeller
         try:
@@ -549,6 +570,56 @@ def hent_dashboard_data() -> Dict:
         },
         "senest_opdateret": senest["indlæst_dato"] if senest else None,
     }
+
+
+def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
+    with _conn() as conn:
+        for linje in linjer:
+            conn.execute("""
+                INSERT INTO ugebestillinger
+                    (uge, aar, varenummer, varenavn, pris_ex_moms,
+                     man, tir, ons, tor, fre, loe, son, total_antal, total_pris)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                uge, aar,
+                linje.get("varenummer", ""),
+                linje["varenavn"],
+                linje.get("pris_ex_moms", 0),
+                linje.get("man", 0), linje.get("tir", 0), linje.get("ons", 0),
+                linje.get("tor", 0), linje.get("fre", 0), linje.get("loe", 0),
+                linje.get("son", 0),
+                linje.get("total_antal", 0),
+                linje.get("total_pris", 0),
+            ))
+    return len(linjer)
+
+
+def hent_bestilling_uger() -> List[Dict]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT uge, aar,
+                   COUNT(*)                    AS antal_varer,
+                   ROUND(SUM(total_antal), 0)  AS total_antal,
+                   ROUND(SUM(total_pris), 2)   AS total_pris,
+                   MAX(indlæst)                AS indlæst
+            FROM ugebestillinger
+            GROUP BY uge, aar
+            ORDER BY aar DESC, uge DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_bestilling_uge(uge: int, aar: int) -> List[Dict]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms,
+                   man, tir, ons, tor, fre, loe, son,
+                   total_antal, total_pris
+            FROM ugebestillinger
+            WHERE uge = ? AND aar = ?
+            ORDER BY total_pris DESC
+        """, (uge, aar)).fetchall()
+    return [dict(r) for r in rows]
 
 
 def hent_mangler_kostpris() -> Dict:

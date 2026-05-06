@@ -441,6 +441,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         Trend &amp; bestilling
       </div>
 
+      <div class="nav-group-label" style="margin-top:12px;">Indkøb</div>
+      <div class="nav-item" onclick="showPanel('bestilling',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/></svg>
+        Ugebestilling
+      </div>
+
       <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
       <div class="nav-item" onclick="showPanel('kostpris',this)">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/></svg>
@@ -819,6 +825,80 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <button onclick="document.getElementById('kaffe-drill').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:16px;color:rgba(200,168,75,.7);line-height:1;padding:0;">✕</button>
               </div>
               <div id="kaffe-drill-body" style="padding:16px 20px;background:var(--white);"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- UGEBESTILLING -->
+      <div class="panel" id="p-bestilling">
+        <div class="page-hdr">
+          <h2>Ugebestilling — bagværk</h2>
+          <p>Importerede bestillinger fra Google Drive · én fil per uge</p>
+        </div>
+        <div class="kpi-row" id="bestilling-kpi-row">
+          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Importerede uger</div>
+            <div class="kpi-v" id="bestilling-uger-antal" style="color:var(--amber);font-size:30px;">—</div>
+            <div class="kpi-s" style="color:rgba(255,255,255,.45);">uger i systemet</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Seneste uge</div>
+            <div class="kpi-v" id="bestilling-seneste-uge">—</div>
+            <div class="kpi-s" id="bestilling-seneste-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Seneste uge — total stk</div>
+            <div class="kpi-v" id="bestilling-seneste-antal">—</div>
+            <div class="kpi-s" id="bestilling-seneste-pris">—</div>
+          </div>
+        </div>
+
+        <div class="aar2-tbl-wrap" style="margin-bottom:14px;">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Alle importerede uger</span>
+            <span class="aar2-tbl-hdr-r" id="bestilling-uger-lbl"></span>
+          </div>
+          <table class="aar2-tbl">
+            <thead><tr>
+              <th style="width:12%;">Uge</th>
+              <th style="width:8%;">År</th>
+              <th class="num" style="width:16%;">Varer bestilt</th>
+              <th class="num" style="width:16%;">Total stk</th>
+              <th class="num" style="width:20%;">Total kostpris ex moms</th>
+              <th style="width:18%;">Importeret</th>
+              <th style="width:10%;"></th>
+            </tr></thead>
+            <tbody id="bestilling-uger-tbody">
+              <tr><td colspan="7" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div id="bestilling-detalje" style="display:none;">
+          <div class="aar2-tbl-wrap">
+            <div class="aar2-tbl-hdr">
+              <span class="aar2-tbl-hdr-l" id="bestilling-detalje-titel">—</span>
+              <button onclick="document.getElementById('bestilling-detalje').style.display='none'"
+                style="background:none;border:none;cursor:pointer;font-size:16px;color:rgba(200,168,75,.7);line-height:1;padding:0;">✕</button>
+            </div>
+            <div style="overflow-x:auto;">
+              <table class="aar2-tbl" id="bestilling-detalje-tbl">
+                <thead><tr>
+                  <th style="min-width:220px;">Varenavn</th>
+                  <th class="num" style="min-width:80px;">Pris ex moms</th>
+                  <th class="num" style="min-width:55px;">Man</th>
+                  <th class="num" style="min-width:55px;">Tir</th>
+                  <th class="num" style="min-width:55px;">Ons</th>
+                  <th class="num" style="min-width:55px;">Tor</th>
+                  <th class="num" style="min-width:55px;">Fre</th>
+                  <th class="num" style="min-width:55px;">Lør</th>
+                  <th class="num" style="min-width:55px;">Søn</th>
+                  <th class="num" style="min-width:65px;">Total stk</th>
+                  <th class="num" style="min-width:90px;">Total kr</th>
+                </tr></thead>
+                <tbody id="bestilling-detalje-tbody"></tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1856,6 +1936,82 @@ function kaffeVisProduktTimer(idx) {
 }
 
 // Indlæs dage-detaljer når panelet vises første gang
+// ── UGEBESTILLING ─────────────────────────────────────────────────────────────
+let _bestillingLoaded = false;
+
+async function loadBestilling() {
+  if (_bestillingLoaded) return;
+  _bestillingLoaded = true;
+  const uger = await api('/api/bestilling/uger');
+  if (!uger || !uger.length) {
+    document.getElementById('bestilling-uger-tbody').innerHTML =
+      '<tr><td colspan="7" class="empty">Ingen bestillinger importeret endnu — kør bestilling_sync.py</td></tr>';
+    document.getElementById('bestilling-uger-antal').textContent = '0';
+    return;
+  }
+
+  document.getElementById('bestilling-uger-antal').textContent = uger.length;
+  document.getElementById('bestilling-uger-lbl').textContent = uger.length + ' uger importeret';
+
+  const seneste = uger[0];
+  document.getElementById('bestilling-seneste-uge').textContent = 'Uge ' + seneste.uge + ' · ' + seneste.aar;
+  document.getElementById('bestilling-seneste-sub').textContent = seneste.antal_varer + ' varelinjer';
+  document.getElementById('bestilling-seneste-antal').textContent = Math.round(seneste.total_antal).toLocaleString('da-DK') + ' stk';
+  document.getElementById('bestilling-seneste-pris').textContent = Math.round(seneste.total_pris).toLocaleString('da-DK') + ' kr ex moms';
+
+  document.getElementById('bestilling-uger-tbody').innerHTML = uger.map(u => `<tr>
+    <td style="font-size:15px;font-weight:400;">Uge ${u.uge}</td>
+    <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--ash);">${u.aar}</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${u.antal_varer}</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(u.total_antal).toLocaleString('da-DK')}</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(u.total_pris).toLocaleString('da-DK')} kr</td>
+    <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);">${u.indlæst ? u.indlæst.slice(0,16) : '—'}</td>
+    <td><button onclick="visBestillingDetalje(${u.uge},${u.aar})"
+          style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;
+                 background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
+        Se uge →
+      </button></td>
+  </tr>`).join('');
+}
+
+async function visBestillingDetalje(uge, aar) {
+  const linjer = await api(`/api/bestilling/uge/${uge}?aar=${aar}`);
+  if (!linjer || !linjer.length) return;
+
+  document.getElementById('bestilling-detalje-titel').textContent =
+    `Uge ${uge} · ${aar} — ${linjer.length} varelinjer`;
+
+  const dage = ['man','tir','ons','tor','fre','loe','son'];
+  const dagTotaler = dage.map(d => linjer.reduce((s, r) => s + (r[d] || 0), 0));
+  const totalStk   = linjer.reduce((s, r) => s + (r.total_antal || 0), 0);
+  const totalKr    = linjer.reduce((s, r) => s + (r.total_pris  || 0), 0);
+
+  document.getElementById('bestilling-detalje-tbody').innerHTML =
+    linjer.map(r => {
+      const dCells = dage.map(d =>
+        `<td class="num" style="font-family:'DM Mono',monospace;">${r[d] > 0 ? Math.round(r[d]) : ''}</td>`
+      ).join('');
+      return `<tr>
+        <td style="font-size:13px;">${r.varenavn}</td>
+        <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${r.pris_ex_moms > 0 ? r.pris_ex_moms.toFixed(2) : '—'}</td>
+        ${dCells}
+        <td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(r.total_antal)}</td>
+        <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.total_pris).toLocaleString('da-DK')}</td>
+      </tr>`;
+    }).join('') +
+    `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
+      <td style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);">Total</td>
+      <td></td>
+      ${dagTotaler.map(t => `<td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(t)}</td>`).join('')}
+      <td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(totalStk).toLocaleString('da-DK')}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(totalKr).toLocaleString('da-DK')}</td>
+    </tr>`;
+
+  const el = document.getElementById('bestilling-detalje');
+  el.style.display = '';
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────
 let _kostprisLoaded = false;
 
@@ -1901,7 +2057,8 @@ window.showPanel = function(id, el) {
   if (id === 'kaffe')    loadKaffe();
   if (id === 'trend'     && !_trendLoaded) loadTrend(_trendDage);
   if (id === 'aar'       && !_aarLoaded)   loadAar();
-  if (id === 'kostpris') loadKostpris();
+  if (id === 'kostpris')    loadKostpris();
+  if (id === 'bestilling') loadBestilling();
 };
 
 loadAll();

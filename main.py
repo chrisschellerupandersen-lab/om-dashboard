@@ -180,6 +180,45 @@ async def rapport_status():
 
 # ── WEBHOOK ───────────────────────────────────────────────────────────────────
 
+@app.get("/api/bestilling/uger")
+async def api_bestilling_uger(request: Request):
+    _kræv_login(request)
+    return database.hent_bestilling_uger()
+
+
+@app.get("/api/bestilling/uge/{uge}")
+async def api_bestilling_uge(request: Request, uge: int, aar: Optional[int] = None):
+    _kræv_login(request)
+    if aar is None:
+        from datetime import datetime
+        aar = datetime.now().year
+    return database.hent_bestilling_uge(uge, aar)
+
+
+@app.post("/api/bestilling/opdater")
+async def bestilling_opdater(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+
+    uge    = body.get("uge")
+    aar    = body.get("aar")
+    linjer = body.get("linjer", [])
+
+    if not uge or not aar:
+        raise HTTPException(status_code=400, detail="Mangler uge eller aar")
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen bestillingslinjer")
+
+    antal = database.gem_ugebestilling(int(uge), int(aar), linjer)
+    return {"ok": True, "uge": uge, "aar": aar, "linjer": antal}
+
+
 @app.get("/api/salg/mangler-kostpris")
 async def api_mangler_kostpris(request: Request):
     _kræv_login(request)

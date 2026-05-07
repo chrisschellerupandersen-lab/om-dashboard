@@ -282,31 +282,35 @@ async def api_bestilling_eksport(
 def _byg_bestilling_xlsx(d: dict) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-    from collections import defaultdict
 
     DAGE    = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
     DAG_LBL = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
-    KAT_ORD = ['Rugbrød', 'Flute', 'Brød', 'Boller', 'Wiener', 'Kage']
-    # kolonne-indeks 0-baseret: Fre=8, Loe=9, Son=10 → openpyxl 1-baseret: 9,10,11
+    # Openpyxl-kolonnenumre (1-baseret) for Fre/Lør/Søn
     WEEKEND_COL = {9, 10, 11}
+
+    # Kategori-farver — subtile baggrunde så man kan se sektionerne
+    KAT_COLOR = {
+        'Rugbrød': 'FFFFF3CC', 'Flute': 'FFFFF3CC',
+        'Brød':    'FFFFE8D0',
+        'Boller':  'FFE8F4E8',
+        'Wiener':  'FFE8EEFF',
+        'Kage':    'FFFFF0F5',
+    }
+    DEFAULT_COLOR = 'FFFFFFFF'
 
     wb = Workbook()
     ws = wb.active
     ws.title = f"Uge {d['maal_uge']}"
 
-    # Kolonne-bredder matcher originale bestillingsfiler
     for col_ltr, w in zip('ABCDEFGHIJKLM', [16, 10, 36, 12, 7, 7, 7, 7, 8, 8, 8, 10, 12]):
         ws.column_dimensions[col_ltr].width = w
 
-    grey     = "FFD9D9D9"
-    grey_dk  = "FFB0B0B0"
-    kat_bg   = "FFEFEFEF"
-    wknd_bg  = "FFDDEEDD"
-    total_bg = "FFD0D0D0"
+    grey    = "FFD9D9D9"
+    grey_dk = "FFB8B8B8"
 
     def fill(c):  return PatternFill("solid", fgColor=c)
-    def bd_top(): return Border(top=Side(style="thin", color="FF888888"))
-    def bd_bot(): return Border(bottom=Side(style="thin", color="FF888888"))
+    def bd_top(): return Border(top=Side(style="thin", color="FF999999"))
+    def bd_bot(): return Border(bottom=Side(style="thin", color="FF999999"))
 
     # ── Rad 1 (i=0): Titel ───────────────────────────────────────────────────
     ws.append([f"Organic Market  –  Ugebestilling uge {d['maal_uge']}  ·  {d['maal_aar']}  ·  {d['dato_range']}"]
@@ -318,8 +322,8 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
 
     # ── Rad 2 (i=1): faktorer ────────────────────────────────────────────────
     evt_txt = f"  ·  {d['event']['navn']}" if d.get("event") else ""
-    ws.append([f"SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}  "
-               f"·  basis: uge {d['basis_uge']} {d['basis_aar']}"]
+    ws.append([f"SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}"
+               f"  ·  basis: uge {d['basis_uge']} {d['basis_aar']}"]
               + [None] * 12)
     ws.merge_cells("A2:M2")
     ws["A2"].font      = Font(italic=True, size=9, color="FF666666")
@@ -339,52 +343,38 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
     ws.row_dimensions[3].height = 15
     ws.freeze_panes = "A4"
 
-    # ── Produkter (i=3+) ─────────────────────────────────────────────────────
-    groups: dict = defaultdict(list)
+    # ── Produkter i original rækkefølge (i=3+) ───────────────────────────────
+    # Ingen kategori-omsortering — produkterne er allerede i original
+    # rækkefølge fra basen. Ny kategori → let skillelinje øverst.
+    prev_kat = None
     for p in d["produkter"]:
-        groups[p["kategori"]].append(p)
+        kat  = p.get("kategori", "")
+        anb  = p["anbefalet"]
+        bg   = KAT_COLOR.get(kat, DEFAULT_COLOR)
+        # Weekend-celler får lidt mørkere grøn variant af kategorifarven
+        wknd_bg = "FFD4EDD4" if kat in ("Boller", "Wiener", "Brød") else "FFE8E8D8"
 
-    for kat in KAT_ORD:
-        prods = groups.get(kat, [])
-        if not prods:
-            continue
-
-        # Kategori-header: col[2] er tom → parser springer over
-        ws.append([kat] + [None] * 12)
+        dag_vals = [anb[dg] for dg in DAGE]
+        ws.append([kat if kat != prev_kat else None,
+                   p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
+                  + dag_vals + [p["total_anbefalet"], p["total_pris"]])
         r = ws.max_row
-        for ci in range(1, 14):
-            ws.cell(r, ci).fill = fill(kat_bg)
-            ws.cell(r, ci).font = Font(bold=True, size=9)
-        ws.cell(r, 1).border = bd_top()
-        ws.row_dimensions[r].height = 13
 
-        for p in prods:
-            anb = p["anbefalet"]
-            dag_vals = [anb[dg] for dg in DAGE]
-            ws.append([None, p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
-                      + dag_vals + [p["total_anbefalet"], p["total_pris"]])
-            r = ws.max_row
-            for ci, cell in enumerate(ws[r], 1):
-                cell.font      = Font(size=9)
-                cell.alignment = Alignment(
-                    horizontal="right" if ci > 3 else "left", vertical="center")
-                if ci in WEEKEND_COL:
-                    cell.fill = fill(wknd_bg)
-            ws.row_dimensions[r].height = 13
-
-        # Subtotal: col[2] er tom → parser springer over
-        kat_dag = [sum(p["anbefalet"][dg] for p in prods) for dg in DAGE]
-        kat_stk = sum(p["total_anbefalet"] for p in prods)
-        kat_kr  = round(sum(p["total_pris"] for p in prods), 2)
-        ws.append([f"{kat} i alt"] + [None, None, None] + kat_dag + [kat_stk, kat_kr])
-        r = ws.max_row
         for ci, cell in enumerate(ws[r], 1):
-            cell.font      = Font(bold=True, size=9)
-            cell.fill      = fill(kat_bg)
-            cell.border    = bd_bot()
+            cell.font      = Font(size=9)
+            cell.fill      = fill(bg)
             cell.alignment = Alignment(
-                horizontal="right" if ci > 1 else "left", vertical="center")
+                horizontal="right" if ci > 3 else "left", vertical="center")
+            if ci in WEEKEND_COL:
+                cell.fill = fill(wknd_bg)
+
+        # Tynd skillelinje øverst ved ny kategori
+        if kat != prev_kat and prev_kat is not None:
+            for ci in range(1, 14):
+                ws.cell(r, ci).border = bd_top()
+
         ws.row_dimensions[r].height = 13
+        prev_kat = kat
 
     # ── Grand total ───────────────────────────────────────────────────────────
     all_dag = [sum(p["anbefalet"][dg] for p in d["produkter"]) for dg in DAGE]
@@ -393,7 +383,7 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
     r = ws.max_row
     for ci, cell in enumerate(ws[r], 1):
         cell.font      = Font(bold=True, size=9)
-        cell.fill      = fill(total_bg)
+        cell.fill      = fill(grey)
         cell.border    = bd_top()
         cell.alignment = Alignment(
             horizontal="right" if ci > 1 else "left", vertical="center")

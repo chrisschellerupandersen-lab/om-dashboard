@@ -1012,13 +1012,13 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         basis_uge = basis_row["uge"]
         basis_aar = basis_row["aar"]
 
-        # Hent alle produkter fra basis-ugen
+        # Hent alle produkter fra basis-ugen — bevar original rækkefølge (id)
         prod_rows = conn.execute("""
             SELECT varenummer, varenavn, pris_ex_moms,
                    man, tir, ons, tor, fre, loe, son, total_antal
             FROM ugebestillinger
             WHERE uge=? AND aar=?
-            ORDER BY varenavn
+            ORDER BY id
         """, (basis_uge, basis_aar)).fetchall()
 
         # Effektivt solgt seneste 8 uger til vækst+TGTG

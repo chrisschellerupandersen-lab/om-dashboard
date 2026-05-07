@@ -181,7 +181,7 @@ def hent_kpi() -> Dict:
                    END                          AS transak,
                    COALESCE(SUM(avance),0)      AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)/SUM(omsætning)*100
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
                         ELSE 0 END              AS db_pct
             FROM transaktioner WHERE dato = ?
         """, (seneste_dato,)).fetchone()
@@ -195,7 +195,7 @@ def hent_kpi() -> Dict:
                    COALESCE(SUM(kostpris),0)   AS vareforbrug,
                    COALESCE(SUM(avance),0)      AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)/SUM(omsætning)*100
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
                         ELSE 0 END              AS db_pct,
                    COUNT(DISTINCT dato)         AS antal_dage
             FROM transaktioner
@@ -216,7 +216,7 @@ def hent_kpi() -> Dict:
             SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
                    COALESCE(SUM(avance),0)    AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)/SUM(omsætning)*100
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
                         ELSE 0 END            AS db_pct
             FROM transaktioner
             WHERE strftime('%Y-%W', dato) = (
@@ -247,7 +247,7 @@ def hent_dag_produkter() -> Dict:
                    ROUND(SUM(omsætning), 0) AS omsaetning,
                    ROUND(SUM(kostpris), 0)  AS vareforbrug,
                    ROUND(SUM(avance), 0)    AS db_kr,
-                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(avance)/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
+                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(avance)*1.25/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
             FROM transaktioner
             WHERE dato = ?
             GROUP BY varenavn
@@ -268,24 +268,59 @@ def hent_dage(n: int = 14) -> List[Dict]:
     return [dict(r) for r in reversed(rows)]
 
 
+def _mp_uge_netto(aar: int, maaned: int) -> float:
+    """Pro-ratet MobilePay netto (ex. moms) for én uge i given måned."""
+    from calendar import monthrange
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT omsaetning FROM mobilepay WHERE aar=? AND maaned=?",
+            (aar, maaned)
+        ).fetchone()
+    if not row:
+        return 0.0
+    days = monthrange(aar, maaned)[1]
+    return round((row["omsaetning"] / 1.25) / days * 7, 2)
+
+
+def _mp_map_alle() -> Dict:
+    """Returnerer {(aar, maaned): omsaetning_inkl_moms}."""
+    with _conn() as conn:
+        rows = conn.execute("SELECT aar, maaned, omsaetning FROM mobilepay").fetchall()
+    return {(r["aar"], r["maaned"]): r["omsaetning"] for r in rows}
+
+
 def hent_uger() -> List[Dict]:
+    from datetime import date as _date
+    from calendar import monthrange
     with _conn() as conn:
         rows = conn.execute("""
             SELECT
                 strftime('%Y', dato)  AS aar,
                 CAST(strftime('%W', dato) AS INTEGER) AS uge,
+                MIN(dato)                             AS min_dato,
                 ROUND(SUM(omsætning), 2)              AS omsaetning,
                 ROUND(SUM(kostpris), 2)               AS vareforbrug,
                 ROUND(SUM(avance), 2)                 AS db_kr,
                 ROUND(CASE WHEN SUM(omsætning)>0
-                     THEN SUM(avance)/SUM(omsætning)*100
+                     THEN SUM(avance)*1.25/SUM(omsætning)*100
                      ELSE 0 END, 1)                   AS db_pct,
                 COUNT(DISTINCT dato)                  AS antal_dage
             FROM transaktioner
             GROUP BY strftime('%Y-%W', dato)
             ORDER BY dato ASC
         """).fetchall()
-    return [dict(r) for r in rows]
+
+    mp = _mp_map_alle()
+    resultat = []
+    for r in rows:
+        d = _date.fromisoformat(r["min_dato"])
+        days = monthrange(d.year, d.month)[1]
+        mp_inkl = mp.get((d.year, d.month), 0.0)
+        mp_netto = round((mp_inkl / 1.25) / days * 7, 0) if mp_inkl else 0.0
+        row = dict(r)
+        row["mp_netto"] = mp_netto
+        resultat.append(row)
+    return resultat
 
 
 def hent_timer_idag() -> List[Dict]:
@@ -333,7 +368,7 @@ def hent_kategorier() -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""
             SELECT kategori, ROUND(SUM(omsætning), 2) AS omsaetning,
-                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
             WHERE kategori != ''
             GROUP BY kategori
@@ -410,7 +445,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 ROUND(SUM(omsætning), 2)               AS omsaetning,
                 ROUND(SUM(kostpris),  2)               AS kostpris,
                 ROUND(SUM(avance),    2)               AS avance,
-                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner
             WHERE strftime('%Y', dato) = ?
             GROUP BY maaned
@@ -422,7 +457,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
                    ROUND(SUM(omsætning), 2) AS omsaetning,
                    ROUND(SUM(kostpris),  2) AS kostpris,
                    ROUND(SUM(avance),    2) AS avance,
-                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner WHERE strftime('%Y-%m', dato) = ?
         """, (f"{aar-1}-12",)).fetchone()
 
@@ -432,7 +467,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
             base_row = conn.execute("""
                 SELECT
                     ROUND(SUM(omsætning)/NULLIF(COUNT(DISTINCT dato),0), 2) AS kr_pr_dag,
-                    ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)      AS gpm
+                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)      AS gpm
                 FROM transaktioner
                 WHERE dato >= date(?, '-28 days')
             """, (seneste,)).fetchone()
@@ -468,7 +503,7 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
                 ROUND(SUM(CASE WHEN dato > ? THEN omsætning  ELSE 0 END), 2) AS ny_omsat,
                 ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN antal      ELSE 0 END), 1) AS gl_antal,
                 ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN omsætning  ELSE 0 END), 2) AS gl_omsat,
-                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
             WHERE dato > ? AND varenavn != ''
             GROUP BY varenavn
@@ -514,7 +549,7 @@ def hent_kaffe_analyse() -> Dict:
                 ROUND(SUM(antal), 0)                                      AS total_antal,
                 ROUND(SUM(omsætning), 2)                                  AS total_omsaetning,
                 ROUND(SUM(avance), 2)                                     AS total_avance,
-                ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
+                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
                 ROUND(SUM(omsætning)/NULLIF(SUM(antal),0), 2)            AS gns_pris
             FROM transaktioner
             WHERE {_KAFFE_WHERE}
@@ -528,7 +563,7 @@ def hent_kaffe_analyse() -> Dict:
             SELECT varenavn,
                    ROUND(SUM(antal), 0)                                   AS antal,
                    ROUND(SUM(omsætning), 2)                               AS omsaetning,
-                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
+                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
             FROM transaktioner
             WHERE {_KAFFE_WHERE}
             GROUP BY varenavn
@@ -594,7 +629,7 @@ def hent_top_produkter(n: int = 20) -> List[Dict]:
                    ROUND(SUM(kostpris), 2)                             AS vareforbrug,
                    ROUND(SUM(antal), 0)                                AS antal,
                    ROUND(SUM(avance), 2)                               AS db_kr,
-                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)  AS db_pct
+                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)  AS db_pct
             FROM transaktioner
             WHERE varenavn != ''
             GROUP BY varenavn
@@ -784,6 +819,9 @@ def hent_svind_data() -> List[Dict]:
             ORDER BY aar DESC, uge DESC
         """).fetchall()
 
+    from calendar import monthrange as _monthrange
+    mp = _mp_map_alle()
+
     result = []
     for r in rows:
         d = dict(r)
@@ -791,9 +829,24 @@ def hent_svind_data() -> List[Dict]:
         kw_stk    = int(kw_map.get((d["uge"], d["aar"]), 0) or 0)
         tgtg_stk  = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0
 
+        # MobilePay netto pro-ratet til ugen (mandag bestemmer måned)
+        try:
+            mon = _date.fromisocalendar(d["aar"], d["uge"], 1)
+            days = _monthrange(mon.year, mon.month)[1]
+            mp_inkl = mp.get((mon.year, mon.month), 0.0)
+            mp_netto = round((mp_inkl / 1.25) / days * 7, 0) if mp_inkl else 0.0
+        except Exception:
+            mp_netto = 0.0
+
         d["kassesalg_stk"] = kassesalg
         d["kw_stk"]        = kw_stk
         d["tgtg_stk"]      = tgtg_stk
+        d["mp_netto"]      = mp_netto
+        # Netto justeret: hvad kostede brødet minus hvad vi fik ind (inkl. MobilePay)
+        if d.get("netto_kr") is not None:
+            d["netto_kr_adj"] = round(d["netto_kr"] - mp_netto, 0)
+        else:
+            d["netto_kr_adj"] = None
 
         if kassesalg is not None and d["bestilt_stk"]:
             effektivt = kassesalg + kw_stk + tgtg_stk

@@ -635,9 +635,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">DB kr</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">MobilePay</th><th class="num">DB kr</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
-            <tbody id="uge-tbody"><tr><td colspan="8" class="empty">Indlæser…</td></tr></tbody>
+            <tbody id="uge-tbody"><tr><td colspan="9" class="empty">Indlæser…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1039,10 +1039,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th class="num" style="width:9%;">Indkøb kr</th>
                 <th class="num" style="width:8%;">TGTG kr</th>
                 <th class="num" style="width:8%;">Retur i alt</th>
-                <th class="num" style="width:9%;">Netto kr</th>
+                <th class="num" style="width:8%;" title="MobilePay omsætning netto (÷1.25), pro-ratet til ugen">MobilePay</th>
+                <th class="num" style="width:9%;" title="Netto kr justeret for MobilePay">Netto adj.</th>
               </tr></thead>
               <tbody id="svind-tbody">
-                <tr><td colspan="12" class="empty">Indlæser…</td></tr>
+                <tr><td colspan="13" class="empty">Indlæser…</td></tr>
               </tbody>
             </table>
           </div>
@@ -1439,6 +1440,7 @@ function buildUge(uger) {
       <td style="font-size:14px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
       <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
       <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
+      <td class="num" style="${mono}font-size:13px;color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
       <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>
@@ -2392,7 +2394,8 @@ async function loadSvind() {
       <td class="num" style="${mono}">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
       <td class="num" style="${mono}color:var(--ash);">${Math.round(r.retur_ialt || 0).toLocaleString('da-DK')}</td>
-      <td class="num" style="${mono}font-weight:500;">${Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}font-weight:500;">${r.netto_kr_adj != null ? Math.round(r.netto_kr_adj).toLocaleString('da-DK') : Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
     </tr>`;
   }).join('');
 }

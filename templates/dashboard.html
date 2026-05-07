@@ -76,6 +76,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-5{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-5 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
+.kpi-row-5 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
+.kpi-row-5 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
+.kpi-row-5 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
+/* Dag-produkt-liste */
+.daglist{list-style:none;padding:0;margin:0;}
+.daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
+.daglist li:last-child{border-bottom:none;}
+.daglist .dl-navn{flex:1;color:var(--ink);}
+.daglist .dl-stk{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
+.daglist .dl-kr{font-family:'DM Mono',monospace;font-size:12px;color:var(--forest);white-space:nowrap;margin-left:auto;}
 .kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
 .kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
 .kpi-v{font-size:28px;font-weight:300;color:var(--forest);line-height:1;}
@@ -314,6 +326,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   /* KPI rows: 2 columns, first card full width */
   .kpi-row{grid-template-columns:1fr 1fr;}
   .kpi-row > *:first-child{grid-column:1/-1;}
+  .kpi-row-5{grid-template-columns:1fr 1fr;}
+  .kpi-row-5 > *:first-child{grid-column:1/-1;}
   .aar-kpi-row{grid-template-columns:1fr 1fr;}
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
@@ -507,16 +521,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Overblik</h2>
           <p id="hdr-forside-sub">Organic Market Greve</p>
         </div>
-        <div class="kpi-row">
+        <div class="kpi-row-5">
           <div class="kpi">
             <div class="kpi-l">Seneste dag</div>
             <div class="kpi-v" id="kpi-dag-omsat">—</div>
             <div class="kpi-s" id="kpi-dag-vs">indlæser…</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Bruttoavance</div>
+            <div class="kpi-l">DB · dag</div>
             <div class="kpi-v" id="kpi-dag-db">—</div>
-            <div class="kpi-s" id="kpi-dag-db-sub">DB%</div>
+            <div class="kpi-s" id="kpi-dag-db-sub">—</div>
           </div>
           <div class="kpi">
             <div class="kpi-l">Denne uge</div>
@@ -524,19 +538,33 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">Kunder</div>
-            <div class="kpi-v" id="kpi-dag-transak">—</div>
-            <div class="kpi-s" id="kpi-dag-kurv">seneste dag</div>
+            <div class="kpi-l">DB · uge</div>
+            <div class="kpi-v" id="kpi-uge-db">—</div>
+            <div class="kpi-s" id="kpi-uge-db-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">DB vs. forrige uge</div>
+            <div class="kpi-v" id="kpi-uge-vs">—</div>
+            <div class="kpi-s" id="kpi-uge-vs-sub">—</div>
           </div>
         </div>
         <div class="two-col">
           <div class="card">
-            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Daglig omsætning · seneste 30 dage</span></div>
-            <div style="position:relative;height:200px;"><canvas id="c-forside"></canvas></div>
+            <div class="aar2-chart-hdr">
+              <span class="aar2-chart-ttl" id="daglist-hdr">Seneste dag</span>
+              <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);" id="daglist-sub"></span>
+            </div>
+            <ul class="daglist" id="daglist-ul"><li><span class="dl-navn" style="color:var(--ash);">Indlæser…</span></li></ul>
           </div>
-          <div class="card">
-            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Bruttoavance per uge · %</span></div>
-            <div style="position:relative;height:200px;"><canvas id="c-db"></canvas></div>
+          <div>
+            <div class="card" style="margin-bottom:14px;">
+              <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Daglig omsætning · seneste 30 dage</span></div>
+              <div style="position:relative;height:160px;"><canvas id="c-forside"></canvas></div>
+            </div>
+            <div class="card">
+              <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Bruttoavance per uge · %</span></div>
+              <div style="position:relative;height:160px;"><canvas id="c-db"></canvas></div>
+            </div>
           </div>
         </div>
       </div>
@@ -1148,17 +1176,18 @@ function mk(id, type, labels, datasets, extra={}) {
 }
 
 async function loadAll() {
-  const [kpi, dage, uger, timer, timerSnit, kategorier, top] = await Promise.all([
+  const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top] = await Promise.all([
     api('/api/kpi'),
     api('/api/salg/dage?n=30'),
     api('/api/salg/uger'),
+    api('/api/salg/idag'),
     api('/api/salg/timer'),
     api('/api/salg/timer/snit'),
     api('/api/salg/kategorier'),
     api('/api/salg/top?n=20'),
   ]);
 
-  buildForside(kpi, dage, uger);
+  buildForside(kpi, dage, uger, idag);
   buildDag(kpi, timer);
   buildUge(uger);
   buildTime(timerSnit);
@@ -1173,15 +1202,14 @@ function setSyncNow() {
   document.getElementById('tb-sync').textContent = '● Opdateret ' + t;
 }
 
-function buildForside(kpi, dage, uger) {
+function buildForside(kpi, dage, uger, idag) {
   if (kpi) {
-    const dag = kpi.dag || {};
-    const uge = kpi.uge || {};
-    document.getElementById('kpi-dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
-    document.getElementById('kpi-dag-transak').textContent = dag.transak != null ? dag.transak : '—';
-    document.getElementById('kpi-dag-db').textContent      = dag.db_pct != null ? dag.db_pct.toFixed(1) + '%' : '—';
-    document.getElementById('kpi-uge-omsat').textContent   = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
-    document.getElementById('kpi-uge-dage').textContent    = uge.antal_dage != null ? uge.antal_dage + ' dage denne uge' : '—';
+    const dag      = kpi.dag      || {};
+    const uge      = kpi.uge      || {};
+    const prevUge  = kpi.prev_uge || {};
+
+    // ── Dag-kasser ────────────────────────────────────────────────────────
+    document.getElementById('kpi-dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
 
     if (kpi.snit_uge && dag.omsaetning) {
       const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
@@ -1189,23 +1217,80 @@ function buildForside(kpi, dage, uger) {
       el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. dagsnit';
       el.className = 'kpi-s ' + (pct >= 0 ? 'up' : 'dn');
     }
+    if (dag.transak > 0 && dag.omsaetning > 0) {
+      document.getElementById('kpi-dag-vs').textContent +=
+        '  ·  ' + Math.round(dag.omsaetning / dag.transak) + ' kr/kurv';
+    }
+
+    // DB dag
+    const dbDagEl = document.getElementById('kpi-dag-db');
+    dbDagEl.textContent = dag.db_kr != null ? kr(dag.db_kr) : '—';
+    const dbDagSub = document.getElementById('kpi-dag-db-sub');
     if (dag.db_pct != null) {
-      const el = document.getElementById('kpi-dag-db-sub');
-      el.textContent = 'bruttoavance seneste dag';
-      el.className = 'kpi-s ' + (dag.db_pct >= 35 ? 'up' : dag.db_pct >= 30 ? '' : 'dn');
+      dbDagSub.textContent = dag.db_pct.toFixed(1) + '% bruttoavance';
+      dbDagSub.className = 'kpi-s ' + (dag.db_pct >= 35 ? 'up' : dag.db_pct >= 30 ? '' : 'dn');
+    }
+
+    // ── Uge-kasser ────────────────────────────────────────────────────────
+    document.getElementById('kpi-uge-omsat').textContent = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
+    document.getElementById('kpi-uge-dage').textContent  = uge.antal_dage != null ? uge.antal_dage + ' dage denne uge' : '—';
+
+    // DB uge
+    const dbUgeEl = document.getElementById('kpi-uge-db');
+    dbUgeEl.textContent = uge.db_kr != null ? kr(uge.db_kr) : '—';
+    const dbUgeSub = document.getElementById('kpi-uge-db-sub');
+    if (uge.db_pct != null) {
+      dbUgeSub.textContent = uge.db_pct.toFixed(1) + '% bruttoavance';
+      dbUgeSub.className = 'kpi-s ' + (uge.db_pct >= 35 ? 'up' : uge.db_pct >= 30 ? '' : 'dn');
+    }
+
+    // DB uge vs. forrige uge
+    const vsEl  = document.getElementById('kpi-uge-vs');
+    const vsSub = document.getElementById('kpi-uge-vs-sub');
+    if (uge.db_pct != null && prevUge.db_pct != null && prevUge.db_pct > 0) {
+      const diff = uge.db_pct - prevUge.db_pct;
+      vsEl.textContent  = (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' pp';
+      vsEl.style.color  = diff >= 0 ? 'var(--moss)' : 'var(--danger)';
+      vsSub.textContent = 'forrige uge: ' + prevUge.db_pct.toFixed(1) + '%  ·  ' + kr(prevUge.db_kr);
+    } else {
+      vsEl.textContent  = '—';
+      vsSub.textContent = 'ingen forrige uge';
     }
   }
 
+  // ── Dag-produkt-liste ─────────────────────────────────────────────────
+  if (idag && idag.produkter && idag.produkter.length) {
+    const d = new Date(idag.dato + 'T12:00:00');
+    const dagNavn = d.toLocaleDateString('da-DK', {weekday:'long', day:'numeric', month:'long'});
+    document.getElementById('daglist-hdr').textContent = dagNavn.charAt(0).toUpperCase() + dagNavn.slice(1);
+
+    const totalOmsat = idag.produkter.reduce((s, p) => s + (p.omsaetning || 0), 0);
+    const kunder = kpi && kpi.dag ? kpi.dag.transak : null;
+    const kurv   = kunder && totalOmsat ? Math.round(totalOmsat / kunder) : null;
+    document.getElementById('daglist-sub').textContent =
+      kr(totalOmsat) + (kunder ? '  ·  ' + kunder + ' kunder' : '') + (kurv ? '  ·  ' + kurv + ' kr/kurv' : '');
+
+    const ul = document.getElementById('daglist-ul');
+    ul.innerHTML = idag.produkter.map(p => `
+      <li>
+        <span class="dl-navn">${p.varenavn}</span>
+        <span class="dl-stk">${p.antal} stk</span>
+        <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+      </li>`).join('');
+  }
+
+  // ── Grafer ────────────────────────────────────────────────────────────
   if (dage && dage.length) {
     mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
       [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth: 1, borderRadius: 2 }],
-      { scales:{ x:{ ticks:{ font:{ size:11 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:10 }, callback: v => Math.round(v/1000)+'k' }}}});
 
     const seneste = dage[dage.length - 1];
     if (seneste) {
-      const jan1 = new Date(seneste.dato.slice(0,4)+'-01-01');
-      const d = new Date(seneste.dato);
-      const week = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+      const d    = new Date(seneste.dato + 'T12:00:00');
+      const thu  = new Date(d); thu.setDate(d.getDate() + (4 - (d.getDay()||7)));
+      const y1   = new Date(thu.getFullYear(), 0, 4);
+      const week = Math.ceil(((thu - y1) / 86400000 + 1) / 7);
       document.getElementById('tb-week').textContent = `Uge ${week} · ${d.getFullYear()}`;
       document.getElementById('hdr-forside-sub').textContent =
         'Organic Market Greve · seneste dag: ' + d.toLocaleDateString('da-DK', {weekday:'long',day:'numeric',month:'long',year:'numeric'});
@@ -1215,7 +1300,7 @@ function buildForside(kpi, dage, uger) {
   if (uger && uger.length) {
     mk('c-db','line', uger.map(r => `U${r.uge}`),
       [{ data: uger.map(r => r.db_pct), borderColor: G, backgroundColor: GL, fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:G }],
-      { scales:{ x:{ ticks:{ font:{ size:11 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:11 }, callback: v => v+'%' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:10 }, callback: v => v+'%' }}}});
   }
 }
 

@@ -183,11 +183,46 @@ def hent_kpi() -> Dict:
             )
         """).fetchone()
 
+        # Forrige uge med data (til uge-over-uge DB-sammenligning)
+        prev_uge_row = conn.execute("""
+            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
+                   COALESCE(SUM(avance),0)    AS db_kr,
+                   CASE WHEN SUM(omsætning)>0
+                        THEN SUM(avance)/SUM(omsætning)*100
+                        ELSE 0 END            AS db_pct
+            FROM transaktioner
+            WHERE strftime('%Y-%W', dato) = (
+                SELECT DISTINCT strftime('%Y-%W', dato)
+                FROM transaktioner
+                WHERE strftime('%Y-%W', dato) < ?
+                ORDER BY dato DESC LIMIT 1
+            )
+        """, (seneste_yw,)).fetchone()
+
     return {
-        "dag": dict(dag) if dag else None,
-        "uge": dict(uge) if uge else None,
-        "snit_uge": snit_row["snit_uge"] if snit_row else None,
+        "dag":      dict(dag)          if dag          else None,
+        "uge":      dict(uge)          if uge          else None,
+        "prev_uge": dict(prev_uge_row) if prev_uge_row else None,
+        "snit_uge": snit_row["snit_uge"] if snit_row   else None,
     }
+
+
+def hent_dag_produkter() -> Dict:
+    """Produkter solgt seneste dag, sorteret efter omsætning."""
+    with _conn() as conn:
+        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        if not seneste_dato:
+            return {"dato": None, "produkter": []}
+        rows = conn.execute("""
+            SELECT varenavn,
+                   ROUND(SUM(antal), 0)     AS antal,
+                   ROUND(SUM(omsætning), 0) AS omsaetning
+            FROM transaktioner
+            WHERE dato = ?
+            GROUP BY varenavn
+            ORDER BY omsaetning DESC
+        """, (seneste_dato,)).fetchall()
+    return {"dato": seneste_dato, "produkter": [dict(r) for r in rows]}
 
 
 def hent_dage(n: int = 14) -> List[Dict]:

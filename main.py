@@ -109,6 +109,12 @@ async def api_kpi(request: Request):
     return database.hent_kpi()
 
 
+@app.get("/api/salg/idag")
+async def api_idag(request: Request):
+    _kræv_login(request)
+    return database.hent_dag_produkter()
+
+
 @app.get("/api/salg/dage")
 async def api_dage(request: Request, n: int = 14):
     _kræv_login(request)

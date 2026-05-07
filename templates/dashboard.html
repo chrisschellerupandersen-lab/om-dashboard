@@ -1314,7 +1314,6 @@ function buildDag(kpi, timer) {
     if (dag.transak > 0 && dag.omsaetning > 0) {
       const kurv = Math.round(dag.omsaetning / dag.transak);
       document.getElementById('dag-snit-kurv').textContent = kurv + ' kr/kurv';
-      document.getElementById('kpi-dag-kurv').textContent  = kurv + ' kr/kurv';
     }
     if (kpi.snit_uge && dag.omsaetning) {
       const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;

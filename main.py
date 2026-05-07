@@ -287,113 +287,110 @@ async def api_bestilling_eksport(
 
 def _byg_bestilling_xlsx(d: dict) -> bytes:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Font, PatternFill, Alignment
 
     DAGE    = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
-    DAG_LBL = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
-    # Openpyxl-kolonnenumre (1-baseret) for Fre/Lør/Søn
-    WEEKEND_COL = {9, 10, 11}
-
-    # Kategori-farver — subtile baggrunde så man kan se sektionerne
-    KAT_COLOR = {
-        'Rugbrød': 'FFFFF3CC', 'Flute': 'FFFFF3CC',
-        'Brød':    'FFFFE8D0',
-        'Boller':  'FFE8F4E8',
-        'Wiener':  'FFE8EEFF',
-        'Kage':    'FFFFF0F5',
-    }
-    DEFAULT_COLOR = 'FFFFFFFF'
+    DAG_LBL = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
+    HDR_BG  = "FFC4D79B"
 
     wb = Workbook()
     ws = wb.active
-    ws.title = f"Uge {d['maal_uge']}"
+    ws.title = "Ark1"
 
-    for col_ltr, w in zip('ABCDEFGHIJKLM', [16, 10, 36, 12, 7, 7, 7, 7, 8, 8, 8, 10, 12]):
-        ws.column_dimensions[col_ltr].width = w
+    # Kolonnebredder fra skabelonen
+    ws.column_dimensions['A'].width = 18.86
+    ws.column_dimensions['B'].width = 10.71
+    ws.column_dimensions['C'].width = 33.14
+    ws.column_dimensions['D'].width = 16.57
+    for col in 'EFGHIJK':
+        ws.column_dimensions[col].width = 8.86
+    ws.column_dimensions['L'].width = 10.71
+    ws.column_dimensions['M'].width = 23.86
 
-    grey    = "FFD9D9D9"
-    grey_dk = "FFB8B8B8"
+    hdr_fill = PatternFill("solid", fgColor=HDR_BG)
 
-    def fill(c):  return PatternFill("solid", fgColor=c)
-    def bd_top(): return Border(top=Side(style="thin", color="FF999999"))
-    def bd_bot(): return Border(bottom=Side(style="thin", color="FF999999"))
+    def hdr_row(row_num):
+        for cell in ws[row_num]:
+            cell.fill = hdr_fill
 
-    # ── Rad 1 (i=0): Titel ───────────────────────────────────────────────────
-    ws.append([f"Organic Market  –  Ugebestilling uge {d['maal_uge']}  ·  {d['maal_aar']}  ·  {d['dato_range']}"]
-              + [None] * 12)
-    ws.merge_cells("A1:M1")
-    ws["A1"].font      = Font(bold=True, size=12)
-    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[1].height = 20
-
-    # ── Rad 2 (i=1): faktorer ────────────────────────────────────────────────
+    # Rad 1: "Organic Market" (A bold) + titel i C (bold)
     evt_txt = f"  ·  {d['event']['navn']}" if d.get("event") else ""
-    ws.append([f"SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}"
-               f"  ·  basis: uge {d['basis_uge']} {d['basis_aar']}"]
-              + [None] * 12)
-    ws.merge_cells("A2:M2")
-    ws["A2"].font      = Font(italic=True, size=9, color="FF666666")
-    ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[2].height = 14
+    titel = (f"Bestilling uge {d['maal_uge']} {d['maal_aar']}  ·  {d['dato_range']}"
+             f"  ·  SI {d['si']:.2f}{evt_txt}  ·  basis uge {d['basis_uge']} {d['basis_aar']}")
+    ws.append(["Organic Market", None, titel] + [None] * 12)
+    ws["A1"].font = Font(bold=True)
+    ws["C1"].font = Font(bold=True)
+    hdr_row(1)
+    ws.row_dimensions[1].height = 14.25
 
-    # ── Rad 3 (i=2): Kolonneoverskrifter ─────────────────────────────────────
-    hdrs = ["Varetype", "Varenr.", "Varenavn", "Pris ex moms"] + DAG_LBL + ["I alt stk", "I alt kr"]
-    ws.append(hdrs)
-    for ci, cell in enumerate(ws[3], 1):
-        cell.font      = Font(bold=True, size=9)
-        cell.fill      = fill(grey)
-        cell.alignment = Alignment(horizontal="center" if ci > 2 else "left", vertical="center")
-        cell.border    = bd_bot()
-        if ci in WEEKEND_COL:
-            cell.fill = fill(grey_dk)
-    ws.row_dimensions[3].height = 15
-    ws.freeze_panes = "A4"
+    # Rad 2: "Uge X" i A + kolonneoverskrifter
+    ws.append([f"Uge {d['maal_uge']}", "Varenummer", "VARETYPE", "Pris ex moms"]
+              + DAG_LBL + ["Total antal", "Pris ex moms", None, None])
+    for cell in ws[2]:
+        cell.fill = hdr_fill
+        cell.font = Font(bold=True)
+    ws.row_dimensions[2].height = 14.25
 
-    # ── Produkter i original rækkefølge (i=3+) ───────────────────────────────
-    # Ingen kategori-omsortering — produkterne er allerede i original
-    # rækkefølge fra basen. Ny kategori → let skillelinje øverst.
-    prev_kat = None
+    # Rad 3: blanke/spaces i dagkolonnerne
+    ws.append([None, None, None, None] + [" "] * 7 + [None, None, None, None])
+    hdr_row(3)
+    ws.row_dimensions[3].height = 14.25
+
+    ws.freeze_panes = "C4"
+
+    # Opdel produkter i tre sektioner (bevar original rækkefølge)
+    sek1, sek2, sek3 = [], [], []
     for p in d["produkter"]:
         kat  = p.get("kategori", "")
-        anb  = p["anbefalet"]
-        bg   = KAT_COLOR.get(kat, DEFAULT_COLOR)
-        # Weekend-celler får lidt mørkere grøn variant af kategorifarven
-        wknd_bg = "FFD4EDD4" if kat in ("Boller", "Wiener", "Brød") else "FFE8E8D8"
+        navn = p["varenavn"].lower()
+        if kat != "Kage":
+            sek1.append(p)
+        elif "muffin" in navn or "brownie" in navn:
+            sek3.append(p)
+        else:
+            sek2.append(p)
 
-        dag_vals = [anb[dg] for dg in DAGE]
-        ws.append([kat if kat != prev_kat else None,
-                   p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
-                  + dag_vals + [p["total_anbefalet"], p["total_pris"]])
+    def _v(val):
+        return None if (val == 0 or val is None) else val
+
+    def skriv_produkt(p):
+        anb = p["anbefalet"]
+        ws.append([None, p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
+                  + [_v(anb[dg]) for dg in DAGE]
+                  + [_v(p["total_anbefalet"]), p["total_pris"] or None, None, None])
+        ws.row_dimensions[ws.max_row].height = 15.75
+
+    def skriv_ialt(produkter):
+        dag_sums = [sum(p["anbefalet"][dg] for p in produkter) for dg in DAGE]
+        ws.append([None, None, "I alt", None]
+                  + [_v(s) for s in dag_sums]
+                  + [None, None, None, None])
         r = ws.max_row
+        for cell in ws[r]:
+            cell.font = Font(bold=True)
+        ws.row_dimensions[r].height = 15.75
 
-        for ci, cell in enumerate(ws[r], 1):
-            cell.font      = Font(size=9)
-            cell.fill      = fill(bg)
-            cell.alignment = Alignment(
-                horizontal="right" if ci > 3 else "left", vertical="center")
-            if ci in WEEKEND_COL:
-                cell.fill = fill(wknd_bg)
+    def blank():
+        ws.append([None] * 15)
+        ws.row_dimensions[ws.max_row].height = 15.75
 
-        # Tynd skillelinje øverst ved ny kategori
-        if kat != prev_kat and prev_kat is not None:
-            for ci in range(1, 14):
-                ws.cell(r, ci).border = bd_top()
+    for p in sek1:
+        skriv_produkt(p)
+    skriv_ialt(sek1)
 
-        ws.row_dimensions[r].height = 13
-        prev_kat = kat
+    blank(); blank()
 
-    # ── Grand total ───────────────────────────────────────────────────────────
-    all_dag = [sum(p["anbefalet"][dg] for p in d["produkter"]) for dg in DAGE]
-    ws.append(["I alt"] + [None, None, None] + all_dag
-              + [d["total_stk"], round(d["total_kr"], 2)])
-    r = ws.max_row
-    for ci, cell in enumerate(ws[r], 1):
-        cell.font      = Font(bold=True, size=9)
-        cell.fill      = fill(grey)
-        cell.border    = bd_top()
-        cell.alignment = Alignment(
-            horizontal="right" if ci > 1 else "left", vertical="center")
-    ws.row_dimensions[r].height = 15
+    for p in sek2:
+        skriv_produkt(p)
+    if sek2:
+        skriv_ialt(sek2)
+
+    blank(); blank()
+
+    for p in sek3:
+        skriv_produkt(p)
+    if sek3:
+        skriv_ialt(sek3)
 
     buf = io.BytesIO()
     wb.save(buf)

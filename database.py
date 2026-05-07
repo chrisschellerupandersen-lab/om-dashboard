@@ -818,11 +818,13 @@ def _kat(varenavn: str) -> str:
         return 'Flute'
     if 'bolle' in n:
         return 'Boller'
-    if ('brød' in n or 'brod' in n) and 'wiener' not in n:
+    # Studenterbrød er kage trods "brød" i navnet
+    if ('brød' in n or 'brod' in n) and 'wiener' not in n and 'studenter' not in n:
         return 'Brød'
-    if 'kage' in n or 'tærte' in n or 'muffin' in n:
-        return 'Kage'
-    return 'Wiener'
+    if 'wiener' in n or 'spandauer' in n:
+        return 'Wiener'
+    # Alt andet (croissant, brownie, cookies, træstammer, romkugler osv.) → Kage
+    return 'Kage'
 
 
 def _dato_range(iso_uge: int, aar: int) -> str:

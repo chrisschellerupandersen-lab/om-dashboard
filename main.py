@@ -281,75 +281,65 @@ async def api_bestilling_eksport(
 
 def _byg_bestilling_xlsx(d: dict) -> bytes:
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
     from collections import defaultdict
 
-    DAGE     = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
-    DAG_LBL  = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
-    KAT_ORD  = ['Rugbrød', 'Flute', 'Brød', 'Boller', 'Wiener', 'Kage']
-    WEEKEND  = {4, 5, 6}  # 0-based: fre=4, loe=5, son=6
+    DAGE    = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    DAG_LBL = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
+    KAT_ORD = ['Rugbrød', 'Flute', 'Brød', 'Boller', 'Wiener', 'Kage']
+    # kolonne-indeks 0-baseret: Fre=8, Loe=9, Son=10 → openpyxl 1-baseret: 9,10,11
+    WEEKEND_COL = {9, 10, 11}
 
     wb = Workbook()
     ws = wb.active
     ws.title = f"Uge {d['maal_uge']}"
 
-    # Kolonne-bredder
-    col_widths = [14, 10, 32, 12, 7, 7, 7, 7, 7, 7, 7, 10, 12]
-    for i, w in enumerate(col_widths, 1):
-        ws.column_dimensions[ws.cell(1, i).column_letter].width = w
+    # Kolonne-bredder matcher originale bestillingsfiler
+    for col_ltr, w in zip('ABCDEFGHIJKLM', [16, 10, 36, 12, 7, 7, 7, 7, 8, 8, 8, 10, 12]):
+        ws.column_dimensions[col_ltr].width = w
 
-    forest  = "FF1E3A1E"
-    parch   = "FFF5F0E8"
-    green_l = "FFE8F0E8"
-    gold    = "FFB8860B"
-    white   = "FFFFFFFF"
-    grey_l  = "FFF0EDE8"
+    grey     = "FFD9D9D9"
+    grey_dk  = "FFB0B0B0"
+    kat_bg   = "FFEFEFEF"
+    wknd_bg  = "FFDDEEDD"
+    total_bg = "FFD0D0D0"
 
-    def _fill(hex_col):
-        return PatternFill("solid", fgColor=hex_col)
+    def fill(c):  return PatternFill("solid", fgColor=c)
+    def bd_top(): return Border(top=Side(style="thin", color="FF888888"))
+    def bd_bot(): return Border(bottom=Side(style="thin", color="FF888888"))
 
-    def _font(bold=False, color="FF000000", sz=10):
-        return Font(bold=bold, color=color, size=sz)
-
-    def _border_bottom():
-        s = Side(style="thin", color="FF999999")
-        return Border(bottom=s)
-
-    # ── Rad 1: Titel ──────────────────────────────────────────────────────────
-    ws.append([f"Organic Market — Ugebestilling uge {d['maal_uge']} · {d['maal_aar']}"])
+    # ── Rad 1 (i=0): Titel ───────────────────────────────────────────────────
+    ws.append([f"Organic Market  –  Ugebestilling uge {d['maal_uge']}  ·  {d['maal_aar']}  ·  {d['dato_range']}"]
+              + [None] * 12)
     ws.merge_cells("A1:M1")
-    c = ws["A1"]
-    c.font      = Font(bold=True, size=13, color=white)
-    c.fill      = _fill(forest)
-    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[1].height = 22
+    ws["A1"].font      = Font(bold=True, size=12)
+    ws["A1"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 20
 
-    # ── Rad 2: Dato-range + faktorer ─────────────────────────────────────────
+    # ── Rad 2 (i=1): faktorer ────────────────────────────────────────────────
     evt_txt = f"  ·  {d['event']['navn']}" if d.get("event") else ""
-    ws.append([f"{d['dato_range']}  ·  SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}"])
+    ws.append([f"SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}  "
+               f"·  basis: uge {d['basis_uge']} {d['basis_aar']}"]
+              + [None] * 12)
     ws.merge_cells("A2:M2")
-    c = ws["A2"]
-    c.font      = Font(size=9, italic=True, color="FF555555")
-    c.fill      = _fill(parch)
-    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws["A2"].font      = Font(italic=True, size=9, color="FF666666")
+    ws["A2"].alignment = Alignment(horizontal="left", vertical="center", indent=1)
     ws.row_dimensions[2].height = 14
 
-    # ── Rad 3: Tom (matcher parser skip i<3) ─────────────────────────────────
-    ws.append([None] * 13)
-    ws.row_dimensions[3].height = 4
-
-    # ── Rad 4: Kolonneoverskrifter ────────────────────────────────────────────
+    # ── Rad 3 (i=2): Kolonneoverskrifter ─────────────────────────────────────
     hdrs = ["Varetype", "Varenr.", "Varenavn", "Pris ex moms"] + DAG_LBL + ["I alt stk", "I alt kr"]
     ws.append(hdrs)
-    for col_i, cell in enumerate(ws[4], 1):
-        cell.font      = Font(bold=True, size=9, color=white)
-        cell.fill      = _fill(forest)
-        cell.alignment = Alignment(horizontal="center" if col_i > 2 else "left", vertical="center")
-        if col_i in WEEKEND:
-            cell.fill = _fill("FF2D4A2D")
-    ws.row_dimensions[4].height = 16
+    for ci, cell in enumerate(ws[3], 1):
+        cell.font      = Font(bold=True, size=9)
+        cell.fill      = fill(grey)
+        cell.alignment = Alignment(horizontal="center" if ci > 2 else "left", vertical="center")
+        cell.border    = bd_bot()
+        if ci in WEEKEND_COL:
+            cell.fill = fill(grey_dk)
+    ws.row_dimensions[3].height = 15
+    ws.freeze_panes = "A4"
 
-    # ── Produkter grupperet efter kategori ───────────────────────────────────
+    # ── Produkter (i=3+) ─────────────────────────────────────────────────────
     groups: dict = defaultdict(list)
     for p in d["produkter"]:
         groups[p["kategori"]].append(p)
@@ -359,58 +349,55 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
         if not prods:
             continue
 
-        # Kategori-header
+        # Kategori-header: col[2] er tom → parser springer over
         ws.append([kat] + [None] * 12)
         r = ws.max_row
-        for col_i in range(1, 14):
-            c = ws.cell(r, col_i)
-            c.fill = _fill(green_l)
-            c.font = Font(bold=True, size=9, color=forest)
-        ws.row_dimensions[r].height = 14
+        for ci in range(1, 14):
+            ws.cell(r, ci).fill = fill(kat_bg)
+            ws.cell(r, ci).font = Font(bold=True, size=9)
+        ws.cell(r, 1).border = bd_top()
+        ws.row_dimensions[r].height = 13
 
         for p in prods:
             anb = p["anbefalet"]
             dag_vals = [anb[dg] for dg in DAGE]
             ws.append([None, p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
-                      + dag_vals + [p["total_anbefalet"], round(p["total_pris"])])
+                      + dag_vals + [p["total_anbefalet"], p["total_pris"]])
             r = ws.max_row
-            for col_i, cell in enumerate(ws[r], 1):
-                cell.font = Font(size=9)
-                cell.alignment = Alignment(horizontal="right" if col_i > 3 else "left",
-                                           vertical="center")
-                if col_i == 3:
-                    cell.alignment = Alignment(horizontal="left", vertical="center")
-                if col_i - 1 in WEEKEND and col_i >= 5:
-                    cell.fill = _fill("FFEFF5EF")
+            for ci, cell in enumerate(ws[r], 1):
+                cell.font      = Font(size=9)
+                cell.alignment = Alignment(
+                    horizontal="right" if ci > 3 else "left", vertical="center")
+                if ci in WEEKEND_COL:
+                    cell.fill = fill(wknd_bg)
             ws.row_dimensions[r].height = 13
 
-        # Kategori-subtotal
+        # Subtotal: col[2] er tom → parser springer over
         kat_dag = [sum(p["anbefalet"][dg] for p in prods) for dg in DAGE]
         kat_stk = sum(p["total_anbefalet"] for p in prods)
-        kat_kr  = sum(p["total_pris"]      for p in prods)
-        ws.append([f"{kat} i alt", None, None, None] + kat_dag + [kat_stk, round(kat_kr)])
+        kat_kr  = round(sum(p["total_pris"] for p in prods), 2)
+        ws.append([f"{kat} i alt"] + [None, None, None] + kat_dag + [kat_stk, kat_kr])
         r = ws.max_row
-        for col_i, cell in enumerate(ws[r], 1):
-            cell.font   = Font(bold=True, size=9, color=gold)
-            cell.fill   = _fill(grey_l)
-            cell.border = _border_bottom()
-            cell.alignment = Alignment(horizontal="right" if col_i > 1 else "left",
-                                       vertical="center")
+        for ci, cell in enumerate(ws[r], 1):
+            cell.font      = Font(bold=True, size=9)
+            cell.fill      = fill(kat_bg)
+            cell.border    = bd_bot()
+            cell.alignment = Alignment(
+                horizontal="right" if ci > 1 else "left", vertical="center")
         ws.row_dimensions[r].height = 13
 
-    # ── Grand total ──────────────────────────────────────────────────────────
+    # ── Grand total ───────────────────────────────────────────────────────────
     all_dag = [sum(p["anbefalet"][dg] for p in d["produkter"]) for dg in DAGE]
-    ws.append(["I alt", None, None, None] + all_dag + [d["total_stk"], round(d["total_kr"])])
+    ws.append(["I alt"] + [None, None, None] + all_dag
+              + [d["total_stk"], round(d["total_kr"], 2)])
     r = ws.max_row
-    for col_i, cell in enumerate(ws[r], 1):
-        cell.font      = Font(bold=True, size=10, color=white)
-        cell.fill      = _fill(forest)
-        cell.alignment = Alignment(horizontal="right" if col_i > 1 else "left",
-                                   vertical="center")
-    ws.row_dimensions[r].height = 16
-
-    # Frys øverste 4 rækker
-    ws.freeze_panes = "A5"
+    for ci, cell in enumerate(ws[r], 1):
+        cell.font      = Font(bold=True, size=9)
+        cell.fill      = fill(total_bg)
+        cell.border    = bd_top()
+        cell.alignment = Alignment(
+            horizontal="right" if ci > 1 else "left", vertical="center")
+    ws.row_dimensions[r].height = 15
 
     buf = io.BytesIO()
     wb.save(buf)

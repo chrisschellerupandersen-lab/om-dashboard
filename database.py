@@ -1079,10 +1079,16 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     produkter = []
     for r in prod_rows:
         basis_dag = {d: float(r[d] or 0) for d in DAGE}
-        anb_dag = {}
-        for d in DAGE:
-            raw = basis_dag[d] * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
-            anb_dag[d] = int(round(raw))
+        kat = _kat(r["varenavn"])
+
+        if kat == 'Kage':
+            # Kage skaleres ikke — brug basis-tallene direkte
+            anb_dag = {d: int(basis_dag[d]) for d in DAGE}
+        else:
+            anb_dag = {}
+            for d in DAGE:
+                raw = basis_dag[d] * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
+                anb_dag[d] = int(round(raw))
 
         total_basis = sum(basis_dag[d] for d in DAGE)
         total_anb   = sum(anb_dag[d]   for d in DAGE)
@@ -1091,7 +1097,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         produkter.append({
             "varenummer":    r["varenummer"] or "",
             "varenavn":      r["varenavn"],
-            "kategori":      _kat(r["varenavn"]),
+            "kategori":      kat,
             "pris_ex_moms":  round(pris, 2),
             "basis":         {d: int(basis_dag[d]) for d in DAGE},
             "anbefalet":     anb_dag,

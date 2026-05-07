@@ -229,6 +229,7 @@ def hent_dag_produkter() -> Dict:
                    ROUND(SUM(antal), 0)     AS antal,
                    ROUND(SUM(omsætning), 0) AS omsaetning,
                    ROUND(SUM(kostpris), 0)  AS vareforbrug,
+                   ROUND(SUM(avance), 0)    AS db_kr,
                    ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(avance)/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
             FROM transaktioner
             WHERE dato = ?

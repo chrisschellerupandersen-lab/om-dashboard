@@ -98,6 +98,14 @@ def init_db():
                 antal      INTEGER NOT NULL,
                 PRIMARY KEY (uge, aar, varenummer, dag)
             );
+
+            CREATE TABLE IF NOT EXISTS mobilepay (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                aar        INTEGER NOT NULL,
+                maaned     INTEGER NOT NULL,
+                omsaetning REAL    NOT NULL DEFAULT 0,
+                UNIQUE(aar, maaned) ON CONFLICT REPLACE
+            );
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -1053,6 +1061,25 @@ def gem_bestilling_manuel(uge: int, aar: int, varenummer: str, dag: str, antal: 
             VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(uge, aar, varenummer, dag) DO UPDATE SET antal=excluded.antal
         """, (uge, aar, varenummer, dag, antal))
+
+
+def gem_mobilepay(aar: int, maaned: int, omsaetning: float):
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO mobilepay (aar, maaned, omsaetning)
+            VALUES (?, ?, ?)
+            ON CONFLICT(aar, maaned) DO UPDATE SET omsaetning=excluded.omsaetning
+        """, (aar, maaned, omsaetning))
+
+
+def hent_mobilepay() -> List[Dict]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT aar, maaned, omsaetning
+            FROM mobilepay
+            ORDER BY aar DESC, maaned DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
 
 
 def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:

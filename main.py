@@ -431,6 +431,28 @@ async def bager_retur_opdater(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/mobilepay")
+async def api_mobilepay(request: Request):
+    _kræv_login(request)
+    return database.hent_mobilepay()
+
+
+@app.post("/api/mobilepay/gem")
+async def mobilepay_gem(request: Request):
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    aar       = body.get("aar")
+    maaned    = body.get("maaned")
+    omsaetning = body.get("omsaetning")
+    if aar is None or maaned is None or omsaetning is None:
+        raise HTTPException(status_code=400, detail="Mangler felter")
+    database.gem_mobilepay(int(aar), int(maaned), float(omsaetning))
+    return {"ok": True}
+
+
 @app.get("/api/salg/mangler-kostpris")
 async def api_mangler_kostpris(request: Request):
     _kræv_login(request)

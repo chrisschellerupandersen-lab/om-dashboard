@@ -509,6 +509,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/></svg>
         Bestillingsberegner
       </div>
+      <div class="nav-item" onclick="showPanel('mobilepay',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/></svg>
+        MobilePay
+      </div>
 
       <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
       <div class="nav-item" onclick="showPanel('kostpris',this)">
@@ -1086,6 +1090,62 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
+      </div>
+
+      <!-- MOBILEPAY -->
+      <div class="panel" id="p-mobilepay">
+        <div class="page-hdr">
+          <h2>MobilePay omsætning</h2>
+          <p>Omsætning der ikke fremgår af Shopbox — primært bagværk · bruges til korrekt spildberegning</p>
+        </div>
+
+        <!-- Tilføj ny måned -->
+        <div class="card" style="margin-bottom:16px;max-width:480px;">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Registrer måned</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px;">
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;color:var(--ash);">Måned</label>
+              <select id="mp-maaned" style="font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 10px;border:1px solid rgba(30,58,30,.2);border-radius:4px;background:var(--white);">
+                <option value="1">Januar</option><option value="2">Februar</option><option value="3">Marts</option>
+                <option value="4">April</option><option value="5">Maj</option><option value="6">Juni</option>
+                <option value="7">Juli</option><option value="8">August</option><option value="9">September</option>
+                <option value="10">Oktober</option><option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;color:var(--ash);">År</label>
+              <input id="mp-aar" type="number" value="2026" min="2020" max="2099"
+                style="font-family:'DM Mono',monospace;font-size:13px;padding:6px 10px;border:1px solid rgba(30,58,30,.2);border-radius:4px;background:var(--white);width:90px;">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <label style="font-size:11px;color:var(--ash);">Omsætning (kr)</label>
+              <input id="mp-omsat" type="number" min="0" placeholder="0"
+                style="font-family:'DM Mono',monospace;font-size:13px;padding:6px 10px;border:1px solid rgba(30,58,30,.2);border-radius:4px;background:var(--white);width:130px;">
+            </div>
+            <button onclick="mpGem()" style="padding:7px 18px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:400;white-space:nowrap;">
+              Gem
+            </button>
+          </div>
+          <div id="mp-status" style="font-size:11px;color:var(--moss);margin-top:8px;min-height:16px;"></div>
+        </div>
+
+        <!-- Tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Alle registrerede måneder</span>
+            <span class="aar2-tbl-hdr-r" id="mp-tbl-lbl"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl">
+              <thead><tr>
+                <th>Måned</th>
+                <th>År</th>
+                <th class="num">Omsætning (kr)</th>
+              </tr></thead>
+              <tbody id="mp-tbody"><tr><td colspan="3" class="empty">Indlæser…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- MANGLER KOSTPRIS -->
@@ -2624,17 +2684,91 @@ async function loadKostpris() {
   </tr>`).join('');
 }
 
+// ── MOBILEPAY ─────────────────────────────────────────────────────────────────
+const MND_NAVN = ['','Januar','Februar','Marts','April','Maj','Juni',
+                  'Juli','August','September','Oktober','November','December'];
+
+async function loadMobilepay() {
+  const data = await api('/api/mobilepay');
+  if (!data) return;
+
+  document.getElementById('mp-tbl-lbl').textContent = data.length + ' måneder';
+
+  // Sæt dropdown til aktuel måned
+  const nu = new Date();
+  document.getElementById('mp-maaned').value = nu.getMonth() + 1;
+  document.getElementById('mp-aar').value    = nu.getFullYear();
+
+  const tbody = document.getElementById('mp-tbody');
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Ingen data endnu — tilføj første måned ovenfor</td></tr>';
+    return;
+  }
+
+  const mono = "font-family:'DM Mono',monospace;";
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="font-size:14px;">${MND_NAVN[r.maaned]}</td>
+      <td style="${mono}font-size:13px;">${r.aar}</td>
+      <td class="num">
+        <span class="mp-omsat" contenteditable="true"
+          data-aar="${r.aar}" data-maaned="${r.maaned}"
+          onblur="mpOpdater(this)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+          onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/[^0-9.]/g,'');document.execCommand('insertText',false,t);"
+          style="${mono}font-size:13px;cursor:text;border-bottom:1px dashed rgba(30,58,30,.3);padding:1px 3px;"
+        >${Math.round(r.omsaetning).toLocaleString('da-DK')}</span>
+        <span style="${mono}font-size:11px;color:var(--ash);"> kr</span>
+      </td>
+    </tr>`).join('');
+}
+
+async function mpGem() {
+  const maaned    = parseInt(document.getElementById('mp-maaned').value, 10);
+  const aar       = parseInt(document.getElementById('mp-aar').value, 10);
+  const omsatEl   = document.getElementById('mp-omsat');
+  const omsaetning = parseFloat(omsatEl.value.replace(',', '.'));
+  if (isNaN(omsaetning) || isNaN(aar) || isNaN(maaned)) return;
+
+  const statusEl = document.getElementById('mp-status');
+  statusEl.textContent = 'Gemmer…';
+  await api('/api/mobilepay/gem', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({aar, maaned, omsaetning}),
+  });
+  omsatEl.value = '';
+  statusEl.textContent = MND_NAVN[maaned] + ' ' + aar + ' gemt ✓';
+  setTimeout(() => statusEl.textContent = '', 3000);
+  loadMobilepay();
+}
+
+async function mpOpdater(span) {
+  const raw = span.textContent.replace(/\./g, '').replace(',', '.').trim();
+  const val = parseFloat(raw);
+  if (isNaN(val) || val < 0) { loadMobilepay(); return; }
+  const aar    = parseInt(span.dataset.aar, 10);
+  const maaned = parseInt(span.dataset.maaned, 10);
+  span.style.opacity = '0.5';
+  await api('/api/mobilepay/gem', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({aar, maaned, omsaetning: val}),
+  });
+  span.style.opacity = '1';
+  span.style.borderBottom = '2px solid var(--gold)';
+}
+
 const _origShowPanel = showPanel;
 window.showPanel = function(id, el) {
   _origShowPanel(id, el);
   if (id === 'dagedetaljer' && !_dageCache[_dageN]) loadDageDetaljer(_dageN);
-  if (id === 'kaffe')    loadKaffe();
-  if (id === 'trend'     && !_trendLoaded) loadTrend(_trendDage);
-  if (id === 'aar'       && !_aarLoaded)   loadAar();
-  if (id === 'kostpris')    loadKostpris();
+  if (id === 'kaffe')      loadKaffe();
+  if (id === 'trend'       && !_trendLoaded) loadTrend(_trendDage);
+  if (id === 'aar'         && !_aarLoaded)   loadAar();
+  if (id === 'kostpris')   loadKostpris();
   if (id === 'bestilling') loadBestilling();
   if (id === 'svind')      loadSvind();
   if (id === 'beregner')   loadBeregner();
+  if (id === 'mobilepay')  loadMobilepay();
 };
 
 loadAll();

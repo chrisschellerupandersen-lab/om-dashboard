@@ -116,9 +116,6 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
                 except ValueError:
                     pass
 
-        # Position 1 i data-rækker = header col 0 = ordre/bon-nummer (med +1 offset)
-        bon_nr = str(row[1]).strip() if len(row) > 1 and row[1] else ""
-
         transaktioner.append({
             "dato":       dato,
             "varenummer": str(row[col["varenummer"]]).strip(),
@@ -130,10 +127,14 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "avance":     _tal(row[col["avance"]]),
             "avance_pct": _tal(row[col["avance_pct"]]),
             "time_start": time_start,
-            "bon_nr":     bon_nr,
+            "bon_nr":     "",
         })
 
     print(f"[INFO] Shopbox parser: {len(transaktioner)} transaktioner parsed")
+    # Debug: vis de første 3 rå data-rækker så vi kan finde bon_nr-kolonnen
+    debug_rows = [r for r in alle_rækker[:5] if len(r) >= min_cols and r[col["varenavn"]]]
+    for i, r in enumerate(debug_rows[:3]):
+        print(f"[DEBUG] Rk{i} col0-7: {[str(r[j])[:20] if j < len(r) else '?' for j in range(8)]}")
     if transaktioner:
         t0 = transaktioner[0]
         print(f"[INFO] Første transaktion: dato={t0['dato']}, varenavn={repr(t0['varenavn'])}, kategori={repr(t0['kategori'])}")

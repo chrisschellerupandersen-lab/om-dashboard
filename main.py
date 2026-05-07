@@ -1,10 +1,11 @@
+import io
 import os
 import base64
 from datetime import datetime
 from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -244,6 +245,176 @@ async def api_bestillings_anbefaling(
         from datetime import date
         aar = date.today().year
     return database.hent_bestillings_uge(int(uge), int(aar))
+
+
+@app.get("/api/bestilling/eksport")
+async def api_bestilling_eksport(
+    request: Request,
+    uge: Optional[int] = None,
+    aar: Optional[int] = None,
+):
+    _kræv_login(request)
+    if uge is None:
+        from datetime import date
+        iso = date.today().isocalendar()
+        uge = iso[1] + 1
+        aar = iso[0]
+        if uge > 52:
+            uge = 1
+            aar += 1
+    if aar is None:
+        from datetime import date
+        aar = date.today().year
+
+    d = database.hent_bestillings_uge(int(uge), int(aar))
+    if "fejl" in d:
+        raise HTTPException(status_code=404, detail=d["fejl"])
+
+    xlsx_bytes = _byg_bestilling_xlsx(d)
+    filename = f"Bestilling uge {d['maal_uge']} {d['maal_aar']}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _byg_bestilling_xlsx(d: dict) -> bytes:
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, numbers
+    from collections import defaultdict
+
+    DAGE     = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    DAG_LBL  = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
+    KAT_ORD  = ['Rugbrød', 'Flute', 'Brød', 'Boller', 'Wiener', 'Kage']
+    WEEKEND  = {4, 5, 6}  # 0-based: fre=4, loe=5, son=6
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = f"Uge {d['maal_uge']}"
+
+    # Kolonne-bredder
+    col_widths = [14, 10, 32, 12, 7, 7, 7, 7, 7, 7, 7, 10, 12]
+    for i, w in enumerate(col_widths, 1):
+        ws.column_dimensions[ws.cell(1, i).column_letter].width = w
+
+    forest  = "FF1E3A1E"
+    parch   = "FFF5F0E8"
+    green_l = "FFE8F0E8"
+    gold    = "FFB8860B"
+    white   = "FFFFFFFF"
+    grey_l  = "FFF0EDE8"
+
+    def _fill(hex_col):
+        return PatternFill("solid", fgColor=hex_col)
+
+    def _font(bold=False, color="FF000000", sz=10):
+        return Font(bold=bold, color=color, size=sz)
+
+    def _border_bottom():
+        s = Side(style="thin", color="FF999999")
+        return Border(bottom=s)
+
+    # ── Rad 1: Titel ──────────────────────────────────────────────────────────
+    ws.append([f"Organic Market — Ugebestilling uge {d['maal_uge']} · {d['maal_aar']}"])
+    ws.merge_cells("A1:M1")
+    c = ws["A1"]
+    c.font      = Font(bold=True, size=13, color=white)
+    c.fill      = _fill(forest)
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[1].height = 22
+
+    # ── Rad 2: Dato-range + faktorer ─────────────────────────────────────────
+    evt_txt = f"  ·  {d['event']['navn']}" if d.get("event") else ""
+    ws.append([f"{d['dato_range']}  ·  SI {d['si']:.2f}  ·  vækst {d['vaekst_pct']:+.1f}%{evt_txt}"])
+    ws.merge_cells("A2:M2")
+    c = ws["A2"]
+    c.font      = Font(size=9, italic=True, color="FF555555")
+    c.fill      = _fill(parch)
+    c.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 14
+
+    # ── Rad 3: Tom (matcher parser skip i<3) ─────────────────────────────────
+    ws.append([None] * 13)
+    ws.row_dimensions[3].height = 4
+
+    # ── Rad 4: Kolonneoverskrifter ────────────────────────────────────────────
+    hdrs = ["Varetype", "Varenr.", "Varenavn", "Pris ex moms"] + DAG_LBL + ["I alt stk", "I alt kr"]
+    ws.append(hdrs)
+    for col_i, cell in enumerate(ws[4], 1):
+        cell.font      = Font(bold=True, size=9, color=white)
+        cell.fill      = _fill(forest)
+        cell.alignment = Alignment(horizontal="center" if col_i > 2 else "left", vertical="center")
+        if col_i in WEEKEND:
+            cell.fill = _fill("FF2D4A2D")
+    ws.row_dimensions[4].height = 16
+
+    # ── Produkter grupperet efter kategori ───────────────────────────────────
+    groups: dict = defaultdict(list)
+    for p in d["produkter"]:
+        groups[p["kategori"]].append(p)
+
+    for kat in KAT_ORD:
+        prods = groups.get(kat, [])
+        if not prods:
+            continue
+
+        # Kategori-header
+        ws.append([kat] + [None] * 12)
+        r = ws.max_row
+        for col_i in range(1, 14):
+            c = ws.cell(r, col_i)
+            c.fill = _fill(green_l)
+            c.font = Font(bold=True, size=9, color=forest)
+        ws.row_dimensions[r].height = 14
+
+        for p in prods:
+            anb = p["anbefalet"]
+            dag_vals = [anb[dg] for dg in DAGE]
+            ws.append([None, p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
+                      + dag_vals + [p["total_anbefalet"], round(p["total_pris"])])
+            r = ws.max_row
+            for col_i, cell in enumerate(ws[r], 1):
+                cell.font = Font(size=9)
+                cell.alignment = Alignment(horizontal="right" if col_i > 3 else "left",
+                                           vertical="center")
+                if col_i == 3:
+                    cell.alignment = Alignment(horizontal="left", vertical="center")
+                if col_i - 1 in WEEKEND and col_i >= 5:
+                    cell.fill = _fill("FFEFF5EF")
+            ws.row_dimensions[r].height = 13
+
+        # Kategori-subtotal
+        kat_dag = [sum(p["anbefalet"][dg] for p in prods) for dg in DAGE]
+        kat_stk = sum(p["total_anbefalet"] for p in prods)
+        kat_kr  = sum(p["total_pris"]      for p in prods)
+        ws.append([f"{kat} i alt", None, None, None] + kat_dag + [kat_stk, round(kat_kr)])
+        r = ws.max_row
+        for col_i, cell in enumerate(ws[r], 1):
+            cell.font   = Font(bold=True, size=9, color=gold)
+            cell.fill   = _fill(grey_l)
+            cell.border = _border_bottom()
+            cell.alignment = Alignment(horizontal="right" if col_i > 1 else "left",
+                                       vertical="center")
+        ws.row_dimensions[r].height = 13
+
+    # ── Grand total ──────────────────────────────────────────────────────────
+    all_dag = [sum(p["anbefalet"][dg] for p in d["produkter"]) for dg in DAGE]
+    ws.append(["I alt", None, None, None] + all_dag + [d["total_stk"], round(d["total_kr"])])
+    r = ws.max_row
+    for col_i, cell in enumerate(ws[r], 1):
+        cell.font      = Font(bold=True, size=10, color=white)
+        cell.fill      = _fill(forest)
+        cell.alignment = Alignment(horizontal="right" if col_i > 1 else "left",
+                                   vertical="center")
+    ws.row_dimensions[r].height = 16
+
+    # Frys øverste 4 rækker
+    ws.freeze_panes = "A5"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
 
 
 @app.post("/api/bager/retur-opdater")

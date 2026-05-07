@@ -1091,6 +1091,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         produkter.append({
             "varenummer":    r["varenummer"] or "",
             "varenavn":      r["varenavn"],
+            "kategori":      _kat(r["varenavn"]),
             "pris_ex_moms":  round(pris, 2),
             "basis":         {d: int(basis_dag[d]) for d in DAGE},
             "anbefalet":     anb_dag,

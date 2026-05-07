@@ -2280,39 +2280,79 @@ async function loadBernUge(uge, aar) {
   document.getElementById('bern-vaekst-sub').textContent =
     vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt';
 
-  // Produkt-tabel
+  // Produkt-tabel — grupperet efter kategori
   const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
   const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
   const WEEKEND = new Set(['fre','loe','son']);
+  const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
 
   const thDage = DAGE.map(dag =>
     `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
   ).join('');
 
-  const rows = d.produkter.map(p => {
-    const dagCells = DAGE.map(dag => {
-      const v    = p.anbefalet[dag] || 0;
-      const base = p.basis[dag]     || 0;
-      const diff = v - base;
-      const diffHtml = diff !== 0
-        ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};">${diff>0?'+':''}${diff}</span>`
-        : '';
-      return `<td class="num" style="${mono}${WEEKEND.has(dag)?'background:rgba(45,74,45,.04);':''}${v===0?'color:var(--ash);':''}">${v}${diffHtml}</td>`;
-    }).join('');
+  // Gruppér produkter efter kategori
+  const groups = {};
+  for (const p of d.produkter) {
+    const k = p.kategori || 'Andet';
+    if (!groups[k]) groups[k] = [];
+    groups[k].push(p);
+  }
 
-    const diffTotal  = p.total_anbefalet - p.total_basis;
-    const diffTotHtml = diffTotal !== 0
-      ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
-      : '';
+  let bodyRows = '';
+  const COLSPAN = 11; // varenavn + 7 dage + total + kr/stk + kr total
 
-    return `<tr>
-      <td style="font-size:12px;max-width:180px;">${p.varenavn}</td>
-      ${dagCells}
-      <td class="num" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
-      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
-      <td class="num" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
+  const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+
+  for (const kat of katOrder) {
+    const prods = groups[kat];
+    if (!prods || prods.length === 0) continue;
+
+    // Kategori-header
+    bodyRows += `<tr style="background:rgba(45,74,45,.07);">
+      <td colspan="${COLSPAN}" style="font-weight:600;font-size:11px;color:var(--forest);padding:5px 8px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
     </tr>`;
-  }).join('');
+
+    // Produkt-rækker
+    for (const p of prods) {
+      const dagCells = DAGE.map(dag => {
+        const v    = p.anbefalet[dag] || 0;
+        const base = p.basis[dag]     || 0;
+        const diff = v - base;
+        const diffHtml = diff !== 0
+          ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};">${diff>0?'+':''}${diff}</span>`
+          : '';
+        return `<td class="num" style="${mono}${WEEKEND.has(dag)?'background:rgba(45,74,45,.04);':''}${v===0?'color:var(--ash);':''}">${v}${diffHtml}</td>`;
+      }).join('');
+
+      const diffTotal   = p.total_anbefalet - p.total_basis;
+      const diffTotHtml = diffTotal !== 0
+        ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
+        : '';
+
+      bodyRows += `<tr>
+        <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
+        ${dagCells}
+        <td class="num" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
+        <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
+        <td class="num" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
+      </tr>`;
+    }
+
+    // Kategori-subtotal
+    const katDagCells = DAGE.map(dag => {
+      const t = prods.reduce((s,p) => s + (p.anbefalet[dag]||0), 0);
+      return `<td class="num" style="${mono}font-weight:600;color:var(--forest);${WEEKEND.has(dag)?'background:rgba(45,74,45,.08);':''}">${t}</td>`;
+    }).join('');
+    const katStk = prods.reduce((s,p) => s + p.total_anbefalet, 0);
+    const katKr  = prods.reduce((s,p) => s + p.total_pris, 0);
+    bodyRows += `<tr style="background:rgba(45,74,45,.04);border-top:1px solid rgba(45,74,45,.15);">
+      <td style="font-size:11px;font-weight:600;color:var(--forest);padding-left:16px;">${kat} i alt</td>
+      ${katDagCells}
+      <td class="num" style="${mono}font-weight:700;color:var(--forest);">${katStk}</td>
+      <td class="num" style="${mono}color:var(--ash);">—</td>
+      <td class="num" style="${mono}font-weight:600;">${Math.round(katKr).toLocaleString('da-DK')}</td>
+    </tr>`;
+  }
 
   const footDage = DAGE.map(dag => {
     const t    = d.produkter.reduce((s,p) => s + (p.anbefalet[dag]||0), 0);
@@ -2336,23 +2376,28 @@ async function loadBernUge(uge, aar) {
     `= faktor ${d.total_faktor.toFixed(3)}`,
   ].filter(Boolean).join('  ·  ');
 
+  const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;
+
   document.getElementById('beregner-tabel').innerHTML = `
     ${evtNote}
     <div class="aar2-tbl-wrap">
       <div class="aar2-tbl-hdr">
         <span class="aar2-tbl-hdr-l">Baseret på uge ${d.basis_uge} · grøn/rød = forskel vs. udgangspunkt</span>
-        <span class="aar2-tbl-hdr-r">${d.total_stk.toLocaleString('da-DK')} stk · ${Math.round(d.total_kr).toLocaleString('da-DK')} kr</span>
+        <span class="aar2-tbl-hdr-r">
+          ${d.total_stk.toLocaleString('da-DK')} stk · ${Math.round(d.total_kr).toLocaleString('da-DK')} kr
+          &nbsp;<a href="${eksportUrl}" download style="margin-left:10px;padding:3px 10px;background:var(--forest);color:#fff;border-radius:4px;font-size:11px;text-decoration:none;font-weight:600;">↓ Excel</a>
+        </span>
       </div>
       <div style="overflow-x:auto;">
         <table class="aar2-tbl" style="min-width:780px;">
           <thead><tr>
-            <th style="min-width:160px;">Produkt</th>${thDage}
+            <th style="min-width:180px;">Produkt</th>${thDage}
             <th class="num">Total</th>
             <th class="num">Kr/stk</th>
             <th class="num">Kr total</th>
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="12" class="empty">Ingen produkter — kør bestilling_sync.py</td></tr>'}</tbody>
-          <tfoot><tr><td>Total</td>${footDage}
+          <tbody>${bodyRows || '<tr><td colspan="11" class="empty">Ingen produkter — kør bestilling_sync.py</td></tr>'}</tbody>
+          <tfoot><tr><td>I alt</td>${footDage}
             <td class="num" style="font-weight:700;">${d.total_stk.toLocaleString('da-DK')}</td>
             <td class="num">—</td>
             <td class="num" style="font-weight:700;">${Math.round(d.total_kr).toLocaleString('da-DK')}</td>

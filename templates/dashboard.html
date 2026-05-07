@@ -77,10 +77,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-5{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
-.kpi-row-5 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
-.kpi-row-5 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
-.kpi-row-5 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
-.kpi-row-5 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
+.kpi-row-6{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
+.kpi-row-5 .kpi:first-child .kpi-l,.kpi-row-6 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
+.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
+.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 /* Dag-produkt-liste */
 .daglist{list-style:none;padding:0;margin:0;}
 .daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
@@ -329,6 +330,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .kpi-row > *:first-child{grid-column:1/-1;}
   .kpi-row-5{grid-template-columns:1fr 1fr;}
   .kpi-row-5 > *:first-child{grid-column:1/-1;}
+  .kpi-row-6{grid-template-columns:1fr 1fr;}
+  .kpi-row-6 > *:first-child{grid-column:1/-1;}
   .aar-kpi-row{grid-template-columns:1fr 1fr;}
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
@@ -522,7 +525,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Overblik</h2>
           <p id="hdr-forside-sub">Organic Market Greve</p>
         </div>
-        <div class="kpi-row-5">
+        <div class="kpi-row-6">
           <div class="kpi">
             <div class="kpi-l">Seneste dag</div>
             <div class="kpi-v" id="kpi-dag-omsat">—</div>
@@ -549,6 +552,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l">DB vs. forrige uge</div>
             <div class="kpi-v" id="kpi-uge-vs">—</div>
             <div class="kpi-s" id="kpi-uge-vs-sub">—</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Kunder · dag</div>
+            <div class="kpi-v" id="kpi-kunder">—</div>
+            <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
         <div class="two-col">
@@ -1227,6 +1235,11 @@ function buildForside(kpi, dage, uger, idag) {
 
     if (dag.vareforbrug > 0) {
       document.getElementById('kpi-dag-vf').textContent = 'VF ' + kr(dag.vareforbrug);
+    }
+    if (dag.transak > 0) {
+      document.getElementById('kpi-kunder').textContent = dag.transak;
+      const kurv = dag.omsaetning && dag.transak ? Math.round(dag.omsaetning / dag.transak) : 0;
+      document.getElementById('kpi-kurv').textContent = kurv > 0 ? kurv.toLocaleString('da-DK') + ' kr/kurv' : '—';
     }
 
     // DB dag

@@ -48,7 +48,8 @@ def init_db():
                 kostpris    REAL    DEFAULT 0,
                 avance      REAL    DEFAULT 0,
                 avance_pct  REAL    DEFAULT 0,
-                time_start  INTEGER DEFAULT -1
+                time_start  INTEGER DEFAULT -1,
+                bon_nr      TEXT    DEFAULT ''
             );
 
             CREATE INDEX IF NOT EXISTS idx_trans_dato ON transaktioner(dato);
@@ -89,11 +90,15 @@ def init_db():
                 UNIQUE(uge, aar) ON CONFLICT REPLACE
             );
         """)
-        # Migration: tilføj time_start til eksisterende tabeller
-        try:
-            conn.execute("ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1")
-        except Exception:
-            pass  # kolonnen eksisterer allerede
+        # Migrationer til eksisterende tabeller
+        for sql in [
+            "ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1",
+            "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
+        ]:
+            try:
+                conn.execute(sql)
+            except Exception:
+                pass  # kolonnen eksisterer allerede
 
 
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
@@ -109,8 +114,8 @@ def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
 
         conn.executemany("""
             INSERT INTO transaktioner
-                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
                 t["dato"],
@@ -123,6 +128,7 @@ def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
                 t.get("avance", 0),
                 t.get("avance_pct", 0),
                 t.get("time_start", -1),
+                t.get("bon_nr", ""),
             )
             for t in transaktioner
         ])
@@ -151,7 +157,10 @@ def hent_kpi() -> Dict:
 
         dag = conn.execute("""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
-                   COUNT(*)                     AS transak,
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END                          AS transak,
                    COALESCE(SUM(avance),0)      AS db_kr,
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(avance)/SUM(omsætning)*100

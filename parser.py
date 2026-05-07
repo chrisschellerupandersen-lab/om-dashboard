@@ -116,6 +116,9 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
                 except ValueError:
                     pass
 
+        # Position 1 i data-rækker = header col 0 = ordre/bon-nummer (med +1 offset)
+        bon_nr = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+
         transaktioner.append({
             "dato":       dato,
             "varenummer": str(row[col["varenummer"]]).strip(),
@@ -127,6 +130,7 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "avance":     _tal(row[col["avance"]]),
             "avance_pct": _tal(row[col["avance_pct"]]),
             "time_start": time_start,
+            "bon_nr":     bon_nr,
         })
 
     print(f"[INFO] Shopbox parser: {len(transaktioner)} transaktioner parsed")

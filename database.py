@@ -253,6 +253,7 @@ def hent_uger() -> List[Dict]:
                 strftime('%Y', dato)  AS aar,
                 CAST(strftime('%W', dato) AS INTEGER) AS uge,
                 ROUND(SUM(omsætning), 2)              AS omsaetning,
+                ROUND(SUM(kostpris), 2)               AS vareforbrug,
                 ROUND(SUM(avance), 2)                 AS db_kr,
                 ROUND(CASE WHEN SUM(omsætning)>0
                      THEN SUM(avance)/SUM(omsætning)*100
@@ -567,9 +568,11 @@ def hent_top_produkter(n: int = 20) -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""
             SELECT varenavn,
-                   ROUND(SUM(omsætning), 2)   AS omsaetning,
-                   ROUND(SUM(antal), 0)        AS antal,
-                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+                   ROUND(SUM(omsætning), 2)                            AS omsaetning,
+                   ROUND(SUM(kostpris), 2)                             AS vareforbrug,
+                   ROUND(SUM(antal), 0)                                AS antal,
+                   ROUND(SUM(avance), 2)                               AS db_kr,
+                   ROUND(SUM(avance)/NULLIF(SUM(omsætning),0)*100, 1)  AS db_pct
             FROM transaktioner
             WHERE varenavn != ''
             GROUP BY varenavn

@@ -620,9 +620,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">DB kr</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
-            <tbody id="uge-tbody"><tr><td colspan="6" class="empty">Indlæser…</td></tr></tbody>
+            <tbody id="uge-tbody"><tr><td colspan="8" class="empty">Indlæser…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -697,9 +697,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>#</th><th>Produkt</th><th class="num">Omsætning</th><th class="num">Antal solgt</th><th class="num">DB%</th></tr>
+              <tr><th>#</th><th>Produkt</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">DB kr</th><th class="num">Antal solgt</th><th class="num">DB%</th></tr>
             </thead>
-            <tbody id="top-tbody"><tr><td colspan="5" class="empty">Indlæser…</td></tr></tbody>
+            <tbody id="top-tbody"><tr><td colspan="7" class="empty">Indlæser…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1347,13 +1347,16 @@ function buildUge(uger) {
     const dbColor = r.db_pct>=35.5?'#2d5a2d':r.db_pct>=33?'#7a5c00':'#9b3420';
     const dbBg    = r.db_pct>=35.5?'rgba(74,124,74,.1)':r.db_pct>=33?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
     const status  = r.db_pct>=35.5?'God':r.db_pct>=33?'Ok':'Lav';
+    const mono    = "font-family:'DM Mono',monospace;";
     return `<tr>
       <td style="font-size:14px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
       <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
+      <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
       <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>
       <td class="num" style="font-size:14px;">${r.antal_dage}</td>
-      <td><span style="font-family:'DM Mono',monospace;font-size:12px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${status}</span></td>
+      <td><span style="${mono}font-size:12px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${status}</span></td>
     </tr>`;
   }).join('');
 }
@@ -1487,15 +1490,18 @@ function setTopN(n, el) {
 function renderTop(top, n) {
   if (!top) return;
   document.getElementById('top-card-title').textContent = `Top ${n} produkter · samlet periode`;
+  const mono = "font-family:'DM Mono',monospace;";
   document.getElementById('top-tbody').innerHTML = top.map((r,i) => {
     const dbColor = r.db_pct>=35?'#2d5a2d':r.db_pct>=28?'#7a5c00':'#9b3420';
     const dbBg    = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
     return `<tr>
-      <td style="color:var(--amber);font-family:'DM Mono',monospace;font-size:12px;font-weight:500;">${i+1}</td>
+      <td style="color:var(--amber);${mono}font-size:12px;font-weight:500;">${i+1}</td>
       <td style="font-size:14px;">${r.varenavn}</td>
       <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
+      <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="font-size:14px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
-      <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
+      <td class="num"><span style="${mono}font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
     </tr>`;
   }).join('');
 }

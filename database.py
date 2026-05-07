@@ -157,6 +157,7 @@ def hent_kpi() -> Dict:
 
         dag = conn.execute("""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(kostpris),0)   AS vareforbrug,
                    CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
                         THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
                         ELSE COUNT(*)
@@ -174,6 +175,7 @@ def hent_kpi() -> Dict:
 
         uge = conn.execute("""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(kostpris),0)   AS vareforbrug,
                    COALESCE(SUM(avance),0)      AS db_kr,
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(avance)/SUM(omsætning)*100
@@ -225,7 +227,9 @@ def hent_dag_produkter() -> Dict:
         rows = conn.execute("""
             SELECT varenavn,
                    ROUND(SUM(antal), 0)     AS antal,
-                   ROUND(SUM(omsætning), 0) AS omsaetning
+                   ROUND(SUM(omsætning), 0) AS omsaetning,
+                   ROUND(SUM(kostpris), 0)  AS vareforbrug,
+                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(avance)/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
             FROM transaktioner
             WHERE dato = ?
             GROUP BY varenavn

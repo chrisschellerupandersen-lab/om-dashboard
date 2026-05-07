@@ -88,6 +88,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .daglist .dl-navn{flex:1;color:var(--ink);}
 .daglist .dl-stk{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
 .daglist .dl-kr{font-family:'DM Mono',monospace;font-size:12px;color:var(--forest);white-space:nowrap;margin-left:auto;}
+.daglist .dl-db{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;min-width:36px;text-align:right;}
 .kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
 .kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
 .kpi-v{font-size:28px;font-weight:300;color:var(--forest);line-height:1;}
@@ -526,6 +527,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l">Seneste dag</div>
             <div class="kpi-v" id="kpi-dag-omsat">—</div>
             <div class="kpi-s" id="kpi-dag-vs">indlæser…</div>
+            <div class="kpi-s" id="kpi-dag-vf" style="color:var(--ash);"></div>
           </div>
           <div class="kpi">
             <div class="kpi-l">DB · dag</div>
@@ -536,6 +538,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l">Denne uge</div>
             <div class="kpi-v" id="kpi-uge-omsat">—</div>
             <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
+            <div class="kpi-s" id="kpi-uge-vf" style="color:var(--ash);"></div>
           </div>
           <div class="kpi">
             <div class="kpi-l">DB · uge</div>
@@ -1222,6 +1225,10 @@ function buildForside(kpi, dage, uger, idag) {
         '  ·  ' + Math.round(dag.omsaetning / dag.transak) + ' kr/kurv';
     }
 
+    if (dag.vareforbrug > 0) {
+      document.getElementById('kpi-dag-vf').textContent = 'VF ' + kr(dag.vareforbrug);
+    }
+
     // DB dag
     const dbDagEl = document.getElementById('kpi-dag-db');
     dbDagEl.textContent = dag.db_kr != null ? kr(dag.db_kr) : '—';
@@ -1234,6 +1241,10 @@ function buildForside(kpi, dage, uger, idag) {
     // ── Uge-kasser ────────────────────────────────────────────────────────
     document.getElementById('kpi-uge-omsat').textContent = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
     document.getElementById('kpi-uge-dage').textContent  = uge.antal_dage != null ? uge.antal_dage + ' dage denne uge' : '—';
+
+    if (uge.vareforbrug > 0) {
+      document.getElementById('kpi-uge-vf').textContent = 'VF ' + kr(uge.vareforbrug);
+    }
 
     // DB uge
     const dbUgeEl = document.getElementById('kpi-uge-db');
@@ -1276,6 +1287,7 @@ function buildForside(kpi, dage, uger, idag) {
         <span class="dl-navn">${p.varenavn}</span>
         <span class="dl-stk">${p.antal} stk</span>
         <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+        <span class="dl-db">${p.db_pct > 0 ? p.db_pct.toFixed(0) + '%' : ''}</span>
       </li>`).join('');
   }
 

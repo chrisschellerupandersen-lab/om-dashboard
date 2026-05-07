@@ -689,35 +689,40 @@ def hent_svind_data() -> List[Dict]:
     """
     TGTG_KR_PR_POSE = 38.0
 
+    from datetime import date as _date
+
     with _conn() as conn:
-        # Kassesalg bagværk per uge — matcher varenummer fra bestillinger
-        kasse = conn.execute("""
-            SELECT
-                CAST(CAST(strftime('%W', dato) AS INTEGER) AS TEXT) AS uge_nr,
-                strftime('%Y', dato) AS aar_str,
-                ROUND(SUM(antal), 0) AS kassesalg_stk
+        # Kassesalg bagværk per dag — matcher varenummer fra bestillinger
+        # Aggregeres til ISO-uger i Python (SQLite %W ≠ ISO-ugenummer)
+        kasse_dage = conn.execute("""
+            SELECT dato, ROUND(SUM(antal), 0) AS kassesalg_stk
             FROM transaktioner
             WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
                 SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                 FROM ugebestillinger
                 WHERE varenummer != '' AND varenummer != '0'
             )
-            GROUP BY uge_nr, aar_str
+            GROUP BY dato
         """).fetchall()
-        kasse_map = {(int(r["uge_nr"]), int(r["aar_str"])): r["kassesalg_stk"] for r in kasse}
+        kasse_map: Dict = {}
+        for r in kasse_dage:
+            iso = _date.fromisoformat(r["dato"]).isocalendar()
+            key = (iso[1], iso[0])
+            kasse_map[key] = kasse_map.get(key, 0) + (r["kassesalg_stk"] or 0)
 
-        # KW stk: Kaffe+Wienerbrød-kombination — hvert salg tæller som 1 bagværk solgt
-        kw = conn.execute("""
-            SELECT
-                CAST(CAST(strftime('%W', dato) AS INTEGER) AS TEXT) AS uge_nr,
-                strftime('%Y', dato) AS aar_str,
-                ROUND(SUM(antal), 0) AS kw_stk
+        # KW stk: Kaffe+Wienerbrød-kombination — per dag → ISO-uge
+        kw_dage = conn.execute("""
+            SELECT dato, ROUND(SUM(antal), 0) AS kw_stk
             FROM transaktioner
             WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
                OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
-            GROUP BY uge_nr, aar_str
+            GROUP BY dato
         """).fetchall()
-        kw_map = {(int(r["uge_nr"]), int(r["aar_str"])): r["kw_stk"] for r in kw}
+        kw_map: Dict = {}
+        for r in kw_dage:
+            iso = _date.fromisoformat(r["dato"]).isocalendar()
+            key = (iso[1], iso[0])
+            kw_map[key] = kw_map.get(key, 0) + (r["kw_stk"] or 0)
 
         rows = conn.execute("""
             SELECT

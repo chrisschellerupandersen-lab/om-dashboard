@@ -1159,9 +1159,9 @@ function showPanel(id, el) {
   closeSidebar();
 }
 
-async function api(path) {
+async function api(path, opts) {
   try {
-    const r = await fetch(path);
+    const r = await fetch(path, opts);
     if (r.status === 401) { window.location.href = '/login'; return null; }
     if (!r.ok) return null;
     return r.json();
@@ -2402,6 +2402,7 @@ async function loadBernUge(uge, aar) {
   const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
   const WEEKEND = new Set(['fre','loe','son']);
   const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+  window._bernData = d;
 
   const thDage = DAGE.map(dag =>
     `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
@@ -2431,14 +2432,19 @@ async function loadBernUge(uge, aar) {
 
     // Produkt-rækker
     for (const p of prods) {
+      const vnSafe = (p.varenummer || '').replace(/[^a-zA-Z0-9_-]/g, '_');
       const dagCells = DAGE.map(dag => {
-        const v    = p.anbefalet[dag] || 0;
-        const base = p.basis[dag]     || 0;
-        const diff = v - base;
-        const diffHtml = diff !== 0
-          ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};">${diff>0?'+':''}${diff}</span>`
-          : '';
-        return `<td class="num" style="${mono}${WEEKEND.has(dag)?'background:rgba(45,74,45,.04);':''}${v===0?'color:var(--ash);':''}">${v}${diffHtml}</td>`;
+        const v       = p.anbefalet[dag] || 0;
+        const isManuel = p.manuel && p.manuel[dag];
+        const wkBg    = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
+        const manStyle = isManuel ? 'border-bottom:2px solid var(--gold);' : '';
+        return `<td class="num bern-cell" contenteditable="true"
+          data-vn="${p.varenummer || ''}" data-dag="${dag}"
+          onblur="bernCellSave(this)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+          onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
+          style="${mono}${wkBg}${v===0?'color:var(--ash);':''}${manStyle}cursor:text;min-width:28px;"
+        >${v}</td>`;
       }).join('');
 
       const diffTotal   = p.total_anbefalet - p.total_basis;
@@ -2446,12 +2452,12 @@ async function loadBernUge(uge, aar) {
         ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
         : '';
 
-      bodyRows += `<tr>
+      bodyRows += `<tr data-vn="${p.varenummer || ''}">
         <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
         ${dagCells}
-        <td class="num" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
+        <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
         <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
-        <td class="num" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
+        <td class="num bern-row-kr" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
       </tr>`;
     }
 
@@ -2531,6 +2537,42 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
+}
+
+async function bernCellSave(td) {
+  const raw  = td.textContent.trim().replace(/\D/g, '');
+  const val  = raw === '' ? 0 : parseInt(raw, 10);
+  if (isNaN(val) || val < 0) { td.textContent = '0'; return; }
+  td.textContent = val;
+
+  const vn  = td.dataset.vn;
+  const dag = td.dataset.dag;
+  td.style.opacity = '0.5';
+  await api('/api/bestilling/gem-manuel', {
+    method:  'POST',
+    headers: {'Content-Type':'application/json'},
+    body:    JSON.stringify({uge: _bernUge, aar: _bernAar, varenummer: vn, dag, antal: val}),
+  });
+  td.style.opacity    = '1';
+  td.style.borderBottom = '2px solid var(--gold)';
+  if (val === 0) td.style.color = 'var(--ash)';
+  else           td.style.color = '';
+
+  // Opdater række-total
+  const row   = td.closest('tr');
+  const cells = row.querySelectorAll('.bern-cell');
+  let rowTot = 0;
+  cells.forEach(c => { const v = parseInt(c.textContent.trim(), 10); if (!isNaN(v)) rowTot += v; });
+  const totCell = row.querySelector('.bern-row-tot');
+  if (totCell) totCell.textContent = rowTot;
+
+  // Opdater KPI total stk
+  let grand = 0;
+  document.querySelectorAll('.bern-row-tot').forEach(c => {
+    const v = parseInt(c.textContent.trim(), 10); if (!isNaN(v)) grand += v;
+  });
+  const totEl = document.getElementById('bern-total');
+  if (totEl) totEl.textContent = grand.toLocaleString('da-DK') + ' stk';
 }
 
 function bernPrev() {

@@ -89,6 +89,15 @@ def init_db():
                 indlæst       TEXT DEFAULT (datetime('now','localtime')),
                 UNIQUE(uge, aar) ON CONFLICT REPLACE
             );
+
+            CREATE TABLE IF NOT EXISTS bestilling_manuel (
+                uge        INTEGER NOT NULL,
+                aar        INTEGER NOT NULL,
+                varenummer TEXT    NOT NULL,
+                dag        TEXT    NOT NULL,
+                antal      INTEGER NOT NULL,
+                PRIMARY KEY (uge, aar, varenummer, dag)
+            );
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -1037,6 +1046,15 @@ def hent_bestillings_anbefaling() -> Dict:
     }
 
 
+def gem_bestilling_manuel(uge: int, aar: int, varenummer: str, dag: str, antal: int):
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO bestilling_manuel (uge, aar, varenummer, dag, antal)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(uge, aar, varenummer, dag) DO UPDATE SET antal=excluded.antal
+        """, (uge, aar, varenummer, dag, antal))
+
+
 def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     """Produktniveau bestillingsanbefaling for mål-uge.
 
@@ -1077,6 +1095,17 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             WHERE uge=? AND aar=?
             ORDER BY id
         """, (basis_uge, basis_aar)).fetchall()
+
+        # Manuelle overrides for mål-ugen
+        manuel_rows = conn.execute("""
+            SELECT varenummer, dag, antal FROM bestilling_manuel
+            WHERE uge=? AND aar=?
+        """, (maal_uge, maal_aar)).fetchall()
+        manuel: Dict = {}
+        for mr in manuel_rows:
+            if mr["varenummer"] not in manuel:
+                manuel[mr["varenummer"]] = {}
+            manuel[mr["varenummer"]][mr["dag"]] = mr["antal"]
 
         # Effektivt solgt seneste 8 uger til vækst+TGTG
         salg_rows = conn.execute("""
@@ -1139,9 +1168,9 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     for r in prod_rows:
         basis_dag = {d: float(r[d] or 0) for d in DAGE}
         kat = _kat(r["varenavn"])
+        vn  = r["varenummer"] or ""
 
         if kat == 'Kage':
-            # Kage skaleres ikke — brug basis-tallene direkte
             anb_dag = {d: int(basis_dag[d]) for d in DAGE}
         else:
             anb_dag = {}
@@ -1149,20 +1178,27 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 raw = basis_dag[d] * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
                 anb_dag[d] = int(round(raw))
 
+        # Anvend manuelle overrides
+        vn_manuel = manuel.get(vn, {})
+        for d in DAGE:
+            if d in vn_manuel:
+                anb_dag[d] = vn_manuel[d]
+
         total_basis = sum(basis_dag[d] for d in DAGE)
         total_anb   = sum(anb_dag[d]   for d in DAGE)
         pris = float(r["pris_ex_moms"] or 0)
 
         produkter.append({
-            "varenummer":    r["varenummer"] or "",
-            "varenavn":      r["varenavn"],
-            "kategori":      kat,
-            "pris_ex_moms":  round(pris, 2),
-            "basis":         {d: int(basis_dag[d]) for d in DAGE},
-            "anbefalet":     anb_dag,
-            "total_basis":   int(total_basis),
+            "varenummer":      vn,
+            "varenavn":        r["varenavn"],
+            "kategori":        kat,
+            "pris_ex_moms":    round(pris, 2),
+            "basis":           {d: int(basis_dag[d]) for d in DAGE},
+            "anbefalet":       anb_dag,
+            "manuel":          {d: True for d in DAGE if d in vn_manuel},
+            "total_basis":     int(total_basis),
             "total_anbefalet": total_anb,
-            "total_pris":    round(total_anb * pris, 2),
+            "total_pris":      round(total_anb * pris, 2),
         })
 
     total_stk = sum(p["total_anbefalet"] for p in produkter)

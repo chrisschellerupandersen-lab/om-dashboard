@@ -232,6 +232,24 @@ async def api_bager_svind(request: Request):
     return database.hent_svind_data()
 
 
+@app.post("/api/bestilling/gem-manuel")
+async def bestilling_gem_manuel(request: Request):
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    uge  = body.get("uge")
+    aar  = body.get("aar")
+    vn   = body.get("varenummer")
+    dag  = body.get("dag")
+    antal = body.get("antal")
+    if uge is None or aar is None or vn is None or dag is None or antal is None:
+        raise HTTPException(status_code=400, detail="Mangler felter")
+    database.gem_bestilling_manuel(int(uge), int(aar), str(vn), str(dag), int(antal))
+    return {"ok": True}
+
+
 @app.get("/api/bestilling/anbefaling")
 async def api_bestillings_anbefaling(
     request: Request,

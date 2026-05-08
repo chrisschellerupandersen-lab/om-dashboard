@@ -1,8 +1,12 @@
 import io
 import csv
+import re
 from datetime import datetime
 from typing import List, Dict, Any
 import openpyxl
+
+# Shopbox Order hash: "NNNNN-YYMMDDHHMMSS" — unikt per kassebon
+_ORDER_HASH_RE = re.compile(r'^\d{3,}-\d{8,}$')
 
 # Shopbox varesalgsrapport pipe-format (type=1, fileType=txt)
 # Datarækker starter med en tom celle (+1 offset fra header).
@@ -116,6 +120,17 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
                 except ValueError:
                     pass
 
+        # Order hash (unikt per kassebon): Shopbox placerer det 2 felter efter dato.
+        # Format: "NNNNN-YYMMDDHHMMSS" — bruges til at tælle unikke kunder.
+        # Fallback: felt 3 (gammel bon_nr-position).
+        bon_nr = ""
+        if dato_idx + 2 < n:
+            oh = str(row[dato_idx + 2]).strip()
+            if _ORDER_HASH_RE.match(oh):
+                bon_nr = oh
+        if not bon_nr and len(row) > 3 and row[3]:
+            bon_nr = str(row[3]).strip()
+
         transaktioner.append({
             "dato":       dato,
             "varenummer": str(row[col["varenummer"]]).strip(),
@@ -127,13 +142,15 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "avance":     _tal(row[col["avance"]]),
             "avance_pct": _tal(row[col["avance_pct"]]),
             "time_start": time_start,
-            "bon_nr":     str(row[3]).strip() if len(row) > 3 and row[3] else "",
+            "bon_nr":     bon_nr,
         })
 
     print(f"[INFO] Shopbox parser: {len(transaktioner)} transaktioner parsed")
     if transaktioner:
         t0 = transaktioner[0]
-        print(f"[INFO] Første transaktion: dato={t0['dato']}, varenavn={repr(t0['varenavn'])}, kategori={repr(t0['kategori'])}")
+        print(f"[INFO] Første transaktion: dato={t0['dato']}, varenavn={repr(t0['varenavn'])}, kategori={repr(t0['kategori'])}, bon_nr={repr(t0['bon_nr'])}")
+        unique_bon = len({t['bon_nr'] for t in transaktioner if t['bon_nr']})
+        print(f"[INFO] Unikke bon_nr: {unique_bon} ud af {len(transaktioner)} rækker")
     else:
         if alle_rækker:
             for r in alle_rækker[:5]:

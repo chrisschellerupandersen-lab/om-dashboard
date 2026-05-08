@@ -2788,10 +2788,10 @@ async function loadBernUge(uge, aar) {
   const returBoller  = Math.round(bollerStk  * RETUR_BOLLER);
   const returWiener  = Math.round(wienerStk  * RETUR_WIENER);
 
-  setText('bern-retur-boller',     bollerStk > 0 ? returBoller + ' stk' : '—');
-  setText('bern-retur-boller-sub', bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt');
-  setText('bern-retur-wiener',     wienerStk > 0 ? returWiener + ' stk' : '—');
-  setText('bern-retur-wiener-sub', wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt');
+  document.getElementById('bern-retur-boller').textContent     = bollerStk > 0 ? returBoller + ' stk' : '—';
+  document.getElementById('bern-retur-boller-sub').textContent = bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt';
+  document.getElementById('bern-retur-wiener').textContent     = wienerStk > 0 ? returWiener + ' stk' : '—';
+  document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
 
   document.getElementById('beregner-tabel').innerHTML = `
     ${evtNote}

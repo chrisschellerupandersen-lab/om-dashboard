@@ -116,15 +116,15 @@ async def api_idag(request: Request):
 
 
 @app.get("/api/salg/dage")
-async def api_dage(request: Request, n: int = 14):
+async def api_dage(request: Request, n: int = 14, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_dage(min(n, 365))
+    return database.hent_dage(min(n, 365), aar)
 
 
 @app.get("/api/salg/uger")
-async def api_uger(request: Request):
+async def api_uger(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_uger()
+    return database.hent_uger(aar)
 
 
 @app.get("/api/salg/timer")
@@ -140,15 +140,15 @@ async def api_timer_snit(request: Request):
 
 
 @app.get("/api/salg/kategorier")
-async def api_kategorier(request: Request):
+async def api_kategorier(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_kategorier()
+    return database.hent_kategorier(aar)
 
 
 @app.get("/api/salg/top")
-async def api_top(request: Request, n: int = 20):
+async def api_top(request: Request, n: int = 20, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_top_produkter(min(n, 100))
+    return database.hent_top_produkter(min(n, 100), aar)
 
 
 @app.get("/api/salg/aarsdata")
@@ -227,9 +227,9 @@ async def bestilling_opdater(request: Request):
 
 
 @app.get("/api/bager/svind")
-async def api_bager_svind(request: Request):
+async def api_bager_svind(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_svind_data()
+    return database.hent_svind_data(aar)
 
 
 @app.post("/api/bestilling/gem-manuel")

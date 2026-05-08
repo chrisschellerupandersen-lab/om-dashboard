@@ -35,6 +35,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .tb-week{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:rgba(232,192,104,.6);text-transform:uppercase;}
 .tb-right{display:flex;align-items:center;gap:8px;}
 .tb-sync{font-family:'DM Mono',monospace;font-size:9px;color:rgba(143,188,143,.7);}
+.tb-aar-pick{display:flex;align-items:center;gap:4px;}
+.tb-aar-btn{background:none;border:none;cursor:pointer;color:rgba(232,192,104,.5);font-size:13px;padding:0 3px;line-height:1;}
+.tb-aar-btn:hover{color:var(--amber);}
+.tb-aar-val{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--amber);min-width:34px;text-align:center;}
+.tb-aar-val.hist{color:var(--gold);opacity:.8;}
 .tb-btn{
   font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
   background:rgba(255,255,255,.08);color:rgba(232,192,104,.7);
@@ -435,6 +440,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
       <div class="tb-divider"></div>
       <div class="tb-week" id="tb-week">Uge — · —</div>
+      <div class="tb-divider"></div>
+      <div class="tb-aar-pick">
+        <button class="tb-aar-btn" onclick="setAar(VALGT_AAR-1)" title="Forrige år">&#8249;</button>
+        <span class="tb-aar-val" id="tb-aar-val">—</span>
+        <button class="tb-aar-btn" onclick="setAar(VALGT_AAR+1)" title="Næste år">&#8250;</button>
+      </div>
     </div>
     <div class="tb-right">
       <span class="tb-sync" id="tb-sync">● Indlæser…</span>
@@ -1243,6 +1254,36 @@ function showPanel(id, el) {
   closeSidebar();
 }
 
+let VALGT_AAR = new Date().getFullYear();
+const NUVAERENDE_AAR = new Date().getFullYear();
+
+function setAar(aar) {
+  if (aar < 2020 || aar > NUVAERENDE_AAR) return;
+  VALGT_AAR = aar;
+  const el = document.getElementById('tb-aar-val');
+  el.textContent = aar;
+  el.className = 'tb-aar-val' + (aar < NUVAERENDE_AAR ? ' hist' : '');
+  // Reset år-afhængige caches
+  _aarLoaded   = false;
+  _aarRaw      = null;
+  _svindLoaded = false;
+  Object.keys(_topCache).forEach(k => delete _topCache[k]);
+  loadAll();
+  // Genindlæs aktivt panel hvis det er år-specifikt
+  const active = document.querySelector('.panel.active');
+  if (active) {
+    const id = active.id.replace('p-', '');
+    if (id === 'aar')   loadAar();
+    if (id === 'svind') loadSvind();
+  }
+}
+
+// Initialiser år-visning
+(function() {
+  const el = document.getElementById('tb-aar-val');
+  if (el) el.textContent = VALGT_AAR;
+})();
+
 async function api(path, opts) {
   try {
     const r = await fetch(path, opts);
@@ -1271,15 +1312,16 @@ function mk(id, type, labels, datasets, extra={}) {
 }
 
 async function loadAll() {
+  const a = VALGT_AAR;
   const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top] = await Promise.all([
     api('/api/kpi'),
-    api('/api/salg/dage?n=30'),
-    api('/api/salg/uger'),
+    api(`/api/salg/dage?n=30&aar=${a}`),
+    api(`/api/salg/uger?aar=${a}`),
     api('/api/salg/idag'),
     api('/api/salg/timer'),
     api('/api/salg/timer/snit'),
-    api('/api/salg/kategorier'),
-    api('/api/salg/top?n=20'),
+    api(`/api/salg/kategorier?aar=${a}`),
+    api(`/api/salg/top?n=20&aar=${a}`),
   ]);
 
   buildForside(kpi, dage, uger, idag);
@@ -1597,7 +1639,7 @@ function setTopN(n, el) {
   document.querySelectorAll('#top-tabs .ptab').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   if (_topCache[n]) { renderTop(_topCache[n], n); return; }
-  api('/api/salg/top?n='+n).then(d => { _topCache[n]=d; renderTop(d,n); });
+  api(`/api/salg/top?n=${n}&aar=${VALGT_AAR}`).then(d => { _topCache[n]=d; renderTop(d,n); });
 }
 function renderTop(top, n) {
   if (!top) return;
@@ -1697,7 +1739,7 @@ async function loadAar() {
   const aarTbody = document.getElementById('aar2-tbody');
   if (aarTbody) aarTbody.innerHTML =
     '<tr><td colspan="6" style="padding:28px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
-  const data = await api('/api/salg/aarsdata');
+  const data = await api(`/api/salg/aarsdata?aar=${VALGT_AAR}`);
   if (!data) return;
   _aarRaw = data;
   const saved = localStorage.getItem('aar_cfg_v2');
@@ -2454,7 +2496,7 @@ let _svindLoaded = false;
 async function loadSvind() {
   if (_svindLoaded) return;
   _svindLoaded = true;
-  const data = await api('/api/bager/svind');
+  const data = await api(`/api/bager/svind?aar=${VALGT_AAR}`);
   if (!data || !data.length) {
     document.getElementById('svind-tbody').innerHTML =
       '<tr><td colspan="12" class="empty">Ingen data — kør bager_retur_sync.py og bestilling_sync.py</td></tr>';

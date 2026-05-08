@@ -256,15 +256,18 @@ def hent_dag_produkter() -> Dict:
     return {"dato": seneste_dato, "produkter": [dict(r) for r in rows]}
 
 
-def hent_dage(n: int = 14) -> List[Dict]:
+def hent_dage(n: int = 14, aar: int = None) -> List[Dict]:
     with _conn() as conn:
-        rows = conn.execute("""
+        where = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar), n) if aar else (n,)
+        rows = conn.execute(f"""
             SELECT dato, SUM(omsætning) AS omsaetning
             FROM transaktioner
+            {where}
             GROUP BY dato
             ORDER BY dato DESC
             LIMIT ?
-        """, (n,)).fetchall()
+        """, params).fetchall()
     return [dict(r) for r in reversed(rows)]
 
 
@@ -289,11 +292,13 @@ def _mp_map_alle() -> Dict:
     return {(r["aar"], r["maaned"]): r["omsaetning"] for r in rows}
 
 
-def hent_uger() -> List[Dict]:
+def hent_uger(aar: int = None) -> List[Dict]:
     from datetime import date as _date
     from calendar import monthrange
     with _conn() as conn:
-        rows = conn.execute("""
+        where = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar),) if aar else ()
+        rows = conn.execute(f"""
             SELECT
                 strftime('%Y', dato)  AS aar,
                 CAST(strftime('%W', dato) AS INTEGER) AS uge,
@@ -306,9 +311,10 @@ def hent_uger() -> List[Dict]:
                      ELSE 0 END, 1)                   AS db_pct,
                 COUNT(DISTINCT dato)                  AS antal_dage
             FROM transaktioner
+            {where}
             GROUP BY strftime('%Y-%W', dato)
             ORDER BY dato ASC
-        """).fetchall()
+        """, params).fetchall()
 
     mp = _mp_map_alle()
     resultat = []
@@ -364,16 +370,18 @@ def hent_timer_snit() -> List[Dict]:
     return [dict(r) for r in rows]
 
 
-def hent_kategorier() -> List[Dict]:
+def hent_kategorier(aar: int = None) -> List[Dict]:
     with _conn() as conn:
-        rows = conn.execute("""
+        extra = "AND strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar),) if aar else ()
+        rows = conn.execute(f"""
             SELECT kategori, ROUND(SUM(omsætning), 2) AS omsaetning,
                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
-            WHERE kategori != ''
+            WHERE kategori != '' {extra}
             GROUP BY kategori
             ORDER BY omsaetning DESC
-        """).fetchall()
+        """, params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -691,9 +699,11 @@ def hent_kaffe_analyse() -> Dict:
     }
 
 
-def hent_top_produkter(n: int = 20) -> List[Dict]:
+def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
     with _conn() as conn:
-        rows = conn.execute("""
+        extra = "AND strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar), n) if aar else (n,)
+        rows = conn.execute(f"""
             SELECT varenavn,
                    ROUND(SUM(omsætning), 2)                            AS omsaetning,
                    ROUND(SUM(kostpris), 2)                             AS vareforbrug,
@@ -701,11 +711,11 @@ def hent_top_produkter(n: int = 20) -> List[Dict]:
                    ROUND(SUM(avance), 2)                               AS db_kr,
                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)  AS db_pct
             FROM transaktioner
-            WHERE varenavn != ''
+            WHERE varenavn != '' {extra}
             GROUP BY varenavn
             ORDER BY omsaetning DESC
             LIMIT ?
-        """, (n,)).fetchall()
+        """, params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -822,7 +832,7 @@ def gem_bager_regnskab(linjer: List[Dict]) -> int:
     return len(linjer)
 
 
-def hent_svind_data() -> List[Dict]:
+def hent_svind_data(aar: int = None) -> List[Dict]:
     """Kombinerer bestilling, bager_regnskab og kassesalg per uge.
     Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk (tgtg_kr ÷ 38 kr/pose).
     """
@@ -863,7 +873,10 @@ def hent_svind_data() -> List[Dict]:
             key = (iso[1], iso[0])
             kw_map[key] = kw_map.get(key, 0) + (r["kw_stk"] or 0)
 
-        rows = conn.execute("""
+        aar_filter1 = "AND b.aar = ?" if aar else ""
+        aar_filter2 = "AND u.aar = ?" if aar else ""
+        aar_params  = (aar,) if aar else ()
+        rows = conn.execute(f"""
             SELECT
                 b.uge, b.aar,
                 ROUND(SUM(u.total_antal), 0)                   AS bestilt_stk,
@@ -872,6 +885,7 @@ def hent_svind_data() -> List[Dict]:
                 ROUND(SUM(u.total_pris) - b.retur_ialt, 2)    AS netto_kr
             FROM bager_regnskab b
             LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
+            WHERE 1=1 {aar_filter1}
             GROUP BY b.uge, b.aar
             UNION ALL
             -- Uger med bestilling men uden bager_regnskab endnu
@@ -884,10 +898,10 @@ def hent_svind_data() -> List[Dict]:
             FROM ugebestillinger u
             WHERE NOT EXISTS (
                 SELECT 1 FROM bager_regnskab b WHERE b.uge = u.uge AND b.aar = u.aar
-            )
+            ) {aar_filter2}
             GROUP BY u.uge, u.aar
             ORDER BY aar DESC, uge DESC
-        """).fetchall()
+        """, aar_params + aar_params).fetchall()
 
     from calendar import monthrange as _monthrange
     mp = _mp_map_alle()

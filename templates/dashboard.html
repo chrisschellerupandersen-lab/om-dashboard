@@ -1105,7 +1105,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- KPI-række -->
-        <div class="kpi-row" style="margin-bottom:16px;">
+        <div class="kpi-row-6" style="margin-bottom:16px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
             <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
@@ -1125,6 +1125,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l">Væksttrend</div>
             <div class="kpi-v" id="bern-vaekst">—</div>
             <div class="kpi-s" id="bern-vaekst-sub"></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Retur boller</div>
+            <div class="kpi-v" id="bern-retur-boller" style="font-size:26px;">—</div>
+            <div class="kpi-s" id="bern-retur-boller-sub">10% af bestilt</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Retur wienerbrød</div>
+            <div class="kpi-v" id="bern-retur-wiener" style="font-size:26px;">—</div>
+            <div class="kpi-s" id="bern-retur-wiener-sub">13,5% af bestilt</div>
           </div>
         </div>
 
@@ -2778,26 +2788,10 @@ async function loadBernUge(uge, aar) {
   const returBoller  = Math.round(bollerStk  * RETUR_BOLLER);
   const returWiener  = Math.round(wienerStk  * RETUR_WIENER);
 
-  let returHtml = '';
-  if (bollerStk > 0 || wienerStk > 0) {
-    const items = [];
-    if (bollerStk > 0) items.push(
-      `<span style="color:var(--forest);font-weight:500;">${returBoller} stk boller</span>` +
-      `<span style="color:var(--ash);"> (10% af ${bollerStk} stk)</span>`
-    );
-    if (wienerStk > 0) items.push(
-      `<span style="color:var(--forest);font-weight:500;">${returWiener} stk wienerbrød</span>` +
-      `<span style="color:var(--ash);"> (13,5% af ${wienerStk} stk)</span>`
-    );
-    returHtml = `
-    <div style="margin-top:10px;background:rgba(200,168,75,.07);border:1px solid rgba(200,168,75,.25);
-                border-radius:3px;padding:10px 14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
-      <span style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);flex-shrink:0;">
-        Retur denne uge
-      </span>
-      <span style="font-family:'DM Mono',monospace;font-size:12px;">${items.join('<span style="color:var(--ash);margin:0 6px;">·</span>')}</span>
-    </div>`;
-  }
+  setText('bern-retur-boller',     bollerStk > 0 ? returBoller + ' stk' : '—');
+  setText('bern-retur-boller-sub', bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt');
+  setText('bern-retur-wiener',     wienerStk > 0 ? returWiener + ' stk' : '—');
+  setText('bern-retur-wiener-sub', wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt');
 
   document.getElementById('beregner-tabel').innerHTML = `
     ${evtNote}
@@ -2826,8 +2820,7 @@ async function loadBernUge(uge, aar) {
         </table>
       </div>
     </div>
-    <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>
-    ${returHtml}`;
+    <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
 }
 
 async function loadBeregner() {

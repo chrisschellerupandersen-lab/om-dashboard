@@ -434,7 +434,7 @@ def hent_dage_detaljer(n: int = 8) -> List[Dict]:
 
 
 def hent_aarsdata(aar: int = None) -> Dict:
-    from datetime import datetime
+    from datetime import datetime, date as _date
     if aar is None:
         aar = datetime.now().year
     with _conn() as conn:
@@ -472,12 +472,36 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 WHERE dato >= date(?, '-28 days')
             """, (seneste,)).fetchone()
 
+        # Faktisk vareforbrug per måned: bagerfakturaer → ISO-uge mandag → måned
+        bager_rows = conn.execute(
+            "SELECT uge, aar, faktura FROM bager_regnskab WHERE aar=? OR aar=?",
+            (aar, aar - 1)
+        ).fetchall()
+        faktura_maaned: Dict = {}
+        for br in bager_rows:
+            try:
+                mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
+                if mon.year == aar:
+                    faktura_maaned[mon.month] = round(
+                        faktura_maaned.get(mon.month, 0.0) + (br["faktura"] or 0), 2
+                    )
+            except Exception:
+                pass
+
+        # MobilePay netto per måned (÷1.25)
+        mp_rows = conn.execute(
+            "SELECT maaned, omsaetning FROM mobilepay WHERE aar=?", (aar,)
+        ).fetchall()
+        mp_netto_maaned: Dict = {r["maaned"]: round(r["omsaetning"] / 1.25, 0) for r in mp_rows}
+
     return {
-        "aar":            aar,
-        "maaneder":       [dict(r) for r in rows],
-        "prev_dec":       dict(prev_dec) if prev_dec and prev_dec["omsaetning"] else None,
-        "base_kr_pr_dag": base_row["kr_pr_dag"] if base_row else None,
-        "base_gpm":       base_row["gpm"]       if base_row else None,
+        "aar":               aar,
+        "maaneder":          [dict(r) for r in rows],
+        "prev_dec":          dict(prev_dec) if prev_dec and prev_dec["omsaetning"] else None,
+        "base_kr_pr_dag":    base_row["kr_pr_dag"] if base_row else None,
+        "base_gpm":          base_row["gpm"]       if base_row else None,
+        "faktura_maaned":    faktura_maaned,
+        "mp_netto_maaned":   mp_netto_maaned,
     }
 
 

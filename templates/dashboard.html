@@ -807,6 +807,28 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </table>
           </div>
           <div class="aar-note" id="aar-note"></div>
+
+          <!-- Faktisk resultatopgørelse -->
+          <div class="aar2-tbl-wrap" style="margin-top:20px;" id="aar-faktisk-wrap">
+            <div class="aar2-tbl-hdr">
+              <span class="aar2-tbl-hdr-l">Faktisk resultatopgørelse — baseret på bagerfakturaer</span>
+              <span class="aar2-tbl-hdr-r" style="font-size:10px;">Netto omsat − faktisk indkøb (faktura) − faste omk.</span>
+            </div>
+            <table class="aar2-tbl">
+              <thead><tr>
+                <th>Måned</th>
+                <th class="num">Omsat netto</th>
+                <th class="num" title="MobilePay netto (÷1.25)">MobilePay</th>
+                <th class="num">Faktura</th>
+                <th class="num">Faktisk DB</th>
+                <th class="num">Faktisk GPM</th>
+                <th class="num">Faste omk.</th>
+                <th class="num">Faktisk resultat</th>
+                <th class="num" style="color:var(--ash);" title="Forskel til teknisk DB — svind + frostlager">Svind/frost</th>
+              </tr></thead>
+              <tbody id="aar-faktisk-tbody"><tr><td colspan="9" class="empty">Kræver bagerfakturaer i Svind &amp; økonomi</td></tr></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -1948,6 +1970,88 @@ function buildAar() {
 
   document.getElementById('aar-note').textContent =
     `ok = faktiske tal · * = estimat: ${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst · GPM ${c.gpm}% · Faste omk. ${dk(c.faste)} kr/mdr · Resultat = DB − faste omk.`;
+
+  // ── Faktisk resultatopgørelse ─────────────────────────────────────────────
+  buildAarFaktisk(d, c);
+}
+
+function buildAarFaktisk(d, c) {
+  const tbody = document.getElementById('aar-faktisk-tbody');
+  if (!tbody) return;
+  const mono = "font-family:'DM Mono',monospace;";
+  const dk = v => Math.round(v).toLocaleString('da-DK');
+
+  const faktisk = {};
+  (d.maaneder || []).forEach(m => faktisk[m.maaned] = m);
+  const faktura  = d.faktura_maaned  || {};
+  const mpNetto  = d.mp_netto_maaned || {};
+
+  // Byg kun rækker for måneder med omsætning ELLER faktura
+  const måneder = Array.from({length:12}, (_,i) => i+1)
+    .filter(m => faktisk[m] || faktura[m]);
+
+  if (!måneder.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">Ingen data endnu — upload rapport og bagerfakturaer</td></tr>';
+    return;
+  }
+
+  let totNetto = 0, totMp = 0, totFaktura = 0, totDB = 0, totRes = 0, totTekniskDB = 0;
+
+  const rows = måneder.map(m => {
+    const f         = faktisk[m] || {};
+    const omsat     = f.omsaetning || 0;
+    const netto     = Math.round(omsat / 1.25);
+    const mp        = mpNetto[m] || 0;
+    const totalNetto = netto + mp;
+    const fakt      = Math.round(faktura[m] || 0);
+    const faktDB    = totalNetto - fakt;
+    const faktGPM   = totalNetto > 0 ? (faktDB / totalNetto * 100) : null;
+    const res       = faktDB - c.faste;
+    const tekniskDB = Math.round(f.avance || 0);
+    const svindFrost = fakt > 0 ? tekniskDB - faktDB : null; // positiv = vi har betalt mere end solgt
+
+    totNetto     += netto;
+    totMp        += mp;
+    totFaktura   += fakt;
+    totDB        += faktDB;
+    totRes       += res;
+    totTekniskDB += tekniskDB;
+
+    const resCls = res >= 0 ? 'var(--moss)' : 'var(--danger)';
+    const gpmTxt = faktGPM != null ? faktGPM.toFixed(1) + '%' : '—';
+    const mndNavn = AAR_MND_NAVNE[m-1];
+    const hasFakt = fakt > 0;
+
+    return `<tr>
+      <td style="font-size:14px;">${mndNavn}</td>
+      <td class="num" style="${mono}">${dk(netto)}</td>
+      <td class="num" style="${mono}color:var(--moss);">${mp > 0 ? dk(mp) : '—'}</td>
+      <td class="num" style="${mono}${!hasFakt?'color:var(--ash);':''};">${hasFakt ? dk(fakt) : '—'}</td>
+      <td class="num" style="${mono}${hasFakt?'font-weight:500;':'color:var(--ash);'}">${hasFakt ? dk(faktDB) : '—'}</td>
+      <td class="num" style="${mono}">${hasFakt ? gpmTxt : '—'}</td>
+      <td class="num" style="${mono}color:var(--ash);">${dk(c.faste)}</td>
+      <td class="num" style="${mono}font-weight:600;color:${hasFakt ? resCls : 'var(--ash)'};">${hasFakt ? dk(res) : '—'}</td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${svindFrost != null ? (svindFrost >= 0 ? '' : '+') + dk(-svindFrost) : '—'}</td>
+    </tr>`;
+  });
+
+  // Totallinje
+  const totGPM   = (totNetto + totMp) > 0 ? (totDB / (totNetto + totMp) * 100).toFixed(1) + '%' : '—';
+  const totResCls = totRes >= 0 ? 'var(--moss)' : 'var(--danger)';
+  const totSvind  = totTekniskDB - totDB;
+  rows.push(`<tr style="background:rgba(45,74,45,.06);border-top:2px solid rgba(45,74,45,.2);">
+    <td style="font-weight:600;">I alt</td>
+    <td class="num" style="${mono}font-weight:600;">${dk(totNetto)}</td>
+    <td class="num" style="${mono}color:var(--moss);">${totMp > 0 ? dk(totMp) : '—'}</td>
+    <td class="num" style="${mono}font-weight:600;">${dk(totFaktura)}</td>
+    <td class="num" style="${mono}font-weight:600;">${dk(totDB)}</td>
+    <td class="num" style="${mono}font-weight:600;">${totGPM}</td>
+    <td class="num" style="${mono}color:var(--ash);">${dk(c.faste * måneder.length)}</td>
+    <td class="num" style="${mono}font-weight:700;color:${totResCls};">${dk(totRes)}</td>
+    <td class="num" style="${mono}font-size:11px;color:var(--ash);">${dk(totSvind)}</td>
+  </tr>`);
+
+  tbody.innerHTML = rows.join('');
 }
 
 // ── TREND ANALYSE ─────────────────────────────────────────────────────────────

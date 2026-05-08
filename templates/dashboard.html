@@ -2733,6 +2733,36 @@ async function loadBernUge(uge, aar) {
 
   const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;
 
+  // Retur-beregning: 10% boller, 13,5% wienerbrød
+  const RETUR_BOLLER = 0.10, RETUR_WIENER = 0.135;
+  const bollerProds  = d.produkter.filter(p => (p.kategori||'').toLowerCase() === 'boller');
+  const wienerProds  = d.produkter.filter(p => (p.kategori||'').toLowerCase() === 'wiener');
+  const bollerStk    = bollerProds.reduce((s,p) => s + p.total_anbefalet, 0);
+  const wienerStk    = wienerProds.reduce((s,p) => s + p.total_anbefalet, 0);
+  const returBoller  = Math.round(bollerStk  * RETUR_BOLLER);
+  const returWiener  = Math.round(wienerStk  * RETUR_WIENER);
+
+  let returHtml = '';
+  if (bollerStk > 0 || wienerStk > 0) {
+    const items = [];
+    if (bollerStk > 0) items.push(
+      `<span style="color:var(--forest);font-weight:500;">${returBoller} stk boller</span>` +
+      `<span style="color:var(--ash);"> (10% af ${bollerStk} stk)</span>`
+    );
+    if (wienerStk > 0) items.push(
+      `<span style="color:var(--forest);font-weight:500;">${returWiener} stk wienerbrød</span>` +
+      `<span style="color:var(--ash);"> (13,5% af ${wienerStk} stk)</span>`
+    );
+    returHtml = `
+    <div style="margin-top:10px;background:rgba(200,168,75,.07);border:1px solid rgba(200,168,75,.25);
+                border-radius:3px;padding:10px 14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">
+      <span style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);flex-shrink:0;">
+        Retur denne uge
+      </span>
+      <span style="font-family:'DM Mono',monospace;font-size:12px;">${items.join('<span style="color:var(--ash);margin:0 6px;">·</span>')}</span>
+    </div>`;
+  }
+
   document.getElementById('beregner-tabel').innerHTML = `
     ${evtNote}
     <div class="aar2-tbl-wrap">
@@ -2760,7 +2790,8 @@ async function loadBernUge(uge, aar) {
         </table>
       </div>
     </div>
-    <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
+    <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>
+    ${returHtml}`;
 }
 
 async function loadBeregner() {

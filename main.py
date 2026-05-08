@@ -104,15 +104,15 @@ async def api_data(request: Request):
 
 
 @app.get("/api/kpi")
-async def api_kpi(request: Request):
+async def api_kpi(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_kpi()
+    return database.hent_kpi(aar)
 
 
 @app.get("/api/salg/idag")
-async def api_idag(request: Request):
+async def api_idag(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_dag_produkter()
+    return database.hent_dag_produkter(aar)
 
 
 @app.get("/api/salg/dage")
@@ -128,15 +128,15 @@ async def api_uger(request: Request, aar: Optional[int] = None):
 
 
 @app.get("/api/salg/timer")
-async def api_timer(request: Request):
+async def api_timer(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_timer_idag()
+    return database.hent_timer_idag(aar)
 
 
 @app.get("/api/salg/timer/snit")
-async def api_timer_snit(request: Request):
+async def api_timer_snit(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_timer_snit()
+    return database.hent_timer_snit(aar)
 
 
 @app.get("/api/salg/kategorier")
@@ -158,21 +158,21 @@ async def api_aarsdata(request: Request, aar: Optional[int] = None):
 
 
 @app.get("/api/salg/trend")
-async def api_trend(request: Request, dage: int = 21):
+async def api_trend(request: Request, dage: int = 21, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_trend_analyse(min(dage, 90))
+    return database.hent_trend_analyse(min(dage, 90), aar)
 
 
 @app.get("/api/salg/kaffe")
-async def api_kaffe(request: Request):
+async def api_kaffe(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_kaffe_analyse()
+    return database.hent_kaffe_analyse(aar)
 
 
 @app.get("/api/salg/dage-detaljer")
-async def api_dage_detaljer(request: Request, n: int = 8):
+async def api_dage_detaljer(request: Request, n: int = 8, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_dage_detaljer(min(n, 30))
+    return database.hent_dage_detaljer(min(n, 30), aar)
 
 
 @app.get("/api/rapport-status")

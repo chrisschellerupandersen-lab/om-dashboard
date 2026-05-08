@@ -163,10 +163,12 @@ def hent_seneste_snapshot_info() -> Optional[Dict]:
 
 # ── NYE ENDPOINTS ─────────────────────────────────────────────────────────────
 
-def hent_kpi() -> Dict:
+def hent_kpi(aar: int = None) -> Dict:
     with _conn() as conn:
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
         seneste_dato = conn.execute(
-            "SELECT MAX(dato) FROM transaktioner"
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
         ).fetchone()[0]
 
         if not seneste_dato:
@@ -202,17 +204,20 @@ def hent_kpi() -> Dict:
             WHERE strftime('%Y-%W', dato) = ?
         """, (seneste_yw,)).fetchone()
 
-        snit_row = conn.execute("""
+        snit_where = f"WHERE strftime('%Y', dato) = '{aar}'" if aar else ""
+        snit_row = conn.execute(f"""
             SELECT AVG(uge_total) AS snit_uge FROM (
                 SELECT SUM(omsætning) AS uge_total
                 FROM transaktioner
+                {snit_where}
                 GROUP BY strftime('%Y-%W', dato)
                 ORDER BY dato DESC LIMIT 12
             )
         """).fetchone()
 
         # Forrige uge med data (til uge-over-uge DB-sammenligning)
-        prev_uge_row = conn.execute("""
+        prev_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
+        prev_uge_row = conn.execute(f"""
             SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
                    COALESCE(SUM(avance),0)    AS db_kr,
                    CASE WHEN SUM(omsætning)>0
@@ -222,7 +227,7 @@ def hent_kpi() -> Dict:
             WHERE strftime('%Y-%W', dato) = (
                 SELECT DISTINCT strftime('%Y-%W', dato)
                 FROM transaktioner
-                WHERE strftime('%Y-%W', dato) < ?
+                WHERE strftime('%Y-%W', dato) < ? {prev_extra}
                 ORDER BY dato DESC LIMIT 1
             )
         """, (seneste_yw,)).fetchone()
@@ -235,10 +240,14 @@ def hent_kpi() -> Dict:
     }
 
 
-def hent_dag_produkter() -> Dict:
+def hent_dag_produkter(aar: int = None) -> Dict:
     """Produkter solgt seneste dag, sorteret efter omsætning."""
     with _conn() as conn:
-        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
+        seneste_dato = conn.execute(
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
+        ).fetchone()[0]
         if not seneste_dato:
             return {"dato": None, "produkter": []}
         rows = conn.execute("""
@@ -329,10 +338,12 @@ def hent_uger(aar: int = None) -> List[Dict]:
     return resultat
 
 
-def hent_timer_idag() -> List[Dict]:
+def hent_timer_idag(aar: int = None) -> List[Dict]:
     with _conn() as conn:
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
         seneste_dato = conn.execute(
-            "SELECT MAX(dato) FROM transaktioner"
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
         ).fetchone()[0]
         if not seneste_dato:
             return []
@@ -346,9 +357,11 @@ def hent_timer_idag() -> List[Dict]:
     return [dict(r) for r in rows]
 
 
-def hent_timer_snit() -> List[Dict]:
+def hent_timer_snit(aar: int = None) -> List[Dict]:
     with _conn() as conn:
-        rows = conn.execute("""
+        extra = "AND strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar),) if aar else ()
+        rows = conn.execute(f"""
             SELECT time_start, ugedag,
                    ROUND(AVG(dag_total), 2) AS snit_omsaetning
             FROM (
@@ -361,12 +374,12 @@ def hent_timer_snit() -> List[Dict]:
                     END AS ugedag,
                     SUM(omsætning) AS dag_total
                 FROM transaktioner
-                WHERE time_start >= 0
+                WHERE time_start >= 0 {extra}
                 GROUP BY time_start, dato
             )
             GROUP BY time_start, ugedag
             ORDER BY time_start, ugedag
-        """).fetchall()
+        """, params).fetchall()
     return [dict(r) for r in rows]
 
 
@@ -385,22 +398,25 @@ def hent_kategorier(aar: int = None) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
-def hent_dage_detaljer(n: int = 8) -> List[Dict]:
+def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
     from datetime import datetime
     DAG_NAVNE    = ['Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag','Søndag']
     MAANED_NAVNE = {1:'januar',2:'februar',3:'marts',4:'april',5:'maj',6:'juni',
                     7:'juli',8:'august',9:'september',10:'oktober',11:'november',12:'december'}
 
     with _conn() as conn:
-        dage = conn.execute("""
+        where = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        params = (str(aar), n) if aar else (n,)
+        dage = conn.execute(f"""
             SELECT dato,
                    ROUND(SUM(omsætning), 2) AS omsaetning,
                    COUNT(*)                  AS linjer
             FROM transaktioner
+            {where}
             GROUP BY dato
             ORDER BY dato DESC
             LIMIT ?
-        """, (n,)).fetchall()
+        """, params).fetchall()
 
         if not dage:
             return []
@@ -559,12 +575,18 @@ def hent_aarsdata(aar: int = None) -> Dict:
     }
 
 
-def hent_trend_analyse(periode_dage: int = 21) -> Dict:
+def hent_trend_analyse(periode_dage: int = 21, aar: int = None) -> Dict:
     """Sammenlign seneste periode mod forrige periode (dagsnormaliseret)."""
     from datetime import datetime, timedelta
     with _conn() as conn:
-        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
-        tidligste_dato = conn.execute("SELECT MIN(dato) FROM transaktioner").fetchone()[0]
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
+        seneste_dato = conn.execute(
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
+        ).fetchone()[0]
+        tidligste_dato = conn.execute(
+            f"SELECT MIN(dato) FROM transaktioner {aar_filter}", aar_params
+        ).fetchone()[0]
         if not seneste_dato:
             return {}
 
@@ -574,7 +596,8 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
         midt_str  = midt.strftime('%Y-%m-%d')
         start_str = start.strftime('%Y-%m-%d')
 
-        rows = conn.execute("""
+        aar_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
+        rows = conn.execute(f"""
             SELECT
                 varenavn, kategori,
                 ROUND(SUM(CASE WHEN dato > ? THEN antal      ELSE 0 END), 1) AS ny_antal,
@@ -583,7 +606,7 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
                 ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN omsætning  ELSE 0 END), 2) AS gl_omsat,
                 ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
-            WHERE dato > ? AND varenavn != ''
+            WHERE dato > ? AND varenavn != '' {aar_extra}
             GROUP BY varenavn
             HAVING ny_omsat > 0 OR gl_omsat > 0
         """, (midt_str, midt_str,
@@ -592,18 +615,18 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
               start_str)).fetchall()
 
         ny_dage = conn.execute(
-            "SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ?", (midt_str,)
+            f"SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ? {aar_extra}", (midt_str,)
         ).fetchone()[0] or 1
         gl_dage = conn.execute(
-            "SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ? AND dato <= ?",
+            f"SELECT COUNT(DISTINCT dato) FROM transaktioner WHERE dato > ? AND dato <= ? {aar_extra}",
             (start_str, midt_str)
         ).fetchone()[0] or 1
 
         ny_total = conn.execute(
-            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ?", (midt_str,)
+            f"SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ? {aar_extra}", (midt_str,)
         ).fetchone()[0]
         gl_total = conn.execute(
-            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ? AND dato <= ?",
+            f"SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE dato > ? AND dato <= ? {aar_extra}",
             (start_str, midt_str)
         ).fetchone()[0]
 
@@ -620,8 +643,9 @@ def hent_trend_analyse(periode_dage: int = 21) -> Dict:
     }
 
 
-def hent_kaffe_analyse() -> Dict:
+def hent_kaffe_analyse(aar: int = None) -> Dict:
     with _conn() as conn:
+        aar_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
         kpi = conn.execute(f"""
             SELECT
                 ROUND(SUM(antal), 0)                                      AS total_antal,
@@ -630,11 +654,11 @@ def hent_kaffe_analyse() -> Dict:
                 ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
                 ROUND(SUM(omsætning)/NULLIF(SUM(antal),0), 2)            AS gns_pris
             FROM transaktioner
-            WHERE {_KAFFE_WHERE}
+            WHERE {_KAFFE_WHERE} {aar_extra}
         """).fetchone()
 
         total_omsat = conn.execute(
-            "SELECT COALESCE(SUM(omsætning),0) FROM transaktioner"
+            f"SELECT COALESCE(SUM(omsætning),0) FROM transaktioner WHERE 1=1 {aar_extra}"
         ).fetchone()[0]
 
         produkter = conn.execute(f"""
@@ -643,7 +667,7 @@ def hent_kaffe_analyse() -> Dict:
                    ROUND(SUM(omsætning), 2)                               AS omsaetning,
                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
             FROM transaktioner
-            WHERE {_KAFFE_WHERE}
+            WHERE {_KAFFE_WHERE} {aar_extra}
             GROUP BY varenavn
             ORDER BY omsaetning DESC
         """).fetchall()
@@ -653,7 +677,7 @@ def hent_kaffe_analyse() -> Dict:
                    ROUND(SUM(antal), 0)    AS antal,
                    ROUND(SUM(omsætning), 2) AS omsaetning
             FROM transaktioner
-            WHERE {_KAFFE_WHERE}
+            WHERE {_KAFFE_WHERE} {aar_extra}
             GROUP BY dato
             ORDER BY dato DESC
             LIMIT 30
@@ -665,7 +689,7 @@ def hent_kaffe_analyse() -> Dict:
                    ROUND(SUM(omsætning), 2)  AS total_omsaetning,
                    ROUND(SUM(antal) * 100.0 / NULLIF(SUM(SUM(antal)) OVER (), 0), 1) AS pct
             FROM transaktioner
-            WHERE {_KAFFE_WHERE} AND time_start >= 0
+            WHERE {_KAFFE_WHERE} AND time_start >= 0 {aar_extra}
             GROUP BY time_start
             ORDER BY time_start
         """).fetchall()
@@ -674,7 +698,7 @@ def hent_kaffe_analyse() -> Dict:
             SELECT time_start, varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
-            WHERE {_KAFFE_WHERE} AND time_start >= 0
+            WHERE {_KAFFE_WHERE} AND time_start >= 0 {aar_extra}
             GROUP BY time_start, varenavn
             ORDER BY time_start, total_antal DESC
         """).fetchall()
@@ -683,7 +707,7 @@ def hent_kaffe_analyse() -> Dict:
             SELECT dato, varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
-            WHERE {_KAFFE_WHERE}
+            WHERE {_KAFFE_WHERE} {aar_extra}
             GROUP BY dato, varenavn
             ORDER BY dato DESC, total_antal DESC
         """).fetchall()

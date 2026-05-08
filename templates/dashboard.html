@@ -1263,18 +1263,26 @@ function setAar(aar) {
   const el = document.getElementById('tb-aar-val');
   el.textContent = aar;
   el.className = 'tb-aar-val' + (aar < NUVAERENDE_AAR ? ' hist' : '');
-  // Reset år-afhængige caches
-  _aarLoaded   = false;
-  _aarRaw      = null;
-  _svindLoaded = false;
+  // Reset alle år-afhængige caches
+  _aarLoaded      = false;
+  _aarRaw         = null;
+  _svindLoaded    = false;
+  _kaffeLoaded    = false;
+  _kaffeData      = null;
+  _trendLoaded    = false;
+  _trendData      = null;
   Object.keys(_topCache).forEach(k => delete _topCache[k]);
+  Object.keys(_dageCache).forEach(k => delete _dageCache[k]);
   loadAll();
-  // Genindlæs aktivt panel hvis det er år-specifikt
+  // Genindlæs det aktive panel
   const active = document.querySelector('.panel.active');
   if (active) {
     const id = active.id.replace('p-', '');
-    if (id === 'aar')   loadAar();
-    if (id === 'svind') loadSvind();
+    if (id === 'aar')         loadAar();
+    if (id === 'svind')       loadSvind();
+    if (id === 'kaffe')       loadKaffe();
+    if (id === 'trend')       loadTrend(_trendDage);
+    if (id === 'dagedetaljer') loadDageDetaljer(_dageN);
   }
 }
 
@@ -1314,12 +1322,12 @@ function mk(id, type, labels, datasets, extra={}) {
 async function loadAll() {
   const a = VALGT_AAR;
   const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top] = await Promise.all([
-    api('/api/kpi'),
+    api(`/api/kpi?aar=${a}`),
     api(`/api/salg/dage?n=30&aar=${a}`),
     api(`/api/salg/uger?aar=${a}`),
-    api('/api/salg/idag'),
-    api('/api/salg/timer'),
-    api('/api/salg/timer/snit'),
+    api(`/api/salg/idag?aar=${a}`),
+    api(`/api/salg/timer?aar=${a}`),
+    api(`/api/salg/timer/snit?aar=${a}`),
     api(`/api/salg/kategorier?aar=${a}`),
     api(`/api/salg/top?n=20&aar=${a}`),
   ]);
@@ -1668,7 +1676,7 @@ async function loadDageDetaljer(n) {
   if (_dageCache[n]) { renderDageDetaljer(_dageCache[n], n); return; }
   document.getElementById('dag-grid').innerHTML =
     '<div style="padding:32px;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</div>';
-  const data = await api('/api/salg/dage-detaljer?n=' + n);
+  const data = await api(`/api/salg/dage-detaljer?n=${n}&aar=${VALGT_AAR}`);
   if (data) { _dageCache[n] = data; renderDageDetaljer(data, n); }
 }
 
@@ -2110,7 +2118,7 @@ async function loadTrend(dage) {
   _trendLoaded = true;
   document.getElementById('trend-tbody').innerHTML =
     '<tr><td colspan="7" style="padding:24px;text-align:center;font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);">Indlæser…</td></tr>';
-  const data = await api('/api/salg/trend?dage=' + dage);
+  const data = await api(`/api/salg/trend?dage=${dage}&aar=${VALGT_AAR}`);
   if (data) { _trendData = data; buildTrend(data); }
 }
 
@@ -2275,7 +2283,7 @@ let _kaffeLoaded = false;
 async function loadKaffe() {
   if (_kaffeLoaded) return;
   _kaffeLoaded = true;
-  const data = await api('/api/salg/kaffe');
+  const data = await api(`/api/salg/kaffe?aar=${VALGT_AAR}`);
   if (data) buildKaffe(data);
 }
 

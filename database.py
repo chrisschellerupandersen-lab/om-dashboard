@@ -494,6 +494,20 @@ def hent_aarsdata(aar: int = None) -> Dict:
         ).fetchall()
         mp_netto_maaned: Dict = {r["maaned"]: round(r["omsaetning"] / 1.25, 0) for r in mp_rows}
 
+        # Kostpris for IKKE-bagværk per måned (Shopbox er korrekt for disse)
+        ikke_bager_rows = conn.execute("""
+            SELECT CAST(strftime('%m', dato) AS INTEGER) AS maaned,
+                   ROUND(SUM(kostpris), 2) AS vf
+            FROM transaktioner
+            WHERE strftime('%Y', dato) = ?
+              AND CAST(CAST(varenummer AS REAL) AS INTEGER) NOT IN (
+                  SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                  FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+              )
+            GROUP BY maaned
+        """, (str(aar),)).fetchall()
+        vf_ikke_bager: Dict = {r["maaned"]: r["vf"] for r in ikke_bager_rows}
+
     return {
         "aar":               aar,
         "maaneder":          [dict(r) for r in rows],
@@ -502,6 +516,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
         "base_gpm":          base_row["gpm"]       if base_row else None,
         "faktura_maaned":    faktura_maaned,
         "mp_netto_maaned":   mp_netto_maaned,
+        "vf_ikke_bager":     vf_ikke_bager,
     }
 
 

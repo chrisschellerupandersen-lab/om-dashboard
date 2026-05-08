@@ -1981,10 +1981,11 @@ function buildAarFaktisk(d, c) {
   const mono = "font-family:'DM Mono',monospace;";
   const dk = v => Math.round(v).toLocaleString('da-DK');
 
-  const faktisk = {};
+  const faktisk   = {};
   (d.maaneder || []).forEach(m => faktisk[m.maaned] = m);
-  const faktura  = d.faktura_maaned  || {};
-  const mpNetto  = d.mp_netto_maaned || {};
+  const faktura   = d.faktura_maaned  || {};
+  const mpNetto   = d.mp_netto_maaned || {};
+  const vfAndreMap = d.vf_ikke_bager  || {};
 
   // Byg kun rækker for måneder med omsætning ELLER faktura
   const måneder = Array.from({length:12}, (_,i) => i+1)
@@ -1995,24 +1996,27 @@ function buildAarFaktisk(d, c) {
     return;
   }
 
-  let totNetto = 0, totMp = 0, totFaktura = 0, totDB = 0, totRes = 0, totTekniskDB = 0;
+  let totNetto = 0, totMp = 0, totVF = 0, totDB = 0, totRes = 0, totTekniskDB = 0;
 
   const rows = måneder.map(m => {
-    const f         = faktisk[m] || {};
-    const omsat     = f.omsaetning || 0;
-    const netto     = Math.round(omsat / 1.25);
-    const mp        = mpNetto[m] || 0;
+    const f          = faktisk[m] || {};
+    const omsat      = f.omsaetning || 0;
+    const netto      = Math.round(omsat / 1.25);
+    const mp         = mpNetto[m] || 0;
     const totalNetto = netto + mp;
-    const fakt      = Math.round(faktura[m] || 0);
-    const faktDB    = totalNetto - fakt;
-    const faktGPM   = totalNetto > 0 ? (faktDB / totalNetto * 100) : null;
-    const res       = faktDB - c.faste;
-    const tekniskDB = Math.round(f.avance || 0);
-    const svindFrost = fakt > 0 ? tekniskDB - faktDB : null; // positiv = vi har betalt mere end solgt
+    const bagerFakt  = Math.round(faktura[m] || 0);
+    const vfAndre    = Math.round(vfAndreMap[m] || 0);
+    const totalVF    = bagerFakt + vfAndre;    // faktura + øvrige produkters kostpris
+    const hasFakt    = bagerFakt > 0;
+    const faktDB     = totalNetto - totalVF;
+    const faktGPM    = totalNetto > 0 ? (faktDB / totalNetto * 100) : null;
+    const res        = faktDB - c.faste;
+    const tekniskDB  = Math.round(f.avance || 0);
+    const svindFrost = hasFakt ? tekniskDB - faktDB : null;
 
     totNetto     += netto;
     totMp        += mp;
-    totFaktura   += fakt;
+    totVF        += totalVF;
     totDB        += faktDB;
     totRes       += res;
     totTekniskDB += tekniskDB;
@@ -2020,13 +2024,12 @@ function buildAarFaktisk(d, c) {
     const resCls = res >= 0 ? 'var(--moss)' : 'var(--danger)';
     const gpmTxt = faktGPM != null ? faktGPM.toFixed(1) + '%' : '—';
     const mndNavn = AAR_MND_NAVNE[m-1];
-    const hasFakt = fakt > 0;
 
     return `<tr>
       <td style="font-size:14px;">${mndNavn}</td>
       <td class="num" style="${mono}">${dk(netto)}</td>
       <td class="num" style="${mono}color:var(--moss);">${mp > 0 ? dk(mp) : '—'}</td>
-      <td class="num" style="${mono}${!hasFakt?'color:var(--ash);':''};">${hasFakt ? dk(fakt) : '—'}</td>
+      <td class="num" style="${mono}${!hasFakt?'color:var(--ash);':''};" title="Bager ${dk(bagerFakt)} + øvrige ${dk(vfAndre)}">${hasFakt || vfAndre > 0 ? dk(totalVF) : '—'}</td>
       <td class="num" style="${mono}${hasFakt?'font-weight:500;':'color:var(--ash);'}">${hasFakt ? dk(faktDB) : '—'}</td>
       <td class="num" style="${mono}">${hasFakt ? gpmTxt : '—'}</td>
       <td class="num" style="${mono}color:var(--ash);">${dk(c.faste)}</td>

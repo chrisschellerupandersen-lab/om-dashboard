@@ -472,18 +472,49 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 WHERE dato >= date(?, '-28 days')
             """, (seneste,)).fetchone()
 
-        # Faktisk vareforbrug per måned: bagerfakturaer → ISO-uge mandag → måned
+        # Faktisk vareforbrug per måned: bagerfakturaer fordeles proportionalt
+        # efter faktiske daglige indkøb (dag_antal × pris_ex_moms fra bestillinger).
+        # Fallback til 1/7 uniform hvis ingen bestillingsdata findes for ugen.
+        from datetime import timedelta as _td
         bager_rows = conn.execute(
             "SELECT uge, aar, faktura FROM bager_regnskab WHERE aar=? OR aar=?",
             (aar, aar - 1)
         ).fetchall()
+
+        # Daglig indkøbsværdi per uge fra ugebestillinger
+        bestil_rows = conn.execute("""
+            SELECT uge, aar,
+                   SUM(man * pris_ex_moms) AS man,
+                   SUM(tir * pris_ex_moms) AS tir,
+                   SUM(ons * pris_ex_moms) AS ons,
+                   SUM(tor * pris_ex_moms) AS tor,
+                   SUM(fre * pris_ex_moms) AS fre,
+                   SUM(loe * pris_ex_moms) AS loe,
+                   SUM(son * pris_ex_moms) AS son
+            FROM ugebestillinger
+            GROUP BY uge, aar
+        """).fetchall()
+        _DAG_NAVNE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+        bestil_map = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows}
+
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
+                fakt = br["faktura"] or 0
+                if fakt == 0:
+                    continue
+                key = (int(br["aar"]), int(br["uge"]))
                 mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
-                if mon.year == aar:
-                    faktura_maaned[mon.month] = round(
-                        faktura_maaned.get(mon.month, 0.0) + (br["faktura"] or 0), 2
+                bestil = bestil_map.get(key)
+                dag_vaerdier = [float(bestil[d] or 0) for d in _DAG_NAVNE] if bestil else []
+                total_bestil = sum(dag_vaerdier) if dag_vaerdier else 0.0
+                for i, dag_navn in enumerate(_DAG_NAVNE):
+                    dag = mon + _td(days=i)
+                    if dag.year != aar:
+                        continue
+                    vaegt = (dag_vaerdier[i] / total_bestil) if total_bestil > 0 else (1.0 / 7.0)
+                    faktura_maaned[dag.month] = round(
+                        faktura_maaned.get(dag.month, 0.0) + fakt * vaegt, 2
                     )
             except Exception:
                 pass

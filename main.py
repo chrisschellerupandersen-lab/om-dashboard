@@ -459,6 +459,57 @@ async def api_mangler_kostpris(request: Request):
     return database.hent_mangler_kostpris()
 
 
+# ── VARESTAMDATA ──────────────────────────────────────────────────────────────
+
+@app.get("/api/stamdata")
+async def api_stamdata(request: Request):
+    _kræv_login(request)
+    return database.hent_stamdata()
+
+
+@app.post("/api/stamdata/gem")
+async def stamdata_gem(request: Request):
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    varenavn = body.get("varenavn", "").strip()
+    type_    = body.get("type", "").strip()
+    if not varenavn or not type_:
+        raise HTTPException(status_code=400, detail="Mangler varenavn eller type")
+    id_ = database.gem_stamdata_linje(
+        body.get("sku", ""),
+        varenavn,
+        type_,
+        float(body.get("pris_ex_moms", 0) or 0),
+    )
+    return {"ok": True, "id": id_}
+
+
+@app.delete("/api/stamdata/{id_}")
+async def stamdata_slet(request: Request, id_: int):
+    _kræv_login(request)
+    database.slet_stamdata(id_)
+    return {"ok": True}
+
+
+@app.post("/api/stamdata/bulk")
+async def stamdata_bulk(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    antal = database.gem_stamdata_bulk(linjer)
+    return {"ok": True, "linjer": antal}
+
+
 @app.post("/api/opdater-rapport")
 async def opdater_rapport(request: Request):
     header_secret = request.headers.get("X-Webhook-Secret", "")

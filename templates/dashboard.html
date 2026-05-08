@@ -530,6 +530,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/></svg>
         Mangler kostpris
       </div>
+      <div class="nav-item" onclick="showPanel('stamdata',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
+        Varestamdata
+      </div>
     </nav>
 
     <div class="content">
@@ -1222,6 +1226,38 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </tr></thead>
             <tbody id="kostpris-tbody">
               <tr><td colspan="6" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- VARESTAMDATA -->
+      <div class="panel" id="p-stamdata">
+        <div class="page-hdr">
+          <h2>Varestamdata</h2>
+          <p>Produkttyper brugt i bestillingsberegner og kategorisering — kan rettes og tilføjes</p>
+        </div>
+
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+          <button class="tb-btn" style="font-size:10px;padding:6px 14px;" onclick="stamAddRow()">+ Tilføj vare</button>
+          <span id="sd-status" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+        </div>
+
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Produkter</span>
+            <span class="aar2-tbl-hdr-r" id="sd-count"></span>
+          </div>
+          <table class="aar2-tbl" id="sd-table">
+            <thead><tr>
+              <th style="width:10%;">SKU</th>
+              <th style="width:38%;">Varenavn</th>
+              <th style="width:16%;">Type</th>
+              <th class="num" style="width:14%;">Pris ex moms</th>
+              <th style="width:22%;"></th>
+            </tr></thead>
+            <tbody id="sd-tbody">
+              <tr><td colspan="5" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
         </div>
@@ -2972,7 +3008,130 @@ window.showPanel = function(id, el) {
   if (id === 'svind')      loadSvind();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
+  if (id === 'stamdata')   loadStamdata();
 };
+
+// ── VARESTAMDATA ─────────────────────────────────────────────────────────────
+const SD_TYPER = ['Brød','Flute','Rugbrød','Boller','Wienerbrød','Kage','Jul'];
+
+async function loadStamdata() {
+  const tbody = document.getElementById('sd-tbody');
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">Indlæser…</td></tr>';
+  const rows = await api('/api/stamdata');
+  document.getElementById('sd-count').textContent = rows.length + ' varer';
+  buildStamdataTbl(rows);
+}
+
+function buildStamdataTbl(rows) {
+  const tbody = document.getElementById('sd-tbody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Ingen varer endnu</td></tr>';
+    return;
+  }
+  // Gruppér efter type
+  const grouped = {};
+  SD_TYPER.forEach(t => grouped[t] = []);
+  rows.forEach(r => {
+    const g = grouped[r.type] || (grouped[r.type] = []);
+    g.push(r);
+  });
+  let html = '';
+  for (const type of SD_TYPER) {
+    const grp = grouped[type] || [];
+    if (!grp.length) continue;
+    html += `<tr style="background:rgba(30,58,30,.04);">
+      <td colspan="5" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:6px 14px;">${type} · ${grp.length} varer</td>
+    </tr>`;
+    grp.forEach(r => {
+      html += stamRow(r);
+    });
+  }
+  tbody.innerHTML = html;
+}
+
+function stamRow(r) {
+  const typeOpts = SD_TYPER.map(t =>
+    `<option value="${t}"${r.type===t?' selected':''}>${t}</option>`
+  ).join('');
+  return `<tr data-id="${r.id}">
+    <td><input class="aar-cfg-inp" style="width:90px;" value="${r.sku||''}" onblur="stamSave(${r.id},this.closest('tr'))" placeholder="—"></td>
+    <td><input class="aar-cfg-inp" style="width:100%;" value="${escHtml(r.varenavn)}" onblur="stamSave(${r.id},this.closest('tr'))"></td>
+    <td><select class="aar-cfg-inp" style="width:100%;" onchange="stamSave(${r.id},this.closest('tr'))">${typeOpts}</select></td>
+    <td><input class="aar-cfg-inp num" style="width:80px;text-align:right;" value="${r.pris_ex_moms||''}" onblur="stamSave(${r.id},this.closest('tr'))" placeholder="0.00"></td>
+    <td style="text-align:right;">
+      <button onclick="stamSlet(${r.id},this.closest('tr'))" style="background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;color:var(--danger);padding:4px 8px;">Slet</button>
+    </td>
+  </tr>`;
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function stamSave(id, tr) {
+  const inputs = tr.querySelectorAll('input,select');
+  const sku     = inputs[0].value.trim();
+  const varenavn = inputs[1].value.trim();
+  const type_   = inputs[2].value;
+  const pris    = parseFloat(inputs[3].value.replace(',','.')) || 0;
+  if (!varenavn) return;
+  const status = document.getElementById('sd-status');
+  status.textContent = 'Gemmer…';
+  try {
+    await api('/api/stamdata/gem', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({id, sku, varenavn, type: type_, pris_ex_moms: pris}),
+    });
+    status.textContent = '✓ Gemt';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+    // Reload for at opdatere grupperingen
+    loadStamdata();
+  } catch(e) {
+    status.textContent = 'Fejl ved gem';
+  }
+}
+
+async function stamSlet(id, tr) {
+  if (!confirm('Slet denne vare fra stamdata?')) return;
+  tr.style.opacity = '0.4';
+  await api('/api/stamdata/' + id, {method:'DELETE'});
+  loadStamdata();
+}
+
+function stamAddRow() {
+  const tbody = document.getElementById('sd-tbody');
+  // Indsæt en ny tom redigérbar række øverst
+  const typeOpts = SD_TYPER.map(t => `<option value="${t}">${t}</option>`).join('');
+  const newTr = document.createElement('tr');
+  newTr.dataset.id = 'new';
+  newTr.innerHTML = `
+    <td><input class="aar-cfg-inp" style="width:90px;" placeholder="SKU" id="sd-new-sku"></td>
+    <td><input class="aar-cfg-inp" style="width:100%;" placeholder="Varenavn" id="sd-new-navn"></td>
+    <td><select class="aar-cfg-inp" style="width:100%;" id="sd-new-type">${typeOpts}</select></td>
+    <td><input class="aar-cfg-inp num" style="width:80px;text-align:right;" placeholder="0.00" id="sd-new-pris"></td>
+    <td style="text-align:right;">
+      <button onclick="stamGemNy()" style="background:var(--forest);border:none;cursor:pointer;font-family:'DM Mono',monospace;font-size:9px;color:var(--amber);padding:4px 10px;border-radius:2px;">Gem</button>
+    </td>`;
+  tbody.insertBefore(newTr, tbody.firstChild);
+  document.getElementById('sd-new-navn').focus();
+}
+
+async function stamGemNy() {
+  const sku     = document.getElementById('sd-new-sku').value.trim();
+  const varenavn = document.getElementById('sd-new-navn').value.trim();
+  const type_   = document.getElementById('sd-new-type').value;
+  const pris    = parseFloat((document.getElementById('sd-new-pris').value||'0').replace(',','.')) || 0;
+  if (!varenavn) { document.getElementById('sd-new-navn').focus(); return; }
+  const status = document.getElementById('sd-status');
+  status.textContent = 'Gemmer…';
+  await api('/api/stamdata/gem', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({sku, varenavn, type: type_, pris_ex_moms: pris}),
+  });
+  status.textContent = '✓ Tilføjet';
+  setTimeout(() => { status.textContent = ''; }, 2000);
+  loadStamdata();
+}
 
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);

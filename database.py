@@ -106,6 +106,15 @@ def init_db():
                 omsaetning REAL    NOT NULL DEFAULT 0,
                 UNIQUE(aar, maaned) ON CONFLICT REPLACE
             );
+
+            CREATE TABLE IF NOT EXISTS varestamdata (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                sku          TEXT    DEFAULT '',
+                varenavn     TEXT    NOT NULL,
+                type         TEXT    NOT NULL DEFAULT '',
+                pris_ex_moms REAL    DEFAULT 0,
+                UNIQUE(varenavn) ON CONFLICT REPLACE
+            );
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -1048,7 +1057,15 @@ _RW = 0.135   # returrate wienerbrød (13.5%)
 _BUFFER = 1.05
 
 
-def _kat(varenavn: str) -> str:
+def _kat(varenavn: str, stamdata_map: Dict = None) -> str:
+    if stamdata_map:
+        t = stamdata_map.get((varenavn or '').lower().strip())
+        if t:
+            # Normaliser stamdata-typer til de interne kategorinavne
+            _norm = {"Wienerbrød": "Wiener", "Rugbrød": "Rugbrød",
+                     "Brød": "Brød", "Boller": "Boller", "Flute": "Flute",
+                     "Kage": "Kage", "Jul": "Kage"}
+            return _norm.get(t, t)
     n = (varenavn or '').lower()
     if 'rugbrød' in n or 'rugbrod' in n:
         return 'Rugbrød'
@@ -1100,10 +1117,11 @@ def hent_bestillings_anbefaling() -> Dict:
             GROUP BY varenavn
         """).fetchall()
 
+        sd_map_anb = _stamdata_type_map()
         kat_sum = {"Boller": 0.0, "Wiener": 0.0, "Brød": 0.0,
                    "Kage": 0.0, "Rugbrød": 0.0, "Flute": 0.0}
         for r in kat_rows:
-            kat_sum[_kat(r["varenavn"])] += (r["stk"] or 0)
+            kat_sum[_kat(r["varenavn"], sd_map_anb)] += (r["stk"] or 0)
         grand = sum(kat_sum.values()) or 1
         kat_pct = {k: v / grand for k, v in kat_sum.items()}
 
@@ -1246,6 +1264,57 @@ def hent_mobilepay() -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+# ── VARESTAMDATA ──────────────────────────────────────────────────────────────
+
+def hent_stamdata() -> List[Dict]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT id, sku, varenavn, type, pris_ex_moms
+            FROM varestamdata
+            ORDER BY type, varenavn
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def gem_stamdata_linje(sku: str, varenavn: str, type_: str, pris_ex_moms: float) -> int:
+    with _conn() as conn:
+        cur = conn.execute("""
+            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(varenavn) DO UPDATE SET
+                sku          = excluded.sku,
+                type         = excluded.type,
+                pris_ex_moms = excluded.pris_ex_moms
+        """, (sku or '', varenavn, type_, pris_ex_moms or 0))
+        return cur.lastrowid
+
+
+def slet_stamdata(id_: int):
+    with _conn() as conn:
+        conn.execute("DELETE FROM varestamdata WHERE id = ?", (id_,))
+
+
+def gem_stamdata_bulk(linjer: List[Dict]) -> int:
+    with _conn() as conn:
+        conn.executemany("""
+            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(varenavn) DO UPDATE SET
+                sku          = excluded.sku,
+                type         = excluded.type,
+                pris_ex_moms = excluded.pris_ex_moms
+        """, [(r.get("sku", ""), r["varenavn"], r["type"], r.get("pris_ex_moms", 0))
+              for r in linjer])
+    return len(linjer)
+
+
+def _stamdata_type_map() -> Dict[str, str]:
+    """Returnerer {varenavn.lower(): type} fra varestamdata."""
+    with _conn() as conn:
+        rows = conn.execute("SELECT varenavn, type FROM varestamdata").fetchall()
+    return {r["varenavn"].lower().strip(): r["type"] for r in rows}
+
+
 def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     """Produktniveau bestillingsanbefaling for mål-uge.
 
@@ -1355,10 +1424,11 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     total_faktor = si * (evt["factor"] if evt else 1.0) * tgtg_korr * (1 + vaekst)
 
     # Byg produkttabel
+    sd_map = _stamdata_type_map()
     produkter = []
     for r in prod_rows:
         basis_dag = {d: float(r[d] or 0) for d in DAGE}
-        kat = _kat(r["varenavn"])
+        kat = _kat(r["varenavn"], sd_map)
         vn  = r["varenummer"] or ""
 
         if kat == 'Kage':

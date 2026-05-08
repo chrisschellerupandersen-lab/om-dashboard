@@ -1264,13 +1264,14 @@ function setAar(aar) {
   el.textContent = aar;
   el.className = 'tb-aar-val' + (aar < NUVAERENDE_AAR ? ' hist' : '');
   // Reset alle år-afhængige caches
-  _aarLoaded      = false;
-  _aarRaw         = null;
-  _svindLoaded    = false;
-  _kaffeLoaded    = false;
-  _kaffeData      = null;
-  _trendLoaded    = false;
-  _trendData      = null;
+  _aarLoaded        = false;
+  _aarRaw           = null;
+  _svindLoaded      = false;
+  _kaffeLoaded      = false;
+  _kaffeData        = null;
+  _trendLoaded      = false;
+  _trendData        = null;
+  _bestillingLoaded = false;
   Object.keys(_topCache).forEach(k => delete _topCache[k]);
   Object.keys(_dageCache).forEach(k => delete _dageCache[k]);
   loadAll();
@@ -1278,11 +1279,12 @@ function setAar(aar) {
   const active = document.querySelector('.panel.active');
   if (active) {
     const id = active.id.replace('p-', '');
-    if (id === 'aar')         loadAar();
-    if (id === 'svind')       loadSvind();
-    if (id === 'kaffe')       loadKaffe();
-    if (id === 'trend')       loadTrend(_trendDage);
+    if (id === 'aar')          loadAar();
+    if (id === 'svind')        loadSvind();
+    if (id === 'kaffe')        loadKaffe();
+    if (id === 'trend')        loadTrend(_trendDage);
     if (id === 'dagedetaljer') loadDageDetaljer(_dageN);
+    if (id === 'bestilling')   loadBestilling();
   }
 }
 
@@ -1962,10 +1964,6 @@ function buildAar() {
 
   // ── Charts ─────────────────────────────────────────────────────────────────
   const chartData = [];
-  if (d.prev_dec?.omsaetning) {
-    chartData.push({ label:`D${(aar-1)%100}`, type:'faktisk',
-                     res: Math.round(d.prev_dec.avance - c.faste), avance: d.prev_dec.avance });
-  }
   maaneder.forEach(r => chartData.push({ label:AAR_MND_KORT[r.m-1], type:r.type, res:r.res, avance:r.avance }));
   const cBgF = 'rgba(30,58,30,.75)', cBgE = 'rgba(200,168,75,.55)';
   const cBgFd = 'rgba(30,58,30,.65)', cBgEd = 'rgba(200,168,75,.45)';
@@ -1984,19 +1982,13 @@ function buildAar() {
 
   // ── Tabel ──────────────────────────────────────────────────────────────────
   const tblRows = [];
-  if (d.prev_dec?.omsaetning) {
-    tblRows.push({ label:`Dec ${aar-1}`, type:'faktisk', isIndev:false,
-                   omsat:d.prev_dec.omsaetning, avance:d.prev_dec.avance,
-                   gpm:d.prev_dec.gpm, res:Math.round(d.prev_dec.avance-c.faste) });
-  }
   maaneder.forEach(r => tblRows.push({
     label:AAR_MND_NAVNE[r.m-1], type:r.type,
     isIndev: aar===thisYear && r.m===thisMonth,
     omsat:r.omsat, avance:r.avance, gpm:r.gpm, faste:r.faste, res:r.res,
   }));
 
-  document.getElementById('aar2-tbl-lbl').textContent =
-    d.prev_dec?.omsaetning ? `Resultatopgørelse — Dec ${aar-1} til Dec ${aar}` : `Resultatopgørelse — Jan–Dec ${aar}`;
+  document.getElementById('aar2-tbl-lbl').textContent = `Resultatopgørelse — Jan–Dec ${aar}`;
 
   const maxRes = Math.max(...tblRows.map(r => Math.abs(r.res)));
   document.getElementById('aar2-tbody').innerHTML = tblRows.map(r => {
@@ -2425,7 +2417,7 @@ let _bestillingLoaded = false;
 async function loadBestilling() {
   if (_bestillingLoaded) return;
   _bestillingLoaded = true;
-  const uger = await api('/api/bestilling/uger');
+  const uger = await api(`/api/bestilling/uger?aar=${VALGT_AAR}`);
   if (!uger || !uger.length) {
     document.getElementById('bestilling-uger-tbody').innerHTML =
       '<tr><td colspan="7" class="empty">Ingen bestillinger importeret endnu — kør bestilling_sync.py</td></tr>';

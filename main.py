@@ -188,9 +188,9 @@ async def rapport_status():
 # ── WEBHOOK ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/bestilling/uger")
-async def api_bestilling_uger(request: Request):
+async def api_bestilling_uger(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
-    return database.hent_bestilling_uger()
+    return database.hent_bestilling_uger(aar)
 
 
 @app.get("/api/bestilling/uge/{uge}")

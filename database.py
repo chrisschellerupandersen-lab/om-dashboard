@@ -816,18 +816,21 @@ def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
     return len(linjer)
 
 
-def hent_bestilling_uger() -> List[Dict]:
+def hent_bestilling_uger(aar: int = None) -> List[Dict]:
     with _conn() as conn:
-        rows = conn.execute("""
+        extra = "WHERE aar = ?" if aar else ""
+        params = (aar,) if aar else ()
+        rows = conn.execute(f"""
             SELECT uge, aar,
                    COUNT(*)                    AS antal_varer,
                    ROUND(SUM(total_antal), 0)  AS total_antal,
                    ROUND(SUM(total_pris), 2)   AS total_pris,
                    MAX(indlæst)                AS indlæst
             FROM ugebestillinger
+            {extra}
             GROUP BY uge, aar
             ORDER BY aar DESC, uge DESC
-        """).fetchall()
+        """, params).fetchall()
     return [dict(r) for r in rows]
 
 

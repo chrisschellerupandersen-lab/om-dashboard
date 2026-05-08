@@ -799,6 +799,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th class="num">Omsætning</th>
                 <th class="num">DB</th>
                 <th class="num">GPM</th>
+                <th class="num">Faste omk.</th>
                 <th class="num">Resultat</th>
                 <th>Bar</th>
               </tr></thead>
@@ -1662,7 +1663,7 @@ function defaultAarCfg(base, gpm) {
     base:   Math.round(base||5000),
     vaekst: 0,
     gpm:    gpm ? Math.round(gpm*10)/10 : 35.4,
-    faste:  12150,
+    faste:  13000,
     haevet: 0,
     saeson: [...AAR_DEFAULT_SAESON],
   };
@@ -1919,7 +1920,7 @@ function buildAar() {
   maaneder.forEach(r => tblRows.push({
     label:AAR_MND_NAVNE[r.m-1], type:r.type,
     isIndev: aar===thisYear && r.m===thisMonth,
-    omsat:r.omsat, avance:r.avance, gpm:r.gpm, res:r.res,
+    omsat:r.omsat, avance:r.avance, gpm:r.gpm, faste:r.faste, res:r.res,
   }));
 
   document.getElementById('aar2-tbl-lbl').textContent =
@@ -1937,6 +1938,7 @@ function buildAar() {
       <td class="num">${dk(r.omsat)}</td>
       <td class="num">${dk(r.avance)}</td>
       <td class="num">${r.gpm!=null?r.gpm.toFixed(1)+'%':'—'}</td>
+      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${r.faste!=null?dk(r.faste):'—'}</td>
       <td class="num" style="color:${resCls};font-weight:400;"><strong>${dk(r.res)}</strong></td>
       <td style="width:140px;padding-right:18px;">
         <div class="aar2-minibar-bg"><div class="aar2-minibar-fill" style="width:${barPct}%;background:${barColor};"></div></div>

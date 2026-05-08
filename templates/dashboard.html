@@ -1362,8 +1362,8 @@ function buildForside(kpi, dage, uger, idag) {
         <span class="dl-stk">${p.antal} stk</span>
         <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
         <span class="dl-db" style="color:var(--ash);">${p.vareforbrug > 0 ? 'VF ' + Math.round(p.vareforbrug).toLocaleString('da-DK') : ''}</span>
-        <span class="dl-db" style="color:var(--forest);">${p.db_kr > 0 ? 'DB ' + Math.round(p.db_kr).toLocaleString('da-DK') : ''}</span>
-        <span class="dl-db">${p.db_pct > 0 ? p.db_pct.toFixed(0) + '%' : ''}</span>
+        <span class="dl-db" style="color:${p.db_kr >= 0 ? 'var(--forest)' : 'var(--danger)'};">${p.db_kr != null ? 'DB ' + Math.round(p.db_kr).toLocaleString('da-DK') : ''}</span>
+        <span class="dl-db" style="color:${p.db_pct >= 0 ? '' : 'var(--danger)'};">${p.db_pct != null ? p.db_pct.toFixed(0) + '%' : ''}</span>
       </li>`).join('');
   }
 

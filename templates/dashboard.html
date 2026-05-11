@@ -833,7 +833,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Måned</th>
-                <th class="num">Omsætning</th>
+                <th class="num">Omsat</th>
+                <th class="num">Netto omsat</th>
+                <th class="num">Bageri VF</th>
+                <th class="num">Andet VF</th>
+                <th class="num">VF i alt</th>
                 <th class="num">DB</th>
                 <th class="num">GPM</th>
                 <th class="num">Faste omk.</th>
@@ -2185,30 +2189,45 @@ function buildAar() {
       plugins:{ tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
   // ── Tabel ──────────────────────────────────────────────────────────────────
+  const fmStr = d.faktura_maaned   || {};
+  const vfStr = d.vf_ikke_bager   || {};
   const tblRows = [];
-  maaneder.forEach(r => tblRows.push({
-    label:AAR_MND_NAVNE[r.m-1], type:r.type,
-    isIndev: aar===thisYear && r.m===thisMonth,
-    omsat:r.omsat, avance:r.avance, gpm:r.gpm, faste:r.faste, res:r.res,
-  }));
+  maaneder.forEach(r => {
+    const bagerVF = r.type==='faktisk' ? (fmStr[r.m] || 0)  : null;
+    const andetVF = r.type==='faktisk' ? (vfStr[r.m] || 0)  : null;
+    const vfTot   = (bagerVF != null && andetVF != null) ? bagerVF + andetVF : null;
+    const netto   = r.type==='faktisk' ? r.omsat / 1.25 : null;
+    tblRows.push({
+      label:AAR_MND_NAVNE[r.m-1], type:r.type,
+      isIndev: aar===thisYear && r.m===thisMonth,
+      omsat:r.omsat, netto, bagerVF, andetVF, vfTot,
+      avance:r.avance, gpm:r.gpm, faste:r.faste, res:r.res,
+    });
+  });
 
   document.getElementById('aar2-tbl-lbl').textContent = `Resultatopgørelse — Jan–Dec ${aar}`;
 
   const maxRes = Math.max(...tblRows.map(r => Math.abs(r.res)));
+  const mono = "font-family:'DM Mono',monospace;";
   document.getElementById('aar2-tbody').innerHTML = tblRows.map(r => {
     const resCls = r.res>=30000?'#2d5a2d':r.res>=0?'#c8a84b':'#9b3420';
     const mark = r.isIndev ? ' •' : r.type==='estimat' ? ' *' : '';
     const markStyle = r.isIndev ? 'color:var(--amber);' : r.type==='faktisk' ? 'color:var(--moss);' : 'color:var(--ash);';
     const barPct = maxRes>0 ? Math.max(2, Math.round(Math.abs(r.res)/maxRes*100)) : 2;
     const barColor = r.res>=0 ? (r.type==='faktisk'?'var(--forest)':'rgba(200,168,75,.7)') : '#c0392b';
+    const ash = `${mono}color:var(--ash);`;
     return `<tr class="${r.isIndev?'indev':''}">
-      <td><strong>${r.label}</strong><span style="${markStyle}font-family:'DM Mono',monospace;font-size:9px;">${mark}</span></td>
+      <td><strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
       <td class="num">${dk(r.omsat)}</td>
+      <td class="num" style="${ash}">${r.netto!=null?dk(r.netto):'—'}</td>
+      <td class="num" style="${ash}">${r.bagerVF!=null&&r.bagerVF>0?dk(r.bagerVF):'—'}</td>
+      <td class="num" style="${ash}">${r.andetVF!=null&&r.andetVF>0?dk(r.andetVF):'—'}</td>
+      <td class="num" style="${ash}">${r.vfTot!=null&&r.vfTot>0?dk(r.vfTot):'—'}</td>
       <td class="num">${dk(r.avance)}</td>
       <td class="num">${r.gpm!=null?r.gpm.toFixed(1)+'%':'—'}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${r.faste!=null?dk(r.faste):'—'}</td>
+      <td class="num" style="${ash}">${r.faste!=null?dk(r.faste):'—'}</td>
       <td class="num" style="color:${resCls};font-weight:400;"><strong>${dk(r.res)}</strong></td>
-      <td style="width:140px;padding-right:18px;">
+      <td style="width:100px;padding-right:18px;">
         <div class="aar2-minibar-bg"><div class="aar2-minibar-fill" style="width:${barPct}%;background:${barColor};"></div></div>
       </td>
     </tr>`;

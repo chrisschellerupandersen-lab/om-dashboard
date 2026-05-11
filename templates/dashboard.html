@@ -435,6 +435,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   flex:1;height:6px;background:var(--parchment);border-radius:3px;overflow:hidden;max-width:200px;
 }
 .bern-tgtg-fill{height:100%;border-radius:3px;}
+
+/* ── NAV CUSTOMIZATION ─────────────────────────────────────────────────────── */
+.sidebar{display:flex;flex-direction:column;}
+#nav-list{flex:1;overflow-y:auto;padding-bottom:4px;}
+.nav-edit-footer{border-top:1px solid rgba(30,58,30,.12);padding:10px 14px;display:flex;gap:6px;flex-shrink:0;}
+.nav-edit-toggle{flex:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);background:none;border:1px solid rgba(30,58,30,.15);border-radius:2px;padding:6px 8px;cursor:pointer;transition:all .12s;}
+.nav-edit-toggle:hover,.nav-edit-toggle.on{background:var(--forest);color:var(--amber);border-color:var(--forest);}
+.nav-reset-btn{font-family:'DM Mono',monospace;font-size:13px;color:var(--ash);background:none;border:1px solid rgba(30,58,30,.15);border-radius:2px;padding:5px 9px;cursor:pointer;line-height:1;}
+.nav-reset-btn:hover{color:var(--forest);border-color:var(--forest);}
+.nav-edit-item{display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;border-top:2px solid transparent;transition:border-color .08s;user-select:none;}
+.nav-edit-item:hover{background:rgba(30,58,30,.04);}
+.nav-edit-item.drag-over{border-top:2px solid var(--forest)!important;}
+.nav-ei-hidden{opacity:.38;}
+.nav-drag{font-size:13px;color:var(--ash);cursor:grab;flex-shrink:0;line-height:1;padding:2px 1px;}
+.nav-drag:active{cursor:grabbing;}
+.nav-vis{font-size:11px;cursor:pointer;flex-shrink:0;width:16px;text-align:center;color:var(--ash);background:none;border:none;padding:0;line-height:1;}
+.nav-vis:hover{color:var(--forest);}
+.nav-edit-lbl{flex:1;font-size:12px;color:var(--charcoal);min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:text;}
+.nav-edit-lbl:hover{color:var(--forest);}
+.nav-grp-chip{font-family:'DM Mono',monospace;font-size:7px;color:var(--ash);opacity:.45;flex-shrink:0;max-width:44px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.nav-rename-inp{flex:1;border:none;border-bottom:1px solid var(--forest);background:transparent;font-size:12px;color:var(--charcoal);padding:0;outline:none;min-width:0;font-family:'DM Sans',sans-serif;}
 </style>
 </head>
 <body>
@@ -474,80 +495,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   <div class="sidebar-backdrop" id="sidebar-backdrop" onclick="closeSidebar()"></div>
   <div class="body-wrap">
     <nav class="sidebar" id="sidebar">
-      <div class="nav-group-label">Overblik</div>
-      <div class="nav-item active" onclick="showPanel('forside',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/></svg>
-        Forside
-      </div>
-      <div class="nav-item" onclick="showPanel('dag',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.5 7.5V4h-1v5l3.5 2 .5-.87L8.5 8.5z"/></svg>
-        Seneste dag
-      </div>
-
-      <div class="nav-group-label" style="margin-top:12px;">Analyse</div>
-      <div class="nav-item" onclick="showPanel('uge',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 11h2v3H1zm3-4h2v7H4zm3-3h2v10H7zm3 2h2v8h-2zm3-4h2v12h-2z"/></svg>
-        Ugeoversigt
-      </div>
-      <div class="nav-item" onclick="showPanel('time',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 2 4-6 3 4H1z"/></svg>
-        Timeprofil
-      </div>
-      <div class="nav-item" onclick="showPanel('kategori',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2l5 3-5 3-5-3 5-3zM3 9.5l4 2.3v2.7l-4-2.3V9.5zm6 2.3l4-2.3v2.7l-4 2.3v-2.7z"/></svg>
-        Kategorier
-      </div>
-      <div class="nav-item" onclick="showPanel('top',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/></svg>
-        Top produkter
-      </div>
-      <div class="nav-item" onclick="showPanel('dagedetaljer',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
-        Dage · produkter
-      </div>
-
-      <div class="nav-group-label" style="margin-top:12px;">Økonomi</div>
-      <div class="nav-item" onclick="showPanel('aar',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 14V5l6-4 6 4v9H2zm5-1h2V9H7v4zm-3 0h2v-3H4v3zm6 0h2v-3h-2v3z"/></svg>
-        Årsplan
-      </div>
-
-      <div class="nav-group-label" style="margin-top:12px;">Specialrapporter</div>
-      <div class="nav-item" onclick="showPanel('kaffe',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/></svg>
-        Kaffe
-      </div>
-      <div class="nav-item" onclick="showPanel('trend',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/></svg>
-        Trend &amp; bestilling
-      </div>
-
-      <div class="nav-group-label" style="margin-top:12px;">Indkøb</div>
-      <div class="nav-item" onclick="showPanel('bestilling',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/></svg>
-        Ugebestilling
-      </div>
-      <div class="nav-item" onclick="showPanel('svind',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/></svg>
-        Svind &amp; økonomi
-      </div>
-      <div class="nav-item" onclick="showPanel('beregner',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/></svg>
-        Bestillingsberegner
-      </div>
-      <div class="nav-item" onclick="showPanel('mobilepay',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/></svg>
-        MobilePay
-      </div>
-
-      <div class="nav-group-label" style="margin-top:12px;">Datakvalitet</div>
-      <div class="nav-item" onclick="showPanel('kostpris',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/></svg>
-        Mangler kostpris
-      </div>
-      <div class="nav-item" onclick="showPanel('stamdata',this)">
-        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
-        Varestamdata
+      <div id="nav-list"></div>
+      <div class="nav-edit-footer">
+        <button class="nav-edit-toggle" id="nav-edit-btn" onclick="_navToggleEdit()">⚙ Tilpas</button>
+        <button class="nav-reset-btn" id="nav-reset-btn" onclick="_navReset()" title="Nulstil til standard" style="display:none;">↺</button>
       </div>
     </nav>
 
@@ -1354,12 +1305,182 @@ function closeSidebar() {
   document.getElementById('sidebar-backdrop').classList.remove('open');
 }
 
+let _navCurrentId = 'forside';
 function showPanel(id, el) {
+  _navCurrentId = id;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('p-' + id).classList.add('active');
   el.classList.add('active');
   closeSidebar();
+}
+
+// ── NAV CUSTOMIZATION ─────────────────────────────────────────────────────────
+const NAV_SVG = {
+  forside:      '<path d="M2 2h5v5H2zm7 0h5v5H9zM2 9h5v5H2zm7 0h5v5H9z"/>',
+  dag:          '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.5 7.5V4h-1v5l3.5 2 .5-.87L8.5 8.5z"/>',
+  uge:          '<path d="M1 11h2v3H1zm3-4h2v7H4zm3-3h2v10H7zm3 2h2v8h-2zm3-4h2v12h-2z"/>',
+  time:         '<path d="M1 12l4-5 3 2 4-6 3 4H1z"/>',
+  kategori:     '<path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2l5 3-5 3-5-3 5-3zM3 9.5l4 2.3v2.7l-4-2.3V9.5zm6 2.3l4-2.3v2.7l-4 2.3v-2.7z"/>',
+  top:          '<path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/>',
+  dagedetaljer: '<path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/>',
+  aar:          '<path d="M2 14V5l6-4 6 4v9H2zm5-1h2V9H7v4zm-3 0h2v-3H4v3zm6 0h2v-3h-2v3z"/>',
+  kaffe:        '<path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/>',
+  trend:        '<path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/>',
+  bestilling:   '<path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/>',
+  svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
+  beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
+  mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
+  kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
+  stamdata:     '<path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/>',
+};
+const NAV_DEFAULT = [
+  {id:'forside',     label:'Forside',              group:'Overblik',         hidden:false},
+  {id:'dag',         label:'Seneste dag',           group:'Overblik',         hidden:false},
+  {id:'uge',         label:'Ugeoversigt',           group:'Analyse',          hidden:false},
+  {id:'time',        label:'Timeprofil',            group:'Analyse',          hidden:false},
+  {id:'kategori',    label:'Kategorier',            group:'Analyse',          hidden:false},
+  {id:'top',         label:'Top produkter',         group:'Analyse',          hidden:false},
+  {id:'dagedetaljer',label:'Dage · produkter', group:'Analyse',          hidden:false},
+  {id:'aar',         label:'Årsplan',           group:'Økonomi',      hidden:false},
+  {id:'kaffe',       label:'Kaffe',                 group:'Specialrapporter', hidden:false},
+  {id:'trend',       label:'Trend & bestilling',    group:'Specialrapporter', hidden:false},
+  {id:'bestilling',  label:'Ugebestilling',         group:'Indkøb',      hidden:false},
+  {id:'svind',       label:'Svind & økonomi',  group:'Indkøb',      hidden:false},
+  {id:'beregner',    label:'Bestillingsberegner',   group:'Indkøb',      hidden:false},
+  {id:'mobilepay',   label:'MobilePay',             group:'Indkøb',      hidden:false},
+  {id:'kostpris',    label:'Mangler kostpris',      group:'Datakvalitet',     hidden:false},
+  {id:'stamdata',    label:'Varestamdata',          group:'Datakvalitet',     hidden:false},
+];
+
+let _navItems = null, _navEditMode = false, _navDragIdx = null;
+
+function _navLoad() {
+  try {
+    const s = localStorage.getItem('om_nav_v1');
+    if (s) {
+      const saved = JSON.parse(s);
+      _navItems = saved.map(sv => {
+        const def = NAV_DEFAULT.find(d => d.id === sv.id);
+        return def ? { ...def, label: sv.label ?? def.label, hidden: !!sv.hidden } : null;
+      }).filter(Boolean);
+      NAV_DEFAULT.forEach(def => {
+        if (!_navItems.find(n => n.id === def.id)) _navItems.push({ ...def });
+      });
+    } else {
+      _navItems = NAV_DEFAULT.map(d => ({ ...d }));
+    }
+  } catch(e) { _navItems = NAV_DEFAULT.map(d => ({ ...d })); }
+}
+
+function _navSave() {
+  localStorage.setItem('om_nav_v1', JSON.stringify(
+    _navItems.map(n => ({ id:n.id, label:n.label, hidden:n.hidden }))
+  ));
+}
+
+function _navReset() {
+  if (!confirm('Nulstil sidepanel til standard?')) return;
+  localStorage.removeItem('om_nav_v1');
+  _navLoad();
+  _navSave();
+  _buildNav();
+}
+
+function _buildNav() {
+  const container = document.getElementById('nav-list');
+  if (!container) return;
+  const btn = document.getElementById('nav-edit-btn');
+  const resetBtn = document.getElementById('nav-reset-btn');
+  if (btn) btn.classList.toggle('on', _navEditMode);
+  if (resetBtn) resetBtn.style.display = _navEditMode ? '' : 'none';
+
+  if (_navEditMode) {
+    container.innerHTML = _navItems.map((item, i) => `
+      <div class="nav-edit-item${item.hidden ? ' nav-ei-hidden' : ''}"
+           data-idx="${i}" draggable="true"
+           ondragstart="_navDragStart(event,${i})"
+           ondragover="event.preventDefault();_navDragHover(event,${i})"
+           ondragleave="if(!this.contains(event.relatedTarget))this.classList.remove('drag-over')"
+           ondrop="_navDrop(event,${i})"
+           ondragend="_navDragEnd()">
+        <span class="nav-drag" title="Træk for at flytte">⠿</span>
+        <button class="nav-vis" onclick="_navToggleVis(${i})" title="${item.hidden?'Vis':'Skjul'}">${item.hidden?'○':'●'}</button>
+        <span class="nav-edit-lbl" ondblclick="_navStartRename(this,${i})" title="Dobbeltklik for at omdøbe">${item.label}</span>
+        <span class="nav-grp-chip">${item.group}</span>
+      </div>`).join('');
+  } else {
+    let html = '', lastGroup = null;
+    _navItems.filter(n => !n.hidden).forEach(item => {
+      if (item.group !== lastGroup) {
+        html += `<div class="nav-group-label" style="margin-top:${lastGroup?'12':'0'}px;">${item.group}</div>`;
+        lastGroup = item.group;
+      }
+      const active = _navCurrentId === item.id ? ' active' : '';
+      html += `<div class="nav-item${active}" onclick="showPanel('${item.id}',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor">${NAV_SVG[item.id]||''}</svg>${item.label}
+      </div>`;
+    });
+    container.innerHTML = html;
+  }
+}
+
+function _navToggleEdit() {
+  _navEditMode = !_navEditMode;
+  _buildNav();
+}
+
+function _navToggleVis(i) {
+  _navItems[i].hidden = !_navItems[i].hidden;
+  _navSave(); _buildNav();
+}
+
+function _navStartRename(el, i) {
+  const orig = _navItems[i].label;
+  const inp = document.createElement('input');
+  inp.className = 'nav-rename-inp';
+  inp.value = orig;
+  el.replaceWith(inp);
+  inp.focus(); inp.select();
+  const commit = () => {
+    const val = inp.value.trim() || orig;
+    _navItems[i].label = val;
+    _navSave(); _buildNav();
+  };
+  inp.addEventListener('blur', commit);
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+    if (e.key === 'Escape') { inp.value = orig; inp.blur(); }
+  });
+}
+
+function _navDragStart(e, i) {
+  _navDragIdx = i;
+  e.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => {
+    const el = document.querySelector(`.nav-edit-item[data-idx="${i}"]`);
+    if (el) el.style.opacity = '.35';
+  }, 0);
+}
+function _navDragHover(e, i) {
+  if (i === _navDragIdx) return;
+  document.querySelectorAll('.nav-edit-item').forEach(el => el.classList.remove('drag-over'));
+  const el = document.querySelector(`.nav-edit-item[data-idx="${i}"]`);
+  if (el) el.classList.add('drag-over');
+}
+function _navDrop(e, targetIdx) {
+  e.preventDefault();
+  if (_navDragIdx === null || _navDragIdx === targetIdx) return;
+  const moved = _navItems.splice(_navDragIdx, 1)[0];
+  _navItems.splice(targetIdx > _navDragIdx ? targetIdx : targetIdx, 0, moved);
+  _navDragIdx = null;
+  _navSave(); _buildNav();
+}
+function _navDragEnd() {
+  _navDragIdx = null;
+  document.querySelectorAll('.nav-edit-item').forEach(el => {
+    el.style.opacity = ''; el.classList.remove('drag-over');
+  });
 }
 
 let VALGT_AAR = new Date().getFullYear();
@@ -3741,6 +3862,7 @@ async function stamGemNy() {
   loadStamdata();
 }
 
+_navLoad(); _buildNav();
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);
 </script>

@@ -1821,11 +1821,12 @@ function renderTop(top, n) {
     const dbColor  = katDbPct>=35?'#2d5a2d':katDbPct>=28?'#7a5c00':'#9b3420';
     const dbBg     = katDbPct>=35?'rgba(74,124,74,.1)':katDbPct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
     const gid = 'topg'+ki;
+    // Brug klasse på <tr> i stedet for indlejret <tbody> (invalid HTML → virker ikke)
     const prodRows = prods.map(r => {
       rowNum++;
       const dc = r.db_pct>=35?'#2d5a2d':r.db_pct>=28?'#7a5c00':'#9b3420';
       const db = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
-      return `<tr style="background:rgba(30,58,30,.015);">
+      return `<tr class="tg-${gid}" style="display:none;background:rgba(30,58,30,.015);">
         <td style="color:var(--ash);${mono}font-size:11px;padding-left:28px;">${rowNum}</td>
         <td style="font-size:13px;padding-left:28px;color:var(--charcoal);">${r.varenavn}</td>
         <td class="num" style="font-size:13px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
@@ -1843,16 +1844,15 @@ function renderTop(top, n) {
       <td class="num" style="${mono}font-size:12px;">${katDbKr>0?Math.round(katDbKr).toLocaleString('da-DK')+' kr':'—'}</td>
       <td class="num" style="font-size:13px;">${Math.round(katAntal).toLocaleString('da-DK')} stk</td>
       <td class="num"><span style="${mono}font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${katDbPct.toFixed(1)}%</span></td>
-    </tr>
-    <tbody id="${gid}" style="display:none;">${prodRows}</tbody>`;
+    </tr>${prodRows}`;
   }).join('');
 }
 
 function topToggle(gid, hdr) {
-  const grp  = document.getElementById(gid);
+  const rows = document.querySelectorAll('.tg-' + gid);
   const arr  = hdr.querySelector('td:first-child');
-  const open = grp.style.display === 'none';
-  grp.style.display = open ? '' : 'none';
+  const open = rows.length > 0 && rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = open ? '' : 'none');
   if (arr) arr.textContent = open ? '▼' : '▶';
 }
 
@@ -2481,11 +2481,12 @@ function renderTrendTabel(prod, filter) {
     const pill       = katDbPct!=null ? (katDbPct>=35?'pill-g':katDbPct>=28?'pill-a':'pill-r') : '';
     const gid = 'trendg'+ki;
 
+    // Brug klasse på <tr> i stedet for indlejret <tbody> (invalid HTML → virker ikke)
     const prodRows = prods.map(r => {
       const p2    = r.pct != null ? (r.pct>=0?'+':'')+r.pct.toFixed(1)+'%' : '—';
       const p2cls = r.pct == null ? '' : (r.pct>=0?'color:#2d5a2d;':'color:#9b3420;');
       const pill2 = r.db_pct>=35?'pill-g':r.db_pct>=28?'pill-a':r.db_pct!=null?'pill-r':'';
-      return `<tr style="background:rgba(30,58,30,.015);">
+      return `<tr class="trg-${gid}" style="display:none;background:rgba(30,58,30,.015);">
         <td style="padding-left:28px;font-size:12px;">${r.varenavn}</td>
         <td style="font-size:11px;color:var(--ash);"></td>
         <td class="num" style="${mono}font-size:12px;">${Math.round(r.ny_snit)}</td>
@@ -2506,16 +2507,15 @@ function renderTrendTabel(prod, filter) {
       <td class="num" style="${pctCls}${mono}font-size:12px;font-weight:500;">${pctTxt}</td>
       <td class="num">${katDbPct!=null?'<span class="pill '+pill+'">'+katDbPct.toFixed(1)+'%</span>':'—'}</td>
       <td></td>
-    </tr>
-    <tbody id="${gid}" style="display:none;">${prodRows}</tbody>`;
+    </tr>${prodRows}`;
   }).join('');
 }
 
 function trendToggle(gid, hdr) {
-  const grp  = document.getElementById(gid);
+  const rows = document.querySelectorAll('.trg-' + gid);
   const arr  = hdr.querySelector('.tarr');
-  const open = grp.style.display === 'none';
-  grp.style.display = open ? '' : 'none';
+  const open = rows.length > 0 && rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = open ? '' : 'none');
   if (arr) arr.textContent = open ? '▼' : '▶';
 }
 

@@ -510,6 +510,12 @@ async def stamdata_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/aarsplan/vf-detaljer")
+async def api_vf_detaljer(request: Request, aar: int, maaned: int):
+    _require_auth(request)
+    return database.hent_vf_detaljer(aar, maaned)
+
+
 @app.get("/api/faste-omk")
 async def api_faste_omk(request: Request, aar: int):
     _require_auth(request)

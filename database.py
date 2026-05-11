@@ -1558,6 +1558,67 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     }
 
 
+# ── VF DRILL-DOWN ─────────────────────────────────────────────────────────────
+
+def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
+    """Ugevis bageri-faktura + kategori-niveau andet VF for en enkelt måned."""
+    from datetime import date as _date, timedelta as _td
+    with _conn() as conn:
+        # Hvilke ISO-uger falder (overvejende) i denne måned?
+        # Vi bruger uger hvor mandag ligger i måneden.
+        first = _date(aar, maaned, 1)
+        last  = _date(aar, maaned + 1, 1) - _td(days=1) if maaned < 12 else _date(aar, 12, 31)
+
+        # Find alle ISO-uger hvor mindst én dag er i måneden
+        uger_i_maaned = set()
+        dag = first
+        while dag <= last:
+            uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
+            dag += _td(days=7)
+        # Inkludér ugen for første dag og sidste dag
+        uger_i_maaned.add(first.isocalendar()[:2])
+        uger_i_maaned.add(last.isocalendar()[:2])
+
+        # Hent bager_regnskab for disse uger
+        bager_rækker = []
+        for (y, w) in sorted(uger_i_maaned):
+            row = conn.execute("""
+                SELECT b.uge, b.aar, b.faktura, b.retur_ialt,
+                       COALESCE(u.bestilt_kr, 0) AS bestilt_kr
+                FROM bager_regnskab b
+                LEFT JOIN (
+                    SELECT uge, aar, ROUND(SUM(total_pris),2) AS bestilt_kr
+                    FROM ugebestillinger GROUP BY uge, aar
+                ) u ON u.uge = b.uge AND u.aar = b.aar
+                WHERE b.uge=? AND b.aar=?
+            """, (w, y)).fetchone()
+            if row and (row["faktura"] or 0) > 0:
+                bager_rækker.append(dict(row))
+
+        # Andet VF per kategori for måneden (Shopbox kostpris, non-bager)
+        andet_rows = conn.execute("""
+            SELECT
+                CASE WHEN kategori != '' THEN kategori ELSE 'Øvrige' END AS kategori,
+                ROUND(SUM(kostpris), 0) AS vf
+            FROM transaktioner
+            WHERE strftime('%Y', dato) = ?
+              AND CAST(strftime('%m', dato) AS INTEGER) = ?
+              AND CAST(CAST(varenummer AS REAL) AS INTEGER) NOT IN (
+                  SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                  FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+              )
+            GROUP BY kategori
+            ORDER BY vf DESC
+        """, (str(aar), maaned)).fetchall()
+
+    return {
+        "aar":        aar,
+        "maaned":     maaned,
+        "bager_vf":   bager_rækker,
+        "andet_vf":   [dict(r) for r in andet_rows],
+    }
+
+
 # ── FASTE OMKOSTNINGER ────────────────────────────────────────────────────────
 
 def hent_faste_omk(aar: int) -> List[Dict]:

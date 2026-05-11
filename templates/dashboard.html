@@ -2146,22 +2146,56 @@ async function fasteOmkSlet(aar, kategori, btn) {
 }
 
 async function fasteOmkTilfoej() {
-  const inp = document.getElementById('faste-omk-ny-kat');
-  const kat = inp.value.trim();
-  if (!kat || !_aarRaw) return;
-  const aar = _aarRaw.aar;
-  // Tjek duplikat
-  if (_fasteOmkData.some(r => r.aar===aar && r.kategori===kat)) {
-    inp.style.borderColor = 'var(--danger)';
-    setTimeout(()=>inp.style.borderColor='', 1500);
+  const inp    = document.getElementById('faste-omk-ny-kat');
+  const status = document.getElementById('faste-omk-status');
+  const kat    = inp.value.trim();
+
+  if (!kat) {
+    status.textContent = '⚠ Skriv et kategori-navn';
+    status.style.color = 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 2000);
     return;
   }
-  // Initialiser alle 12 måneder med 0 så kategorien vises straks
-  const res = await _post('/api/faste-omk/gem', {aar, maaned:1, kategori:kat, beloeb:0});
-  if (res) {
-    for (let m = 1; m <= 12; m++) _fasteOmkData.push({aar, maaned:m, kategori:kat, beloeb:0});
+  if (!_aarRaw) {
+    status.textContent = '⚠ Årsdata ikke indlæst – gå til Årsplan først';
+    status.style.color = 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 3000);
+    return;
+  }
+
+  const aar = _aarRaw.aar;
+
+  // Tjek duplikat
+  if (_fasteOmkData.some(r => r.aar === aar && r.kategori === kat)) {
+    status.textContent = '⚠ Kategorien findes allerede';
+    status.style.color = 'var(--danger)';
+    inp.style.borderColor = 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; inp.style.borderColor = ''; }, 2000);
+    return;
+  }
+
+  status.textContent = 'Gemmer…';
+  status.style.color = 'var(--ash)';
+
+  // Gem alle 12 måneder til DB med beloeb=0
+  let ok = true;
+  for (let m = 1; m <= 12; m++) {
+    const res = await _post('/api/faste-omk/gem', {aar, maaned: m, kategori: kat, beloeb: 0});
+    if (!res) { ok = false; break; }
+  }
+
+  if (ok) {
+    for (let m = 1; m <= 12; m++) _fasteOmkData.push({aar, maaned: m, kategori: kat, beloeb: 0});
     inp.value = '';
+    status.textContent = '✓ Tilføjet';
+    status.style.color = 'var(--forest)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 2000);
     buildFasteOmkTbl();
+    buildAar();
+  } else {
+    status.textContent = '✗ Fejl — kunne ikke gemme (tjek konsol)';
+    status.style.color = 'var(--danger)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 4000);
   }
 }
 

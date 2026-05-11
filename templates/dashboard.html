@@ -2158,6 +2158,11 @@ function buildAar() {
   const faktisk = {};
   d.maaneder.forEach(m => faktisk[m.maaned] = m);
 
+  // Opslag-maps for VF og MobilePay
+  const fmStr = d.faktura_maaned  || {};  // bageri VF
+  const vfStr = d.vf_ikke_bager   || {};  // andet VF
+  const mpStr = d.mp_netto_maaned || {};  // MobilePay netto (ex-moms)
+
   // Byg DB-baseret faste omk. sum per måned: {maaned: sum}
   const dbFasteSum = {};
   _fasteOmkData.forEach(r => {
@@ -2167,17 +2172,27 @@ function buildAar() {
 
   const maaneder = Array.from({length:12}, (_,i) => {
     const m = i+1, dage = mndDage(aar, m);
-    // Faste omk: DB-sum hvis tilgængelig, ellers c.faste
     const faste = harDBFaste ? (dbFasteSum[m] || 0) : c.faste;
     if (faktisk[m]) {
-      const f = faktisk[m];
+      const f       = faktisk[m];
+      const bagerVF = fmStr[m] || 0;
+      const andetVF = vfStr[m] || 0;
+      const vfTot   = bagerVF + andetVF;
+      const mpNetto = mpStr[m] || 0;
+      // Netto omsætning = Shopbox ex-moms + MobilePay netto
+      const netto   = Math.round(f.omsaetning / 1.25 + mpNetto);
+      // DB = Netto omsætning − VF i alt
+      const db_kr   = Math.round(netto - vfTot);
+      const gpm     = netto > 0 ? db_kr / netto * 100 : 0;
       return { m, dage, faktDage:f.faktiske_dage, type:'faktisk',
-               omsat:f.omsaetning, kost:f.kostpris, avance:f.avance, gpm:f.gpm,
-               faste, res:Math.round(f.avance - faste) };
+               omsat:f.omsaetning, netto, bagerVF, andetVF, vfTot,
+               avance:db_kr, gpm, faste, res:Math.round(db_kr - faste) };
     }
     const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
     const avance = Math.round(omsat * c.gpm / 100);
-    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, kost:omsat-avance,
+    const netto  = Math.round(omsat / 1.25);
+    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, netto,
+             bagerVF:null, andetVF:null, vfTot:null,
              avance, gpm:c.gpm, faste, res:avance - faste };
   });
 
@@ -2186,10 +2201,17 @@ function buildAar() {
   const totRes    = maaneder.reduce((s,r) => s+r.res, 0);
   const fMaaneder = maaneder.filter(r => r.type==='faktisk');
   const ytdOmsat  = fMaaneder.reduce((s,r) => s+r.omsat, 0);
+  const ytdNetto  = fMaaneder.reduce((s,r) => s+(r.netto||0), 0);
   const ytdRes    = fMaaneder.reduce((s,r) => s+r.res, 0);
   const ytdAvance = fMaaneder.reduce((s,r) => s+r.avance, 0);
-  const faktGPM   = ytdOmsat > 0 ? ytdAvance/ytdOmsat*100 : null;
-  const breakEven = c.gpm > 0 ? Math.round(c.faste / (c.gpm/100)) : 0;
+  // GPM = DB / Netto omsætning (netto er ex-moms inkl. MP)
+  const faktGPM   = ytdNetto > 0 ? ytdAvance / ytdNetto * 100 : null;
+  // Break-even baseret på gennemsnitlig GPM og gennemsnitlig faste omk
+  const snit_faste = harDBFaste
+    ? Object.values(dbFasteSum).reduce((s,v)=>s+v,0) / Math.max(1, Object.keys(dbFasteSum).length)
+    : c.faste;
+  const gpmEst    = faktGPM ?? c.gpm;
+  const breakEven = gpmEst > 0 ? Math.round(snit_faste / (gpmEst/100)) : 0;
   const yearPct   = totOmsat > 0 ? Math.round(ytdOmsat/totOmsat*100) : 0;
   const expYTD    = fMaaneder.length > 0 ? maaneder.slice(0, fMaaneder.length).reduce((s,r) => s+r.omsat, 0) : 0;
   const tempo     = expYTD > 0 ? Math.round(ytdOmsat/expYTD*100) : null;
@@ -2343,22 +2365,21 @@ function buildAar() {
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
       plugins:{ tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
-  // ── Tabel ──────────────────────────────────────────────────────────────────
-  const fmStr = d.faktura_maaned   || {};
-  const vfStr = d.vf_ikke_bager   || {};
-  const tblRows = [];
-  maaneder.forEach(r => {
-    const bagerVF = r.type==='faktisk' ? (fmStr[r.m] || 0)  : null;
-    const andetVF = r.type==='faktisk' ? (vfStr[r.m] || 0)  : null;
-    const vfTot   = (bagerVF != null && andetVF != null) ? bagerVF + andetVF : null;
-    const netto   = r.type==='faktisk' ? r.omsat / 1.25 : null;
-    tblRows.push({
-      label:AAR_MND_NAVNE[r.m-1], type:r.type,
-      isIndev: aar===thisYear && r.m===thisMonth,
-      omsat:r.omsat, netto, bagerVF, andetVF, vfTot,
-      avance:r.avance, gpm:r.gpm, faste:r.faste, res:r.res,
-    });
-  });
+  // ── Tabel ── alle felter allerede beregnet i maaneder-array ──────────────
+  const tblRows = maaneder.map(r => ({
+    label:   AAR_MND_NAVNE[r.m-1],
+    type:    r.type,
+    isIndev: aar===thisYear && r.m===thisMonth,
+    omsat:   r.omsat,
+    netto:   r.type==='faktisk' ? r.netto  : null,
+    bagerVF: r.type==='faktisk' ? r.bagerVF : null,
+    andetVF: r.type==='faktisk' ? r.andetVF : null,
+    vfTot:   r.type==='faktisk' ? r.vfTot   : null,
+    avance:  r.avance,
+    gpm:     r.gpm,
+    faste:   r.faste,
+    res:     r.res,
+  }));
 
   document.getElementById('aar2-tbl-lbl').textContent = `Resultatopgørelse — Jan–Dec ${aar}`;
 

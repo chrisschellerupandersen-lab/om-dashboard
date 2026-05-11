@@ -224,6 +224,18 @@ def hent_kpi(aar: int = None) -> Dict:
             )
         """).fetchone()
 
+        # Dagssnit: gennemsnit af dagstotaler over seneste 28 dage med data
+        dag_snit_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
+        dag_snit_row = conn.execute(f"""
+            SELECT AVG(dag_total) AS snit_dag FROM (
+                SELECT SUM(omsætning) AS dag_total
+                FROM transaktioner
+                WHERE 1=1 {dag_snit_extra}
+                GROUP BY dato
+                ORDER BY dato DESC LIMIT 28
+            )
+        """).fetchone()
+
         # Forrige uge med data (til uge-over-uge DB-sammenligning)
         prev_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
         prev_uge_row = conn.execute(f"""
@@ -245,7 +257,8 @@ def hent_kpi(aar: int = None) -> Dict:
         "dag":      dict(dag)          if dag          else None,
         "uge":      dict(uge)          if uge          else None,
         "prev_uge": dict(prev_uge_row) if prev_uge_row else None,
-        "snit_uge": snit_row["snit_uge"] if snit_row   else None,
+        "snit_uge": snit_row["snit_uge"]         if snit_row     else None,
+        "snit_dag": dag_snit_row["snit_dag"]     if dag_snit_row else None,
     }
 
 

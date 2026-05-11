@@ -631,9 +631,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="dag-db-pct">—</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">vs. ugesnit</div>
+            <div class="kpi-l">vs. dagssnit</div>
             <div class="kpi-v" id="dag-vs-snit">—</div>
-            <div class="kpi-s" id="dag-vs-sub">pr. dag</div>
+            <div class="kpi-s" id="dag-vs-sub">snit 28 dage</div>
           </div>
         </div>
         <div class="card">
@@ -1421,10 +1421,10 @@ function buildForside(kpi, dage, uger, idag) {
     // ── Dag-kasser ────────────────────────────────────────────────────────
     document.getElementById('kpi-dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
 
-    if (kpi.snit_uge && dag.omsaetning) {
-      const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
+    if (kpi.snit_dag && dag.omsaetning) {
+      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
       const el = document.getElementById('kpi-dag-vs');
-      el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. dagsnit';
+      el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. dagssnit';
       el.className = 'kpi-s ' + (pct >= 0 ? 'up' : 'dn');
     }
     if (dag.transak > 0 && dag.omsaetning > 0) {
@@ -1570,11 +1570,13 @@ function buildDag(kpi, timer) {
       const kurv = Math.round(dag.omsaetning / dag.transak);
       document.getElementById('dag-snit-kurv').textContent = kurv + ' kr/kurv';
     }
-    if (kpi.snit_uge && dag.omsaetning) {
-      const pct = ((dag.omsaetning / (kpi.snit_uge / 5)) - 1) * 100;
-      const el = document.getElementById('dag-vs-snit');
+    if (kpi.snit_dag && dag.omsaetning) {
+      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
+      const el  = document.getElementById('dag-vs-snit');
       el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
       el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+      document.getElementById('dag-vs-sub').textContent =
+        'snit ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
     }
   }
 

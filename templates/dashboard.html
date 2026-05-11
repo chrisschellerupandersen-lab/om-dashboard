@@ -865,12 +865,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <div class="aar-note" id="aar-note"></div>
 
-          <!-- Faktisk resultatopgørelse -->
-          <div class="aar2-tbl-wrap" style="margin-top:20px;" id="aar-faktisk-wrap">
-            <div class="aar2-tbl-hdr">
-              <span class="aar2-tbl-hdr-l">Faktisk resultatopgørelse — baseret på bagerfakturaer</span>
-              <span class="aar2-tbl-hdr-r" style="font-size:10px;">Netto omsat − faktisk indkøb (faktura) − faste omk.</span>
-            </div>
+          <!-- Faktisk resultatopgørelse fjernet -->
+          <div style="display:none;" id="aar-faktisk-wrap">
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Måned</th>
@@ -2436,8 +2432,6 @@ function buildAar() {
   document.getElementById('aar-note').textContent =
     `ok = faktiske tal · * = estimat: ${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst · GPM ${c.gpm}% · Faste omk. ${dk(c.faste)} kr/mdr · Resultat = DB − faste omk.`;
 
-  // ── Faktisk resultatopgørelse ─────────────────────────────────────────────
-  buildAarFaktisk(d, c);
 }
 
 function buildAarFaktisk(d, c) {

@@ -95,6 +95,15 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .daglist .dl-stk{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;}
 .daglist .dl-kr{font-family:'DM Mono',monospace;font-size:12px;color:var(--forest);white-space:nowrap;margin-left:auto;}
 .daglist .dl-db{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;min-width:36px;text-align:right;}
+/* Kategori-grupperinger */
+.daglist .dl-kat{display:flex;align-items:center;gap:8px;padding:8px 0 5px;border-bottom:1px solid rgba(30,58,30,.12);cursor:pointer;user-select:none;}
+.daglist .dl-kat-navn{flex:1;font-size:12px;font-weight:500;color:var(--forest);letter-spacing:.01em;}
+.daglist .dl-kat-arrow{font-size:9px;color:var(--ash);width:12px;flex-shrink:0;transition:transform .15s;}
+.daglist .dl-kat-arrow.open{transform:rotate(90deg);}
+.daglist .dl-kat:hover .dl-kat-navn{color:var(--moss);}
+.daglist .dl-prod-group{list-style:none;padding:0;margin:0;overflow:hidden;}
+.daglist .dl-prod-group li{padding-left:20px;border-bottom:1px solid rgba(30,58,30,.04);}
+.daglist .dl-prod-group li:last-child{border-bottom:none;}
 .kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
 .kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
 .kpi-v{font-size:28px;font-weight:300;color:var(--forest);line-height:1;}
@@ -1350,6 +1359,14 @@ async function api(path, opts) {
 }
 
 function kr(v) { return Math.round(v).toLocaleString('da-DK') + ' kr'; }
+
+function dlToggle(gid, hdr) {
+  const grp = document.getElementById(gid);
+  const arr = hdr.querySelector('.dl-kat-arrow');
+  const open = grp.style.display === 'none';
+  grp.style.display = open ? 'block' : 'none';
+  if (arr) arr.classList.toggle('open', open);
+}
 function fmtDato(iso) {
   if (!iso) return '—';
   const [,m,d] = iso.split('-');
@@ -1476,16 +1493,45 @@ function buildForside(kpi, dage, uger, idag) {
     document.getElementById('daglist-sub').textContent =
       kr(totalOmsat) + (kunder ? '  ·  ' + kunder + ' kunder' : '') + (kurv ? '  ·  ' + kurv + ' kr/kurv' : '');
 
+    // Gruppér produkter efter kategori
     const ul = document.getElementById('daglist-ul');
-    ul.innerHTML = idag.produkter.map(p => `
-      <li>
-        <span class="dl-navn">${p.varenavn}</span>
-        <span class="dl-stk">${p.antal} stk</span>
-        <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
-        <span class="dl-db" style="color:var(--ash);">${p.vareforbrug > 0 ? 'VF ' + Math.round(p.vareforbrug).toLocaleString('da-DK') : ''}</span>
-        <span class="dl-db" style="color:${p.db_kr >= 0 ? 'var(--forest)' : 'var(--danger)'};">${p.db_kr != null ? 'DB ' + Math.round(p.db_kr).toLocaleString('da-DK') : ''}</span>
-        <span class="dl-db" style="color:${p.db_pct >= 0 ? '' : 'var(--danger)'};">${p.db_pct != null ? p.db_pct.toFixed(0) + '%' : ''}</span>
-      </li>`).join('');
+    const katMap = {};
+    idag.produkter.forEach(p => {
+      const k = p.kategori || 'Øvrige';
+      if (!katMap[k]) katMap[k] = [];
+      katMap[k].push(p);
+    });
+    // Sorter kategorier efter samlet omsætning (høj→lav)
+    const katSorted = Object.entries(katMap).sort(
+      ([,a],[,b]) => b.reduce((s,p)=>s+(p.omsaetning||0),0) - a.reduce((s,p)=>s+(p.omsaetning||0),0)
+    );
+    ul.innerHTML = katSorted.map(([kat, prods], ki) => {
+      const katOmsat  = prods.reduce((s,p) => s+(p.omsaetning||0), 0);
+      const katAntal  = prods.reduce((s,p) => s+(p.antal||0), 0);
+      const katDbKr   = prods.reduce((s,p) => s+(p.db_kr||0), 0);
+      const katDbPct  = katOmsat > 0 ? (katDbKr * 1.25 / katOmsat * 100) : 0;
+      const dbCol     = katDbPct >= 0 ? 'var(--forest)' : 'var(--danger)';
+      const gid       = 'dlg' + ki;
+      return `<li style="display:block;padding:0;border-bottom:1px solid rgba(30,58,30,.1);">
+        <div class="dl-kat" onclick="dlToggle('${gid}',this)">
+          <span class="dl-kat-arrow">▶</span>
+          <span class="dl-kat-navn">${kat}</span>
+          <span class="dl-stk">${Math.round(katAntal)} stk</span>
+          <span class="dl-kr">${Math.round(katOmsat).toLocaleString('da-DK')} kr</span>
+          <span class="dl-db" style="color:${dbCol};font-family:'DM Mono',monospace;font-size:11px;font-weight:500;">DB ${katDbPct.toFixed(0)}%</span>
+        </div>
+        <ul class="dl-prod-group" id="${gid}" style="display:none;">${
+          prods.map(p => `<li>
+            <span class="dl-navn" style="font-size:12px;">${p.varenavn}</span>
+            <span class="dl-stk">${p.antal} stk</span>
+            <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+            <span class="dl-db" style="color:var(--ash);">${p.vareforbrug>0?'VF '+Math.round(p.vareforbrug):''}</span>
+            <span class="dl-db" style="color:${(p.db_kr||0)>=0?'var(--forest)':'var(--danger)'};">${p.db_kr!=null?'DB '+Math.round(p.db_kr):''}</span>
+            <span class="dl-db" style="color:${(p.db_pct||0)>=0?'var(--ash)':'var(--danger)'};">${p.db_pct!=null?p.db_pct.toFixed(0)+'%':''}</span>
+          </li>`).join('')
+        }</ul>
+      </li>`;
+    }).join('');
   }
 
   // ── Grafer ────────────────────────────────────────────────────────────

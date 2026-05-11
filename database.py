@@ -261,6 +261,7 @@ def hent_dag_produkter(aar: int = None) -> Dict:
             return {"dato": None, "produkter": []}
         rows = conn.execute("""
             SELECT varenavn,
+                   MAX(kategori)            AS kategori,
                    ROUND(SUM(antal), 0)     AS antal,
                    ROUND(SUM(omsætning), 0) AS omsaetning,
                    ROUND(SUM(kostpris), 0)  AS vareforbrug,

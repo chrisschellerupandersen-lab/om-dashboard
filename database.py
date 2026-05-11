@@ -484,12 +484,39 @@ def hent_kategorier(aar: int = None) -> List[Dict]:
         params = (str(aar),) if aar else ()
         rows = conn.execute(f"""
             SELECT kategori, ROUND(SUM(omsætning), 2) AS omsaetning,
+                   ROUND(SUM(avance), 2) AS db_kr,
                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
             WHERE kategori != '' {extra}
             GROUP BY kategori
             ORDER BY omsaetning DESC
         """, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_kategorier_uge(aar: int = None) -> List[Dict]:
+    """DB per kategori for indeværende uge (seneste dato)."""
+    with _conn() as conn:
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
+        seneste_dato = conn.execute(
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
+        ).fetchone()[0]
+        if not seneste_dato:
+            return []
+        yw = conn.execute(
+            "SELECT strftime('%Y-%W', ?)", (seneste_dato,)
+        ).fetchone()[0]
+        rows = conn.execute("""
+            SELECT kategori,
+                   ROUND(SUM(omsætning), 2)                                    AS omsaetning,
+                   ROUND(SUM(avance), 2)                                        AS db_kr,
+                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)     AS db_pct
+            FROM transaktioner
+            WHERE kategori != '' AND strftime('%Y-%W', dato) = ?
+            GROUP BY kategori
+            ORDER BY db_kr DESC
+        """, (yw,)).fetchall()
     return [dict(r) for r in rows]
 
 

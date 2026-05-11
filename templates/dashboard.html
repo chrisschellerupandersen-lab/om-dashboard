@@ -613,6 +613,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
           </div>
         </div>
+        <!-- DB per kategori · indeværende uge -->
+        <div class="card" style="margin-top:14px;">
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">DB · indeværende uge per kategori</span>
+            <span class="aar2-chart-sub" id="forside-kat-sub"></span>
+          </div>
+          <div id="forside-kat-tbl" style="margin-top:8px;"></div>
+        </div>
       </div>
 
       <!-- SENESTE DAG -->
@@ -1415,7 +1423,7 @@ function mk(id, type, labels, datasets, extra={}) {
 
 async function loadAll() {
   const a = VALGT_AAR;
-  const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top] = await Promise.all([
+  const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top, katUge] = await Promise.all([
     api(`/api/kpi?aar=${a}`),
     api(`/api/salg/dage?n=30&aar=${a}`),
     api(`/api/salg/uger?aar=${a}`),
@@ -1424,9 +1432,10 @@ async function loadAll() {
     api(`/api/salg/timer/snit?aar=${a}`),
     api(`/api/salg/kategorier?aar=${a}`),
     api(`/api/salg/top?n=20&aar=${a}`),
+    api(`/api/salg/kategorier/uge?aar=${a}`),
   ]);
 
-  buildForside(kpi, dage, uger, idag);
+  buildForside(kpi, dage, uger, idag, katUge);
   buildDag(kpi, timer);
   buildUge(uger);
   buildTime(timerSnit);
@@ -1441,7 +1450,7 @@ function setSyncNow() {
   document.getElementById('tb-sync').textContent = '● Opdateret ' + t;
 }
 
-function buildForside(kpi, dage, uger, idag) {
+function buildForside(kpi, dage, uger, idag, katUge) {
   if (kpi) {
     const dag      = kpi.dag      || {};
     const uge      = kpi.uge      || {};
@@ -1630,6 +1639,59 @@ function buildForside(kpi, dage, uger, idag) {
     mk('c-db','line', uger.map(r => `U${r.uge}`),
       [{ data: uger.map(r => r.db_pct), borderColor: G, backgroundColor: GL, fill:true, tension:0.3, pointRadius:3, pointBackgroundColor:G }],
       { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:10 }, callback: v => v+'%' }}}});
+  }
+
+  // ── DB per kategori · indeværende uge ─────────────────────────────────
+  if (katUge && katUge.length) {
+    const mono  = "font-family:'DM Mono',monospace;";
+    const totDB = katUge.reduce((s, r) => s + (r.db_kr || 0), 0);
+    const totOM = katUge.reduce((s, r) => s + (r.omsaetning || 0), 0);
+    const totPct = totOM > 0 ? (totDB * 1.25 / totOM * 100).toFixed(1) : '—';
+
+    document.getElementById('forside-kat-sub').textContent =
+      'Total DB: ' + Math.round(totDB).toLocaleString('da-DK') + ' kr  ·  ' + totPct + '%';
+
+    // Max db_kr til progress-bar
+    const maxDB = Math.max(...katUge.map(r => r.db_kr || 0), 1);
+
+    document.getElementById('forside-kat-tbl').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+            <th style="text-align:left;padding:4px 8px;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">KATEGORI</th>
+            <th style="text-align:right;padding:4px 8px;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">OMSÆTNING</th>
+            <th style="text-align:right;padding:4px 8px;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">DB KR</th>
+            <th style="text-align:right;padding:4px 8px;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">DB%</th>
+            <th style="padding:4px 8px;width:120px;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${katUge.map(r => {
+            const barW = Math.round((r.db_kr || 0) / maxDB * 100);
+            const barCol = (r.db_pct || 0) >= 35 ? 'var(--forest)' : (r.db_pct || 0) >= 25 ? 'var(--moss)' : 'var(--danger)';
+            return `<tr style="border-bottom:1px solid rgba(30,58,30,.05);">
+              <td style="padding:5px 8px;font-size:13px;">${r.kategori}</td>
+              <td style="padding:5px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${Math.round(r.omsaetning).toLocaleString('da-DK')}</td>
+              <td style="padding:5px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${Math.round(r.db_kr).toLocaleString('da-DK')}</td>
+              <td style="padding:5px 8px;text-align:right;${mono}font-size:12px;">${(r.db_pct||0).toFixed(1)}%</td>
+              <td style="padding:5px 8px;">
+                <div style="background:rgba(30,58,30,.08);border-radius:2px;height:6px;">
+                  <div style="background:${barCol};width:${barW}%;height:6px;border-radius:2px;"></div>
+                </div>
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
+            <td style="padding:6px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
+            <td style="padding:6px 8px;text-align:right;${mono}font-size:12px;font-weight:500;">${Math.round(totOM).toLocaleString('da-DK')}</td>
+            <td style="padding:6px 8px;text-align:right;${mono}font-size:13px;font-weight:700;color:var(--forest);">${Math.round(totDB).toLocaleString('da-DK')}</td>
+            <td style="padding:6px 8px;text-align:right;${mono}font-size:12px;font-weight:600;">${totPct}%</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>`;
   }
 }
 

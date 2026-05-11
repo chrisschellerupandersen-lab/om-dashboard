@@ -145,6 +145,12 @@ async def api_kategorier(request: Request, aar: Optional[int] = None):
     return database.hent_kategorier(aar)
 
 
+@app.get("/api/salg/kategorier/uge")
+async def api_kategorier_uge(request: Request, aar: Optional[int] = None):
+    _kræv_login(request)
+    return database.hent_kategorier_uge(aar)
+
+
 @app.get("/api/salg/top")
 async def api_top(request: Request, n: int = 20, aar: Optional[int] = None):
     _kræv_login(request)

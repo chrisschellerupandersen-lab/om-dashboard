@@ -1583,8 +1583,28 @@ function buildForside(kpi, dage, uger, idag) {
 
   // ── Grafer ────────────────────────────────────────────────────────────
   if (dage && dage.length) {
+    // Per-bar farve: grøn = bedre end samme dag -7 dage, rød = dårligere, grå = ingen data
+    const datoMap = {};
+    dage.forEach(r => { datoMap[r.dato] = r.omsaetning; });
+    const barColors = dage.map(r => {
+      const d7 = new Date(r.dato + 'T12:00:00');
+      d7.setDate(d7.getDate() - 7);
+      const key = d7.toISOString().slice(0, 10);
+      if (!(key in datoMap)) return 'rgba(180,180,180,.25)';  // ingen sammenligningsdag
+      const prev = datoMap[key];
+      if (r.omsaetning > prev) return 'rgba(30,120,30,.45)';   // grøn — bedre
+      if (r.omsaetning < prev) return 'rgba(180,40,40,.40)';   // rød — dårligere
+      return 'rgba(180,180,180,.25)';                           // uændret
+    });
+    const barBorders = dage.map(r => {
+      const d7 = new Date(r.dato + 'T12:00:00');
+      d7.setDate(d7.getDate() - 7);
+      const key = d7.toISOString().slice(0, 10);
+      if (!(key in datoMap)) return 'rgba(150,150,150,.4)';
+      return datoMap[key] <= r.omsaetning ? '#1e7a1e' : '#b42828';
+    });
     mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
-      [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth: 1, borderRadius: 2 }],
+      [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: barColors, borderColor: barBorders, borderWidth: 1, borderRadius: 2 }],
       { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:10 }, callback: v => Math.round(v/1000)+'k' }}}});
 
     const seneste = dage[dage.length - 1];

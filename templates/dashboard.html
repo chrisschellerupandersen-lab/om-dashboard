@@ -1451,36 +1451,7 @@ function buildForside(kpi, dage, uger, idag) {
     const uge      = kpi.uge      || {};
     const prevUge  = kpi.prev_uge || {};
 
-    // ── Dag-kasser (viser samme dag forrige uge) ──────────────────────────
-    const lwDag     = kpi.prev_dag      || {};
-    const lwPrevDag = kpi.prev_prev_dag || {};
-
-    document.getElementById('kpi-dag-omsat').textContent = lwDag.omsaetning != null ? kr(lwDag.omsaetning) : '—';
-
-    // Dato-label: "man. 4. maj"
-    if (kpi.prev_dag_dato) {
-      const d   = new Date(kpi.prev_dag_dato);
-      const lbl = d.toLocaleDateString('da-DK', {weekday:'short', day:'numeric', month:'short'});
-      const el  = document.getElementById('kpi-dag-vs');
-      // Sammenlign vs. samme dag 2 uger siden
-      if (lwPrevDag.omsaetning > 0 && lwDag.omsaetning != null) {
-        const diff = lwDag.omsaetning - lwPrevDag.omsaetning;
-        const pct  = (diff / lwPrevDag.omsaetning) * 100;
-        el.textContent = lbl + '  ·  ' + (diff >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. -2 uger';
-        el.className = 'kpi-s ' + (diff >= 0 ? 'up' : 'dn');
-      } else {
-        el.textContent = lbl;
-        el.className = 'kpi-s';
-      }
-    }
-    if (lwDag.transak > 0 && lwDag.omsaetning > 0) {
-      document.getElementById('kpi-dag-vs').textContent +=
-        '  ·  ' + Math.round(lwDag.omsaetning / lwDag.transak) + ' kr/kurv';
-    }
-
-    if (lwDag.vareforbrug > 0) {
-      document.getElementById('kpi-dag-vf').textContent = 'VF ' + kr(lwDag.vareforbrug);
-    }
+    // ── Dag-kasser ────────────────────────────────────────────────────────
     if (dag.transak > 0) {
       document.getElementById('kpi-kunder').textContent = dag.transak;
       const kurv = dag.omsaetning && dag.transak ? Math.round(dag.omsaetning / dag.transak) : 0;

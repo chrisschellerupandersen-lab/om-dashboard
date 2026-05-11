@@ -1637,12 +1637,15 @@ function buildTime(timerSnit) {
   document.getElementById('time-no-data').style.display = 'none';
   document.getElementById('time-content').style.display = '';
 
-  // Aggregate hourly totals across all weekdays
-  const hMap = {};
+  // Gennemsnitlig omsætning per time på tværs af ugedage (ikke sum)
+  const hSum = {}, hCnt = {};
   timerSnit.forEach(r => {
-    if (!hMap[r.time_start]) hMap[r.time_start] = 0;
-    hMap[r.time_start] += r.snit_omsaetning;
+    if (!hSum[r.time_start]) { hSum[r.time_start] = 0; hCnt[r.time_start] = 0; }
+    hSum[r.time_start] += r.snit_omsaetning;
+    hCnt[r.time_start]++;
   });
+  const hMap = {};
+  Object.keys(hSum).forEach(h => { hMap[h] = hCnt[h] > 0 ? hSum[h] / hCnt[h] : 0; });
   const hrs = Object.keys(hMap).map(Number).sort((a,b) => a-b);
   const maxVal = Math.max(...hrs.map(h => hMap[h]));
 

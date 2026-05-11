@@ -105,10 +105,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .daglist .dl-prod-group{list-style:none;padding:0;margin:0;overflow:hidden;}
 .daglist .dl-prod-group li{padding-left:20px;border-bottom:1px solid rgba(30,58,30,.04);}
 .daglist .dl-prod-group li:last-child{border-bottom:none;}
-.kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;padding:16px 18px;}
-.kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
-.kpi-v{font-size:28px;font-weight:300;color:var(--forest);line-height:1;}
-.kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
+.kpi{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:4px;padding:14px 8px 10px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.kpi-ring-wrap{position:relative;width:76px;height:76px;margin-bottom:6px;flex-shrink:0;}
+.kpi-ring-svg{width:76px;height:76px;overflow:visible;}
+.kpi-ring-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:90px;}
+.kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:2px;line-height:1.3;}
+.kpi-v{font-size:18px;font-weight:300;color:var(--forest);line-height:1;margin-bottom:0;}
+.kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:3px;line-height:1.3;}
 .kpi-s.up{color:var(--moss);}
 .kpi-s.dn{color:var(--danger);}
 .kpi-row .kpi:first-child{background:var(--forest);border-color:var(--forest);}
@@ -558,39 +561,39 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="kpi-row-8">
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-db">—</div></div></div>
             <div class="kpi-l">DB · dag</div>
-            <div class="kpi-v" id="kpi-dag-db">—</div>
             <div class="kpi-s" id="kpi-dag-db-sub">—</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-uge-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-uge-omsat">—</div></div></div>
             <div class="kpi-l">Denne uge</div>
-            <div class="kpi-v" id="kpi-uge-omsat">—</div>
             <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
             <div class="kpi-s" id="kpi-uge-vf" style="color:var(--ash);"></div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-uge-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-uge-db">—</div></div></div>
             <div class="kpi-l">DB · uge</div>
-            <div class="kpi-v" id="kpi-uge-db">—</div>
             <div class="kpi-s" id="kpi-uge-db-sub">—</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-vs-dag" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-vs-dag">—</div></div></div>
             <div class="kpi-l">DB dag vs. forrige</div>
-            <div class="kpi-v" id="kpi-vs-dag" style="font-size:26px;">—</div>
             <div class="kpi-s" id="kpi-vs-dag-sub">samme dag -7 dage</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-vs-uge" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-vs-uge">—</div></div></div>
             <div class="kpi-l">DB uge vs. forrige</div>
-            <div class="kpi-v" id="kpi-vs-uge" style="font-size:26px;">—</div>
             <div class="kpi-s" id="kpi-vs-uge-sub">forrige uge</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-vs-mtd" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-vs-mtd">—</div></div></div>
             <div class="kpi-l">DB MTD vs. forrige</div>
-            <div class="kpi-v" id="kpi-vs-mtd" style="font-size:26px;">—</div>
             <div class="kpi-s" id="kpi-vs-mtd-sub">samme periode</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-kunder" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-kunder">—</div></div></div>
             <div class="kpi-l">Kunder · dag</div>
-            <div class="kpi-v" id="kpi-kunder">—</div>
             <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
@@ -631,23 +634,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="kpi-row">
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-omsat">—</div></div></div>
             <div class="kpi-l">Omsætning</div>
-            <div class="kpi-v" id="dag-omsat">—</div>
             <div class="kpi-s">ekskl. moms</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-transak" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-transak">—</div></div></div>
             <div class="kpi-l">Kunder</div>
-            <div class="kpi-v" id="dag-transak">—</div>
             <div class="kpi-s" id="dag-snit-kurv">—</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-sendag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-db">—</div></div></div>
             <div class="kpi-l">Bruttoavance</div>
-            <div class="kpi-v" id="dag-db">—</div>
             <div class="kpi-s" id="dag-db-pct">—</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-vs-snit">—</div></div></div>
             <div class="kpi-l">vs. dagssnit</div>
-            <div class="kpi-v" id="dag-vs-snit">—</div>
             <div class="kpi-s" id="dag-vs-sub">snit 28 dage</div>
           </div>
         </div>
@@ -1084,23 +1087,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="kpi-row" id="svind-kpi-row">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-svind-gns" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="svind-gns-pct" style="color:var(--amber);">—</div></div></div>
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Gns. svind</div>
-            <div class="kpi-v" id="svind-gns-pct" style="color:var(--amber);font-size:30px;">—</div>
             <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="svind-gns-sub">normaluger</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-svind-fakt" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="svind-faktura">—</div></div></div>
             <div class="kpi-l">Total indkøb ex moms</div>
-            <div class="kpi-v" id="svind-faktura">—</div>
             <div class="kpi-s" id="svind-faktura-sub">inkl. moms</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-svind-retur" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="svind-retur">—</div></div></div>
             <div class="kpi-l">Total retur inkl. TGTG</div>
-            <div class="kpi-v" id="svind-retur">—</div>
             <div class="kpi-s" id="svind-retur-sub">krediteres på faktura</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-svind-netto" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="svind-netto">—</div></div></div>
             <div class="kpi-l">Netto bagerregning</div>
-            <div class="kpi-v" id="svind-netto">—</div>
             <div class="kpi-s" id="svind-netto-sub">faktura − retur</div>
           </div>
         </div>
@@ -1153,33 +1156,33 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <!-- KPI-række -->
         <div class="kpi-row-6" style="margin-bottom:16px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-bern-total" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-total" style="color:var(--amber);">—</div></div></div>
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
-            <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
             <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-total-sub">stk · kr ex moms</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-bern-si" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-si">—</div></div></div>
             <div class="kpi-l">Sæsonindeks</div>
-            <div class="kpi-v" id="bern-si">—</div>
             <div class="kpi-s" id="bern-si-sub"></div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-bern-tgtg" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-tgtg">—</div></div></div>
             <div class="kpi-l">TGTG seneste uge</div>
-            <div class="kpi-v" id="bern-tgtg">—</div>
             <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-bern-vaekst" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-vaekst">—</div></div></div>
             <div class="kpi-l">Væksttrend</div>
-            <div class="kpi-v" id="bern-vaekst">—</div>
             <div class="kpi-s" id="bern-vaekst-sub"></div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-bern-retur-b" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-retur-boller">—</div></div></div>
             <div class="kpi-l">Retur boller</div>
-            <div class="kpi-v" id="bern-retur-boller" style="font-size:26px;">—</div>
             <div class="kpi-s" id="bern-retur-boller-sub">10% af bestilt</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-bern-retur-w" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="bern-retur-wiener">—</div></div></div>
             <div class="kpi-l">Retur wienerbrød</div>
-            <div class="kpi-v" id="bern-retur-wiener" style="font-size:26px;">—</div>
             <div class="kpi-s" id="bern-retur-wiener-sub">13,5% af bestilt</div>
           </div>
         </div>
@@ -1264,18 +1267,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="kpi-row" id="kostpris-kpi-row" style="margin-bottom:20px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-kp-antal" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kostpris-antal" style="color:var(--amber);">—</div></div></div>
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Varer uden kostpris</div>
-            <div class="kpi-v" id="kostpris-antal" style="color:var(--amber);font-size:30px;">—</div>
             <div class="kpi-s" style="color:rgba(255,255,255,.45);">produkter mangler</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-kp-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kostpris-omsat">—</div></div></div>
             <div class="kpi-l">Omsætning uden DB</div>
-            <div class="kpi-v" id="kostpris-omsat">—</div>
             <div class="kpi-s" id="kostpris-pct">— af total</div>
           </div>
           <div class="kpi">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-kp-status" cx="18" cy="18" r="15.9" fill="none" stroke="var(--moss)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="100 0" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kostpris-status" style="font-size:13px;">—</div></div></div>
             <div class="kpi-l">Status</div>
-            <div class="kpi-v" id="kostpris-status" style="font-size:14px;margin-top:4px;">—</div>
             <div class="kpi-s">opdater i Shopbox</div>
           </div>
         </div>
@@ -1409,6 +1412,15 @@ async function api(path, opts) {
 }
 
 function kr(v) { return Math.round(v).toLocaleString('da-DK') + ' kr'; }
+
+// Sæt SVG-ring: pct = 0-100, color valgfri
+function setRing(id, pct, color) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const c = Math.max(0, Math.min(100, isFinite(pct) ? pct : 0));
+  el.setAttribute('stroke-dasharray', c.toFixed(1) + ' ' + (100 - c).toFixed(1));
+  if (color) el.setAttribute('stroke', color);
+}
 
 function dlToggle(gid, hdr) {
   const grp = document.getElementById(gid);
@@ -1548,6 +1560,30 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       vsMtdEl.className    = 'kpi-v';
       vsMtdSub.textContent = mtd.antal_dage + ' dage i mnd.';
     }
+
+    // ── Rings ────────────────────────────────────────────────────────────
+    if (dag.db_pct != null)
+      setRing('ring-dag-db', dag.db_pct, dag.db_pct >= 35 ? 'var(--forest)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)');
+    if (uge.omsaetning > 0 && prevUge.omsaetning > 0) {
+      const rU = Math.max(0, Math.min(100, uge.omsaetning / prevUge.omsaetning * 50));
+      setRing('ring-uge-omsat', rU, uge.omsaetning >= prevUge.omsaetning ? 'var(--moss)' : 'var(--danger)');
+    } else if (uge.omsaetning > 0) setRing('ring-uge-omsat', 60, 'var(--forest)');
+    if (uge.db_pct != null)
+      setRing('ring-uge-db', uge.db_pct, uge.db_pct >= 35 ? 'var(--forest)' : uge.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)');
+    if (dag.db_kr != null && prevDag.db_kr > 0) {
+      const rD = Math.max(0, Math.min(100, 50 + (dag.db_kr - prevDag.db_kr) / prevDag.db_kr * 100));
+      setRing('ring-vs-dag', rD, dag.db_kr >= prevDag.db_kr ? 'var(--moss)' : 'var(--danger)');
+    } else if (dag.db_kr != null) setRing('ring-vs-dag', 50, 'rgba(180,180,180,.5)');
+    if (uge.db_kr != null && prevUge.db_kr > 0) {
+      const rV = Math.max(0, Math.min(100, 50 + (uge.db_kr - prevUge.db_kr) / prevUge.db_kr * 100));
+      setRing('ring-vs-uge', rV, uge.db_kr >= prevUge.db_kr ? 'var(--moss)' : 'var(--danger)');
+    } else if (uge.db_kr != null) setRing('ring-vs-uge', 50, 'rgba(180,180,180,.5)');
+    if (mtd.db_kr != null && prevMtd.db_kr > 0) {
+      const rM = Math.max(0, Math.min(100, 50 + (mtd.db_kr - prevMtd.db_kr) / prevMtd.db_kr * 100));
+      setRing('ring-vs-mtd', rM, mtd.db_kr >= prevMtd.db_kr ? 'var(--moss)' : 'var(--danger)');
+    } else if (mtd.db_kr != null) setRing('ring-vs-mtd', 50, 'rgba(180,180,180,.5)');
+    if (dag.transak > 0)
+      setRing('ring-kunder', Math.min(100, dag.transak / 80 * 100), 'var(--forest)');
   }
 
   // ── Dag-produkt-liste ─────────────────────────────────────────────────
@@ -1726,7 +1762,15 @@ function buildDag(kpi, timer) {
       el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
       document.getElementById('dag-vs-sub').textContent =
         'snit ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
+      setRing('ring-dag-omsat', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+      setRing('ring-dag-vssnit', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+    } else if (dag.omsaetning > 0) {
+      setRing('ring-dag-omsat', 60, 'var(--forest)');
     }
+    if (dag.db_pct != null)
+      setRing('ring-sendag-db', dag.db_pct, dag.db_pct >= 35 ? 'var(--forest)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)');
+    if (dag.transak > 0)
+      setRing('ring-dag-transak', Math.min(100, dag.transak / 60 * 100), 'var(--forest)');
   }
 
   if (timer && timer.length > 0) {
@@ -3104,6 +3148,17 @@ async function loadSvind() {
   document.getElementById('svind-netto').textContent    = Math.round(totNetto).toLocaleString('da-DK') + ' kr';
   document.getElementById('svind-tbl-lbl').textContent  = data.length + ' uger';
 
+  // ── Rings ────────────────────────────────────────────────────────────
+  if (gnsSvind !== '—') {
+    const g = parseFloat(gnsSvind);
+    setRing('ring-svind-gns', Math.min(100, g / 30 * 100), 'var(--amber)');
+  }
+  if (totFaktura > 0 && data.length > 0) {
+    setRing('ring-svind-fakt', Math.min(100, totFaktura / (data.length * 20000) * 100), 'var(--forest)');
+    setRing('ring-svind-retur', Math.min(100, totRetur / totFaktura * 100), 'var(--forest)');
+    setRing('ring-svind-netto', Math.min(100, totNetto / totFaktura * 100), 'var(--forest)');
+  }
+
   document.getElementById('svind-tbody').innerHTML = data.map(r => {
     const svindPct = r.svind_pct;
     const svindCls = svindPct == null ? '' : svindPct > 25 ? 'color:#9b3420;font-weight:500;'
@@ -3193,6 +3248,12 @@ async function loadBernUge(uge, aar) {
   vEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
   document.getElementById('bern-vaekst-sub').textContent =
     vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt';
+
+  // ── Rings (top 4) ────────────────────────────────────────────────────
+  setRing('ring-bern-total', Math.min(100, d.total_stk / 1000 * 100), 'var(--amber)');
+  setRing('ring-bern-si', Math.min(100, d.si / 1.5 * 100), d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'var(--forest)');
+  setRing('ring-bern-tgtg', Math.min(100, d.tgtg_kr / 1600 * 100), d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)');
+  setRing('ring-bern-vaekst', Math.max(0, Math.min(100, 50 + vp * 5)), vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'var(--forest)');
 
   // Produkt-tabel — grupperet efter kategori
   const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
@@ -3311,6 +3372,8 @@ async function loadBernUge(uge, aar) {
   document.getElementById('bern-retur-boller-sub').textContent = bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt';
   document.getElementById('bern-retur-wiener').textContent     = wienerStk > 0 ? returWiener + ' stk' : '—';
   document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
+  setRing('ring-bern-retur-b', Math.min(100, returBoller / 50 * 100), 'var(--forest)');
+  setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
 
   // Vis analyse-kort og auto-generer
   document.getElementById('bern-analyse-kort').style.display = '';
@@ -3444,6 +3507,12 @@ async function loadKostpris() {
     d.antal === 0 ? '✓ Alle varer har kostpris' : '⚠ ' + d.antal + ' varer mangler';
   document.getElementById('kostpris-status').style.color =
     d.antal === 0 ? 'var(--moss)' : 'var(--clay)';
+
+  // ── Rings ────────────────────────────────────────────────────────────
+  setRing('ring-kp-antal', Math.min(100, d.antal / 30 * 100), d.antal === 0 ? 'var(--moss)' : d.antal < 5 ? 'var(--gold)' : 'var(--amber)');
+  setRing('ring-kp-omsat', parseFloat(pct), parseFloat(pct) < 5 ? 'var(--moss)' : parseFloat(pct) < 15 ? 'var(--gold)' : 'var(--danger)');
+  setRing('ring-kp-status', d.antal === 0 ? 100 : Math.max(5, 100 - parseFloat(pct)), d.antal === 0 ? 'var(--moss)' : 'var(--clay)');
+
   document.getElementById('kostpris-tbl-lbl').textContent =
     d.antal + ' produkter · ' + pct + '% af omsætning uden DB-beregning';
 

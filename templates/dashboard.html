@@ -83,10 +83,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .kpi-row{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-5{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-6{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
-.kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
-.kpi-row-5 .kpi:first-child .kpi-l,.kpi-row-6 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
-.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
-.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
+.kpi-row-8{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child,.kpi-row-8 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
+.kpi-row-5 .kpi:first-child .kpi-l,.kpi-row-6 .kpi:first-child .kpi-l,.kpi-row-8 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
+.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
+.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s,.kpi-row-8 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 /* Dag-produkt-liste */
 .daglist{list-style:none;padding:0;margin:0;}
 .daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
@@ -346,6 +347,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .kpi-row-5 > *:first-child{grid-column:1/-1;}
   .kpi-row-6{grid-template-columns:1fr 1fr;}
   .kpi-row-6 > *:first-child{grid-column:1/-1;}
+  .kpi-row-8{grid-template-columns:1fr 1fr;}
+  .kpi-row-8 > *:first-child{grid-column:1/-1;}
   .aar-kpi-row{grid-template-columns:1fr 1fr;}
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
@@ -553,7 +556,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Overblik</h2>
           <p id="hdr-forside-sub">Organic Market Greve</p>
         </div>
-        <div class="kpi-row-6">
+        <div class="kpi-row-8">
           <div class="kpi">
             <div class="kpi-l">Seneste dag</div>
             <div class="kpi-v" id="kpi-dag-omsat">—</div>
@@ -577,9 +580,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-uge-db-sub">—</div>
           </div>
           <div class="kpi">
-            <div class="kpi-l">DB vs. forrige uge</div>
-            <div class="kpi-v" id="kpi-uge-vs">—</div>
-            <div class="kpi-s" id="kpi-uge-vs-sub">—</div>
+            <div class="kpi-l">DB dag vs. forrige</div>
+            <div class="kpi-v" id="kpi-vs-dag" style="font-size:26px;">—</div>
+            <div class="kpi-s" id="kpi-vs-dag-sub">samme dag -7 dage</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">DB uge vs. forrige</div>
+            <div class="kpi-v" id="kpi-vs-uge" style="font-size:26px;">—</div>
+            <div class="kpi-s" id="kpi-vs-uge-sub">forrige uge</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">DB MTD vs. forrige</div>
+            <div class="kpi-v" id="kpi-vs-mtd" style="font-size:26px;">—</div>
+            <div class="kpi-s" id="kpi-vs-mtd-sub">samme periode</div>
           </div>
           <div class="kpi">
             <div class="kpi-l">Kunder · dag</div>
@@ -1467,28 +1480,51 @@ function buildForside(kpi, dage, uger, idag) {
       dbUgeSub.className = 'kpi-s ' + (uge.db_pct >= 35 ? 'up' : uge.db_pct >= 30 ? '' : 'dn');
     }
 
-    // DB uge vs. forrige uge (i kr)
-    const vsEl   = document.getElementById('kpi-uge-vs');
-    const vsSub  = document.getElementById('kpi-uge-vs-sub');
+    // ── Sammenlignings-KPI'er ─────────────────────────────────────────────
     const prevDag = kpi.prev_dag || {};
-    if (uge.db_kr != null && prevUge.db_kr != null && prevUge.omsaetning > 0) {
-      const ugeDiff = uge.db_kr - prevUge.db_kr;
-      vsEl.textContent = (ugeDiff >= 0 ? '+' : '') + Math.round(ugeDiff).toLocaleString('da-DK') + ' kr';
-      vsEl.className   = 'kpi-v ' + (ugeDiff >= 0 ? 'up' : 'dn');
-      vsEl.style.color = '';
-      // Sub: samme dag + forrige uge total
-      const subParts = [];
-      if (dag.db_kr != null && prevDag.omsaetning > 0) {
-        const dagDiff = dag.db_kr - prevDag.db_kr;
-        subParts.push('dag: ' + (dagDiff >= 0 ? '+' : '') + Math.round(dagDiff).toLocaleString('da-DK') + ' kr');
-      }
-      subParts.push('forrige uge: ' + Math.round(prevUge.db_kr).toLocaleString('da-DK') + ' kr DB');
-      vsSub.textContent = subParts.join('  ·  ');
-    } else {
-      vsEl.textContent  = '—';
-      vsEl.className    = 'kpi-v';
-      vsEl.style.color  = '';
-      vsSub.textContent = 'ingen forrige uge';
+    const mtd     = kpi.mtd      || {};
+    const prevMtd = kpi.prev_mtd || {};
+
+    // DB dag vs. samme dag forrige uge
+    const vsDagEl  = document.getElementById('kpi-vs-dag');
+    const vsDagSub = document.getElementById('kpi-vs-dag-sub');
+    if (dag.db_kr != null && prevDag.omsaetning > 0) {
+      const d = dag.db_kr - prevDag.db_kr;
+      vsDagEl.textContent = (d >= 0 ? '+' : '') + Math.round(d).toLocaleString('da-DK') + ' kr';
+      vsDagEl.className   = 'kpi-v ' + (d >= 0 ? 'up' : 'dn');
+      vsDagSub.textContent = 'forrige: ' + Math.round(prevDag.db_kr).toLocaleString('da-DK') + ' kr  ·  ' + prevDag.db_pct.toFixed(1) + '%';
+    } else if (dag.db_kr != null) {
+      vsDagEl.textContent  = kr(dag.db_kr);
+      vsDagEl.className    = 'kpi-v';
+      vsDagSub.textContent = 'ingen data forrige uge';
+    }
+
+    // DB uge vs. forrige uge
+    const vsUgeEl  = document.getElementById('kpi-vs-uge');
+    const vsUgeSub = document.getElementById('kpi-vs-uge-sub');
+    if (uge.db_kr != null && prevUge.omsaetning > 0) {
+      const d = uge.db_kr - prevUge.db_kr;
+      vsUgeEl.textContent = (d >= 0 ? '+' : '') + Math.round(d).toLocaleString('da-DK') + ' kr';
+      vsUgeEl.className   = 'kpi-v ' + (d >= 0 ? 'up' : 'dn');
+      vsUgeSub.textContent = 'forrige: ' + Math.round(prevUge.db_kr).toLocaleString('da-DK') + ' kr  ·  ' + prevUge.db_pct.toFixed(1) + '%';
+    } else if (uge.db_kr != null) {
+      vsUgeEl.textContent  = kr(uge.db_kr);
+      vsUgeEl.className    = 'kpi-v';
+      vsUgeSub.textContent = 'ingen forrige uge';
+    }
+
+    // DB MTD vs. forrige måneds samme periode
+    const vsMtdEl  = document.getElementById('kpi-vs-mtd');
+    const vsMtdSub = document.getElementById('kpi-vs-mtd-sub');
+    if (mtd.db_kr != null && prevMtd.omsaetning > 0) {
+      const d = mtd.db_kr - prevMtd.db_kr;
+      vsMtdEl.textContent = (d >= 0 ? '+' : '') + Math.round(d).toLocaleString('da-DK') + ' kr';
+      vsMtdEl.className   = 'kpi-v ' + (d >= 0 ? 'up' : 'dn');
+      vsMtdSub.textContent = 'forrige mnd: ' + Math.round(prevMtd.db_kr).toLocaleString('da-DK') + ' kr  ·  ' + mtd.antal_dage + ' dage';
+    } else if (mtd.db_kr != null) {
+      vsMtdEl.textContent  = kr(mtd.db_kr);
+      vsMtdEl.className    = 'kpi-v';
+      vsMtdSub.textContent = mtd.antal_dage + ' dage i mnd.';
     }
   }
 

@@ -266,11 +266,41 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM transaktioner WHERE dato = ?
         """, (prev_dag_dato,)).fetchone()
 
+        # MTD: fra 1. i indeværende måned til seneste dag
+        mtd_start = seneste_dato[:8] + '01'  # YYYY-MM-01
+        mtd_row = conn.execute("""
+            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
+                   COALESCE(SUM(avance),0)    AS db_kr,
+                   CASE WHEN SUM(omsætning)>0
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
+                        ELSE 0 END            AS db_pct,
+                   COUNT(DISTINCT dato)       AS antal_dage
+            FROM transaktioner WHERE dato >= ? AND dato <= ?
+        """, (mtd_start, seneste_dato)).fetchone()
+
+        # Forrige måned – samme periode (1. til dato -1 måned)
+        prev_mtd_start = conn.execute(
+            "SELECT date(?, '-1 month')", (mtd_start,)
+        ).fetchone()[0]
+        prev_mtd_end = conn.execute(
+            "SELECT date(?, '-1 month')", (seneste_dato,)
+        ).fetchone()[0]
+        prev_mtd_row = conn.execute("""
+            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
+                   COALESCE(SUM(avance),0)    AS db_kr,
+                   CASE WHEN SUM(omsætning)>0
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
+                        ELSE 0 END            AS db_pct
+            FROM transaktioner WHERE dato >= ? AND dato <= ?
+        """, (prev_mtd_start, prev_mtd_end)).fetchone()
+
     return {
         "dag":      dict(dag)          if dag          else None,
         "uge":      dict(uge)          if uge          else None,
         "prev_uge": dict(prev_uge_row) if prev_uge_row else None,
         "prev_dag": dict(prev_dag_row) if prev_dag_row else None,
+        "mtd":      dict(mtd_row)      if mtd_row      else None,
+        "prev_mtd": dict(prev_mtd_row) if prev_mtd_row else None,
         "snit_uge": snit_row["snit_uge"]         if snit_row     else None,
         "snit_dag": dag_snit_row["snit_dag"]      if dag_snit_row else None,
     }

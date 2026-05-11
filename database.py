@@ -253,12 +253,26 @@ def hent_kpi(aar: int = None) -> Dict:
             )
         """, (seneste_yw,)).fetchone()
 
+        # Samme dag forrige uge (seneste_dato - 7 dage)
+        prev_dag_dato = conn.execute(
+            "SELECT date(?, '-7 days')", (seneste_dato,)
+        ).fetchone()[0]
+        prev_dag_row = conn.execute("""
+            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
+                   COALESCE(SUM(avance),0)    AS db_kr,
+                   CASE WHEN SUM(omsætning)>0
+                        THEN SUM(avance)*1.25/SUM(omsætning)*100
+                        ELSE 0 END            AS db_pct
+            FROM transaktioner WHERE dato = ?
+        """, (prev_dag_dato,)).fetchone()
+
     return {
         "dag":      dict(dag)          if dag          else None,
         "uge":      dict(uge)          if uge          else None,
         "prev_uge": dict(prev_uge_row) if prev_uge_row else None,
+        "prev_dag": dict(prev_dag_row) if prev_dag_row else None,
         "snit_uge": snit_row["snit_uge"]         if snit_row     else None,
-        "snit_dag": dag_snit_row["snit_dag"]     if dag_snit_row else None,
+        "snit_dag": dag_snit_row["snit_dag"]      if dag_snit_row else None,
     }
 
 

@@ -1467,16 +1467,27 @@ function buildForside(kpi, dage, uger, idag) {
       dbUgeSub.className = 'kpi-s ' + (uge.db_pct >= 35 ? 'up' : uge.db_pct >= 30 ? '' : 'dn');
     }
 
-    // DB uge vs. forrige uge
-    const vsEl  = document.getElementById('kpi-uge-vs');
-    const vsSub = document.getElementById('kpi-uge-vs-sub');
-    if (uge.db_pct != null && prevUge.db_pct != null && prevUge.db_pct > 0) {
-      const diff = uge.db_pct - prevUge.db_pct;
-      vsEl.textContent  = (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' pp';
-      vsEl.style.color  = diff >= 0 ? 'var(--moss)' : 'var(--danger)';
-      vsSub.textContent = 'forrige uge: ' + prevUge.db_pct.toFixed(1) + '%  ·  ' + kr(prevUge.db_kr);
+    // DB uge vs. forrige uge (i kr)
+    const vsEl   = document.getElementById('kpi-uge-vs');
+    const vsSub  = document.getElementById('kpi-uge-vs-sub');
+    const prevDag = kpi.prev_dag || {};
+    if (uge.db_kr != null && prevUge.db_kr != null && prevUge.omsaetning > 0) {
+      const ugeDiff = uge.db_kr - prevUge.db_kr;
+      vsEl.textContent = (ugeDiff >= 0 ? '+' : '') + Math.round(ugeDiff).toLocaleString('da-DK') + ' kr';
+      vsEl.className   = 'kpi-v ' + (ugeDiff >= 0 ? 'up' : 'dn');
+      vsEl.style.color = '';
+      // Sub: samme dag + forrige uge total
+      const subParts = [];
+      if (dag.db_kr != null && prevDag.omsaetning > 0) {
+        const dagDiff = dag.db_kr - prevDag.db_kr;
+        subParts.push('dag: ' + (dagDiff >= 0 ? '+' : '') + Math.round(dagDiff).toLocaleString('da-DK') + ' kr');
+      }
+      subParts.push('forrige uge: ' + Math.round(prevUge.db_kr).toLocaleString('da-DK') + ' kr DB');
+      vsSub.textContent = subParts.join('  ·  ');
     } else {
       vsEl.textContent  = '—';
+      vsEl.className    = 'kpi-v';
+      vsEl.style.color  = '';
       vsSub.textContent = 'ingen forrige uge';
     }
   }

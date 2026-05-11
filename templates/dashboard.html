@@ -2101,6 +2101,10 @@ function buildFasteOmkTbl() {
     </tr>`;
 }
 
+function _post(path, data) {
+  return api(path, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) });
+}
+
 async function fasteOmkGem(aar, maaned, kategori, beloebStr) {
   const beloeb = parseFloat(beloebStr) || 0;
   // Opdater lokalt
@@ -2108,19 +2112,19 @@ async function fasteOmkGem(aar, maaned, kategori, beloebStr) {
   if (idx >= 0) _fasteOmkData[idx].beloeb = beloeb;
   else _fasteOmkData.push({aar, maaned, kategori, beloeb});
   // Gem til DB
-  const res = await api('/api/faste-omk/gem', {aar, maaned, kategori, beloeb});
+  const res = await _post('/api/faste-omk/gem', {aar, maaned, kategori, beloeb});
   if (res) {
     document.getElementById('faste-omk-status').textContent = 'Gemt ✓';
     setTimeout(() => { document.getElementById('faste-omk-status').textContent = ''; }, 2000);
     buildFasteOmkTbl();
-    buildAar();  // Genberegn årsplan
+    buildAar();
   }
 }
 
 async function fasteOmkSlet(aar, kategori, btn) {
   if (!confirm(`Slet kategorien "${kategori}" for ${aar}?`)) return;
   btn.disabled = true;
-  const res = await api('/api/faste-omk/slet-kategori', {aar, kategori});
+  const res = await _post('/api/faste-omk/slet-kategori', {aar, kategori});
   if (res) {
     _fasteOmkData = _fasteOmkData.filter(r => !(r.aar===aar && r.kategori===kategori));
     buildFasteOmkTbl();
@@ -2139,10 +2143,10 @@ async function fasteOmkTilfoej() {
     setTimeout(()=>inp.style.borderColor='', 1500);
     return;
   }
-  // Gem en tom række for måned 1 (dummy så kategorien vises)
-  const res = await api('/api/faste-omk/gem', {aar, maaned:1, kategori:kat, beloeb:0});
+  // Initialiser alle 12 måneder med 0 så kategorien vises straks
+  const res = await _post('/api/faste-omk/gem', {aar, maaned:1, kategori:kat, beloeb:0});
   if (res) {
-    _fasteOmkData.push({aar, maaned:1, kategori:kat, beloeb:0});
+    for (let m = 1; m <= 12; m++) _fasteOmkData.push({aar, maaned:m, kategori:kat, beloeb:0});
     inp.value = '';
     buildFasteOmkTbl();
   }

@@ -801,6 +801,28 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <div class="aar-saeson-grid" id="aar-saeson-grid"></div>
             </div>
           </div>
+          <!-- Faste omkostninger editor -->
+          <div class="aar-cfg" style="margin-bottom:10px;">
+            <div class="aar-cfg-hdr" onclick="toggleFasteOmk()">
+              <svg viewBox="0 0 16 16" fill="currentColor" style="width:12px;height:12px;opacity:.5;"><path d="M2 3h12v2H2zm0 4h12v2H2zm0 4h8v2H2z"/></svg>
+              Faste omkostninger
+              <span id="faste-omk-arrow" style="margin-left:auto;">▶</span>
+            </div>
+            <div class="aar-cfg-body" id="faste-omk-body" style="display:none;">
+              <div id="faste-omk-tbl-wrap" style="overflow-x:auto;">
+                <table id="faste-omk-tbl" style="border-collapse:collapse;font-size:12px;min-width:900px;">
+                  <thead id="faste-omk-thead"></thead>
+                  <tbody id="faste-omk-tbody"></tbody>
+                  <tfoot id="faste-omk-tfoot"></tfoot>
+                </table>
+              </div>
+              <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
+                <input id="faste-omk-ny-kat" type="text" placeholder="Ny kategori (fx Husleje)" style="padding:6px 10px;font-size:12px;border:1px solid rgba(30,58,30,.2);border-radius:2px;background:var(--white);color:var(--forest);width:200px;">
+                <button onclick="fasteOmkTilfoej()" style="padding:6px 14px;font-size:12px;background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">+ Tilføj</button>
+                <span id="faste-omk-status" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);"></span>
+              </div>
+            </div>
+          </div>
           <!-- Top 5 KPIs -->
           <div class="aar2-top" id="aar2-top"></div>
           <!-- Midt: Indeværende måned + Årsfremdrift -->
@@ -1960,6 +1982,7 @@ async function loadAar() {
   const data = await api(`/api/salg/aarsdata?aar=${VALGT_AAR}`);
   if (!data) return;
   _aarRaw = data;
+  _fasteOmkData = data.faste_omk || [];
   const saved = localStorage.getItem('aar_cfg_v2');
   _aarCfg = saved ? JSON.parse(saved) : defaultAarCfg(data.base_kr_pr_dag, data.base_gpm);
   buildAarInputs();
@@ -2002,6 +2025,129 @@ function toggleAarCfg() {
   arrow.textContent  = open ? '▼' : '▶';
 }
 
+// ── FASTE OMKOSTNINGER ────────────────────────────────────────────────────────
+let _fasteOmkData = [];   // [{id,aar,maaned,kategori,beloeb}]
+
+function toggleFasteOmk() {
+  const body  = document.getElementById('faste-omk-body');
+  const arrow = document.getElementById('faste-omk-arrow');
+  const open  = body.style.display === 'none';
+  body.style.display = open ? '' : 'none';
+  arrow.textContent  = open ? '▼' : '▶';
+  if (open) buildFasteOmkTbl();
+}
+
+function buildFasteOmkTbl() {
+  if (!_aarRaw) return;
+  const aar  = _aarRaw.aar;
+  const mndK = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+  const mono = "font-family:'DM Mono',monospace;";
+
+  // Byg {kategori: {maaned: beloeb}} map
+  const map = {};
+  _fasteOmkData.forEach(r => {
+    if (!map[r.kategori]) map[r.kategori] = {};
+    map[r.kategori][r.maaned] = r.beloeb;
+  });
+  const kats = Object.keys(map).sort();
+
+  // Header
+  document.getElementById('faste-omk-thead').innerHTML =
+    `<tr style="background:var(--forest);">
+      <th style="text-align:left;padding:8px 12px;color:var(--amber);${mono}font-size:9px;letter-spacing:.08em;min-width:140px;">KATEGORI</th>
+      ${mndK.map(m=>`<th class="num" style="padding:8px 10px;color:rgba(200,168,75,.7);${mono}font-size:9px;width:70px;">${m.toUpperCase()}</th>`).join('')}
+      <th class="num" style="padding:8px 12px;color:rgba(200,168,75,.7);${mono}font-size:9px;">TOTAL</th>
+      <th style="width:32px;"></th>
+    </tr>`;
+
+  // Rækker
+  document.getElementById('faste-omk-tbody').innerHTML = kats.map(kat => {
+    const cells = Array.from({length:12}, (_,i) => {
+      const m   = i+1;
+      const val = map[kat][m] || 0;
+      return `<td style="padding:2px 4px;">
+        <input type="number" min="0" step="100"
+          value="${val > 0 ? Math.round(val) : ''}"
+          placeholder="0"
+          style="width:64px;padding:5px 6px;${mono}font-size:11px;border:1px solid rgba(30,58,30,.15);border-radius:2px;background:var(--white);color:var(--forest);text-align:right;"
+          onchange="fasteOmkGem(${aar},${m},'${kat.replace(/'/g,"\\'")}',this.value)"
+        >
+      </td>`;
+    }).join('');
+    const total = Object.values(map[kat]).reduce((s,v)=>s+v,0);
+    return `<tr style="border-bottom:1px solid rgba(30,58,30,.07);">
+      <td style="padding:6px 12px;font-size:13px;font-weight:500;color:var(--forest);">${kat}</td>
+      ${cells}
+      <td class="num" style="${mono}font-size:12px;font-weight:500;padding:6px 12px;color:var(--forest);">${Math.round(total).toLocaleString('da-DK')}</td>
+      <td style="padding:4px 6px;">
+        <button onclick="fasteOmkSlet(${aar},'${kat.replace(/'/g,"\\'")}',this)"
+          style="background:none;border:none;cursor:pointer;font-size:12px;color:var(--ash);padding:2px 4px;"
+          title="Slet kategori">✕</button>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="15" style="padding:16px 12px;${mono}font-size:10px;color:var(--ash);">Ingen faste omkostninger endnu — tilføj en kategori nedenfor</td></tr>`;
+
+  // Totalrække
+  const mndTotals = Array.from({length:12}, (_,i) =>
+    kats.reduce((s,k) => s + (map[k][i+1] || 0), 0)
+  );
+  const grandTotal = mndTotals.reduce((s,v)=>s+v,0);
+  document.getElementById('faste-omk-tfoot').innerHTML =
+    `<tr style="background:var(--parchment);border-top:2px solid rgba(30,58,30,.15);">
+      <td style="padding:8px 12px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT / MND</td>
+      ${mndTotals.map(t=>`<td class="num" style="padding:8px 10px;${mono}font-size:11px;font-weight:500;color:var(--forest);">${t>0?Math.round(t).toLocaleString('da-DK'):'—'}</td>`).join('')}
+      <td class="num" style="padding:8px 12px;${mono}font-size:12px;font-weight:600;color:var(--forest);">${Math.round(grandTotal).toLocaleString('da-DK')}</td>
+      <td></td>
+    </tr>`;
+}
+
+async function fasteOmkGem(aar, maaned, kategori, beloebStr) {
+  const beloeb = parseFloat(beloebStr) || 0;
+  // Opdater lokalt
+  const idx = _fasteOmkData.findIndex(r => r.aar===aar && r.maaned===maaned && r.kategori===kategori);
+  if (idx >= 0) _fasteOmkData[idx].beloeb = beloeb;
+  else _fasteOmkData.push({aar, maaned, kategori, beloeb});
+  // Gem til DB
+  const res = await api('/api/faste-omk/gem', {aar, maaned, kategori, beloeb});
+  if (res) {
+    document.getElementById('faste-omk-status').textContent = 'Gemt ✓';
+    setTimeout(() => { document.getElementById('faste-omk-status').textContent = ''; }, 2000);
+    buildFasteOmkTbl();
+    buildAar();  // Genberegn årsplan
+  }
+}
+
+async function fasteOmkSlet(aar, kategori, btn) {
+  if (!confirm(`Slet kategorien "${kategori}" for ${aar}?`)) return;
+  btn.disabled = true;
+  const res = await api('/api/faste-omk/slet-kategori', {aar, kategori});
+  if (res) {
+    _fasteOmkData = _fasteOmkData.filter(r => !(r.aar===aar && r.kategori===kategori));
+    buildFasteOmkTbl();
+    buildAar();
+  }
+}
+
+async function fasteOmkTilfoej() {
+  const inp = document.getElementById('faste-omk-ny-kat');
+  const kat = inp.value.trim();
+  if (!kat || !_aarRaw) return;
+  const aar = _aarRaw.aar;
+  // Tjek duplikat
+  if (_fasteOmkData.some(r => r.aar===aar && r.kategori===kat)) {
+    inp.style.borderColor = 'var(--danger)';
+    setTimeout(()=>inp.style.borderColor='', 1500);
+    return;
+  }
+  // Gem en tom række for måned 1 (dummy så kategorien vises)
+  const res = await api('/api/faste-omk/gem', {aar, maaned:1, kategori:kat, beloeb:0});
+  if (res) {
+    _fasteOmkData.push({aar, maaned:1, kategori:kat, beloeb:0});
+    inp.value = '';
+    buildFasteOmkTbl();
+  }
+}
+
 function buildAar() {
   const d = _aarRaw; const c = _aarCfg; const aar = d.aar;
   if (!d.maaneder) { document.getElementById('aar-no-data').style.display=''; document.getElementById('aar-content').style.display='none'; return; }
@@ -2012,18 +2158,27 @@ function buildAar() {
   const faktisk = {};
   d.maaneder.forEach(m => faktisk[m.maaned] = m);
 
+  // Byg DB-baseret faste omk. sum per måned: {maaned: sum}
+  const dbFasteSum = {};
+  _fasteOmkData.forEach(r => {
+    if (r.aar === aar) dbFasteSum[r.maaned] = (dbFasteSum[r.maaned] || 0) + r.beloeb;
+  });
+  const harDBFaste = Object.keys(dbFasteSum).length > 0;
+
   const maaneder = Array.from({length:12}, (_,i) => {
     const m = i+1, dage = mndDage(aar, m);
+    // Faste omk: DB-sum hvis tilgængelig, ellers c.faste
+    const faste = harDBFaste ? (dbFasteSum[m] || 0) : c.faste;
     if (faktisk[m]) {
       const f = faktisk[m];
       return { m, dage, faktDage:f.faktiske_dage, type:'faktisk',
                omsat:f.omsaetning, kost:f.kostpris, avance:f.avance, gpm:f.gpm,
-               faste:c.faste, res:Math.round(f.avance - c.faste) };
+               faste, res:Math.round(f.avance - faste) };
     }
     const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
     const avance = Math.round(omsat * c.gpm / 100);
     return { m, dage, type:'estimat', sf:c.saeson[i], omsat, kost:omsat-avance,
-             avance, gpm:c.gpm, faste:c.faste, res:avance - c.faste };
+             avance, gpm:c.gpm, faste, res:avance - faste };
   });
 
   const totOmsat  = maaneder.reduce((s,r) => s+r.omsat, 0);

@@ -510,6 +510,39 @@ async def stamdata_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/faste-omk")
+async def api_faste_omk(request: Request, aar: int):
+    _require_auth(request)
+    return {"items": database.hent_faste_omk(aar)}
+
+
+@app.post("/api/faste-omk/gem")
+async def faste_omk_gem(request: Request):
+    _require_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    database.gem_faste_omk(
+        int(body["aar"]),
+        int(body["maaned"]),
+        str(body["kategori"]),
+        float(body["beloeb"]),
+    )
+    return {"ok": True}
+
+
+@app.post("/api/faste-omk/slet-kategori")
+async def faste_omk_slet(request: Request):
+    _require_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    database.slet_faste_omk_kategori(int(body["aar"]), str(body["kategori"]))
+    return {"ok": True}
+
+
 @app.post("/api/opdater-rapport")
 async def opdater_rapport(request: Request):
     header_secret = request.headers.get("X-Webhook-Secret", "")

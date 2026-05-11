@@ -115,6 +115,15 @@ def init_db():
                 pris_ex_moms REAL    DEFAULT 0,
                 UNIQUE(varenavn) ON CONFLICT REPLACE
             );
+
+            CREATE TABLE IF NOT EXISTS faste_omkostninger (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                aar      INTEGER NOT NULL,
+                maaned   INTEGER NOT NULL,
+                kategori TEXT    NOT NULL DEFAULT 'Faste omk.',
+                beloeb   REAL    NOT NULL DEFAULT 0,
+                UNIQUE(aar, maaned, kategori) ON CONFLICT REPLACE
+            );
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -641,6 +650,8 @@ def hent_aarsdata(aar: int = None) -> Dict:
         "faktura_maaned":    faktura_maaned,
         "mp_netto_maaned":   mp_netto_maaned,
         "vf_ikke_bager":     vf_ikke_bager,
+        "faste_omk":         hent_faste_omk(aar),
+        "faste_omk_sum":     faste_omk_maaned_sum(aar),
     }
 
 
@@ -1545,3 +1556,48 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         "total_stk":       total_stk,
         "total_kr":        round(total_kr, 2),
     }
+
+
+# ── FASTE OMKOSTNINGER ────────────────────────────────────────────────────────
+
+def hent_faste_omk(aar: int) -> List[Dict]:
+    """Returnerer alle faste omkostnings-rækker for et år."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT id, aar, maaned, kategori, beloeb
+            FROM faste_omkostninger
+            WHERE aar = ?
+            ORDER BY kategori, maaned
+        """, (aar,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def gem_faste_omk(aar: int, maaned: int, kategori: str, beloeb: float) -> None:
+    """Upsert én celle (aar, maaned, kategori) → beloeb."""
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO faste_omkostninger (aar, maaned, kategori, beloeb)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(aar, maaned, kategori) DO UPDATE SET beloeb = excluded.beloeb
+        """, (aar, maaned, kategori.strip(), round(beloeb, 2)))
+
+
+def slet_faste_omk_kategori(aar: int, kategori: str) -> None:
+    """Sletter alle rækker for en hel kategori i et givent år."""
+    with _conn() as conn:
+        conn.execute(
+            "DELETE FROM faste_omkostninger WHERE aar=? AND kategori=?",
+            (aar, kategori.strip())
+        )
+
+
+def faste_omk_maaned_sum(aar: int) -> Dict[int, float]:
+    """Returnerer {maaned: sum_beloeb} for alle kategorier i et år."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT maaned, SUM(beloeb) AS total
+            FROM faste_omkostninger
+            WHERE aar = ?
+            GROUP BY maaned
+        """, (aar,)).fetchall()
+        return {r["maaned"]: r["total"] for r in rows}

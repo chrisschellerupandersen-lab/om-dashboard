@@ -436,6 +436,7 @@ def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
 
         produkter = conn.execute(f"""
             SELECT dato, varenavn,
+                   MAX(kategori)            AS kategori,
                    ROUND(SUM(antal), 0)    AS antal,
                    ROUND(SUM(omsætning), 2) AS omsaetning
             FROM transaktioner
@@ -447,8 +448,9 @@ def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
     prod_by_dato: Dict[str, list] = {}
     for p in produkter:
         prod_by_dato.setdefault(p['dato'], []).append({
-            'varenavn':  p['varenavn'],
-            'antal':     int(p['antal']),
+            'varenavn':   p['varenavn'],
+            'kategori':   p['kategori'] or '',
+            'antal':      int(p['antal']),
             'omsaetning': p['omsaetning'],
         })
 
@@ -739,6 +741,7 @@ def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
         params = (str(aar), n) if aar else (n,)
         rows = conn.execute(f"""
             SELECT varenavn,
+                   MAX(kategori)                                        AS kategori,
                    ROUND(SUM(omsætning), 2)                            AS omsaetning,
                    ROUND(SUM(kostpris), 2)                             AS vareforbrug,
                    ROUND(SUM(antal), 0)                                AS antal,

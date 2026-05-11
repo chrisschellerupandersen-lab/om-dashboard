@@ -1747,19 +1747,61 @@ function renderTop(top, n) {
   if (!top) return;
   document.getElementById('top-card-title').textContent = `Top ${n} produkter · samlet periode`;
   const mono = "font-family:'DM Mono',monospace;";
-  document.getElementById('top-tbody').innerHTML = top.map((r,i) => {
-    const dbColor = r.db_pct>=35?'#2d5a2d':r.db_pct>=28?'#7a5c00':'#9b3420';
-    const dbBg    = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
-    return `<tr>
-      <td style="color:var(--amber);${mono}font-size:12px;font-weight:500;">${i+1}</td>
-      <td style="font-size:14px;">${r.varenavn}</td>
-      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
-      <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
-      <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
-      <td class="num" style="font-size:14px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
-      <td class="num"><span style="${mono}font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
-    </tr>`;
+
+  // Gruppér efter kategori
+  const katMap = {};
+  top.forEach(r => {
+    const k = r.kategori || 'Øvrige';
+    if (!katMap[k]) katMap[k] = [];
+    katMap[k].push(r);
+  });
+  const katSorted = Object.entries(katMap).sort(
+    ([,a],[,b]) => b.reduce((s,r)=>s+r.omsaetning,0) - a.reduce((s,r)=>s+r.omsaetning,0)
+  );
+
+  let rowNum = 0;
+  document.getElementById('top-tbody').innerHTML = katSorted.map(([kat, prods], ki) => {
+    const katOmsat = prods.reduce((s,r)=>s+r.omsaetning,0);
+    const katVf    = prods.reduce((s,r)=>s+r.vareforbrug,0);
+    const katDbKr  = prods.reduce((s,r)=>s+r.db_kr,0);
+    const katAntal = prods.reduce((s,r)=>s+r.antal,0);
+    const katDbPct = katOmsat > 0 ? katDbKr * 1.25 / katOmsat * 100 : 0;
+    const dbColor  = katDbPct>=35?'#2d5a2d':katDbPct>=28?'#7a5c00':'#9b3420';
+    const dbBg     = katDbPct>=35?'rgba(74,124,74,.1)':katDbPct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
+    const gid = 'topg'+ki;
+    const prodRows = prods.map(r => {
+      rowNum++;
+      const dc = r.db_pct>=35?'#2d5a2d':r.db_pct>=28?'#7a5c00':'#9b3420';
+      const db = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=28?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
+      return `<tr style="background:rgba(30,58,30,.015);">
+        <td style="color:var(--ash);${mono}font-size:11px;padding-left:28px;">${rowNum}</td>
+        <td style="font-size:13px;padding-left:28px;color:var(--charcoal);">${r.varenavn}</td>
+        <td class="num" style="font-size:13px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+        <td class="num" style="${mono}font-size:12px;color:var(--ash);">${r.vareforbrug>0?Math.round(r.vareforbrug).toLocaleString('da-DK')+' kr':'—'}</td>
+        <td class="num" style="${mono}font-size:12px;">${r.db_kr>0?Math.round(r.db_kr).toLocaleString('da-DK')+' kr':'—'}</td>
+        <td class="num" style="font-size:13px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
+        <td class="num"><span style="${mono}font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:${db};color:${dc};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
+      </tr>`;
+    }).join('');
+    return `<tr style="background:var(--parchment);cursor:pointer;" onclick="topToggle('${gid}',this)">
+      <td style="color:var(--amber);${mono}font-size:10px;width:18px;">▶</td>
+      <td style="font-size:13px;font-weight:500;color:var(--forest);">${kat}</td>
+      <td class="num" style="font-size:13px;font-weight:500;">${Math.round(katOmsat).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:12px;color:var(--ash);">${katVf>0?Math.round(katVf).toLocaleString('da-DK')+' kr':'—'}</td>
+      <td class="num" style="${mono}font-size:12px;">${katDbKr>0?Math.round(katDbKr).toLocaleString('da-DK')+' kr':'—'}</td>
+      <td class="num" style="font-size:13px;">${Math.round(katAntal).toLocaleString('da-DK')} stk</td>
+      <td class="num"><span style="${mono}font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${katDbPct.toFixed(1)}%</span></td>
+    </tr>
+    <tbody id="${gid}" style="display:none;">${prodRows}</tbody>`;
   }).join('');
+}
+
+function topToggle(gid, hdr) {
+  const grp  = document.getElementById(gid);
+  const arr  = hdr.querySelector('td:first-child');
+  const open = grp.style.display === 'none';
+  grp.style.display = open ? '' : 'none';
+  if (arr) arr.textContent = open ? '▼' : '▶';
 }
 
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────
@@ -1783,24 +1825,42 @@ function renderDageDetaljer(dage, n) {
   }
   grid.style.gridTemplateColumns = `repeat(${dage.length}, minmax(200px, 1fr))`;
   grid.innerHTML = dage.map(dag => {
-    const prods = dag.produkter.map(p =>
-      `<div class="dag-prod-row">
-        <span class="dag-prod-navn">${p.varenavn}</span>
-        <span class="dag-prod-antal">${p.antal} stk</span>
-        <span class="dag-prod-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
-      </div>`
-    ).join('');
+    // Gruppér produkter efter kategori
+    const katMap = {};
+    dag.produkter.forEach(p => {
+      const k = p.kategori || 'Øvrige';
+      if (!katMap[k]) katMap[k] = [];
+      katMap[k].push(p);
+    });
+    const katSorted = Object.entries(katMap).sort(
+      ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
+    );
+    const prodsHtml = katSorted.map(([kat, prods]) => {
+      const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);
+      const katAntal = prods.reduce((s,p)=>s+p.antal,0);
+      const prodRows = prods.map(p =>
+        `<div class="dag-prod-row" style="padding-left:20px;">
+          <span class="dag-prod-navn" style="font-size:11px;">${p.varenavn}</span>
+          <span class="dag-prod-antal">${p.antal}</span>
+          <span class="dag-prod-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+        </div>`
+      ).join('');
+      return `<div style="border-bottom:1px solid rgba(30,58,30,.08);">
+        <div style="display:flex;align-items:center;gap:4px;padding:5px 16px 4px;background:rgba(30,58,30,.04);border-bottom:1px solid rgba(30,58,30,.06);">
+          <span style="flex:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">${kat}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${Math.round(katAntal)} stk</span>
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--forest);margin-left:8px;">${Math.round(katOmsat).toLocaleString('da-DK')} kr</span>
+        </div>
+        ${prodRows}
+      </div>`;
+    }).join('');
     return `<div class="dag-col">
       <div class="dag-col-hdr">
         <div class="dag-col-dato">${dag.dato_label}</div>
         <div class="dag-col-omsat">${Math.round(dag.omsaetning).toLocaleString('da-DK')} kr</div>
         <div class="dag-col-sub">${dag.linjer} kunder &middot; ${Math.round(dag.snit_per_linje)} kr/kurv</div>
       </div>
-      <div class="dag-prod-hdr">
-        <span>Produkt</span>
-        <span>Stk &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Kr</span>
-      </div>
-      ${prods}
+      ${prodsHtml}
     </div>`;
   }).join('');
 }
@@ -2345,20 +2405,66 @@ function renderTrendTabel(prod, filter) {
   });
 
   const signalLabel = { op:'↑ Stiger', ned:'↓ Falder', stabil:'→ Stabil', ny:'★ Ny', vaek:'✕ Udgået' };
-  document.getElementById('trend-tbody').innerHTML = sorted.map(r => {
-    const pctTxt = r.pct != null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(1) + '%' : '—';
-    const pctCls = r.pct == null ? '' : (r.pct >= 0 ? 'color:#2d5a2d;' : 'color:#9b3420;');
-    const pill   = r.db_pct >= 35 ? 'pill-g' : r.db_pct >= 28 ? 'pill-a' : r.db_pct != null ? 'pill-r' : '';
-    return `<tr>
-      <td>${r.varenavn}</td>
-      <td style="font-size:11px;color:var(--ash);">${r.kategori || '—'}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.ny_snit)}</td>
-      <td class="num" style="font-family:'DM Mono',monospace;color:var(--ash);">${r.gl_snit > 0 ? Math.round(r.gl_snit) : '—'}</td>
-      <td class="num" style="${pctCls}font-family:'DM Mono',monospace;font-weight:400;">${pctTxt}</td>
-      <td class="num">${r.db_pct != null ? '<span class="pill '+pill+'">'+r.db_pct.toFixed(1)+'%</span>' : '—'}</td>
-      <td><span class="tbadge ${r.signal}">${signalLabel[r.signal]}</span></td>
-    </tr>`;
+  const mono = "font-family:'DM Mono',monospace;";
+
+  // Gruppér efter kategori
+  const katMap = {};
+  sorted.forEach(r => {
+    const k = r.kategori || 'Øvrige';
+    if (!katMap[k]) katMap[k] = [];
+    katMap[k].push(r);
+  });
+  const katSorted = Object.entries(katMap).sort(
+    ([,a],[,b]) => b.reduce((s,r)=>s+(r.ny_omsat||0),0) - a.reduce((s,r)=>s+(r.ny_omsat||0),0)
+  );
+
+  document.getElementById('trend-tbody').innerHTML = katSorted.map(([kat, prods], ki) => {
+    const katNyOmsat = prods.reduce((s,r)=>s+(r.ny_omsat||0),0);
+    const katGlOmsat = prods.reduce((s,r)=>s+(r.gl_omsat||0),0);
+    const katDbKr    = prods.reduce((s,r)=>s+(r.db_pct!=null?(r.ny_omsat||0)*r.db_pct/100/1.25:0),0);
+    const katDbPct   = katNyOmsat > 0 ? katDbKr*1.25/katNyOmsat*100 : null;
+    const katPct     = katGlOmsat > 0 ? (katNyOmsat - katGlOmsat) / katGlOmsat * 100 : null;
+    const pctTxt     = katPct != null ? (katPct>=0?'+':'')+katPct.toFixed(1)+'%' : '—';
+    const pctCls     = katPct == null ? '' : (katPct >= 0 ? 'color:#2d5a2d;' : 'color:#9b3420;');
+    const pill       = katDbPct!=null ? (katDbPct>=35?'pill-g':katDbPct>=28?'pill-a':'pill-r') : '';
+    const gid = 'trendg'+ki;
+
+    const prodRows = prods.map(r => {
+      const p2    = r.pct != null ? (r.pct>=0?'+':'')+r.pct.toFixed(1)+'%' : '—';
+      const p2cls = r.pct == null ? '' : (r.pct>=0?'color:#2d5a2d;':'color:#9b3420;');
+      const pill2 = r.db_pct>=35?'pill-g':r.db_pct>=28?'pill-a':r.db_pct!=null?'pill-r':'';
+      return `<tr style="background:rgba(30,58,30,.015);">
+        <td style="padding-left:28px;font-size:12px;">${r.varenavn}</td>
+        <td style="font-size:11px;color:var(--ash);"></td>
+        <td class="num" style="${mono}font-size:12px;">${Math.round(r.ny_snit)}</td>
+        <td class="num" style="${mono}font-size:12px;color:var(--ash);">${r.gl_snit>0?Math.round(r.gl_snit):'—'}</td>
+        <td class="num" style="${p2cls}${mono}font-size:12px;">${p2}</td>
+        <td class="num">${r.db_pct!=null?'<span class="pill '+pill2+'">'+r.db_pct.toFixed(1)+'%</span>':'—'}</td>
+        <td><span class="tbadge ${r.signal}">${signalLabel[r.signal]}</span></td>
+      </tr>`;
+    }).join('');
+
+    return `<tr style="background:var(--parchment);cursor:pointer;" onclick="trendToggle('${gid}',this)">
+      <td style="font-size:13px;font-weight:500;color:var(--forest);">
+        <span style="color:var(--amber);${mono}font-size:10px;margin-right:6px;" class="tarr">▶</span>${kat}
+      </td>
+      <td style="font-size:11px;color:var(--ash);">${prods.length} varer</td>
+      <td class="num" style="${mono}font-size:12px;">${Math.round(prods.reduce((s,r)=>s+r.ny_snit,0))}</td>
+      <td class="num" style="${mono}font-size:12px;color:var(--ash);">${Math.round(prods.reduce((s,r)=>s+r.gl_snit,0))}</td>
+      <td class="num" style="${pctCls}${mono}font-size:12px;font-weight:500;">${pctTxt}</td>
+      <td class="num">${katDbPct!=null?'<span class="pill '+pill+'">'+katDbPct.toFixed(1)+'%</span>':'—'}</td>
+      <td></td>
+    </tr>
+    <tbody id="${gid}" style="display:none;">${prodRows}</tbody>`;
   }).join('');
+}
+
+function trendToggle(gid, hdr) {
+  const grp  = document.getElementById(gid);
+  const arr  = hdr.querySelector('.tarr');
+  const open = grp.style.display === 'none';
+  grp.style.display = open ? '' : 'none';
+  if (arr) arr.textContent = open ? '▼' : '▶';
 }
 
 // ── KAFFE ANALYSE ─────────────────────────────────────────────────────────────

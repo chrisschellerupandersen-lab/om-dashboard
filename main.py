@@ -512,19 +512,19 @@ async def stamdata_bulk(request: Request):
 
 @app.get("/api/aarsplan/vf-detaljer")
 async def api_vf_detaljer(request: Request, aar: int, maaned: int):
-    _require_auth(request)
+    _kræv_login(request)
     return database.hent_vf_detaljer(aar, maaned)
 
 
 @app.get("/api/faste-omk")
 async def api_faste_omk(request: Request, aar: int):
-    _require_auth(request)
+    _kræv_login(request)
     return {"items": database.hent_faste_omk(aar)}
 
 
 @app.post("/api/faste-omk/gem")
 async def faste_omk_gem(request: Request):
-    _require_auth(request)
+    _kræv_login(request)
     try:
         body = await request.json()
     except Exception:
@@ -540,7 +540,7 @@ async def faste_omk_gem(request: Request):
 
 @app.post("/api/faste-omk/slet-kategori")
 async def faste_omk_slet(request: Request):
-    _require_auth(request)
+    _kræv_login(request)
     try:
         body = await request.json()
     except Exception:

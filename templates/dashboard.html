@@ -1603,9 +1603,16 @@ function buildForside(kpi, dage, uger, idag) {
       if (!(key in datoMap)) return 'rgba(150,150,150,.4)';
       return datoMap[key] <= r.omsaetning ? '#1e7a1e' : '#b42828';
     });
+    const DOW_MARK = {4:'T', 5:'F', 6:'L', 0:'S'};  // tor, fre, lør, søn
     mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
       [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: barColors, borderColor: barBorders, borderWidth: 1, borderRadius: 2 }],
-      { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45 }}, y:{ ticks:{ font:{ size:10 }, callback: v => Math.round(v/1000)+'k' }}}});
+      { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45,
+          callback: function(val, idx) {
+            const lbl = dage[idx] ? fmtDato(dage[idx].dato) : val;
+            const dow = dage[idx] ? new Date(dage[idx].dato + 'T12:00:00').getDay() : -1;
+            return DOW_MARK[dow] ? [lbl, DOW_MARK[dow]] : lbl;
+          }
+        }}, y:{ ticks:{ font:{ size:10 }, callback: v => Math.round(v/1000)+'k' }}}});
 
     const seneste = dage[dage.length - 1];
     if (seneste) {

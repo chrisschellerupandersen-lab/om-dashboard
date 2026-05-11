@@ -558,7 +558,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="kpi-row-8">
           <div class="kpi">
-            <div class="kpi-l">Seneste dag</div>
+            <div class="kpi-l">Samme dag i.f.å.</div>
             <div class="kpi-v" id="kpi-dag-omsat">—</div>
             <div class="kpi-s" id="kpi-dag-vs">indlæser…</div>
             <div class="kpi-s" id="kpi-dag-vf" style="color:var(--ash);"></div>
@@ -1457,22 +1457,35 @@ function buildForside(kpi, dage, uger, idag) {
     const uge      = kpi.uge      || {};
     const prevUge  = kpi.prev_uge || {};
 
-    // ── Dag-kasser ────────────────────────────────────────────────────────
-    document.getElementById('kpi-dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    // ── Dag-kasser (viser samme dag forrige uge) ──────────────────────────
+    const lwDag     = kpi.prev_dag      || {};
+    const lwPrevDag = kpi.prev_prev_dag || {};
 
-    if (kpi.snit_dag && dag.omsaetning) {
-      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
-      const el = document.getElementById('kpi-dag-vs');
-      el.textContent = (pct >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. dagssnit';
-      el.className = 'kpi-s ' + (pct >= 0 ? 'up' : 'dn');
+    document.getElementById('kpi-dag-omsat').textContent = lwDag.omsaetning != null ? kr(lwDag.omsaetning) : '—';
+
+    // Dato-label: "man. 4. maj"
+    if (kpi.prev_dag_dato) {
+      const d   = new Date(kpi.prev_dag_dato);
+      const lbl = d.toLocaleDateString('da-DK', {weekday:'short', day:'numeric', month:'short'});
+      const el  = document.getElementById('kpi-dag-vs');
+      // Sammenlign vs. samme dag 2 uger siden
+      if (lwPrevDag.omsaetning > 0 && lwDag.omsaetning != null) {
+        const diff = lwDag.omsaetning - lwPrevDag.omsaetning;
+        const pct  = (diff / lwPrevDag.omsaetning) * 100;
+        el.textContent = lbl + '  ·  ' + (diff >= 0 ? '▲ +' : '▼ ') + Math.abs(pct).toFixed(0) + '% vs. -2 uger';
+        el.className = 'kpi-s ' + (diff >= 0 ? 'up' : 'dn');
+      } else {
+        el.textContent = lbl;
+        el.className = 'kpi-s';
+      }
     }
-    if (dag.transak > 0 && dag.omsaetning > 0) {
+    if (lwDag.transak > 0 && lwDag.omsaetning > 0) {
       document.getElementById('kpi-dag-vs').textContent +=
-        '  ·  ' + Math.round(dag.omsaetning / dag.transak) + ' kr/kurv';
+        '  ·  ' + Math.round(lwDag.omsaetning / lwDag.transak) + ' kr/kurv';
     }
 
-    if (dag.vareforbrug > 0) {
-      document.getElementById('kpi-dag-vf').textContent = 'VF ' + kr(dag.vareforbrug);
+    if (lwDag.vareforbrug > 0) {
+      document.getElementById('kpi-dag-vf').textContent = 'VF ' + kr(lwDag.vareforbrug);
     }
     if (dag.transak > 0) {
       document.getElementById('kpi-kunder').textContent = dag.transak;

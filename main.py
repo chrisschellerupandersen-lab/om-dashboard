@@ -277,6 +277,81 @@ async def api_bestillings_anbefaling(
     return database.hent_bestillings_uge(int(uge), int(aar))
 
 
+@app.get("/api/bestilling/management-analyse")
+async def api_management_analyse(
+    request: Request,
+    uge: int,
+    aar: int,
+):
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"analyse": None, "fejl": "ANTHROPIC_API_KEY ikke konfigureret i Railway"}
+
+    d = database.hent_bestillings_uge(int(uge), int(aar))
+    if "fejl" in d or "error" in d:
+        return {"analyse": None, "fejl": d.get("fejl") or d.get("error")}
+
+    # Byg kategori-opsummering
+    kat_map = {}
+    for p in d.get("produkter", []):
+        kat = p.get("kategori") or "Øvrige"
+        anbefalet = p.get("total_anbefalet", 0)
+        basis_total = sum((p.get("basis") or {}).values())
+        if kat not in kat_map:
+            kat_map[kat] = {"anbefalet": 0, "basis": 0}
+        kat_map[kat]["anbefalet"] += anbefalet
+        kat_map[kat]["basis"]     += basis_total
+
+    kat_linjer = []
+    for kat, v in sorted(kat_map.items(), key=lambda x: -x[1]["anbefalet"]):
+        diff = v["anbefalet"] - v["basis"]
+        pct  = round(diff / v["basis"] * 100, 1) if v["basis"] > 0 else 0
+        kat_linjer.append(
+            f"  {kat}: {round(v['anbefalet'])} stk (basis: {round(v['basis'])} stk, "
+            f"ændring: {'+' if diff >= 0 else ''}{round(diff)} stk / {'+' if pct >= 0 else ''}{pct}%)"
+        )
+
+    evt = d.get("event")
+    evt_txt = f"\nBegivenhed denne uge: {evt['navn']} (faktor ×{evt.get('faktor',1)})" if evt else "\nIngen registrerede begivenheder denne uge."
+
+    prompt = f"""Du er den erfarne bageri-chef og management-rådgiver for Organic Market i Greve — et dansk specialbageri.
+
+Gennemgå nedenstående bestillingsdata for uge {d['maal_uge']} {d['maal_aar']} og giv en kort, konkret management-vurdering på dansk.
+
+BESTILLINGSDATA:
+- Måluge: {d['maal_uge']} {d['maal_aar']} ({d.get('dato_range','')})
+- Basisuge: {d['basis_uge']} {d['basis_aar']}
+- Anbefalet total: {round(d['total_stk'])} stk / {round(d['total_kr'])} kr ex moms
+- Sæsonindeks (SI): {d['si']:.2f} ({'+' if d['si'] >= 1 else ''}{round((d['si']-1)*100)}% ift. neutral)
+- Væksttrend: {'+' if d['vaekst_pct'] >= 0 else ''}{d['vaekst_pct']:.1f}%
+- Too Good To Go: {round(d['tgtg_kr'])} kr/uge {'⚠ FOR HØJ' if d.get('tgtg_advarsel') else '✓ OK' if d.get('tgtg_ok') else ''}
+{evt_txt}
+
+KATEGORI-FORDELING (anbefalet vs. basisuge):
+{chr(10).join(kat_linjer)}
+
+Giv en management-vurdering med:
+1. En samlet konklusion (2-3 sætninger): ser bestillingen fornuftig ud?
+2. Hvad har ændret sig vs. basisugen og hvorfor (sæson, trend, begivenhed)?
+3. 1-2 konkrete råd eller ting at holde øje med.
+
+Vær direkte og konkret. Brug tal. Maks 200 ord."""
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-20240307",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        tekst = msg.content[0].text
+        return {"analyse": tekst}
+    except Exception as e:
+        return {"analyse": None, "fejl": str(e)}
+
+
 @app.get("/api/bestilling/eksport")
 async def api_bestilling_eksport(
     request: Request,

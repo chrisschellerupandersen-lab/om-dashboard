@@ -1185,6 +1185,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
+
+        <!-- Management analyse -->
+        <div class="card" id="bern-analyse-kort" style="margin-top:16px;display:none;">
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">📋 Management vurdering</span>
+            <button id="bern-analyse-btn" onclick="bernGenererAnalyse()"
+              style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 12px;
+                     background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
+              Generer ny ↻
+            </button>
+          </div>
+          <div id="bern-analyse-tekst" style="margin-top:12px;font-size:14px;line-height:1.7;color:var(--forest);white-space:pre-wrap;"></div>
+        </div>
       </div>
 
       <!-- MOBILEPAY -->
@@ -3299,6 +3312,10 @@ async function loadBernUge(uge, aar) {
   document.getElementById('bern-retur-wiener').textContent     = wienerStk > 0 ? returWiener + ' stk' : '—';
   document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
 
+  // Vis analyse-kort og auto-generer
+  document.getElementById('bern-analyse-kort').style.display = '';
+  bernGenererAnalyse();
+
   document.getElementById('beregner-tabel').innerHTML = `
     ${evtNote}
     <div class="aar2-tbl-wrap">
@@ -3335,6 +3352,29 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
+}
+
+async function bernGenererAnalyse() {
+  if (!_bernUge || !_bernAar) return;
+  const btn  = document.getElementById('bern-analyse-btn');
+  const tekst = document.getElementById('bern-analyse-tekst');
+  btn.textContent = 'Analyserer…';
+  btn.disabled    = true;
+  tekst.style.color = 'var(--ash)';
+  tekst.textContent = '🤔 Henter bestillingsdata og vurderer…';
+
+  const res = await api(`/api/bestilling/management-analyse?uge=${_bernUge}&aar=${_bernAar}`);
+
+  btn.textContent = 'Generer ny ↻';
+  btn.disabled    = false;
+
+  if (!res || res.fejl) {
+    tekst.style.color = 'var(--danger)';
+    tekst.textContent = '⚠ ' + (res?.fejl || 'Fejl ved analyse — tjek ANTHROPIC_API_KEY i Railway');
+    return;
+  }
+  tekst.style.color = 'var(--forest)';
+  tekst.textContent = res.analyse;
 }
 
 async function bernCellSave(td) {

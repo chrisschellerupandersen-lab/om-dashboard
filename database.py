@@ -1248,26 +1248,28 @@ def _events_for_aar(aar: int) -> Dict:
         }
 
     # ── Konfirmationssæson (uge 15–19 hvert år) ─────────────────────────
-    # Ceremionierne er primært søndage; Himmelfartsdag-torsdag bruges også.
-    # Boost lørdag+søndag; noter ekstra kage/wienerbrød.
+    # I Greve holdes konfirmation på TORSDAG.
+    # Familier handler ONS (dagen før) + TOR morgen til festen.
+    # FRE er rolig (festen var i går). LØR/SØN normal.
+    # Ekstra: wienerbrød, hvide boller, flutes, formbrød til festbordet.
     for delta_w in range(5):   # uge 15, 16, 17, 18, 19
         kd = _date.fromisocalendar(aar, 15 + delta_w, 1)
         kw, ky = _yw(kd)
         if (kw, ky) not in ev:
             ev[(kw, ky)] = {
-                "factor": 1.10,
+                "factor": 1.08,
                 "navn":   "Konfirmationssæson",
-                "note":   "Bestil ekstra kage og wienerbrød til konfirmationsfejringer",
-                "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,
-                             "fre":1.05,"loe":1.20,"son":1.30},
+                "note":   "Ons+Tor: ekstra wienerbrød, hvide boller, flutes til torsdagsfest · Fre rolig",
+                "dag_fak": {"man":1.0,"tir":1.0,"ons":1.25,"tor":1.20,
+                             "fre":0.90,"loe":1.05,"son":1.0},
             }
         else:
             ex = dict(ev[(kw, ky)])
             ex["dag_fak"] = dict(ex["dag_fak"])
-            ex["dag_fak"]["loe"] = max(ex["dag_fak"].get("loe", 1.0), 1.15)
-            ex["dag_fak"]["son"] = max(ex["dag_fak"].get("son", 1.0), 1.25)
-            ex["factor"]  = max(ex["factor"], 1.10)
-            ex["note"]    = ex["note"] + " · ekstra kage/wiener (konfirmation)"
+            ex["dag_fak"]["ons"] = max(ex["dag_fak"].get("ons", 1.0), 1.20)
+            ex["dag_fak"]["tor"] = max(ex["dag_fak"].get("tor", 1.0), 1.15)
+            ex["factor"]  = max(ex["factor"], 1.08)
+            ex["note"]    = ex["note"] + " · Ons+Tor: ekstra wiener+boller (konfirmation)"
             ev[(kw, ky)] = ex
 
     # ── Mors dag (anden søndag i maj) ───────────────────────────────────

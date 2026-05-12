@@ -1247,6 +1247,29 @@ def _events_for_aar(aar: int) -> Dict:
             "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.40,"loe":1.20,"son":1.0},
         }
 
+    # ── Konfirmationssæson (uge 15–19 hvert år) ─────────────────────────
+    # Ceremionierne er primært søndage; Himmelfartsdag-torsdag bruges også.
+    # Boost lørdag+søndag; noter ekstra kage/wienerbrød.
+    for delta_w in range(5):   # uge 15, 16, 17, 18, 19
+        kd = _date.fromisocalendar(aar, 15 + delta_w, 1)
+        kw, ky = _yw(kd)
+        if (kw, ky) not in ev:
+            ev[(kw, ky)] = {
+                "factor": 1.10,
+                "navn":   "Konfirmationssæson",
+                "note":   "Bestil ekstra kage og wienerbrød til konfirmationsfejringer",
+                "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,
+                             "fre":1.05,"loe":1.20,"son":1.30},
+            }
+        else:
+            ex = dict(ev[(kw, ky)])
+            ex["dag_fak"] = dict(ex["dag_fak"])
+            ex["dag_fak"]["loe"] = max(ex["dag_fak"].get("loe", 1.0), 1.15)
+            ex["dag_fak"]["son"] = max(ex["dag_fak"].get("son", 1.0), 1.25)
+            ex["factor"]  = max(ex["factor"], 1.10)
+            ex["note"]    = ex["note"] + " · ekstra kage/wiener (konfirmation)"
+            ev[(kw, ky)] = ex
+
     # ── Mors dag (anden søndag i maj) ───────────────────────────────────
     mors = _anden_soendag_i_maaned(aar, 5)
     mw, my = _yw(mors)

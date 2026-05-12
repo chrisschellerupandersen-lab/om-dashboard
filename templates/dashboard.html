@@ -3475,16 +3475,19 @@ async function loadBernUge(uge, aar) {
     for (const p of prods) {
       const vnSafe = (p.varenummer || '').replace(/[^a-zA-Z0-9_-]/g, '_');
       const dagCells = DAGE.map(dag => {
-        const v       = p.anbefalet[dag] || 0;
-        const isManuel = p.manuel && p.manuel[dag];
-        const wkBg    = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
-        const manStyle = isManuel ? 'border-bottom:2px solid var(--gold);' : '';
+        const v         = p.anbefalet[dag] || 0;
+        const isManuel  = p.manuel && p.manuel[dag];
+        const isMinAnb  = (p.min_anb_dage || []).includes(dag);
+        const wkBg      = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
+        const manStyle  = isManuel ? 'border-bottom:2px solid var(--gold);' : '';
+        const minStyle  = isMinAnb ? 'border-bottom:2px dashed var(--amber);color:var(--amber);' : '';
+        const tipAttr   = isMinAnb ? ' title="Normalt 0 — minimum-anbefaling pga. begivenhed"' : '';
         return `<td class="num bern-cell" contenteditable="true"
           data-vn="${p.varenummer || ''}" data-dag="${dag}"
           onblur="bernCellSave(this)"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
-          style="${mono}${wkBg}${v===0?'color:var(--ash);':''}${manStyle}cursor:text;min-width:28px;"
+          style="${mono}${wkBg}${v===0&&!isMinAnb?'color:var(--ash);':''}${manStyle}${minStyle}cursor:text;min-width:28px;"${tipAttr}
         >${v}</td>`;
       }).join('');
 
@@ -3531,6 +3534,7 @@ async function loadBernUge(uge, aar) {
     ? `<div class="bern-evt-note" style="margin-bottom:10px;">⚑ <b>${d.event.navn}</b> — ${d.event.note}</div>`
     : '';
 
+  const hasMinAnb = d.produkter.some(p => (p.min_anb_dage || []).length > 0);
   const faktorer = [
     `Uge ${d.basis_uge} som udgangspunkt`,
     `× SI ${d.si.toFixed(2)} (${MND[d.maaned]})`,
@@ -3538,6 +3542,7 @@ async function loadBernUge(uge, aar) {
     d.tgtg_korrektion < 1 ? `× TGTG-korr. 0,95` : null,
     vp !== 0              ? `× vækst ${vp>=0?'+':''}${vp}%` : null,
     `= faktor ${d.total_faktor.toFixed(3)}`,
+    hasMinAnb             ? `<span style="color:var(--amber);">◆ understregede celler = minimum-anbefaling (normalt ikke bestilt denne dag)</span>` : null,
   ].filter(Boolean).join('  ·  ');
 
   const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;

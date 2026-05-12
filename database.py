@@ -1812,13 +1812,35 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         kat = _kat(r["varenavn"], sd_map)
         vn  = r["varenummer"] or ""
 
+        min_anb_dage: set = set()
+
         if kat == 'Kage':
             anb_dag = {d: int(basis_dag[d]) for d in DAGE}
         else:
             anb_dag = {}
             for d in DAGE:
-                raw = basis_dag[d] * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
-                anb_dag[d] = int(round(raw))
+                b = basis_dag[d]
+                if b > 0:
+                    raw = b * si * dag_fak.get(d, 1.0) * tgtg_korr * (1 + vaekst)
+                    anb_dag[d] = int(round(raw))
+                else:
+                    d_fak = dag_fak.get(d, 1.0)
+                    if evt and d_fak > 1.10:
+                        # Basis = 0, men event løfter denne dag markant.
+                        # Estimer fra den dag med højest event-faktor der HAR basis > 0.
+                        ref_candidates = [
+                            (dag_fak.get(rd, 1.0), basis_dag[rd], rd)
+                            for rd in DAGE if basis_dag[rd] > 0
+                        ]
+                        if ref_candidates:
+                            ref_fak, ref_b, _ = max(ref_candidates, key=lambda x: x[0])
+                            raw_min = ref_b * (d_fak / max(ref_fak, 0.01)) * si * tgtg_korr * (1 + vaekst)
+                            anb_dag[d] = max(1, int(round(raw_min)))
+                            min_anb_dage.add(d)
+                        else:
+                            anb_dag[d] = 0
+                    else:
+                        anb_dag[d] = 0
 
         # Anvend manuelle overrides
         vn_manuel = manuel.get(vn, {})
@@ -1838,6 +1860,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             "basis":           {d: int(basis_dag[d]) for d in DAGE},
             "anbefalet":       anb_dag,
             "manuel":          {d: True for d in DAGE if d in vn_manuel},
+            "min_anb_dage":    list(min_anb_dage),
             "total_basis":     int(total_basis),
             "total_anbefalet": total_anb,
             "total_pris":      round(total_anb * pris, 2),

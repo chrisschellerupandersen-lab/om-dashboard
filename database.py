@@ -1137,38 +1137,220 @@ def hent_mangler_kostpris() -> Dict:
 _SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,
               7:1.08, 8:1.10, 9:1.00, 10:.97, 11:.95, 12:1.85}
 
-_EVENTS: Dict = {
-    (7,  2026): {"factor": 1.20, "navn": "Fastelavn",
-                 "note": "Mere wienerbrød og boller — bestil fastelavnsboller",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.3,"son":1.0}},
-    (14, 2026): {"factor": 1.15, "navn": "Påskeuge (2.–5. apr.)",
-                 "note": "Lang weekend — ekstra på torsdag og fredag",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.3,"fre":1.4,"loe":1.2,"son":1.0}},
-    (15, 2026): {"factor": 0.90, "navn": "Påske — mandag lukket",
-                 "note": "Reducer mandag-leverancen (2. påskedag)",
-                 "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0}},
-    (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",
-                 "note": "+10% — fridag i ugen",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.2,"loe":1.2,"son":1.0}},
+# Manuelle overrides — vinder over dynamiske begivenheder.
+# Bruges til at finjustere faktorer for specifikke år/uger.
+_EVENTS_OVERRIDE: Dict = {
+    # Uge 20 2026: Kr. Himmelfart tors. + brofridag fre. — manuelt analyseret
     (20, 2026): {"factor": 1.15, "navn": "Kr. Himmelfart + brofridag",
                  "note": "Fredag 15. maj er brofridag — bestil 45% ekstra fredag",
                  "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.45,"loe":1.2,"son":1.0}},
-    (21, 2026): {"factor": 1.15, "navn": "Pinse (søn. 24. maj)",
-                 "note": "Søndagsleverance dækker søndag + mandag",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.1,"loe":1.2,"son":1.4}},
-    (22, 2026): {"factor": 0.88, "navn": "2. Pinsedag — mandag lukket",
-                 "note": "Reducer første leverance mandag",
-                 "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0}},
-    (23, 2026): {"factor": 1.25, "navn": "Grundlovsdag (fre. 5. jun.)",
-                 "note": "Fredag er årets bedste bagværksdag — bestil 60% ekstra fredag",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.2,"son":1.0}},
-    (52, 2026): {"factor": 1.85, "navn": "Juleugen",
-                 "note": "Årets travleste uge — planlæg indkøb i oktober",
-                 "dag_fak": {"man":1.2,"tir":1.3,"ons":1.4,"tor":1.5,"fre":1.6,"loe":1.4,"son":1.0}},
-    (1,  2027): {"factor": 0.45, "navn": "Nytårsuge",
-                 "note": "Halv bestilling — butik lukket/kort uge",
-                 "dag_fak": {"man":0.0,"tir":0.5,"ons":0.5,"tor":0.5,"fre":0.5,"loe":0.5,"son":0.0}},
+    # Store Bededag 2026 (1. maj, fredag) — afskaffet helligdag, stadig folkelig fridag
+    (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",
+                 "note": "+10% — fridag i ugen",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.2,"loe":1.2,"son":1.0}},
 }
+
+# ─── Dynamiske, tilbagevendende begivenheder ────────────────────────────────
+
+def _paaskedag(aar: int):
+    """Beregn Påskedag (søndag) vha. Gaussisk algoritme."""
+    from datetime import date as _date
+    a = aar % 19
+    b = aar // 100
+    c = aar % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day   = ((h + l - 7 * m + 114) % 31) + 1
+    return _date(aar, month, day)
+
+
+def _anden_soendag_i_maaned(aar: int, maaned: int):
+    """Returnerer datoen for den anden søndag i den givne måned."""
+    from datetime import date as _date, timedelta
+    d = _date(aar, maaned, 1)
+    dage_til_son = (6 - d.weekday()) % 7   # dage til første søndag
+    return d + timedelta(days=dage_til_son + 7)  # anden søndag
+
+
+_events_cache: Dict = {}   # cache pr. år, nulstilles ikke (Railway genstarter ved deploy)
+
+
+def _events_for_aar(aar: int) -> Dict:
+    """Generer dynamiske tilbagevendende begivenheder for et givet år.
+
+    Inkluderer: Fastelavn, Påske(uge), 2.påskedag, Kr.Himmelfart,
+    Mors dag, Pinse, 2.Pinsedag, Grundlovsdag, Fars dag, Juleugen, Nytårsuge.
+    """
+    if aar in _events_cache:
+        return _events_cache[aar]
+
+    from datetime import date as _date, timedelta
+
+    ev: Dict = {}
+    paaske = _paaskedag(aar)
+
+    def _yw(d):
+        iso = d.isocalendar()
+        return iso[1], iso[0]   # (uge, aar) — iso[0]=år kan afvige ved uge 52/1
+
+    def _dname(d, fmt="%d. %b"):
+        """Kort datostreng, fjerner evt. ledende nul."""
+        s = d.strftime(fmt)
+        return s.lstrip("0")
+
+    # ── Fastelavn (søndag, 7 uger før påske) ────────────────────────────
+    fastelavn = paaske - timedelta(weeks=7)
+    uw, uy = _yw(fastelavn)
+    ev[(uw, uy)] = {
+        "factor": 1.18, "navn": "Fastelavn",
+        "note": "Fastelavnsboller — ekstra lørdag og søndag",
+        "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.35,"son":1.10},
+    }
+
+    # ── Påskeuge (Skærtorsdag til Påskelørdag) ──────────────────────────
+    skaer = paaske - timedelta(days=3)          # Skærtorsdag
+    langfre = paaske - timedelta(days=2)        # Langfredag
+    uw, uy = _yw(skaer)
+    ev[(uw, uy)] = {
+        "factor": 1.20,
+        "navn": f"Påskeuge ({_dname(skaer)}.–{_dname(langfre)}. {langfre.strftime('%b')})",
+        "note": "Lang weekend — ekstra torsdag og fredag",
+        "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.35,"fre":1.40,"loe":1.20,"son":1.0},
+    }
+
+    # ── Ugen efter påske (2. Påskedag — mandag lukket) ──────────────────
+    p2man = paaske + timedelta(days=1)
+    uw2, uy2 = _yw(p2man)
+    if (uw2, uy2) != (uw, uy):              # kun hvis anden uge
+        ev[(uw2, uy2)] = {
+            "factor": 0.90, "navn": "2. Påskedag — mandag lukket",
+            "note": "Reducer mandag-leverancen",
+            "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
+        }
+
+    # ── Kristi Himmelfartsdag (påske + 39 dage, altid torsdag) ──────────
+    himmelfart = paaske + timedelta(days=39)
+    hw, hy = _yw(himmelfart)
+    if (hw, hy) not in ev:
+        ev[(hw, hy)] = {
+            "factor": 1.12,
+            "navn": f"Kristi Himmelfartsdag ({_dname(himmelfart)}. {himmelfart.strftime('%b')})",
+            "note": "Torsdag er helligdag — fredag brofridag for mange",
+            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.40,"loe":1.20,"son":1.0},
+        }
+
+    # ── Mors dag (anden søndag i maj) ───────────────────────────────────
+    mors = _anden_soendag_i_maaned(aar, 5)
+    mw, my = _yw(mors)
+    if (mw, my) not in ev:
+        ev[(mw, my)] = {
+            "factor": 1.22,
+            "navn": f"Mors dag ({_dname(mors)}. maj)",
+            "note": "Høj søndag — kage og wienerbrød sælger stærkt",
+            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.10,"loe":1.25,"son":1.55},
+        }
+    else:
+        # Mors dag falder i helligdagsuge — forstærk søndag og factor
+        existing = dict(ev[(mw, my)])
+        existing["dag_fak"] = dict(existing["dag_fak"])
+        existing["dag_fak"]["son"] = max(existing["dag_fak"].get("son", 1.0), 1.45)
+        existing["factor"] = max(existing["factor"], 1.22)
+        existing["navn"] = existing["navn"] + " + Mors dag"
+        existing["note"] = existing["note"] + " · Mors dag søndag"
+        ev[(mw, my)] = existing
+
+    # ── Pinse (påske + 49 dage, søndag) ─────────────────────────────────
+    pinse = paaske + timedelta(days=49)
+    pw, py = _yw(pinse)
+    ev[(pw, py)] = {
+        "factor": 1.15,
+        "navn": f"Pinse ({_dname(pinse)}. {pinse.strftime('%b')})",
+        "note": "Søndagsleverance dækker søndag + mandag",
+        "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.10,"loe":1.20,"son":1.40},
+    }
+
+    # ── 2. Pinsedag (mandag efter pinse — lukket) ────────────────────────
+    pinse_man = pinse + timedelta(days=1)
+    pw2, py2 = _yw(pinse_man)
+    if (pw2, py2) != (pw, py):
+        ev[(pw2, py2)] = {
+            "factor": 0.88, "navn": "2. Pinsedag — mandag lukket",
+            "note": "Reducer første leverance mandag",
+            "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
+        }
+
+    # ── Grundlovsdag (5. juni — oftest fredag) ───────────────────────────
+    grundlov = _date(aar, 6, 5)
+    gw, gy = _yw(grundlov)
+    if (gw, gy) not in ev:
+        ev[(gw, gy)] = {
+            "factor": 1.25,
+            "navn": f"Grundlovsdag ({_dname(grundlov)}. jun.)",
+            "note": "Fredag fridag — årets bedste bagværksdag",
+            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.20,"son":1.0},
+        }
+    else:
+        existing = dict(ev[(gw, gy)])
+        existing["dag_fak"] = dict(existing["dag_fak"])
+        existing["dag_fak"]["fre"] = max(existing["dag_fak"].get("fre", 1.0), 1.50)
+        existing["factor"] = max(existing["factor"], 1.15)
+        existing["navn"] = existing["navn"] + " + Grundlovsdag"
+        ev[(gw, gy)] = existing
+
+    # ── Fars dag (anden søndag i juni — dansk tradition) ─────────────────
+    fars = _anden_soendag_i_maaned(aar, 6)
+    fw, fy = _yw(fars)
+    if (fw, fy) not in ev:
+        ev[(fw, fy)] = {
+            "factor": 1.10,
+            "navn": f"Fars dag ({_dname(fars)}. jun.)",
+            "note": "Ekstra søndag — kage og brød",
+            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.05,"loe":1.10,"son":1.30},
+        }
+    else:
+        existing = dict(ev[(fw, fy)])
+        existing["dag_fak"] = dict(existing["dag_fak"])
+        existing["dag_fak"]["son"] = max(existing["dag_fak"].get("son", 1.0), 1.25)
+        existing["factor"] = max(existing["factor"], 1.10)
+        if "Fars dag" not in existing.get("navn", ""):
+            existing["navn"] = existing["navn"] + " + Fars dag"
+        ev[(fw, fy)] = existing
+
+    # ── Juleugen (uge med juledag 25. dec.) ─────────────────────────────
+    juledag = _date(aar, 12, 25)
+    jw, jy = _yw(juledag)
+    ev[(jw, jy)] = {
+        "factor": 1.85, "navn": "Juleugen",
+        "note": "Årets travleste uge — planlæg indkøb i oktober",
+        "dag_fak": {"man":1.2,"tir":1.3,"ons":1.4,"tor":1.5,"fre":1.6,"loe":1.4,"son":1.0},
+    }
+
+    # ── Nytårsuge (uge 1 det efterfølgende år) ───────────────────────────
+    nytaar = _date(aar + 1, 1, 4)           # 4. jan er altid i uge 1
+    nyw, nyy = _yw(nytaar)
+    ev[(nyw, nyy)] = {
+        "factor": 0.45, "navn": "Nytårsuge",
+        "note": "Halv bestilling — butik lukket/kort uge",
+        "dag_fak": {"man":0.0,"tir":0.5,"ons":0.5,"tor":0.5,"fre":0.5,"loe":0.5,"son":0.0},
+    }
+
+    _events_cache[aar] = ev
+    return ev
+
+
+def _get_event(uge: int, aar: int) -> Optional[Dict]:
+    """Hent begivenhed for (uge, aar) — override vinder over dynamisk."""
+    if (uge, aar) in _EVENTS_OVERRIDE:
+        return _EVENTS_OVERRIDE[(uge, aar)]
+    return _events_for_aar(aar).get((uge, aar))
 
 _RB = 0.10    # returrate boller (10% sendes retur)
 _RW = 0.135   # returrate wienerbrød (13.5%)
@@ -1310,7 +1492,7 @@ def hent_bestillings_anbefaling() -> Dict:
         u_mdr = mon_dato.month
 
         si   = _SI_MAANED.get(u_mdr, 1.0)
-        evt  = _EVENTS.get((u_uge, u_aar))
+        evt  = _get_event(u_uge, u_aar)
         efak = evt["factor"] if evt else 1.0
         tot_fak = si * efak * tgtg_korr * (1 + vaekst)
 
@@ -1591,7 +1773,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     si = _SI_MAANED.get(mon_dato.month, 1.0)
 
     # Event / helligdage
-    evt = _EVENTS.get((maal_uge, maal_aar))
+    evt = _get_event(maal_uge, maal_aar)
     dag_fak = evt["dag_fak"] if evt else {d: 1.0 for d in DAGE}
     total_faktor = si * (evt["factor"] if evt else 1.0) * tgtg_korr * (1 + vaekst)
 

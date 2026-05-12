@@ -514,6 +514,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p id="hdr-forside-sub">Organic Market Greve</p>
         </div>
         <div class="kpi-row-8">
+          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-dag-omsat-ov" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-omsat" style="color:var(--amber);">—</div></div></div>
+            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning · dag</div>
+            <div class="kpi-s" id="kpi-dag-omsat-sub" style="color:rgba(255,255,255,.45);">ekskl. moms</div>
+          </div>
           <div class="kpi">
             <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-db">—</div></div></div>
             <div class="kpi-l">DB · dag</div>
@@ -1650,6 +1655,22 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       document.getElementById('kpi-kunder').textContent = dag.transak;
       const kurv = dag.omsaetning && dag.transak ? Math.round(dag.omsaetning / dag.transak) : 0;
       document.getElementById('kpi-kurv').textContent = kurv > 0 ? kurv.toLocaleString('da-DK') + ' kr/kurv' : '—';
+    }
+
+    // Omsætning dag (overblik-kort)
+    if (dag.omsaetning != null) {
+      document.getElementById('kpi-dag-omsat').textContent = kr(dag.omsaetning);
+      // Ring: snit 40 kunder × 65 kr/kurv = 2.600 kr/dag normalt → 8.000 kr = fuld ring
+      setRing('ring-dag-omsat-ov', Math.min(100, dag.omsaetning / 8000 * 100), 'var(--amber)');
+      // Subtext: vs. samme dag sidste uge
+      const prevOmsat = (kpi.prev_dag || {}).omsaetning;
+      if (prevOmsat > 0) {
+        const pct = ((dag.omsaetning / prevOmsat) - 1) * 100;
+        document.getElementById('kpi-dag-omsat-sub').textContent =
+          (pct >= 0 ? '+' : '') + pct.toFixed(0) + '% vs. sidste uge';
+        document.getElementById('kpi-dag-omsat-sub').style.color =
+          pct >= 0 ? 'rgba(200,168,75,.85)' : 'rgba(220,100,80,.85)';
+      }
     }
 
     // DB dag

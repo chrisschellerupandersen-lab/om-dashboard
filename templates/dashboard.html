@@ -3391,17 +3391,17 @@ async function loadBernUge(uge, aar) {
     : 'Udgangspunkt: uge ' + d.basis_uge + ' ' + d.basis_aar;
   document.getElementById('bern-basis-label').style.color = d.faktisk ? 'var(--moss)' : '';
 
-  // Event-badge
-  const evtBadge = document.getElementById('bern-event-badge');
-  const evtNote  = document.getElementById('bern-event-note');
+  // Event-badge (header)
+  const evtBadgeEl = document.getElementById('bern-event-badge');
+  const evtNoteEl  = document.getElementById('bern-event-note');
   if (d.event && d.event.navn) {
-    evtBadge.textContent = d.event.navn;
-    evtBadge.style.display = '';
-    evtNote.textContent  = d.event.note || '';
-    evtNote.style.display = d.event.note ? '' : 'none';
+    evtBadgeEl.textContent = d.event.navn;
+    evtBadgeEl.style.display = '';
+    evtNoteEl.textContent  = d.event.note || '';
+    evtNoteEl.style.display = d.event.note ? '' : 'none';
   } else {
-    evtBadge.style.display = 'none';
-    evtNote.style.display  = 'none';
+    evtBadgeEl.style.display = 'none';
+    evtNoteEl.style.display  = 'none';
   }
 
   // KPI-række: skjul beregner-felter ved faktisk bestilling

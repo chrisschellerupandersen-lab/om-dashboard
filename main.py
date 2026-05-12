@@ -191,6 +191,25 @@ async def rapport_status():
     }
 
 
+@app.get("/api/debug-ping")
+async def debug_ping(request: Request):
+    """Diagnostik: tjek session + database uden login-krav på selve ping."""
+    has_session = bool(get_session(request))
+    try:
+        info = database.hent_seneste_snapshot_info()
+        db_ok = True
+        db_dato = info.get("rapport_dato") if info else None
+    except Exception as e:
+        db_ok = False
+        db_dato = str(e)
+    return {
+        "session": has_session,
+        "db_ok": db_ok,
+        "db_dato": db_dato,
+        "cookie_names": list(request.cookies.keys()),
+    }
+
+
 # ── WEBHOOK ───────────────────────────────────────────────────────────────────
 
 @app.get("/api/bestilling/uger")

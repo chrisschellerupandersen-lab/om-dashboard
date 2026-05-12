@@ -208,21 +208,6 @@ async def api_bestilling_uge(request: Request, uge: int, aar: Optional[int] = No
     return database.hent_bestilling_uge(uge, aar)
 
 
-@app.post("/api/bestilling/slet-uge")
-async def bestilling_slet_uge(request: Request):
-    try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Ugyldig JSON")
-    if body.get("secret") != WEBHOOK_SECRET:
-        raise HTTPException(status_code=401, detail="Ugyldig secret")
-    uge = int(body["uge"]); aar = int(body["aar"])
-    import sqlite3
-    db_path = database.DB_PATH
-    with sqlite3.connect(db_path) as conn:
-        n = conn.execute("DELETE FROM ugebestillinger WHERE uge=? AND aar=?", (uge, aar)).rowcount
-    return {"ok": True, "slettet": n, "uge": uge, "aar": aar}
-
 
 @app.post("/api/bestilling/opdater")
 async def bestilling_opdater(request: Request):

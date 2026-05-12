@@ -604,8 +604,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <div class="kpi">
             <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-vs-snit">—</div></div></div>
-            <div class="kpi-l">vs. dagssnit</div>
-            <div class="kpi-s" id="dag-vs-sub">snit 28 dage</div>
+            <div class="kpi-l">vs. sidste uge</div>
+            <div class="kpi-s" id="dag-vs-sub">samme dag</div>
           </div>
         </div>
         <div class="card">
@@ -1919,17 +1919,32 @@ function buildDag(kpi, timer) {
       const kurv = Math.round(dag.omsaetning / dag.transak);
       document.getElementById('dag-snit-kurv').textContent = kurv + ' kr/kurv';
     }
-    if (kpi.snit_dag && dag.omsaetning) {
-      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
+    const prevDagOmsat = kpi.prev_dag ? kpi.prev_dag.omsaetning : null;
+    if (prevDagOmsat > 0 && dag.omsaetning) {
+      const pct = ((dag.omsaetning / prevDagOmsat) - 1) * 100;
       const el  = document.getElementById('dag-vs-snit');
       el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
       el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+      // Vis ugedag + kr for samme dag sidste uge
+      const DAG_NAVN = ['søn','man','tir','ons','tor','fre','lør'];
+      const prevDato = kpi.prev_dag_dato ? new Date(kpi.prev_dag_dato) : null;
+      const dagNavn  = prevDato ? DAG_NAVN[prevDato.getUTCDay()] : 'samme dag';
       document.getElementById('dag-vs-sub').textContent =
-        'snit ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
+        dagNavn + ' · ' + Math.round(prevDagOmsat).toLocaleString('da-DK') + ' kr';
       setRing('ring-dag-omsat', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
       setRing('ring-dag-vssnit', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
     } else if (dag.omsaetning > 0) {
       setRing('ring-dag-omsat', 60, 'var(--forest)');
+      // Fallback til dagssnit hvis ingen data fra samme dag sidste uge
+      if (kpi.snit_dag) {
+        const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
+        const el  = document.getElementById('dag-vs-snit');
+        el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+        document.getElementById('dag-vs-sub').textContent =
+          'snit ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
+        setRing('ring-dag-vssnit', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+      }
     }
     if (dag.db_pct != null)
       setRing('ring-sendag-db', dag.db_pct, dag.db_pct >= 35 ? 'var(--forest)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)');

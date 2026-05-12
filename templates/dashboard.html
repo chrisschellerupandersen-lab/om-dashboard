@@ -455,6 +455,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .nav-edit-lbl{flex:1;font-size:12px;color:var(--charcoal);min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:text;}
 .nav-edit-lbl:hover{color:var(--forest);}
 .nav-grp-chip{font-family:'DM Mono',monospace;font-size:7px;color:var(--ash);opacity:.45;flex-shrink:0;max-width:44px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.nav-grp-sel{font-family:'DM Mono',monospace;font-size:7px;color:var(--ash);background:var(--parchment);border:1px solid rgba(30,58,30,.18);border-radius:2px;padding:2px 3px;cursor:pointer;flex-shrink:0;max-width:80px;outline:none;}
+.nav-grp-sel:focus{border-color:var(--forest);}
+.nav-grp-new-inp{font-family:'DM Mono',monospace;font-size:8px;border:none;border-bottom:1px solid var(--forest);background:transparent;color:var(--charcoal);padding:0 2px;outline:none;width:70px;flex-shrink:0;}
 .nav-rename-inp{flex:1;border:none;border-bottom:1px solid var(--forest);background:transparent;font-size:12px;color:var(--charcoal);padding:0;outline:none;min-width:0;font-family:'DM Sans',sans-serif;}
 </style>
 </head>
@@ -1407,7 +1410,10 @@ function _buildNav() {
         <span class="nav-drag" title="Træk for at flytte">⠿</span>
         <button class="nav-vis" onclick="_navToggleVis(${i})" title="${item.hidden?'Vis':'Skjul'}">${item.hidden?'○':'●'}</button>
         <span class="nav-edit-lbl" ondblclick="_navStartRename(this,${i})" title="Dobbeltklik for at omdøbe">${item.label}</span>
-        <span class="nav-grp-chip">${item.group}</span>
+        <select class="nav-grp-sel" onchange="_navChangeGroup(${i},this)" title="Skift gruppe">
+          ${_navAllGroups().map(g=>`<option value="${g}"${g===item.group?' selected':''}>${g}</option>`).join('')}
+          <option value="__new__">＋ Ny gruppe…</option>
+        </select>
       </div>`).join('');
   } else {
     let html = '', lastGroup = null;
@@ -1481,6 +1487,39 @@ function _navDragEnd() {
   document.querySelectorAll('.nav-edit-item').forEach(el => {
     el.style.opacity = ''; el.classList.remove('drag-over');
   });
+}
+
+function _navAllGroups() {
+  const seen = new Set(), out = [];
+  // Preserve NAV_DEFAULT group order, then any custom ones
+  NAV_DEFAULT.forEach(d => { if (!seen.has(d.group)) { seen.add(d.group); out.push(d.group); }});
+  _navItems.forEach(n => { if (!seen.has(n.group)) { seen.add(n.group); out.push(n.group); }});
+  return out;
+}
+
+function _navChangeGroup(i, selectEl) {
+  const val = selectEl.value;
+  if (val === '__new__') {
+    // Replace the select with a small text input for the new group name
+    const inp = document.createElement('input');
+    inp.className = 'nav-grp-new-inp';
+    inp.placeholder = 'Gruppenavn…';
+    selectEl.replaceWith(inp);
+    inp.focus();
+    const commit = () => {
+      const name = inp.value.trim();
+      if (name) { _navItems[i].group = name; _navSave(); }
+      _buildNav();
+    };
+    inp.addEventListener('blur', commit);
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+      if (e.key === 'Escape') { _buildNav(); }
+    });
+  } else {
+    _navItems[i].group = val;
+    _navSave(); _buildNav();
+  }
 }
 
 let VALGT_AAR = new Date().getFullYear();

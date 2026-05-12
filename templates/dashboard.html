@@ -1099,12 +1099,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- Uge-vælger -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
           <button onclick="bernPrev()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">←</button>
           <span id="bern-uge-label" style="font-size:20px;font-weight:500;color:var(--forest);">Uge —</span>
           <span id="bern-dato-label" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);"></span>
           <button onclick="bernNext()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">→</button>
-          <span id="bern-basis-label" style="font-size:11px;color:var(--ash);margin-left:8px;"></span>
+          <span id="bern-event-badge" style="display:none;background:rgba(30,58,30,.10);color:var(--forest);border:1px solid rgba(30,58,30,.25);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500;letter-spacing:.02em;"></span>
+        </div>
+        <div style="margin-bottom:12px;">
+          <span id="bern-basis-label" style="font-size:11px;color:var(--ash);"></span>
+          <span id="bern-event-note" style="display:none;font-size:11px;color:var(--ash);margin-left:8px;font-style:italic;"></span>
         </div>
 
         <!-- KPI-række -->
@@ -3386,6 +3390,19 @@ async function loadBernUge(uge, aar) {
     ? '✓ Faktisk bestilling — indlæst fra Excel'
     : 'Udgangspunkt: uge ' + d.basis_uge + ' ' + d.basis_aar;
   document.getElementById('bern-basis-label').style.color = d.faktisk ? 'var(--moss)' : '';
+
+  // Event-badge
+  const evtBadge = document.getElementById('bern-event-badge');
+  const evtNote  = document.getElementById('bern-event-note');
+  if (d.event && d.event.navn) {
+    evtBadge.textContent = d.event.navn;
+    evtBadge.style.display = '';
+    evtNote.textContent  = d.event.note || '';
+    evtNote.style.display = d.event.note ? '' : 'none';
+  } else {
+    evtBadge.style.display = 'none';
+    evtNote.style.display  = 'none';
+  }
 
   // KPI-række: skjul beregner-felter ved faktisk bestilling
   const kpiCols = document.querySelectorAll('#p-beregner .kpi-row-6 .kpi:not(:first-child)');

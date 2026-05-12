@@ -923,6 +923,8 @@ def hent_dashboard_data() -> Dict:
 
 def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
     with _conn() as conn:
+        # Ryd eksisterende rækker først — forhindrer dubletter ved force-sync
+        conn.execute("DELETE FROM ugebestillinger WHERE uge=? AND aar=?", (uge, aar))
         for linje in linjer:
             conn.execute("""
                 INSERT INTO ugebestillinger

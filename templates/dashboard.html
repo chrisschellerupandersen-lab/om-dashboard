@@ -3315,12 +3315,30 @@ async function loadSvind() {
   // ── Rings ────────────────────────────────────────────────────────────
   if (gnsSvind !== '—') {
     const g = parseFloat(gnsSvind);
-    setRing('ring-svind-gns', Math.min(100, g / 30 * 100), 'var(--amber)');
+    // Svind-ring: 0% = grøn, 30% = fuld/rød
+    const svindColor = g < 15 ? 'var(--moss)' : g < 22 ? 'var(--gold)' : 'var(--danger)';
+    setRing('ring-svind-gns', Math.min(100, g / 30 * 100), svindColor);
   }
   if (totFaktura > 0 && data.length > 0) {
-    setRing('ring-svind-fakt', Math.min(100, totFaktura / (data.length * 20000) * 100), 'var(--forest)');
-    setRing('ring-svind-retur', Math.min(100, totRetur / totFaktura * 100), 'var(--forest)');
-    setRing('ring-svind-netto', Math.min(100, totNetto / totFaktura * 100), 'var(--forest)');
+    const ugerMedData = data.filter(r => (r.bestilt_kr || 0) > 0).length || data.length;
+    const ugentligSnit = totFaktura / ugerMedData;
+    // Indkøb-ring: ugentligt snit vs 40.000 kr/uge (fuld ring = 40k/uge)
+    setRing('ring-svind-fakt', Math.min(100, ugentligSnit / 40000 * 100), 'var(--forest)');
+    // Retur-ring: retur% på skala 0-20% (20% = fuld ring = meget retur)
+    const returPct = totRetur / totFaktura * 100;
+    const returColor = returPct < 8 ? 'var(--moss)' : returPct < 14 ? 'var(--gold)' : 'var(--danger)';
+    setRing('ring-svind-retur', Math.min(100, returPct / 20 * 100), returColor);
+    // Netto-ring: netto som % af faktura (85-95% = godt)
+    const nettoPct = totNetto / totFaktura * 100;
+    const nettoColor = nettoPct > 85 ? 'var(--moss)' : nettoPct > 75 ? 'var(--gold)' : 'var(--danger)';
+    setRing('ring-svind-netto', Math.min(100, nettoPct), nettoColor);
+    // Opdater subtext med gennemsnit og procenter
+    document.getElementById('svind-faktura-sub').textContent =
+      Math.round(ugentligSnit).toLocaleString('da-DK') + ' kr/uge snit · ' + ugerMedData + ' uger';
+    document.getElementById('svind-retur-sub').textContent =
+      returPct.toFixed(1) + '% af indkøb';
+    document.getElementById('svind-netto-sub').textContent =
+      nettoPct.toFixed(1) + '% netto vs. indkøb';
   }
 
   document.getElementById('svind-tbody').innerHTML = data.map(r => {

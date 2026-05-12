@@ -1140,10 +1140,12 @@ _SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,
 # Manuelle overrides — vinder over dynamiske begivenheder.
 # Bruges til at finjustere faktorer for specifikke år/uger.
 _EVENTS_OVERRIDE: Dict = {
-    # Uge 20 2026: Kr. Himmelfart tors. + brofridag fre. — manuelt analyseret
-    (20, 2026): {"factor": 1.15, "navn": "Kr. Himmelfart + brofridag",
-                 "note": "Fredag 15. maj er brofridag — bestil 45% ekstra fredag",
-                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.45,"loe":1.2,"son":1.0}},
+    # Uge 20 2026: Kr. Himmelfart (tor) = helligdag + konfirmationsdag i Greve
+    # Folk har FRI og fejrer — butikken er åben og travl tor morgen.
+    # Brofridag fredag løfter yderligere.
+    (20, 2026): {"factor": 1.25, "navn": "Kr. Himmelfart + konfirmation + brofridag",
+                 "note": "Tor: helligdag+konfirmation — folk fri og handler. Fre: brofridag +45%",
+                 "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.25,"fre":1.45,"loe":1.20,"son":1.0}},
     # Store Bededag 2026 (1. maj, fredag) — afskaffet helligdag, stadig folkelig fridag
     (18, 2026): {"factor": 1.10, "navn": "Store Bededag (1. maj)",
                  "note": "+10% — fridag i ugen",
@@ -1241,10 +1243,10 @@ def _events_for_aar(aar: int) -> Dict:
     hw, hy = _yw(himmelfart)
     if (hw, hy) not in ev:
         ev[(hw, hy)] = {
-            "factor": 1.12,
+            "factor": 1.18,
             "navn": f"Kristi Himmelfartsdag ({_dname(himmelfart)}. {himmelfart.strftime('%b')})",
-            "note": "Torsdag er helligdag — fredag brofridag for mange",
-            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":0.5,"fre":1.40,"loe":1.20,"son":1.0},
+            "note": "Tor: folk fri — travl formiddag. Fre er brofridag for mange +40%",
+            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.20,"fre":1.40,"loe":1.20,"son":1.0},
         }
 
     # ── Konfirmationssæson (uge 15–19 hvert år) ─────────────────────────

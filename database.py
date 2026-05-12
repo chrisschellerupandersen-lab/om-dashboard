@@ -1444,6 +1444,60 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     TGTG_PR_POSE = 38.0
 
     with _conn() as conn:
+        # ── Har vi en faktisk indlæst bestilling for mål-ugen? ──────────────
+        faktisk_rows = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms,
+                   man, tir, ons, tor, fre, loe, son
+            FROM ugebestillinger
+            WHERE uge=? AND aar=?
+            ORDER BY id
+        """, (maal_uge, maal_aar)).fetchall()
+
+        if faktisk_rows:
+            mon_dato = date.fromisocalendar(maal_aar, maal_uge, 1)
+            sd_map   = _stamdata_type_map()
+            produkter = []
+            for r in faktisk_rows:
+                dag_vals = {d: int(float(r[d] or 0)) for d in DAGE}
+                total_p  = sum(dag_vals.values())
+                pris     = float(r["pris_ex_moms"] or 0)
+                kat      = _kat(r["varenavn"], sd_map)
+                produkter.append({
+                    "varenummer":      r["varenummer"] or "",
+                    "varenavn":        r["varenavn"],
+                    "kategori":        kat,
+                    "pris_ex_moms":    round(pris, 2),
+                    "basis":           dag_vals,
+                    "anbefalet":       dag_vals,
+                    "manuel":          {},
+                    "total_basis":     total_p,
+                    "total_anbefalet": total_p,
+                    "total_pris":      round(total_p * pris, 2),
+                })
+            total_stk = sum(p["total_anbefalet"] for p in produkter)
+            total_kr  = sum(p["total_pris"]      for p in produkter)
+            return {
+                "maal_uge":        maal_uge,
+                "maal_aar":        maal_aar,
+                "dato_range":      _dato_range(maal_uge, maal_aar),
+                "basis_uge":       maal_uge,
+                "basis_aar":       maal_aar,
+                "maaned":          mon_dato.month,
+                "si":              1.0,
+                "event":           None,
+                "tgtg_kr":         0,
+                "tgtg_ok":         True,
+                "tgtg_advarsel":   False,
+                "tgtg_korrektion": 1.0,
+                "vaekst_pct":      0.0,
+                "total_faktor":    1.0,
+                "produkter":       produkter,
+                "total_stk":       total_stk,
+                "total_kr":        round(total_kr, 2),
+                "faktisk":         True,
+            }
+
+        # ── Ingen faktisk bestilling → beregn anbefaling ────────────────────
         # Find seneste bestillingsuge der er ældre end (eller lig) mål-ugen
         basis_row = conn.execute("""
             SELECT uge, aar FROM ugebestillinger
@@ -1601,6 +1655,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         "produkter":       produkter,
         "total_stk":       total_stk,
         "total_kr":        round(total_kr, 2),
+        "faktisk":         False,
     }
 
 

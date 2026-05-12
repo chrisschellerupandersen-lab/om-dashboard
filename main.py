@@ -314,7 +314,7 @@ async def api_management_analyse(
         )
 
     evt = d.get("event")
-    evt_txt = f"\nBegivenhed denne uge: {evt['navn']} (faktor ×{evt.get('faktor',1)})" if evt else "\nIngen registrerede begivenheder denne uge."
+    evt_txt = f"\nBegivenhed denne uge: {evt['navn']} — {evt.get('note','')} (faktor ×{evt.get('factor',1)})" if evt else "\nIngen registrerede begivenheder denne uge."
 
     prompt = f"""Du er den erfarne bageri-chef og management-rådgiver for Organic Market i Greve — et dansk specialbageri.
 
@@ -343,7 +343,7 @@ Vær direkte og konkret. Brug tal. Maks 200 ord."""
         import anthropic as _ant
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-20240307",
+            model="claude-3-haiku-20240307",
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )

@@ -397,6 +397,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .nav-grp-new-inp{font-family:'DM Mono',monospace;font-size:8px;border:none;border-bottom:1px solid var(--forest);background:transparent;color:var(--charcoal);padding:0 2px;outline:none;width:70px;flex-shrink:0;}
 .nav-rename-inp{flex:1;border:none;border-bottom:1px solid var(--forest);background:transparent;font-size:12px;color:var(--charcoal);padding:0;outline:none;min-width:0;font-family:'DM Sans',sans-serif;}
 
+/* ── ALERTS & DAGSOVERBLIK ──────────────────────────────────────────────────── */
+.alert-chip{display:flex;align-items:center;gap:8px;border-radius:10px;padding:10px 16px;font-size:13px;line-height:1.4;}
+.alert-chip.red{background:rgba(192,57,43,.09);border:1px solid rgba(192,57,43,.22);color:#8b2a1a;}
+.alert-chip.amber{background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.3);color:#7a5c00;}
+.alert-chip.green{background:rgba(45,90,45,.07);border:1px solid rgba(45,90,45,.18);color:#2d5a2d;}
+.alert-icon{font-size:16px;flex-shrink:0;line-height:1;}
+.dag-prog-bar{height:8px;background:rgba(30,58,30,.07);border-radius:4px;overflow:hidden;margin-top:5px;}
+.dag-prog-fill{height:100%;border-radius:4px;transition:width .6s ease;}
+
+/* ── SCORECARD ───────────────────────────────────────────────────────────────── */
+.scorecard{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.sc-card{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 14px 12px;box-shadow:0 2px 8px rgba(30,58,30,.05);display:flex;flex-direction:column;align-items:center;text-align:center;}
+.sc-grade{font-size:36px;font-weight:300;line-height:1;margin-bottom:4px;}
+.sc-grade.A{color:var(--moss);}
+.sc-grade.B{color:var(--gold);}
+.sc-grade.C{color:var(--danger);}
+.sc-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
+.sc-val{font-size:18px;font-weight:300;color:var(--charcoal);line-height:1;}
+.sc-bench{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;}
+@media(max-width:768px){.scorecard{grid-template-columns:repeat(3,1fr);gap:8px;}.sc-grade{font-size:28px;}}
+
 /* ── BOTTOM NAV ─────────────────────────────────────────────────────────────── */
 .bnav{
   display:none;position:fixed;bottom:0;left:0;right:0;
@@ -634,6 +655,20 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
+        <!-- ALERT STRIP -->
+        <div id="alert-strip" style="display:none;margin-bottom:12px;">
+          <div id="alert-chips" style="display:flex;flex-direction:column;gap:6px;"></div>
+        </div>
+
+        <!-- DAGSOVERBLIK VS. FORVENTET -->
+        <div class="card" id="dag-progress-card" style="display:none;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Hvad sker der i dag</span>
+            <span id="dag-prog-ref" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <div id="dag-prog-rows"></div>
+        </div>
+
         <div class="two-col">
           <div class="card">
             <div class="aar2-chart-hdr">
@@ -1144,6 +1179,37 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="svind-netto-sub">faktura − retur</div>
           </div>
         </div>
+        <!-- SCORECARD -->
+        <div class="scorecard" id="svind-scorecard" style="display:none;">
+          <div class="sc-card">
+            <div class="sc-grade" id="sc-svind-grade">—</div>
+            <div class="sc-label">Svind</div>
+            <div class="sc-val" id="sc-svind-val">—</div>
+            <div class="sc-bench">A &lt;15% · B &lt;22% · C ≥22%</div>
+          </div>
+          <div class="sc-card">
+            <div class="sc-grade" id="sc-retur-grade">—</div>
+            <div class="sc-label">Retur</div>
+            <div class="sc-val" id="sc-retur-val">—</div>
+            <div class="sc-bench">A &lt;8% · B &lt;14% · C ≥14%</div>
+          </div>
+          <div class="sc-card">
+            <div class="sc-grade" id="sc-netto-grade">—</div>
+            <div class="sc-label">Netto</div>
+            <div class="sc-val" id="sc-netto-val">—</div>
+            <div class="sc-bench">A ≥85% · B ≥75% · C &lt;75%</div>
+          </div>
+        </div>
+
+        <!-- BESTILLINGSHISTORIK CHART -->
+        <div class="card" id="svind-hist-card" style="display:none;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Indkøb & svind — seneste uger</span>
+            <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);">søjle = indkøb kr · linje = svind %</span>
+          </div>
+          <div style="position:relative;height:200px;"><canvas id="c-svind-hist"></canvas></div>
+        </div>
+
         <div class="aar2-tbl-wrap">
           <div class="aar2-tbl-hdr">
             <span class="aar2-tbl-hdr-l">Uge for uge — bestilt, kassesalg, svind &amp; økonomi</span>
@@ -1708,6 +1774,7 @@ async function loadAll() {
   ]);
 
   buildForside(kpi, dage, uger, idag, katUge);
+  if (kpi) { buildAlerts(kpi); buildDagProgress(kpi); }
   buildDag(kpi, timer);
   buildUge(uger);
   buildTime(timerSnit);
@@ -2017,6 +2084,168 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         </tfoot>
       </table>`;
   }
+}
+
+// ── ALERTS ───────────────────────────────────────────────────────────────────
+function buildAlerts(kpi) {
+  const strip = document.getElementById('alert-strip');
+  const chips = document.getElementById('alert-chips');
+  if (!strip || !chips || !kpi) return;
+  const dag     = kpi.dag      || {};
+  const prevDag = kpi.prev_dag || {};
+  const uge     = kpi.uge      || {};
+  const alerts  = [];
+
+  // Dag omsætning vs. samme dag sidste uge
+  if (dag.omsaetning > 0 && prevDag.omsaetning > 0) {
+    const pct = (dag.omsaetning / prevDag.omsaetning - 1) * 100;
+    if      (pct <= -25) alerts.push({sev:'red',   icon:'📉', txt:`Omsætning i dag er ${Math.abs(pct).toFixed(0)}% under samme dag sidste uge`});
+    else if (pct <= -10) alerts.push({sev:'amber',  icon:'⚠️', txt:`Omsætning lidt under forventning (${pct.toFixed(0)}% vs. sidste uge)`});
+    else if (pct >=  20) alerts.push({sev:'green',  icon:'📈', txt:`God dag — omsætning ${pct.toFixed(0)}% over samme dag sidste uge`});
+  }
+  // DB-margin
+  if (dag.db_pct != null && dag.db_pct < 28)
+    alerts.push({sev:'amber', icon:'⚠️', txt:`DB-margin i dag: ${dag.db_pct.toFixed(1)}% — under målsætning på 28%`});
+  // Uge DB
+  if (uge.db_pct != null && uge.db_pct >= 35)
+    alerts.push({sev:'green', icon:'✓', txt:`Ugens DB er ${uge.db_pct.toFixed(1)}% — over 35%-mål`});
+
+  if (!alerts.length)
+    alerts.push({sev:'green', icon:'✓', txt:'Ingen afvigelser — alt ser normalt ud'});
+
+  chips.innerHTML = alerts.map(a =>
+    `<div class="alert-chip ${a.sev}"><span class="alert-icon">${a.icon}</span><span>${a.txt}</span></div>`
+  ).join('');
+  strip.style.display = '';
+}
+
+// Tilføj svind-alert (kaldes fra loadSvind)
+function addSvindAlert(gnsSvind, uge) {
+  const chips = document.getElementById('alert-chips');
+  if (!chips || gnsSvind === '—') return;
+  const g   = parseFloat(gnsSvind);
+  const sev = g >= 22 ? 'red' : g >= 15 ? 'amber' : 'green';
+  const ico = g >= 22 ? '⚠️' : g >= 15 ? '⚠️' : '✓';
+  const txt = g >= 22 ? `Svind snit ${g.toFixed(1)}% — kritisk (over 22%)` :
+              g >= 15 ? `Svind snit ${g.toFixed(1)}% — hold øje (15–22%)` :
+                        `Svind snit ${g.toFixed(1)}% — godt (under 15%)`;
+  chips.innerHTML += `<div class="alert-chip ${sev}"><span class="alert-icon">${ico}</span><span>${txt}</span></div>`;
+  document.getElementById('alert-strip').style.display = '';
+}
+
+// ── DAGSOVERBLIK PROGRESS ─────────────────────────────────────────────────────
+function buildDagProgress(kpi) {
+  const card = document.getElementById('dag-progress-card');
+  const rows = document.getElementById('dag-prog-rows');
+  const ref  = document.getElementById('dag-prog-ref');
+  if (!card || !rows || !kpi) return;
+  const dag     = kpi.dag      || {};
+  const prevDag = kpi.prev_dag || {};
+  if (!dag.omsaetning || !prevDag.omsaetning) return;
+
+  const DAG_NAVN = ['søn','man','tir','ons','tor','fre','lør'];
+  const prevDato = kpi.prev_dag_dato ? new Date(kpi.prev_dag_dato) : null;
+  const dagNavn  = prevDato ? DAG_NAVN[prevDato.getUTCDay()] : 'forrige uge';
+  if (ref) ref.textContent = 'vs. ' + dagNavn + ' sidste uge';
+
+  const items = [];
+  // Omsætning
+  const omPct   = Math.min(100, Math.round(dag.omsaetning / prevDag.omsaetning * 100));
+  const omColor = omPct >= 90 ? 'var(--moss)' : omPct >= 70 ? 'var(--gold)' : 'var(--danger)';
+  items.push({ label:'Omsætning', val: Math.round(dag.omsaetning).toLocaleString('da-DK') + ' kr',
+               exp: '~' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr forventet',
+               pct: omPct, color: omColor });
+  // Kunder
+  if (dag.transak > 0 && prevDag.transak > 0) {
+    const kPct   = Math.min(100, Math.round(dag.transak / prevDag.transak * 100));
+    const kColor = kPct >= 90 ? 'var(--moss)' : kPct >= 70 ? 'var(--gold)' : 'var(--danger)';
+    items.push({ label:'Kunder', val: dag.transak + ' kunder',
+                 exp: '~' + prevDag.transak + ' forventet',
+                 pct: kPct, color: kColor });
+  }
+  // Kurv-størrelse
+  if (dag.transak > 0 && dag.omsaetning > 0) {
+    const kurv = Math.round(dag.omsaetning / dag.transak);
+    const exp_kurv = prevDag.transak > 0 ? Math.round(prevDag.omsaetning / prevDag.transak) : null;
+    if (exp_kurv) {
+      const kPct   = Math.min(100, Math.round(kurv / exp_kurv * 100));
+      const kColor = kPct >= 95 ? 'var(--moss)' : kPct >= 80 ? 'var(--gold)' : 'var(--danger)';
+      items.push({ label:'Gns. kurv', val: kurv.toLocaleString('da-DK') + ' kr/kurv',
+                   exp: '~' + exp_kurv.toLocaleString('da-DK') + ' kr forventet',
+                   pct: kPct, color: kColor });
+    }
+  }
+
+  rows.innerHTML = items.map(it => `
+    <div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+        <span style="font-size:13px;">${it.label}</span>
+        <div>
+          <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--forest);">${it.val}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-left:8px;">${it.exp} · ${it.pct}%</span>
+        </div>
+      </div>
+      <div class="dag-prog-bar"><div class="dag-prog-fill" style="width:${it.pct}%;background:${it.color};"></div></div>
+    </div>`).join('');
+  card.style.display = '';
+}
+
+// ── SVIND CHART ───────────────────────────────────────────────────────────────
+function buildSvindChart(data) {
+  const card = document.getElementById('svind-hist-card');
+  if (!card) return;
+  const recent = data.slice(-14);
+  if (recent.length < 2) return;
+  card.style.display = '';
+  const labels   = recent.map(r => `U${r.uge}`);
+  const faktData = recent.map(r => Math.round(r.bestilt_kr || 0));
+  const svindPct = recent.map(r => r.svind_pct != null ? +r.svind_pct.toFixed(1) : null);
+  const bgColors = recent.map(r =>
+    r.svind_pct == null ? 'rgba(30,58,30,.25)' :
+    r.svind_pct < 15   ? 'rgba(45,90,45,.65)' :
+    r.svind_pct < 22   ? 'rgba(200,168,75,.7)' : 'rgba(192,57,43,.65)');
+  mk('c-svind-hist', 'bar', labels, [
+    { label:'Indkøb kr', data:faktData, backgroundColor:bgColors, borderRadius:4, yAxisID:'y' },
+    { label:'Svind %', data:svindPct, type:'line', borderColor:'rgba(200,168,75,.9)',
+      backgroundColor:'transparent', borderWidth:2, pointRadius:4, pointBackgroundColor:'rgba(200,168,75,.9)',
+      tension:.3, yAxisID:'y2', spanGaps:true }
+  ], {
+    plugins:{ legend:{ display:true, labels:{ font:{size:10}, padding:10, usePointStyle:true }}},
+    scales:{
+      y:{ ticks:{ callback: v => Math.round(v/1000)+'k', font:{size:10} }, grid:{color:'rgba(30,58,30,.05)'} },
+      y2:{ position:'right', min:0, max:35, ticks:{ callback: v => v+'%', font:{size:10} }, grid:{display:false},
+           afterDataLimits: axis => { const ref = axis.chart.canvas.parentElement;
+             // Tegn 15%- og 22%-grænselinjer som annotations ville, her via dataset-reference kun
+           }}
+    }
+  });
+}
+
+// ── SVIND SCORECARD ───────────────────────────────────────────────────────────
+function buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, nUger) {
+  const sc = document.getElementById('svind-scorecard');
+  if (!sc) return;
+  const grade = (v, thA, thB, higher) => {
+    if (v == null || isNaN(v)) return '—';
+    if (higher) return v >= thA ? 'A' : v >= thB ? 'B' : 'C';
+    return v < thA ? 'A' : v < thB ? 'B' : 'C';
+  };
+  const setCard = (gradeId, valId, gradeVal, valTxt) => {
+    const gEl = document.getElementById(gradeId);
+    const vEl = document.getElementById(valId);
+    if (gEl) { gEl.textContent = gradeVal; gEl.className = 'sc-grade ' + gradeVal; }
+    if (vEl)   vEl.textContent = valTxt;
+  };
+  // Svind
+  const svindVal = gnsSvind !== '—' ? parseFloat(gnsSvind) : null;
+  setCard('sc-svind-grade','sc-svind-val', grade(svindVal, 15, 22, false), svindVal != null ? svindVal.toFixed(1)+'%' : '—');
+  // Retur
+  const returPct = totFaktura > 0 ? totRetur / totFaktura * 100 : null;
+  setCard('sc-retur-grade','sc-retur-val', grade(returPct, 8, 14, false), returPct != null ? returPct.toFixed(1)+'%' : '—');
+  // Netto
+  const nettoPct = totFaktura > 0 ? totNetto / totFaktura * 100 : null;
+  setCard('sc-netto-grade','sc-netto-val', grade(nettoPct, 85, 75, true), nettoPct != null ? nettoPct.toFixed(1)+'%' : '—');
+  sc.style.display = '';
 }
 
 function buildDag(kpi, timer) {
@@ -3495,6 +3724,11 @@ async function loadSvind() {
       <td class="num" style="${mono}font-weight:500;">${r.netto_kr_adj != null ? Math.round(r.netto_kr_adj).toLocaleString('da-DK') : Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
     </tr>`;
   }).join('');
+
+  // Byg scorecard, chart og svind-alert fra forside
+  buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, svindUger.length);
+  buildSvindChart(data);
+  addSvindAlert(gnsSvind, data[data.length-1]?.uge);
 }
 
 // ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────

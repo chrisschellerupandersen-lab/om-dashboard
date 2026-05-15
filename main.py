@@ -2,6 +2,7 @@ import io
 import os
 import base64
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request, Form, HTTPException
@@ -405,111 +406,70 @@ async def api_bestilling_eksport(
 
 
 def _byg_bestilling_xlsx(d: dict) -> bytes:
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl import load_workbook
 
-    DAGE    = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
-    DAG_LBL = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
-    HDR_BG  = "FFC4D79B"
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    TEMPLATE = Path(__file__).parent / "bestilling_template.xlsx"
 
-    wb = Workbook()
+    wb = load_workbook(str(TEMPLATE))
     ws = wb.active
-    ws.title = "Ark1"
 
-    # Kolonnebredder fra skabelonen
-    ws.column_dimensions['A'].width = 18.86
-    ws.column_dimensions['B'].width = 10.71
-    ws.column_dimensions['C'].width = 33.14
-    ws.column_dimensions['D'].width = 16.57
-    for col in 'EFGHIJK':
-        ws.column_dimensions[col].width = 8.86
-    ws.column_dimensions['L'].width = 10.71
-    ws.column_dimensions['M'].width = 23.86
+    # Opdater ugenummer i A2
+    ws['A2'] = f"Uge {d['maal_uge']}"
 
-    hdr_fill = PatternFill("solid", fgColor=HDR_BG)
+    # Byg SKU → produkt-map fra bestillingsdata
+    prod_map: dict = {}
+    for p in d.get("produkter", []):
+        sku = p.get("varenummer")
+        if sku:
+            try:
+                prod_map[int(str(sku).strip())] = p
+            except (ValueError, TypeError):
+                pass
 
-    def hdr_row(row_num):
-        for cell in ws[row_num]:
-            cell.fill = hdr_fill
+    # Find "I alt"-rækker (col C = 'I alt') — dem rører vi ikke E-K på
+    ialt_rows: set = set()
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row, values_only=False):
+        if row[2].value == 'I alt':
+            ialt_rows.add(row[0].row)
 
-    # Rad 1: "Organic Market" (A bold) + titel i C (bold)
-    evt_txt = f"  ·  {d['event']['navn']}" if d.get("event") else ""
-    titel = (f"Bestilling uge {d['maal_uge']} {d['maal_aar']}  ·  {d['dato_range']}"
-             f"  ·  SI {d['si']:.2f}{evt_txt}  ·  basis uge {d['basis_uge']} {d['basis_aar']}")
-    ws.append(["Organic Market", None, titel] + [None] * 12)
-    ws["A1"].font = Font(bold=True)
-    ws["C1"].font = Font(bold=True)
-    hdr_row(1)
-    ws.row_dimensions[1].height = 14.25
+    # Ryd E-K i alle data-rækker og udfyld fra bestillingsdata via SKU-match
+    for row in ws.iter_rows(min_row=4, max_row=ws.max_row, values_only=False):
+        rn = row[0].row
+        if rn in ialt_rows:
+            continue
 
-    # Rad 2: "Uge X" i A + kolonneoverskrifter
-    ws.append([f"Uge {d['maal_uge']}", "Varenummer", "VARETYPE", "Pris ex moms"]
-              + DAG_LBL + ["Total antal", "Pris ex moms", None, None])
-    for cell in ws[2]:
-        cell.fill = hdr_fill
-        cell.font = Font(bold=True)
-    ws.row_dimensions[2].height = 14.25
+        # Ryd dagkolonner E-K (tuple-index 4–10)
+        for i in range(4, 11):
+            row[i].value = None
 
-    # Rad 3: blanke/spaces i dagkolonnerne
-    ws.append([None, None, None, None] + [" "] * 7 + [None, None, None, None])
-    hdr_row(3)
-    ws.row_dimensions[3].height = 14.25
+        sku_val = row[1].value  # kolonne B = varenummer
+        if sku_val and isinstance(sku_val, (int, float)):
+            sku_int = int(sku_val)
+            if sku_int in prod_map:
+                p = prod_map[sku_int]
+                # Opdater pris (kolonne D = index 3)
+                if p.get("pris_ex_moms"):
+                    row[3].value = p["pris_ex_moms"]
+                # Indsæt anbefalede antal (E-K)
+                anb = p.get("anbefalet", {})
+                for i, dag in enumerate(DAGE):
+                    qty = anb.get(dag, 0)
+                    row[4 + i].value = qty if qty else None
 
-    ws.freeze_panes = "C4"
-
-    # Opdel produkter i tre sektioner (bevar original rækkefølge)
-    sek1, sek2, sek3 = [], [], []
-    for p in d["produkter"]:
-        kat  = p.get("kategori", "")
-        navn = p["varenavn"].lower()
-        if kat != "Kage":
-            sek1.append(p)
-        elif "muffin" in navn or "brownie" in navn:
-            sek3.append(p)
-        else:
-            sek2.append(p)
-
-    def _v(val):
-        return None if (val == 0 or val is None) else val
-
-    def skriv_produkt(p):
-        anb = p["anbefalet"]
-        ws.append([None, p["varenummer"], p["varenavn"], p["pris_ex_moms"]]
-                  + [_v(anb[dg]) for dg in DAGE]
-                  + [_v(p["total_anbefalet"]), p["total_pris"] or None, None, None])
-        ws.row_dimensions[ws.max_row].height = 15.75
-
-    def skriv_ialt(produkter):
-        dag_sums = [sum(p["anbefalet"][dg] for p in produkter) for dg in DAGE]
-        ws.append([None, None, "I alt", None]
-                  + [_v(s) for s in dag_sums]
-                  + [None, None, None, None])
-        r = ws.max_row
-        for cell in ws[r]:
-            cell.font = Font(bold=True)
-        ws.row_dimensions[r].height = 15.75
-
-    def blank():
-        ws.append([None] * 15)
-        ws.row_dimensions[ws.max_row].height = 15.75
-
-    for p in sek1:
-        skriv_produkt(p)
-    skriv_ialt(sek1)
-
-    blank(); blank()
-
-    for p in sek2:
-        skriv_produkt(p)
-    if sek2:
-        skriv_ialt(sek2)
-
-    blank(); blank()
-
-    for p in sek3:
-        skriv_produkt(p)
-    if sek3:
-        skriv_ialt(sek3)
+    # Rad 68 har hardkodede dagssummer for sektion 3 (Kage/muffin-rækker 63–67)
+    # Genberegn disse fra de opdaterede produktrækker
+    if 68 not in ialt_rows:  # sikkerhed — det er en I alt-række, men E-K er tal, ikke formler
+        dag_sums = [0] * 7
+        for r in range(63, 68):
+            data_row = list(ws.iter_rows(min_row=r, max_row=r, values_only=False))[0]
+            for i in range(7):
+                v = data_row[4 + i].value
+                if v and isinstance(v, (int, float)):
+                    dag_sums[i] += int(v)
+        row68 = list(ws.iter_rows(min_row=68, max_row=68, values_only=False))[0]
+        for i in range(7):
+            row68[4 + i].value = dag_sums[i] if dag_sums[i] else None
 
     buf = io.BytesIO()
     wb.save(buf)

@@ -1156,6 +1156,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="page-hdr">
           <h2>Svind &amp; bageriøkonomi</h2>
           <p>Effektivt solgt = kassesalg + Kaffe/wiener-kombo + TGTG (à 38 kr/pose) · faktura &amp; retur per uge</p>
+          <button onclick="_svindLoaded=false;loadSvind(true);" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
         </div>
         <div class="kpi-row" id="svind-kpi-row">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
@@ -3638,10 +3639,13 @@ async function visBestillingDetalje(uge, aar) {
 
 // ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
 let _svindLoaded = false;
+let _svindTs     = 0;
 
-async function loadSvind() {
-  if (_svindLoaded) return;
+async function loadSvind(force = false) {
+  const nu = Date.now();
+  if (_svindLoaded && !force && (nu - _svindTs) < 120000) return;
   _svindLoaded = true;
+  _svindTs     = nu;
   const data = await api(`/api/bager/svind?aar=${VALGT_AAR}`);
   if (!data || !data.length) {
     document.getElementById('svind-tbody').innerHTML =

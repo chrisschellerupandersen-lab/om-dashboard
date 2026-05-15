@@ -1073,11 +1073,25 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
         """, aar_params + aar_params).fetchall()
 
     from calendar import monthrange as _monthrange
+    from datetime import date as _today_date
     mp = _mp_map_alle()
+
+    # Indeværende ISO-uge og år — uger der ikke er startet endnu filtreres fra
+    _today      = _today_date.today()
+    _iso_today  = _today.isocalendar()
+    _cur_uge    = _iso_today[1]
+    _cur_aar    = _iso_today[0]
 
     result = []
     for r in rows:
         d = dict(r)
+        # Spring uger over der endnu ikke er begyndt
+        try:
+            uge_mandag = _today_date.fromisocalendar(int(d["aar"]), int(d["uge"]), 1)
+            if uge_mandag > _today:
+                continue
+        except Exception:
+            pass
         kassesalg = kasse_map.get((d["uge"], d["aar"]))
         kw_stk    = int(kw_map.get((d["uge"], d["aar"]), 0) or 0)
         tgtg_stk  = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0

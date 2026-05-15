@@ -2195,7 +2195,7 @@ function buildDagProgress(kpi) {
 function buildSvindChart(data) {
   const card = document.getElementById('svind-hist-card');
   if (!card) return;
-  const recent = data.slice(-14);
+  const recent = data.slice(0, 14).reverse();
   if (recent.length < 2) return;
   card.style.display = '';
   const labels   = recent.map(r => `U${r.uge}`);

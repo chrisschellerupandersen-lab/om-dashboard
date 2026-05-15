@@ -2195,7 +2195,9 @@ function buildDagProgress(kpi) {
 function buildSvindChart(data) {
   const card = document.getElementById('svind-hist-card');
   if (!card) return;
-  const recent = data.slice(0, 14).reverse();
+  // Sorter alle data kronologisk (aar ASC, uge ASC) og tag de seneste 14
+  const sorted = [...data].sort((a,b) => a.aar !== b.aar ? a.aar - b.aar : a.uge - b.uge);
+  const recent = sorted.slice(-14);
   if (recent.length < 2) return;
   card.style.display = '';
   const labels   = recent.map(r => `U${r.uge}`);

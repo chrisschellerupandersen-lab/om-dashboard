@@ -124,6 +124,19 @@ def init_db():
                 beloeb   REAL    NOT NULL DEFAULT 0,
                 UNIQUE(aar, maaned, kategori) ON CONFLICT REPLACE
             );
+
+            DROP VIEW IF EXISTS v_transaktioner;
+            CREATE VIEW v_transaktioner AS
+            SELECT t.*,
+                   CASE WHEN s.pris_ex_moms > 0
+                        THEN t.antal * s.pris_ex_moms
+                        ELSE t.kostpris END AS vf_korrekt,
+                   t.omsætning - CASE WHEN s.pris_ex_moms > 0
+                                      THEN t.antal * s.pris_ex_moms
+                                      ELSE t.kostpris END AS db_korrekt
+            FROM transaktioner t
+            LEFT JOIN varestamdata s
+                ON t.varenummer != '' AND t.varenummer = s.sku;
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -193,17 +206,17 @@ def hent_kpi(aar: int = None) -> Dict:
             return {"dag": None, "uge": None, "snit_uge": None}
 
         dag = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
-                   COALESCE(SUM(kostpris),0)   AS vareforbrug,
+            SELECT COALESCE(SUM(omsætning),0)    AS omsaetning,
+                   COALESCE(SUM(vf_korrekt),0)   AS vareforbrug,
                    CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
                         THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
                         ELSE COUNT(*)
-                   END                          AS transak,
-                   COALESCE(SUM(avance),0)      AS db_kr,
+                   END                            AS transak,
+                   COALESCE(SUM(db_korrekt),0)   AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END              AS db_pct
-            FROM transaktioner WHERE dato = ?
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END                AS db_pct
+            FROM v_transaktioner WHERE dato = ?
         """, (seneste_dato,)).fetchone()
 
         seneste_yw = conn.execute(
@@ -211,14 +224,14 @@ def hent_kpi(aar: int = None) -> Dict:
         ).fetchone()[0]
 
         uge = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
-                   COALESCE(SUM(kostpris),0)   AS vareforbrug,
-                   COALESCE(SUM(avance),0)      AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)   AS omsaetning,
+                   COALESCE(SUM(vf_korrekt),0)  AS vareforbrug,
+                   COALESCE(SUM(db_korrekt),0)  AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END              AS db_pct,
-                   COUNT(DISTINCT dato)         AS antal_dage
-            FROM transaktioner
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END               AS db_pct,
+                   COUNT(DISTINCT dato)          AS antal_dage
+            FROM v_transaktioner
             WHERE strftime('%Y-%W', dato) = ?
         """, (seneste_yw,)).fetchone()
 
@@ -248,12 +261,12 @@ def hent_kpi(aar: int = None) -> Dict:
         # Forrige uge med data (til uge-over-uge DB-sammenligning)
         prev_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
         prev_uge_row = conn.execute(f"""
-            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
-                   COALESCE(SUM(avance),0)    AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END            AS db_pct
-            FROM transaktioner
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END             AS db_pct
+            FROM v_transaktioner
             WHERE strftime('%Y-%W', dato) = (
                 SELECT DISTINCT strftime('%Y-%W', dato)
                 FROM transaktioner
@@ -267,16 +280,16 @@ def hent_kpi(aar: int = None) -> Dict:
             "SELECT date(?, '-7 days')", (seneste_dato,)
         ).fetchone()[0]
         prev_dag_row = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
-                   COALESCE(SUM(avance),0)    AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END            AS db_pct,
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END             AS db_pct,
                    CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
                         THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
                         ELSE COUNT(*)
-                   END                        AS transak
-            FROM transaktioner WHERE dato = ?
+                   END                         AS transak
+            FROM v_transaktioner WHERE dato = ?
         """, (prev_dag_dato,)).fetchone()
 
         # Samme dag 2 uger siden (seneste_dato - 14 dage)
@@ -284,24 +297,24 @@ def hent_kpi(aar: int = None) -> Dict:
             "SELECT date(?, '-7 days')", (prev_dag_dato,)
         ).fetchone()[0]
         prev_prev_dag_row = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
-                   COALESCE(SUM(avance),0)    AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END            AS db_pct
-            FROM transaktioner WHERE dato = ?
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END             AS db_pct
+            FROM v_transaktioner WHERE dato = ?
         """, (prev_prev_dag_dato,)).fetchone()
 
         # MTD: fra 1. i indeværende måned til seneste dag
         mtd_start = seneste_dato[:8] + '01'  # YYYY-MM-01
         mtd_row = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
-                   COALESCE(SUM(avance),0)    AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END            AS db_pct,
-                   COUNT(DISTINCT dato)       AS antal_dage
-            FROM transaktioner WHERE dato >= ? AND dato <= ?
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END             AS db_pct,
+                   COUNT(DISTINCT dato)        AS antal_dage
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?
         """, (mtd_start, seneste_dato)).fetchone()
 
         # Forrige måned – samme periode (1. til dato -1 måned)
@@ -312,12 +325,12 @@ def hent_kpi(aar: int = None) -> Dict:
             "SELECT date(?, '-1 month')", (seneste_dato,)
         ).fetchone()[0]
         prev_mtd_row = conn.execute("""
-            SELECT COALESCE(SUM(omsætning),0) AS omsaetning,
-                   COALESCE(SUM(avance),0)    AS db_kr,
+            SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
+                   COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
-                        THEN SUM(avance)*1.25/SUM(omsætning)*100
-                        ELSE 0 END            AS db_pct
-            FROM transaktioner WHERE dato >= ? AND dato <= ?
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END             AS db_pct
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?
         """, (prev_mtd_start, prev_mtd_end)).fetchone()
 
     return {
@@ -346,13 +359,13 @@ def hent_dag_produkter(aar: int = None) -> Dict:
             return {"dato": None, "produkter": []}
         rows = conn.execute("""
             SELECT varenavn,
-                   MAX(kategori)            AS kategori,
-                   ROUND(SUM(antal), 0)     AS antal,
-                   ROUND(SUM(omsætning), 0) AS omsaetning,
-                   ROUND(SUM(kostpris), 0)  AS vareforbrug,
-                   ROUND(SUM(avance), 0)    AS db_kr,
-                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(avance)*1.25/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
-            FROM transaktioner
+                   MAX(kategori)               AS kategori,
+                   ROUND(SUM(antal), 0)        AS antal,
+                   ROUND(SUM(omsætning), 0)    AS omsaetning,
+                   ROUND(SUM(vf_korrekt), 0)   AS vareforbrug,
+                   ROUND(SUM(db_korrekt), 0)   AS db_kr,
+                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
+            FROM v_transaktioner
             WHERE dato = ?
             GROUP BY varenavn
             ORDER BY omsaetning DESC
@@ -408,13 +421,13 @@ def hent_uger(aar: int = None) -> List[Dict]:
                 CAST(strftime('%W', dato) AS INTEGER) AS uge,
                 MIN(dato)                             AS min_dato,
                 ROUND(SUM(omsætning), 2)              AS omsaetning,
-                ROUND(SUM(kostpris), 2)               AS vareforbrug,
-                ROUND(SUM(avance), 2)                 AS db_kr,
+                ROUND(SUM(vf_korrekt), 2)             AS vareforbrug,
+                ROUND(SUM(db_korrekt), 2)             AS db_kr,
                 ROUND(CASE WHEN SUM(omsætning)>0
-                     THEN SUM(avance)*1.25/SUM(omsætning)*100
+                     THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                      ELSE 0 END, 1)                   AS db_pct,
                 COUNT(DISTINCT dato)                  AS antal_dage
-            FROM transaktioner
+            FROM v_transaktioner
             {where}
             GROUP BY strftime('%Y-%W', dato)
             ORDER BY dato ASC
@@ -484,9 +497,9 @@ def hent_kategorier(aar: int = None) -> List[Dict]:
         params = (str(aar),) if aar else ()
         rows = conn.execute(f"""
             SELECT kategori, ROUND(SUM(omsætning), 2) AS omsaetning,
-                   ROUND(SUM(avance), 2) AS db_kr,
-                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
-            FROM transaktioner
+                   ROUND(SUM(db_korrekt), 2) AS db_kr,
+                   ROUND(SUM(db_korrekt)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+            FROM v_transaktioner
             WHERE kategori != '' {extra}
             GROUP BY kategori
             ORDER BY omsaetning DESC
@@ -509,10 +522,10 @@ def hent_kategorier_uge(aar: int = None) -> List[Dict]:
         ).fetchone()[0]
         rows = conn.execute("""
             SELECT kategori,
-                   ROUND(SUM(omsætning), 2)                                    AS omsaetning,
-                   ROUND(SUM(avance), 2)                                        AS db_kr,
-                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)     AS db_pct
-            FROM transaktioner
+                   ROUND(SUM(omsætning), 2)                                        AS omsaetning,
+                   ROUND(SUM(db_korrekt), 2)                                       AS db_kr,
+                   ROUND(SUM(db_korrekt)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
+            FROM v_transaktioner
             WHERE kategori != '' AND strftime('%Y-%W', dato) = ?
             GROUP BY kategori
             ORDER BY db_kr DESC
@@ -855,13 +868,13 @@ def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
         params = (str(aar), n) if aar else (n,)
         rows = conn.execute(f"""
             SELECT varenavn,
-                   MAX(kategori)                                        AS kategori,
-                   ROUND(SUM(omsætning), 2)                            AS omsaetning,
-                   ROUND(SUM(kostpris), 2)                             AS vareforbrug,
-                   ROUND(SUM(antal), 0)                                AS antal,
-                   ROUND(SUM(avance), 2)                               AS db_kr,
-                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)  AS db_pct
-            FROM transaktioner
+                   MAX(kategori)                                              AS kategori,
+                   ROUND(SUM(omsætning), 2)                                  AS omsaetning,
+                   ROUND(SUM(vf_korrekt), 2)                                 AS vareforbrug,
+                   ROUND(SUM(antal), 0)                                      AS antal,
+                   ROUND(SUM(db_korrekt), 2)                                 AS db_kr,
+                   ROUND(SUM(db_korrekt)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+            FROM v_transaktioner
             WHERE varenavn != '' {extra}
             GROUP BY varenavn
             ORDER BY omsaetning DESC

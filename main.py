@@ -250,6 +250,17 @@ async def bestilling_opdater(request: Request):
         raise HTTPException(status_code=400, detail="Ingen bestillingslinjer")
 
     antal = database.gem_ugebestilling(int(uge), int(aar), linjer)
+
+    # Auto-opdater stamdata fra bestillingslinjer (SKU + pris_ex_moms)
+    stamdata_linjer = [
+        {"sku": l["varenummer"], "varenavn": l["varenavn"],
+         "type": "Bagværk", "pris_ex_moms": l["pris_ex_moms"]}
+        for l in linjer
+        if l.get("varenummer") and l.get("pris_ex_moms", 0) > 0
+    ]
+    if stamdata_linjer:
+        database.gem_stamdata_bulk(stamdata_linjer)
+
     return {"ok": True, "uge": uge, "aar": aar, "linjer": antal}
 
 

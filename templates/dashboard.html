@@ -1243,19 +1243,24 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </table>
         </div>
 
-        <!-- Tabel: per uge -->
+        <!-- Tabel: per uge vs. bager-faktura -->
         <div class="card">
-          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Per uge</span></div>
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">Per uge — beregnet vs. bager-faktura</span>
+            <span class="aar2-chart-sub">difference = beregnet − faktura</span>
+          </div>
           <table style="width:100%;border-collapse:collapse;">
             <thead>
               <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
                 <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">UGE</th>
-                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">POSER</th>
-                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITERING</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">POSER STK</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BEREGNET KR</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BAGER FAKTURA</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">DIFFERENCE</th>
               </tr>
             </thead>
             <tbody id="tgtg-uge-tbody">
-              <tr><td colspan="3" class="empty">Indlæser…</td></tr>
+              <tr><td colspan="5" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4026,14 +4031,29 @@ async function loadTgtg() {
       </tr>`).join('')
     : '<tr><td colspan="4" class="empty">Ingen data — kør tgtg_sync.py</td></tr>';
 
-  // Uge-tabel
+  // Uge-tabel: beregnet vs. bager-faktura
   document.getElementById('tgtg-uge-tbody').innerHTML = (d.uger || []).length
-    ? (d.uger || []).map(r => `<tr>
-        <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
-        <td class="num" style="${mono}font-size:13px;">${r.total_antal}</td>
-        <td class="num" style="${mono}font-size:13px;color:var(--forest);font-weight:500;">${Math.round(r.total_kr).toLocaleString('da-DK')} kr</td>
-      </tr>`).join('')
-    : '<tr><td colspan="3" class="empty">Ingen data endnu</td></tr>';
+    ? (d.uger || []).map(r => {
+        const harBager  = r.bager_kr != null;
+        const diff      = r.diff_kr;
+        const diffFarve = diff == null ? 'var(--ash)'
+                        : Math.abs(diff) < 5 ? 'var(--moss)'     // ~match
+                        : diff > 0 ? 'var(--danger)'              // vi beregner mere end bager betaler
+                        : '#2d5a2d';                               // bager betaler mere
+        const diffTxt   = diff == null ? '—'
+                        : (diff > 0 ? '+' : '') + diff.toFixed(2) + ' kr';
+        const diffTitle = diff == null ? '' : diff > 0
+                        ? 'Bager krediterer mindre end beregnet'
+                        : 'Bager krediterer mere end beregnet';
+        return `<tr>
+          <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
+          <td class="num" style="${mono}font-size:13px;">${r.total_antal}</td>
+          <td class="num" style="${mono}font-size:13px;color:var(--forest);">${r.beregnet_kr.toFixed(2)} kr</td>
+          <td class="num" style="${mono}font-size:13px;color:var(--ash);">${harBager ? r.bager_kr.toFixed(2) + ' kr' : '—'}</td>
+          <td class="num" style="${mono}font-size:13px;font-weight:500;color:${diffFarve};" title="${diffTitle}">${diffTxt}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="5" class="empty">Ingen data endnu</td></tr>';
 }
 
 

@@ -1180,51 +1180,71 @@ def gem_tgtg_dagssalg(linjer: List[Dict]) -> int:
 
 
 def hent_tgtg_overblik(aar: int = None) -> Dict:
-    """Returner dagssalg + ugessummer + pose-typer."""
+    """Returner dagssalg + ugessummer matchet mod bager-faktura + pose-typer."""
+    from datetime import date as _date
+
     with _conn() as conn:
         aar_filter = "AND strftime('%Y',dato)=?" if aar else ""
         aar_params = (str(aar),) if aar else ()
 
-        dage = conn.execute(f"""
-            SELECT dato,
-                   SUM(antal)       AS total_antal,
-                   SUM(kreditering) AS total_kr
+        # Dagssalg (seneste 60 dage)
+        dage_rows = conn.execute(f"""
+            SELECT dato, SUM(antal) AS total_antal, SUM(kreditering) AS total_kr
+            FROM tgtg_dagssalg
+            WHERE 1=1 {aar_filter}
+            GROUP BY dato ORDER BY dato DESC LIMIT 60
+        """, aar_params).fetchall()
+
+        # Alle dagssalg til ISO-uge aggregering
+        alle_dage = conn.execute(f"""
+            SELECT dato, SUM(antal) AS antal, SUM(kreditering) AS kreditering
             FROM tgtg_dagssalg
             WHERE 1=1 {aar_filter}
             GROUP BY dato
-            ORDER BY dato DESC
-            LIMIT 60
         """, aar_params).fetchall()
 
-        uger = conn.execute(f"""
-            SELECT strftime('%Y',dato)           AS aar,
-                   CAST(strftime('%W',dato) AS INTEGER) AS uge,
-                   SUM(antal)                    AS total_antal,
-                   SUM(kreditering)              AS total_kr
-            FROM tgtg_dagssalg
-            WHERE 1=1 {aar_filter}
-            GROUP BY strftime('%Y-%W', dato)
-            ORDER BY dato DESC
-            LIMIT 20
-        """, aar_params).fetchall()
+        # Bager-faktura TGTG per uge
+        bager_rows = conn.execute(f"""
+            SELECT uge, aar, tgtg AS bager_kr
+            FROM bager_regnskab
+            WHERE tgtg > 0 {"AND aar=?" if aar else ""}
+        """, (aar,) if aar else ()).fetchall()
+        bager_map = {(r["uge"], r["aar"]): r["bager_kr"] for r in bager_rows}
 
         per_pose = conn.execute(f"""
-            SELECT pose_navn,
-                   SUM(antal)       AS total_antal,
-                   SUM(kreditering) AS total_kr
+            SELECT pose_navn, SUM(antal) AS total_antal, SUM(kreditering) AS total_kr
             FROM tgtg_dagssalg
             WHERE 1=1 {aar_filter}
-            GROUP BY pose_navn
-            ORDER BY total_kr DESC
+            GROUP BY pose_navn ORDER BY total_kr DESC
         """, aar_params).fetchall()
 
         poser = conn.execute(
             "SELECT item_id, navn, kreditpris FROM tgtg_poser WHERE aktiv=1 ORDER BY navn"
         ).fetchall()
 
+    # Aggreger til ISO-uger i Python
+    uge_map: Dict = {}
+    for r in alle_dage:
+        iso = _date.fromisoformat(r["dato"]).isocalendar()
+        key = (iso[1], iso[0])  # (uge, aar)
+        if key not in uge_map:
+            uge_map[key] = {"uge": key[0], "aar": key[1], "total_antal": 0, "beregnet_kr": 0.0}
+        uge_map[key]["total_antal"] += int(r["antal"] or 0)
+        uge_map[key]["beregnet_kr"] += float(r["kreditering"] or 0)
+
+    # Match mod bager-faktura og beregn difference
+    uger = []
+    for key in sorted(uge_map.keys(), reverse=True)[:20]:
+        u = uge_map[key].copy()
+        u["beregnet_kr"] = round(u["beregnet_kr"], 2)
+        bager_kr         = bager_map.get(key)
+        u["bager_kr"]    = round(bager_kr, 2) if bager_kr else None
+        u["diff_kr"]     = round(u["beregnet_kr"] - bager_kr, 2) if bager_kr else None
+        uger.append(u)
+
     return {
-        "dage":     [dict(r) for r in dage],
-        "uger":     [dict(r) for r in uger],
+        "dage":     [dict(r) for r in dage_rows],
+        "uger":     uger,
         "per_pose": [dict(r) for r in per_pose],
         "poser":    [dict(r) for r in poser],
     }

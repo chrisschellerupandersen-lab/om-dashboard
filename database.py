@@ -159,7 +159,9 @@ def init_db():
                               ELSE t.kostpris END          AS db_korrekt
             FROM transaktioner t
             LEFT JOIN varestamdata s
-                ON t.varenummer != '' AND t.varenummer = s.sku;
+                ON (t.varenummer != '' AND t.varenummer = s.sku)
+                OR (COALESCE(s.sku,'') = ''
+                    AND LOWER(TRIM(t.varenavn)) = LOWER(TRIM(s.varenavn)));
         """)
         # Migrationer til eksisterende tabeller
         for sql in [

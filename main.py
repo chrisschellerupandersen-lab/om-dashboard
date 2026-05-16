@@ -640,8 +640,7 @@ async def api_kontrol_varenumre(request: Request):
 async def api_debug_varer(request: Request, q: str = ""):
     """Debug: vis varenummer + varenavn fra transaktioner der matcher søgeord."""
     _kræv_login(request)
-    import database as db
-    with db._conn() as conn:
+    with database._conn() as conn:
         rows = conn.execute("""
             SELECT DISTINCT varenummer, varenavn,
                    COUNT(*) AS linjer,

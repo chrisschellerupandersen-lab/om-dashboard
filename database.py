@@ -1055,7 +1055,7 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
                    COALESCE(son,0) AS son
             FROM ugebestillinger
             WHERE uge = ? AND aar = ?
-            ORDER BY rowid ASC
+            ORDER BY COALESCE(sektion,1) ASC, rowid ASC
         """, (uge, aar)).fetchall()
 
         if not bestil:

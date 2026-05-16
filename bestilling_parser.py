@@ -44,8 +44,28 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
         if m_aar:
             aar = int(m_aar.group(1))
 
+    def _bestem_sektion(varenavn: str) -> int:
+        """Kategoriser produkt i 1 af 4 sektioner via nøgleord."""
+        n = varenavn.lower()
+        # Boller — matcher på 'bolle', 'birkes', 'musli', 'teboller', 'tebirkes',
+        #          'grovbirkes', 'grøskar' m.fl.
+        if any(k in n for k in ('bolle', 'musli', 'teboller', 'tebirkes',
+                                 'grovbirkes', 'grøskar')):
+            return 2
+        # Wienerbrød
+        if any(k in n for k in ('croissant', 'snegl', 'snurrer', 'frøsnapper',
+                                 'wienerstang', 'kanelstang', 'spandauer',
+                                 'marcipan', 'romsnegl', 'wienerbr')):
+            return 3
+        # Kager
+        if any(k in n for k in ('studenterbr', 'stammer', 'napoleonshat',
+                                 'cookie', 'kokostoppe', 'romkugl', 'hindbær',
+                                 'muffin', 'brownie')):
+            return 4
+        # Default: Brød, flute & focaccia
+        return 1
+
     linjer: List[Dict[str, Any]] = []
-    sektion = 1  # tæller op for hvert "I alt"-brudpunkt
     for i, row in enumerate(rows):
         if i < 3:
             continue
@@ -59,7 +79,6 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
         if not varenavn or varenavn.lower() in ("varetype", ""):
             continue
         if "i alt" in varenavn.lower():
-            sektion += 1  # næste sektion starter
             continue
 
         total_antal = _tal(row[11])
@@ -87,7 +106,7 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
             "fre": fre, "loe": loe, "son": son,
             "total_antal":  total_antal,
             "total_pris":   _tal(row[12] if len(row) > 12 else None),
-            "sektion":      sektion,
+            "sektion":      _bestem_sektion(varenavn),
         })
 
     return {"uge": uge, "aar": aar, "linjer": linjer}

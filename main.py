@@ -546,6 +546,38 @@ async def api_mangler_kostpris(request: Request):
     return database.hent_mangler_kostpris()
 
 
+# ── TGTG ──────────────────────────────────────────────────────────────────────
+
+@app.get("/api/tgtg/overblik")
+async def api_tgtg_overblik(request: Request, aar: Optional[int] = None):
+    _kræv_login(request)
+    return database.hent_tgtg_overblik(aar)
+
+
+@app.post("/api/tgtg/dagssalg")
+async def api_tgtg_dagssalg(request: Request):
+    """Modtager dagligt salg fra tgtg_sync.py eller manuel input."""
+    body = await request.json()
+    if body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Ugyldigt secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    n = database.gem_tgtg_dagssalg(linjer)
+    return {"ok": True, "linjer": n}
+
+
+@app.post("/api/tgtg/poser")
+async def api_tgtg_poser(request: Request):
+    """Opdater pose-definitioner (navn + kreditpris)."""
+    body = await request.json()
+    if body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Ugyldigt secret")
+    poser = body.get("poser", [])
+    n = database.gem_tgtg_poser(poser)
+    return {"ok": True, "poser": n}
+
+
 # ── VARESTAMDATA ──────────────────────────────────────────────────────────────
 
 @app.get("/api/stamdata")

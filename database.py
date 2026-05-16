@@ -90,6 +90,27 @@ def init_db():
                 UNIQUE(uge, aar) ON CONFLICT REPLACE
             );
 
+            CREATE TABLE IF NOT EXISTS tgtg_poser (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id      TEXT    DEFAULT '',
+                navn         TEXT    NOT NULL,
+                kreditpris   REAL    NOT NULL DEFAULT 0,
+                aktiv        INTEGER DEFAULT 1,
+                UNIQUE(navn) ON CONFLICT REPLACE
+            );
+
+            CREATE TABLE IF NOT EXISTS tgtg_dagssalg (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato         TEXT    NOT NULL,
+                item_id      TEXT    DEFAULT '',
+                pose_navn    TEXT    NOT NULL DEFAULT '',
+                antal        INTEGER DEFAULT 0,
+                kreditering  REAL    DEFAULT 0,
+                indlæst      TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(dato, pose_navn) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_tgtg_dato ON tgtg_dagssalg(dato);
+
             CREATE TABLE IF NOT EXISTS bestilling_manuel (
                 uge        INTEGER NOT NULL,
                 aar        INTEGER NOT NULL,
@@ -1102,6 +1123,111 @@ def gem_bager_regnskab(linjer: List[Dict]) -> int:
             """, (r["uge"], r["aar"], r.get("retur_wiener", 0), r.get("retur_boller", 0),
                   r.get("tgtg", 0), r.get("b_kvali", 0), r.get("retur_ialt", 0), r.get("faktura", 0)))
     return len(linjer)
+
+
+def gem_tgtg_poser(poser: List[Dict]) -> int:
+    """Gem/opdater pose-definitioner (navn, kreditpris, item_id)."""
+    with _conn() as conn:
+        for p in poser:
+            conn.execute("""
+                INSERT INTO tgtg_poser (item_id, navn, kreditpris, aktiv)
+                VALUES (?,?,?,1)
+                ON CONFLICT(navn) DO UPDATE SET
+                    item_id=excluded.item_id,
+                    kreditpris=excluded.kreditpris,
+                    aktiv=1
+            """, (p.get("item_id",""), p["navn"], p["kreditpris"]))
+    return len(poser)
+
+
+def gem_tgtg_dagssalg(linjer: List[Dict]) -> int:
+    """Gem dagligt TGTG-salg. linjer: [{dato, item_id, pose_navn, antal}]"""
+    with _conn() as conn:
+        # Hent kreditpriser
+        priser = {r["navn"]: r["kreditpris"] for r in
+                  conn.execute("SELECT navn, kreditpris FROM tgtg_poser").fetchall()}
+        for r in linjer:
+            kreditpris   = priser.get(r["pose_navn"], 0)
+            kreditering  = round(r["antal"] * kreditpris, 2)
+            conn.execute("""
+                INSERT INTO tgtg_dagssalg (dato, item_id, pose_navn, antal, kreditering)
+                VALUES (?,?,?,?,?)
+                ON CONFLICT(dato, pose_navn) DO UPDATE SET
+                    antal=excluded.antal,
+                    kreditering=excluded.kreditering
+            """, (r["dato"], r.get("item_id",""), r["pose_navn"], r["antal"], kreditering))
+
+        # Opdater bager_regnskab.tgtg for berørte uger automatisk
+        datoer = list({r["dato"] for r in linjer})
+        for dato in datoer:
+            from datetime import date as _d
+            d   = _d.fromisoformat(dato)
+            iso = d.isocalendar()
+            uge, aar = iso[1], iso[0]
+            # Summer alle tgtg_dagssalg for den uge
+            mandag  = _d.fromisocalendar(aar, uge, 1).isoformat()
+            soendag = _d.fromisocalendar(aar, uge, 7).isoformat()
+            total = conn.execute("""
+                SELECT COALESCE(SUM(kreditering),0) FROM tgtg_dagssalg
+                WHERE dato BETWEEN ? AND ?
+            """, (mandag, soendag)).fetchone()[0]
+            conn.execute("""
+                INSERT INTO bager_regnskab (uge, aar, tgtg)
+                VALUES (?,?,?)
+                ON CONFLICT(uge,aar) DO UPDATE SET tgtg=excluded.tgtg
+            """, (uge, aar, round(total, 2)))
+    return len(linjer)
+
+
+def hent_tgtg_overblik(aar: int = None) -> Dict:
+    """Returner dagssalg + ugessummer + pose-typer."""
+    with _conn() as conn:
+        aar_filter = "AND strftime('%Y',dato)=?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
+
+        dage = conn.execute(f"""
+            SELECT dato,
+                   SUM(antal)       AS total_antal,
+                   SUM(kreditering) AS total_kr
+            FROM tgtg_dagssalg
+            WHERE 1=1 {aar_filter}
+            GROUP BY dato
+            ORDER BY dato DESC
+            LIMIT 60
+        """, aar_params).fetchall()
+
+        uger = conn.execute(f"""
+            SELECT strftime('%Y',dato)           AS aar,
+                   CAST(strftime('%W',dato) AS INTEGER) AS uge,
+                   SUM(antal)                    AS total_antal,
+                   SUM(kreditering)              AS total_kr
+            FROM tgtg_dagssalg
+            WHERE 1=1 {aar_filter}
+            GROUP BY strftime('%Y-%W', dato)
+            ORDER BY dato DESC
+            LIMIT 20
+        """, aar_params).fetchall()
+
+        per_pose = conn.execute(f"""
+            SELECT pose_navn,
+                   SUM(antal)       AS total_antal,
+                   SUM(kreditering) AS total_kr
+            FROM tgtg_dagssalg
+            WHERE 1=1 {aar_filter}
+            GROUP BY pose_navn
+            ORDER BY total_kr DESC
+        """, aar_params).fetchall()
+
+        poser = conn.execute(
+            "SELECT item_id, navn, kreditpris FROM tgtg_poser WHERE aktiv=1 ORDER BY navn"
+        ).fetchall()
+
+    return {
+        "dage":     [dict(r) for r in dage],
+        "uger":     [dict(r) for r in uger],
+        "per_pose": [dict(r) for r in per_pose],
+        "poser":    [dict(r) for r in poser],
+    }
 
 
 def hent_svind_data(aar: int = None) -> List[Dict]:

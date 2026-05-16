@@ -1191,6 +1191,76 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- TOO GOOD TO GO -->
+      <div class="panel" id="p-tgtg">
+        <div class="page-hdr">
+          <h2>Too Good To Go</h2>
+          <p>Dagligt salg · kreditering til bager</p>
+        </div>
+
+        <!-- KPI-kort -->
+        <div class="kpi-row" style="margin-bottom:16px;">
+          <div class="kpi-card">
+            <div class="kpi-l">Poser i alt · år</div>
+            <div class="kpi-v" id="tgtg-kpi-antal">—</div>
+            <div class="kpi-s" id="tgtg-kpi-antal-sub">stk</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-l">Kreditering · år</div>
+            <div class="kpi-v" id="tgtg-kpi-kr">—</div>
+            <div class="kpi-s">inkl. alle poser</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-l">Snit per uge</div>
+            <div class="kpi-v" id="tgtg-kpi-snit">—</div>
+            <div class="kpi-s">poser / uge</div>
+          </div>
+        </div>
+
+        <!-- Graf: dagssalg -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">Poser solgt per dag · seneste 60 dage</span>
+          </div>
+          <div style="position:relative;height:160px;"><canvas id="c-tgtg-dage"></canvas></div>
+        </div>
+
+        <!-- Tabel: per pose-type -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Per pose-type · år til dato</span></div>
+          <table style="width:100%;border-collapse:collapse;" id="tgtg-pose-tbl">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+                <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">POSETYPE</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITPRIS</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SOLGT STK</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITERING</th>
+              </tr>
+            </thead>
+            <tbody id="tgtg-pose-tbody">
+              <tr><td colspan="4" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tabel: per uge -->
+        <div class="card">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Per uge</span></div>
+          <table style="width:100%;border-collapse:collapse;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+                <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">UGE</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">POSER</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITERING</th>
+              </tr>
+            </thead>
+            <tbody id="tgtg-uge-tbody">
+              <tr><td colspan="3" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- SVIND & ØKONOMI -->
       <div class="panel" id="p-svind">
         <div class="page-hdr">
@@ -1544,6 +1614,7 @@ const NAV_DEFAULT = [
   {id:'trend',       label:'Trend & bestilling',    group:'Specialrapporter', hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Indkøb',      hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Indkøb',      hidden:false},
+  {id:'tgtg',        label:'Too Good To Go',       group:'Indkøb',      hidden:false},
   {id:'svind',       label:'Svind & økonomi',  group:'Indkøb',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Indkøb',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Indkøb',      hidden:false},
@@ -3901,6 +3972,63 @@ async function visBestillingDetalje(uge, aar) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// ── TOO GOOD TO GO ────────────────────────────────────────────────────────────
+let _tgtgLoaded = false;
+
+async function loadTgtg() {
+  if (_tgtgLoaded) return;
+  _tgtgLoaded = true;
+
+  const d = await api(`/api/tgtg/overblik?aar=${VALGT_AAR}`);
+  if (!d) { _tgtgLoaded = false; return; }
+
+  const mono = "font-family:'DM Mono',monospace;";
+
+  // KPI-kort
+  const totAntal = (d.uger || []).reduce((s,r) => s + (r.total_antal||0), 0);
+  const totKr    = (d.uger || []).reduce((s,r) => s + (r.total_kr||0), 0);
+  const nUger    = (d.uger || []).length;
+  const snitAntal = nUger > 0 ? (totAntal / nUger).toFixed(1) : '—';
+
+  document.getElementById('tgtg-kpi-antal').textContent     = totAntal || '—';
+  document.getElementById('tgtg-kpi-antal-sub').textContent = `${totAntal} stk solgt`;
+  document.getElementById('tgtg-kpi-kr').textContent        = totKr > 0 ? Math.round(totKr).toLocaleString('da-DK') + ' kr' : '—';
+  document.getElementById('tgtg-kpi-snit').textContent      = snitAntal;
+
+  // Dagsgraf
+  if (d.dage && d.dage.length) {
+    const dage = [...d.dage].reverse();
+    mk('c-tgtg-dage', 'bar', dage.map(r => r.dato.slice(5).replace('-','/')),
+      [{ data: dage.map(r => r.total_antal), backgroundColor: 'rgba(74,124,74,.55)',
+         borderColor: '#4a7c4a', borderWidth:1, borderRadius:2 }],
+      { scales: { x: { ticks: { font:{ size:10 }, maxRotation:45 }},
+                  y: { ticks: { font:{ size:10 }}, beginAtZero:true }}});
+  }
+
+  // Per pose-type tabel
+  const poserPriser = {};
+  (d.poser || []).forEach(p => { poserPriser[p.navn] = p.kreditpris; });
+
+  document.getElementById('tgtg-pose-tbody').innerHTML = (d.per_pose || []).length
+    ? (d.per_pose || []).map(p => `<tr>
+        <td style="font-size:13px;padding:6px 8px;">${p.pose_navn}</td>
+        <td class="num" style="${mono}font-size:12px;color:var(--ash);">${(poserPriser[p.pose_navn]||0).toFixed(2)} kr</td>
+        <td class="num" style="${mono}font-size:13px;">${p.total_antal}</td>
+        <td class="num" style="${mono}font-size:13px;color:var(--forest);font-weight:500;">${Math.round(p.total_kr).toLocaleString('da-DK')} kr</td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty">Ingen data — kør tgtg_sync.py</td></tr>';
+
+  // Uge-tabel
+  document.getElementById('tgtg-uge-tbody').innerHTML = (d.uger || []).length
+    ? (d.uger || []).map(r => `<tr>
+        <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
+        <td class="num" style="${mono}font-size:13px;">${r.total_antal}</td>
+        <td class="num" style="${mono}font-size:13px;color:var(--forest);font-weight:500;">${Math.round(r.total_kr).toLocaleString('da-DK')} kr</td>
+      </tr>`).join('')
+    : '<tr><td colspan="3" class="empty">Ingen data endnu</td></tr>';
+}
+
+
 // ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
 let _svindLoaded = false;
 let _svindTs     = 0;
@@ -4452,6 +4580,7 @@ window.showPanel = function(id, el) {
   if (id === 'kostpris')   loadKostpris();
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
+  if (id === 'tgtg')         loadTgtg();
   if (id === 'svind')        loadSvind();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();

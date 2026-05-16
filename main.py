@@ -602,6 +602,7 @@ async def stamdata_gem(request: Request):
         varenavn,
         type_,
         float(body.get("pris_ex_moms", 0) or 0),
+        int(body.get("portioner", 1) or 1),
     )
     return {"ok": True, "id": id_}
 

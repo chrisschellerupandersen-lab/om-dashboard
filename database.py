@@ -151,11 +151,11 @@ def init_db():
             SELECT t.*,
                    t.omsætning / 1.25                      AS omsaetning_ex_moms,
                    CASE WHEN s.pris_ex_moms > 0
-                        THEN t.antal * s.pris_ex_moms
+                        THEN t.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                         ELSE t.kostpris END                AS vf_korrekt,
                    t.omsætning / 1.25
                        - CASE WHEN s.pris_ex_moms > 0
-                              THEN t.antal * s.pris_ex_moms
+                              THEN t.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                               ELSE t.kostpris END          AS db_korrekt
             FROM transaktioner t
             LEFT JOIN varestamdata s
@@ -166,6 +166,7 @@ def init_db():
             "ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1",
             "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
             "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
+            "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
         ]:
             try:
                 conn.execute(sql)
@@ -1883,23 +1884,26 @@ def hent_mobilepay() -> List[Dict]:
 def hent_stamdata() -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""
-            SELECT id, sku, varenavn, type, pris_ex_moms
+            SELECT id, sku, varenavn, type, pris_ex_moms,
+                   COALESCE(portioner, 1) AS portioner
             FROM varestamdata
             ORDER BY type, varenavn
         """).fetchall()
     return [dict(r) for r in rows]
 
 
-def gem_stamdata_linje(sku: str, varenavn: str, type_: str, pris_ex_moms: float) -> int:
+def gem_stamdata_linje(sku: str, varenavn: str, type_: str, pris_ex_moms: float,
+                       portioner: int = 1) -> int:
     with _conn() as conn:
         cur = conn.execute("""
-            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms, portioner)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(varenavn) DO UPDATE SET
                 sku          = excluded.sku,
                 type         = excluded.type,
-                pris_ex_moms = excluded.pris_ex_moms
-        """, (sku or '', varenavn, type_, pris_ex_moms or 0))
+                pris_ex_moms = excluded.pris_ex_moms,
+                portioner    = excluded.portioner
+        """, (sku or '', varenavn, type_, pris_ex_moms or 0, portioner or 1))
         return cur.lastrowid
 
 
@@ -1911,13 +1915,15 @@ def slet_stamdata(id_: int):
 def gem_stamdata_bulk(linjer: List[Dict]) -> int:
     with _conn() as conn:
         conn.executemany("""
-            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms, portioner)
+            VALUES (?, ?, ?, ?, ?)
             ON CONFLICT(varenavn) DO UPDATE SET
                 sku          = excluded.sku,
                 type         = excluded.type,
-                pris_ex_moms = excluded.pris_ex_moms
-        """, [(r.get("sku", ""), r["varenavn"], r["type"], r.get("pris_ex_moms", 0))
+                pris_ex_moms = excluded.pris_ex_moms,
+                portioner    = excluded.portioner
+        """, [(r.get("sku", ""), r["varenavn"], r["type"], r.get("pris_ex_moms", 0),
+               r.get("portioner", 1) or 1)
               for r in linjer])
     return len(linjer)
 

@@ -466,6 +466,28 @@ def hent_timer_idag(aar: int = None) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def hent_timer_forrige_uge(aar: int = None) -> List[Dict]:
+    """Timeomsætning for samme ugedag 7 dage før seneste dato."""
+    from datetime import date as _date, timedelta as _td
+    with _conn() as conn:
+        aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
+        aar_params = (str(aar),) if aar else ()
+        seneste_dato = conn.execute(
+            f"SELECT MAX(dato) FROM transaktioner {aar_filter}", aar_params
+        ).fetchone()[0]
+        if not seneste_dato:
+            return []
+        prev_dato = (_date.fromisoformat(seneste_dato) - _td(days=7)).isoformat()
+        rows = conn.execute("""
+            SELECT time_start, ROUND(SUM(omsætning), 2) AS omsaetning
+            FROM transaktioner
+            WHERE dato = ? AND time_start >= 0
+            GROUP BY time_start
+            ORDER BY time_start
+        """, (prev_dato,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def hent_timer_snit(aar: int = None) -> List[Dict]:
     with _conn() as conn:
         extra = "AND strftime('%Y', dato) = ?" if aar else ""

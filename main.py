@@ -134,6 +134,12 @@ async def api_timer(request: Request, aar: Optional[int] = None):
     return database.hent_timer_idag(aar)
 
 
+@app.get("/api/salg/timer/forrige-uge")
+async def api_timer_forrige_uge(request: Request, aar: Optional[int] = None):
+    _kræv_login(request)
+    return database.hent_timer_forrige_uge(aar)
+
+
 @app.get("/api/salg/timer/snit")
 async def api_timer_snit(request: Request, aar: Optional[int] = None):
     _kræv_login(request)

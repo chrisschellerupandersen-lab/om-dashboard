@@ -1803,12 +1803,13 @@ function mk(id, type, labels, datasets, extra={}) {
 
 async function loadAll() {
   const a = VALGT_AAR;
-  const [kpi, dage, uger, idag, timer, timerSnit, kategorier, top, katUge] = await Promise.all([
+  const [kpi, dage, uger, idag, timer, timerForrige, timerSnit, kategorier, top, katUge] = await Promise.all([
     api(`/api/kpi?aar=${a}`),
     api(`/api/salg/dage?n=30&aar=${a}`),
     api(`/api/salg/uger?aar=${a}`),
     api(`/api/salg/idag?aar=${a}`),
     api(`/api/salg/timer?aar=${a}`),
+    api(`/api/salg/timer/forrige-uge?aar=${a}`),
     api(`/api/salg/timer/snit?aar=${a}`),
     api(`/api/salg/kategorier?aar=${a}`),
     api(`/api/salg/top?n=20&aar=${a}`),
@@ -1817,7 +1818,7 @@ async function loadAll() {
 
   buildForside(kpi, dage, uger, idag, katUge);
   if (kpi) { buildAlerts(kpi); buildDagProgress(kpi); }
-  buildDag(kpi, timer);
+  buildDag(kpi, timer, timerForrige);
   buildUge(uger);
   buildTime(timerSnit);
   buildKategorier(kategorier);
@@ -2292,7 +2293,7 @@ function buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, nUger) {
   sc.style.display = '';
 }
 
-function buildDag(kpi, timer) {
+function buildDag(kpi, timer, timerForrige) {
   if (kpi && kpi.dag) {
     const dag = kpi.dag;
     document.getElementById('dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
@@ -2339,9 +2340,75 @@ function buildDag(kpi, timer) {
   if (timer && timer.length > 0) {
     document.getElementById('dag-chart-wrap').style.display = '';
     document.getElementById('dag-no-time').style.display = 'none';
-    mk('c-dag','bar', timer.map(r => r.time_start+':00'),
-      [{ data: timer.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
-      { scales:{ x:{ ticks:{ font:{ size:11 }}}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v)+' kr' }}}});
+
+    // Byg opslag for forrige uges timer
+    const prevMap = {};
+    (timerForrige || []).forEach(r => { prevMap[r.time_start] = r.omsaetning; });
+
+    // Alle unikke timer (union af i dag + forrige uge) sorteret
+    const alleTimer = [...new Set([
+      ...timer.map(r => r.time_start),
+      ...Object.keys(prevMap).map(Number)
+    ])].sort((a,b) => a - b);
+
+    const idagMap = {};
+    timer.forEach(r => { idagMap[r.time_start] = r.omsaetning; });
+
+    // Grøn/rød per bar: bedre end samme time forrige uge = grøn
+    const barColors  = alleTimer.map(h => {
+      const idag = idagMap[h] ?? 0;
+      const prev = prevMap[h];
+      if (prev == null) return 'rgba(74,124,74,.45)';      // ingen sammenligningsdata → neutral grøn
+      if (idag > prev)  return 'rgba(30,120,30,.55)';      // grøn — bedre
+      if (idag < prev)  return 'rgba(180,40,40,.45)';      // rød — dårligere
+      return 'rgba(74,124,74,.35)';
+    });
+    const barBorders = alleTimer.map(h => {
+      const idag = idagMap[h] ?? 0;
+      const prev = prevMap[h];
+      if (prev == null) return '#4a7c4a';
+      return idag >= prev ? '#1e7a1e' : '#b42828';
+    });
+
+    const prevData = alleTimer.map(h => prevMap[h] != null ? Math.round(prevMap[h]) : null);
+    const hasPrev  = prevData.some(v => v != null);
+
+    const datasets = [{
+      label: 'I dag',
+      data: alleTimer.map(h => Math.round(idagMap[h] ?? 0)),
+      backgroundColor: barColors,
+      borderColor: barBorders,
+      borderWidth: 1,
+      borderRadius: 2,
+      order: 2,
+    }];
+
+    if (hasPrev) {
+      datasets.push({
+        label: 'Sidste uge',
+        type: 'line',
+        data: prevData,
+        borderColor: 'rgba(100,100,100,.50)',
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+        borderDash: [4, 3],
+        pointRadius: 3,
+        pointBackgroundColor: 'rgba(100,100,100,.5)',
+        tension: 0.2,
+        spanGaps: false,
+        order: 1,
+      });
+    }
+
+    mk('c-dag', 'bar', alleTimer.map(h => h+':00'), datasets, {
+      scales: {
+        x: { ticks: { font: { size:11 }}},
+        y: { ticks: { font: { size:11 }, callback: v => Math.round(v)+' kr' }}
+      },
+      plugins: {
+        legend: { display: hasPrev, labels: { font: { size:10 }, boxWidth:12 }}
+      }
+    });
   } else {
     document.getElementById('dag-chart-wrap').style.display = 'none';
     document.getElementById('dag-no-time').style.display = '';
@@ -2350,8 +2417,22 @@ function buildDag(kpi, timer) {
 
 function buildUge(uger) {
   if (!uger || !uger.length) return;
+
+  // Farv hver søjle: grøn = bedre end forrige uge, rød = dårligere, grå = ingen forrige
+  const ugeColors  = uger.map((r, i) => {
+    if (i === 0) return 'rgba(180,180,180,.30)';
+    const prev = uger[i-1].omsaetning;
+    if (r.omsaetning > prev) return 'rgba(30,120,30,.55)';
+    if (r.omsaetning < prev) return 'rgba(180,40,40,.45)';
+    return 'rgba(180,180,180,.30)';
+  });
+  const ugeBorders = uger.map((r, i) => {
+    if (i === 0) return 'rgba(150,150,150,.4)';
+    return uger[i-1].omsaetning <= r.omsaetning ? '#1e7a1e' : '#b42828';
+  });
+
   mk('c-uge','bar', uger.map(r => `U${r.uge}`),
-    [{ data: uger.map(r => Math.round(r.omsaetning)), backgroundColor: FL, borderColor: F, borderWidth:1, borderRadius:2 }],
+    [{ data: uger.map(r => Math.round(r.omsaetning)), backgroundColor: ugeColors, borderColor: ugeBorders, borderWidth:1, borderRadius:2 }],
     { scales:{ x:{ ticks:{ font:{ size:11 }}}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}}});
 
   const snitOmsat = uger.reduce((a,r) => a + r.omsaetning, 0) / uger.length;

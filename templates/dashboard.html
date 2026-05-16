@@ -4005,7 +4005,7 @@ async function loadTgtg() {
 
   // KPI-kort
   const totAntal = (d.uger || []).reduce((s,r) => s + (r.total_antal||0), 0);
-  const totKr    = (d.uger || []).reduce((s,r) => s + (r.total_kr||0), 0);
+  const totKr    = (d.uger || []).reduce((s,r) => s + (r.beregnet_kr||0), 0);
   const nUger    = (d.uger || []).length;
   const snitAntal = nUger > 0 ? (totAntal / nUger).toFixed(1) : '—';
 

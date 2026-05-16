@@ -582,6 +582,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
     </div>
     <div class="tb-right">
+      <button id="moms-toggle" onclick="toggleMoms()" title="Skift mellem inkl./excl. moms"
+        style="font-family:'DM Mono',monospace;font-size:9px;font-weight:700;letter-spacing:.05em;
+               padding:5px 10px;border-radius:4px;cursor:pointer;border:1px solid rgba(30,58,30,.25);
+               background:rgba(30,58,30,.06);color:var(--forest);transition:all .2s;">
+        INKL. MOMS
+      </button>
       <span class="tb-sync" id="tb-sync">● Indlæser…</span>
       <a class="tb-btn" href="/logout">Log ud</a>
       <button class="tb-menu-btn" onclick="toggleSidebar()" aria-label="Menu">
@@ -1870,7 +1876,36 @@ async function api(path, opts) {
   } catch { return null; }
 }
 
-function kr(v) { return Math.round(v).toLocaleString('da-DK') + ' kr'; }
+// ── MOMS-TOGGLE ──────────────────────────────────────────────────────────────
+let MOMS_EX = localStorage.getItem('momsEx') === '1';
+
+function _initMomsBtn() {
+  const btn = document.getElementById('moms-toggle');
+  if (!btn) return;
+  if (MOMS_EX) {
+    btn.textContent = 'EXCL. MOMS';
+    btn.style.background = 'var(--forest)';
+    btn.style.color = 'var(--amber)';
+    btn.style.borderColor = 'var(--forest)';
+  } else {
+    btn.textContent = 'INKL. MOMS';
+    btn.style.background = 'rgba(30,58,30,.06)';
+    btn.style.color = 'var(--forest)';
+    btn.style.borderColor = 'rgba(30,58,30,.25)';
+  }
+}
+
+function toggleMoms() {
+  MOMS_EX = !MOMS_EX;
+  localStorage.setItem('momsEx', MOMS_EX ? '1' : '0');
+  _initMomsBtn();
+  loadAll();
+}
+
+/** Konverter omsætningsværdi ift. moms-indstilling. */
+function oms(v) { return MOMS_EX ? (v / 1.25) : v; }
+
+function kr(v) { return Math.round(oms(v)).toLocaleString('da-DK') + ' kr'; }
 
 // Sæt SVG-ring: pct = 0-100, color valgfri
 function setRing(id, pct, color) {
@@ -2118,7 +2153,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
           prods.map(p => `<li>
             <span class="dl-navn" style="font-size:12px;">${p.varenavn}</span>
             <span class="dl-stk">${p.antal} stk</span>
-            <span class="dl-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+            <span class="dl-kr">${Math.round(oms(p.omsaetning)).toLocaleString('da-DK')} kr</span>
             <span class="dl-db" style="color:var(--ash);">${p.vareforbrug>0?'VF '+Math.round(p.vareforbrug):''}</span>
             <span class="dl-db" style="color:${(p.db_kr||0)>=0?'var(--forest)':'var(--danger)'};">${p.db_kr!=null?'DB '+Math.round(p.db_kr):''}</span>
             <span class="dl-db" style="color:${(p.db_pct||0)>=0?'var(--ash)':'var(--danger)'};">${p.db_pct!=null?p.db_pct.toFixed(0)+'%':''}</span>
@@ -2152,7 +2187,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     });
     const DOW_MARK = {4:'T', 5:'F', 6:'L', 0:'S'};  // tor, fre, lør, søn
     mk('c-forside','bar', dage.map(r => fmtDato(r.dato)),
-      [{ data: dage.map(r => Math.round(r.omsaetning)), backgroundColor: barColors, borderColor: barBorders, borderWidth: 1, borderRadius: 2 }],
+      [{ data: dage.map(r => Math.round(oms(r.omsaetning))), backgroundColor: barColors, borderColor: barBorders, borderWidth: 1, borderRadius: 2 }],
       { scales:{ x:{ ticks:{ font:{ size:10 }, maxRotation:45,
           callback: function(val, idx) {
             const lbl = dage[idx] ? fmtDato(dage[idx].dato) : val;
@@ -2209,7 +2244,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
             const barCol = (r.db_pct || 0) >= 35 ? 'var(--forest)' : (r.db_pct || 0) >= 25 ? 'var(--moss)' : 'var(--danger)';
             return `<tr style="border-bottom:1px solid rgba(30,58,30,.05);">
               <td style="padding:5px 8px;font-size:13px;">${r.kategori}</td>
-              <td style="padding:5px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${Math.round(r.omsaetning).toLocaleString('da-DK')}</td>
+              <td style="padding:5px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')}</td>
               <td style="padding:5px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${Math.round(r.db_kr).toLocaleString('da-DK')}</td>
               <td style="padding:5px 8px;text-align:right;${mono}font-size:12px;">${(r.db_pct||0).toFixed(1)}%</td>
               <td style="padding:5px 8px;">
@@ -2299,7 +2334,7 @@ function buildDagProgress(kpi) {
   // Omsætning
   const omPct   = Math.min(100, Math.round(dag.omsaetning / prevDag.omsaetning * 100));
   const omColor = omPct >= 90 ? 'var(--moss)' : omPct >= 70 ? 'var(--gold)' : 'var(--danger)';
-  items.push({ label:'Omsætning', val: Math.round(dag.omsaetning).toLocaleString('da-DK') + ' kr',
+  items.push({ label:'Omsætning', val: Math.round(oms(dag.omsaetning)).toLocaleString('da-DK') + ' kr',
                exp: '~' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr forventet',
                pct: omPct, color: omColor });
   // Kunder
@@ -2536,7 +2571,7 @@ function buildUge(uger) {
   });
 
   mk('c-uge','bar', uger.map(r => `U${r.uge}`),
-    [{ data: uger.map(r => Math.round(r.omsaetning)), backgroundColor: ugeColors, borderColor: ugeBorders, borderWidth:1, borderRadius:2 }],
+    [{ data: uger.map(r => Math.round(oms(r.omsaetning))), backgroundColor: ugeColors, borderColor: ugeBorders, borderWidth:1, borderRadius:2 }],
     { scales:{ x:{ ticks:{ font:{ size:11 }}}, y:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}}});
 
   const snitOmsat = uger.reduce((a,r) => a + r.omsaetning, 0) / uger.length;
@@ -2548,7 +2583,7 @@ function buildUge(uger) {
     const mono    = "font-family:'DM Mono',monospace;";
     return `<tr>
       <td style="font-size:14px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
-      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:14px;">${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')} kr</td>
       <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
@@ -2582,7 +2617,7 @@ function buildTime(timerSnit) {
   const hSum = {}, hCnt = {};
   timerSnit.forEach(r => {
     if (!hSum[r.time_start]) { hSum[r.time_start] = 0; hCnt[r.time_start] = 0; }
-    hSum[r.time_start] += r.snit_omsaetning;
+    hSum[r.time_start] += oms(r.snit_omsaetning);
     hCnt[r.time_start]++;
   });
   const hMap = {};
@@ -2631,8 +2666,8 @@ function buildTime(timerSnit) {
   const dagNums = [1,2,3,4,5,6,7];
   // cell value: snit_omsaetning for (ugedag, time_start)
   const cell = {};
-  timerSnit.forEach(r => { cell[`${r.ugedag}_${r.time_start}`] = r.snit_omsaetning; });
-  const allVals = timerSnit.map(r => r.snit_omsaetning);
+  timerSnit.forEach(r => { cell[`${r.ugedag}_${r.time_start}`] = oms(r.snit_omsaetning); });
+  const allVals = timerSnit.map(r => oms(r.snit_omsaetning));
   const maxCell = allVals.length ? Math.max(...allVals) : 1;
 
   let thead = '<thead><tr><th></th>' + hrs.map(h => `<th>${h}</th>`).join('') + '<th>Peak</th></tr></thead>';
@@ -2656,7 +2691,7 @@ function buildTime(timerSnit) {
 function buildKategorier(kategorier) {
   if (!kategorier || !kategorier.length) return;
   const vKat  = kategorier.map(r => r.kategori);
-  const vData = kategorier.map(r => Math.round(r.omsaetning));
+  const vData = kategorier.map(r => Math.round(oms(r.omsaetning)));
   mk('c-vare','bar', vKat,
     [{ data:vData, backgroundColor:vColors.map(c=>c+'cc'), borderColor:vColors, borderWidth:1, borderRadius:2 }],
     { indexAxis:'y', scales:{ x:{ ticks:{ font:{ size:11 }, callback: v => Math.round(v/1000)+'k' }}, y:{ ticks:{ font:{ size:11 }}}}});
@@ -2671,7 +2706,7 @@ function buildKategorier(kategorier) {
     const dbBg    = r.db_pct>=35?'rgba(74,124,74,.1)':r.db_pct>=30?'rgba(200,168,75,.15)':'rgba(155,52,32,.1)';
     return `<tr>
       <td style="font-size:14px;">${r.kategori}</td>
-      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:14px;">${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')} kr</td>
       <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct!=null?r.db_pct.toFixed(1)+'%':'—'}</span></td>
     </tr>`;
   }).join('');
@@ -2723,7 +2758,7 @@ function renderTop(top, n) {
       return `<tr class="tg-${gid}" style="display:none;background:rgba(30,58,30,.015);">
         <td style="color:var(--ash);${mono}font-size:11px;padding-left:28px;">${rowNum}</td>
         <td style="font-size:13px;padding-left:28px;color:var(--charcoal);">${r.varenavn}</td>
-        <td class="num" style="font-size:13px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+        <td class="num" style="font-size:13px;">${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')} kr</td>
         <td class="num" style="${mono}font-size:12px;color:var(--ash);">${r.vareforbrug>0?Math.round(r.vareforbrug).toLocaleString('da-DK')+' kr':'—'}</td>
         <td class="num" style="${mono}font-size:12px;">${r.db_kr>0?Math.round(r.db_kr).toLocaleString('da-DK')+' kr':'—'}</td>
         <td class="num" style="font-size:13px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
@@ -2788,7 +2823,7 @@ function renderDageDetaljer(dage, n) {
         `<div class="dag-prod-row" style="padding-left:20px;">
           <span class="dag-prod-navn" style="font-size:11px;">${p.varenavn}</span>
           <span class="dag-prod-antal">${p.antal}</span>
-          <span class="dag-prod-kr">${Math.round(p.omsaetning).toLocaleString('da-DK')} kr</span>
+          <span class="dag-prod-kr">${Math.round(oms(p.omsaetning)).toLocaleString('da-DK')} kr</span>
         </div>`
       ).join('');
       return `<div style="border-bottom:1px solid rgba(30,58,30,.08);">
@@ -2803,7 +2838,7 @@ function renderDageDetaljer(dage, n) {
     return `<div class="dag-col">
       <div class="dag-col-hdr">
         <div class="dag-col-dato">${dag.dato_label}</div>
-        <div class="dag-col-omsat">${Math.round(dag.omsaetning).toLocaleString('da-DK')} kr</div>
+        <div class="dag-col-omsat">${Math.round(oms(dag.omsaetning)).toLocaleString('da-DK')} kr</div>
         <div class="dag-col-sub">${dag.linjer} kunder &middot; ${Math.round(dag.snit_per_linje)} kr/kurv</div>
       </div>
       ${prodsHtml}
@@ -3678,7 +3713,7 @@ function buildKaffe(d) {
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Kaffeomsætning</div>
-      <div class="kpi-val">${Math.round(kpi.total_omsaetning).toLocaleString('da-DK')} kr</div>
+      <div class="kpi-val">${Math.round(oms(kpi.total_omsaetning)).toLocaleString('da-DK')} kr</div>
       <div class="kpi-sub">${kaffe_pct}% af butikkens total</div>
     </div>
     <div class="kpi-card">
@@ -3699,7 +3734,7 @@ function buildKaffe(d) {
     return `<tr style="cursor:pointer;" title="Klik for timeprofil" onclick="kaffeVisProduktTimer(${i})">
       <td style="font-size:14px;">${r.varenavn} <span style="font-size:10px;color:var(--amber);margin-left:4px;">↗</span></td>
       <td class="num" style="font-size:14px;">${Math.round(r.antal).toLocaleString('da-DK')} stk</td>
-      <td class="num" style="font-size:14px;">${Math.round(r.omsaetning).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:14px;">${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')} kr</td>
       <td class="num"><span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;padding:4px 10px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct != null ? r.db_pct.toFixed(1) + '%' : '—'}</span></td>
     </tr>`;
   }).join('');
@@ -4616,7 +4651,7 @@ async function loadKostpris() {
   tbody.innerHTML = d.produkter.map((r, i) => `<tr>
     <td style="font-size:14px;">${r.varenavn}</td>
     <td style="font-size:12px;color:var(--ash);">${r.kategori || '—'}</td>
-    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.total_omsaetning).toLocaleString('da-DK')} kr</td>
+    <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(oms(r.total_omsaetning)).toLocaleString('da-DK')} kr</td>
     <td class="num" style="font-family:'DM Mono',monospace;">${Math.round(r.total_antal)}</td>
     <td class="num" style="font-family:'DM Mono',monospace;">${r.salgs_dage}</td>
     <td style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);">${fmtDato(r.seneste_dato)}</td>
@@ -4656,7 +4691,7 @@ async function loadMobilepay() {
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/[^0-9.]/g,'');document.execCommand('insertText',false,t);"
           style="${mono}font-size:13px;cursor:text;border-bottom:1px dashed rgba(30,58,30,.3);padding:1px 3px;"
-        >${Math.round(r.omsaetning).toLocaleString('da-DK')}</span>
+        >${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')}</span>
         <span style="${mono}font-size:11px;color:var(--ash);"> kr</span>
       </td>
     </tr>`).join('');
@@ -4926,6 +4961,7 @@ async function loadVnrKontrol() {
 }
 
 _navLoad(); _buildNav();
+_initMomsBtn();
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);
 </script>

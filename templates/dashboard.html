@@ -1327,22 +1327,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <span class="aar2-tbl-hdr-r" id="svind-tbl-lbl"></span>
           </div>
           <div style="overflow-x:auto;">
-            <table class="aar2-tbl" style="min-width:1050px;">
-              <thead><tr>
-                <th style="width:7%;">Uge</th>
-                <th class="num" style="width:8%;">Bestilt stk</th>
-                <th class="num" style="width:8%;">Kassesalg</th>
-                <th class="num" style="width:6%;" title="Kaffe+Wienerbrød kombination — tæller som bagværk solgt">KW stk</th>
-                <th class="num" style="width:6%;" title="Too Good To Go — estimeret à 38 kr/pose">TGTG stk</th>
-                <th class="num" style="width:8%;">Effektivt solgt</th>
-                <th class="num" style="width:7%;">Svind stk</th>
-                <th class="num" style="width:7%;">Svind %</th>
-                <th class="num" style="width:9%;">Indkøb kr</th>
-                <th class="num" style="width:8%;">TGTG kr</th>
-                <th class="num" style="width:8%;">Retur i alt</th>
-                <th class="num" style="width:8%;" title="MobilePay omsætning netto (÷1.25), pro-ratet til ugen">MobilePay</th>
-                <th class="num" style="width:9%;" title="Netto kr justeret for MobilePay">Netto adj.</th>
-              </tr></thead>
+            <table class="aar2-tbl" style="min-width:1100px;">
+              <thead>
+                <tr style="background:rgba(30,58,30,.04);">
+                  <th style="width:7%;"></th>
+                  <th class="num" colspan="2" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">INDKØBT</th>
+                  <th class="num" colspan="3" style="border-bottom:2px solid rgba(74,124,74,.4);font-size:8px;letter-spacing:.07em;color:var(--moss);padding-bottom:2px;">SOLGT I STK</th>
+                  <th class="num" colspan="2" style="border-bottom:2px solid rgba(155,52,32,.3);font-size:8px;letter-spacing:.07em;color:#9b3420;padding-bottom:2px;">SVIND</th>
+                  <th class="num" colspan="4" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">ØKONOMI KR</th>
+                </tr>
+                <tr>
+                  <th style="width:7%;">Uge</th>
+                  <th class="num" style="width:7%;">Bestilt</th>
+                  <th class="num" style="width:7%;">Indkøb kr</th>
+                  <th class="num" style="width:7%;" title="Salg via kassen med varenummer">Kasse stk</th>
+                  <th class="num" style="width:6%;" title="Kaffe+Wienerbrød kombination">KW stk</th>
+                  <th class="num" style="width:7%;" title="Too Good To Go — faktiske poser (estimat hvis ingen sync)">TGTG stk</th>
+                  <th class="num" style="width:7%;">Svind stk</th>
+                  <th class="num" style="width:7%;">Svind %</th>
+                  <th class="num" style="width:7%;">TGTG kr</th>
+                  <th class="num" style="width:7%;">Retur i alt</th>
+                  <th class="num" style="width:7%;" title="MobilePay netto pro-ratet til ugen">MobilePay</th>
+                  <th class="num" style="width:8%;" title="Netto justeret for MobilePay">Netto adj.</th>
+                </tr>
+              </thead>
               <tbody id="svind-tbody">
                 <tr><td colspan="13" class="empty">Indlæser…</td></tr>
               </tbody>
@@ -4102,18 +4110,18 @@ async function loadSvind(force = false) {
     const kasseTxt = r.kassesalg_stk != null ? Math.round(r.kassesalg_stk).toLocaleString('da-DK') : '—';
     const kwTxt    = r.kw_stk > 0 ? r.kw_stk : '—';
     const tgtgStkTxt = r.tgtg_stk > 0 ? r.tgtg_stk : '—';
-    const effTxt   = r.effektivt_solgt != null ? Math.round(r.effektivt_solgt).toLocaleString('da-DK') : '—';
     const mono     = "font-family:'DM Mono',monospace;";
+    const tgtgKilde = r.tgtg_stk_kilde === 'faktisk' ? '' :
+      `<span title="Estimat — kør tgtg_sync.py" style="font-size:8px;color:var(--ash);margin-left:2px;">~</span>`;
     return `<tr>
       <td style="font-size:14px;font-weight:400;">Uge ${r.uge} <span style="${mono}font-size:10px;color:var(--ash);">${r.aar}</span></td>
       <td class="num" style="${mono}">${r.bestilt_stk != null ? Math.round(r.bestilt_stk).toLocaleString('da-DK') : '—'}</td>
-      <td class="num" style="${mono}">${kasseTxt}</td>
+      <td class="num" style="${mono}color:var(--ash);">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}color:var(--forest);font-weight:500;">${kasseTxt}</td>
       <td class="num" style="${mono}color:var(--ash);">${kwTxt}</td>
-      <td class="num" style="${mono}color:var(--moss);">${tgtgStkTxt}</td>
-      <td class="num" style="${mono}font-weight:500;">${effTxt}</td>
+      <td class="num" style="${mono}color:var(--moss);">${tgtgStkTxt}${tgtgKilde}</td>
       <td class="num" style="${mono}">${svindStk}</td>
       <td class="num" style="${svindCls}${mono}">${svindTxt}</td>
-      <td class="num" style="${mono}">${Math.round(r.bestilt_kr || 0).toLocaleString('da-DK')}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
       <td class="num" style="${mono}color:var(--ash);">${Math.round(r.retur_ialt || 0).toLocaleString('da-DK')}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') : '—'}</td>

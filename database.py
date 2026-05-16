@@ -1232,7 +1232,9 @@ def hent_tgtg_overblik(aar: int = None) -> Dict:
 
 def hent_svind_data(aar: int = None) -> List[Dict]:
     """Kombinerer bestilling, bager_regnskab og kassesalg per uge.
-    Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk (tgtg_kr ÷ 38 kr/pose).
+    Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk.
+    TGTG stk: faktiske enheder fra tgtg_dagssalg (dato = produktionsdato = salgsdag-1).
+    Fallback: tgtg_kr ÷ 38 kr/pose hvis ingen tgtg_dagssalg data.
     """
     TGTG_KR_PR_POSE = 38.0
 
@@ -1240,7 +1242,6 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
 
     with _conn() as conn:
         # Kassesalg bagværk per dag — matcher varenummer fra bestillinger
-        # Aggregeres til ISO-uger i Python (SQLite %W ≠ ISO-ugenummer)
         kasse_dage = conn.execute("""
             SELECT dato, ROUND(SUM(antal), 0) AS kassesalg_stk
             FROM transaktioner
@@ -1270,6 +1271,18 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             iso = _date.fromisoformat(r["dato"]).isocalendar()
             key = (iso[1], iso[0])
             kw_map[key] = kw_map.get(key, 0) + (r["kw_stk"] or 0)
+
+        # TGTG faktisk stk fra tgtg_dagssalg (dato er allerede produktionsdato = salgsdag-1)
+        tgtg_dage = conn.execute("""
+            SELECT dato, SUM(antal) AS antal
+            FROM tgtg_dagssalg
+            GROUP BY dato
+        """).fetchall()
+        tgtg_stk_map: Dict = {}
+        for r in tgtg_dage:
+            iso = _date.fromisoformat(r["dato"]).isocalendar()
+            key = (iso[1], iso[0])
+            tgtg_stk_map[key] = tgtg_stk_map.get(key, 0) + int(r["antal"] or 0)
 
         aar_filter1 = "AND b.aar = ?" if aar else ""
         aar_filter2 = "AND u.aar = ?" if aar else ""
@@ -1323,7 +1336,14 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             pass
         kassesalg = kasse_map.get((d["uge"], d["aar"]))
         kw_stk    = int(kw_map.get((d["uge"], d["aar"]), 0) or 0)
-        tgtg_stk  = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0
+        # Foretruk faktiske TGTG stk — fallback til kr-estimat
+        tgtg_stk_actual = tgtg_stk_map.get((d["uge"], d["aar"]))
+        if tgtg_stk_actual is not None:
+            tgtg_stk       = int(tgtg_stk_actual)
+            tgtg_stk_kilde = "faktisk"
+        else:
+            tgtg_stk       = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0
+            tgtg_stk_kilde = "estimat"
 
         # MobilePay netto pro-ratet til ugen (mandag bestemmer måned)
         try:
@@ -1334,9 +1354,10 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
         except Exception:
             mp_netto = 0.0
 
-        d["kassesalg_stk"] = kassesalg
-        d["kw_stk"]        = kw_stk
-        d["tgtg_stk"]      = tgtg_stk
+        d["kassesalg_stk"]  = kassesalg
+        d["kw_stk"]         = kw_stk
+        d["tgtg_stk"]       = tgtg_stk
+        d["tgtg_stk_kilde"] = tgtg_stk_kilde
         d["mp_netto"]      = mp_netto
         # Netto justeret: hvad kostede brødet minus hvad vi fik ind (inkl. MobilePay)
         if d.get("netto_kr") is not None:

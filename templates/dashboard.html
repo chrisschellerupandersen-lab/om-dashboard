@@ -3890,8 +3890,8 @@ async function _loadDagUge(uge, aar) {
     if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);padding:6px 10px;">—</td>`;
     const dc = _diffFarve(diff);
     return `<td class="num" style="${mono}vertical-align:top;padding:6px 10px;">
-      <div style="font-size:15px;color:var(--forest);font-weight:600;">${b || '—'}</div>
       <div style="font-size:15px;">${s || '0'}</div>
+      <div style="font-size:15px;color:var(--forest);font-weight:600;">${b || '—'}</div>
       <div style="font-size:14px;color:${dc};font-weight:600;margin-top:3px;border-top:1px solid rgba(0,0,0,.06);padding-top:3px;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</div>
     </td>`;
   }

@@ -3907,15 +3907,15 @@ async function _loadDagUge(uge, aar) {
 
   // Sektionsnavne — matcher Excel-templatens 4 sektioner
   const SEKTION_NAVNE = {
-    1: 'I alt — Brød, flute & focaccia',
-    2: 'I alt — Boller',
-    3: 'I alt — Wienerbrød',
-    4: 'I alt — Kager',
+    1: 'Brød, flute & focaccia',
+    2: 'Boller',
+    3: 'Wienerbrød',
+    4: 'Kager',
   };
 
   function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff, sektion) {
     const dc    = _diffFarve(totDiff);
-    const label = SEKTION_NAVNE[sektion] || 'I alt';
+    const label = 'I alt — ' + (SEKTION_NAVNE[sektion] || '');
     const dagCeller = dagTotaler.map(([b, s]) => {
       const diff = s - b;
       const c = _diffFarve(diff);
@@ -3944,18 +3944,31 @@ async function _loadDagUge(uge, aar) {
     </tr>`;
   }
 
+  const colSpanTot = 1 + nDage + 3;
+
+  function _sektionHeader(sektion) {
+    const navn = SEKTION_NAVNE[sektion] || ('Gruppe ' + sektion);
+    return `<tr style="background:var(--forest);">
+      <td colspan="${colSpanTot}" style="padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);">${navn}</td>
+    </tr>`;
+  }
+
   const rows = [];
   let curSek = null;
-  let sekDagTot = Array.from({length: nDage}, () => [0, 0]); // [bestilt, solgt] per dag
+  let sekDagTot = Array.from({length: nDage}, () => [0, 0]);
   let sekTotB = 0, sekTotS = 0;
 
   d.produkter.forEach((p, idx) => {
     const sek = p.sektion ?? 1;
-    // Sektion-skift: indsæt I alt for forrige sektion
+    // Sektion-skift: indsæt I alt for forrige sektion + header for ny
     if (curSek !== null && sek !== curSek) {
       rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, curSek));
       sekDagTot = Array.from({length: nDage}, () => [0, 0]);
       sekTotB = 0; sekTotS = 0;
+    }
+    // Indsæt gruppe-header når ny sektion starter
+    if (sek !== curSek) {
+      rows.push(_sektionHeader(sek));
     }
     curSek = sek;
 

@@ -1078,6 +1078,46 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
 
       <!-- UGEBESTILLING -->
+      <!-- ── DAGSOVERBLIK: BESTILT VS. SOLGT ─────────────────────────────── -->
+      <div class="panel" id="p-dagsoverblik">
+        <div class="page-hdr">
+          <h2>Bestilt vs. solgt — dagsoverblik</h2>
+          <p>Sammenligning af bestilt antal fra indkøb og solgt antal fra kassen · per produkt per dag</p>
+        </div>
+
+        <!-- Uge-vælger -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <button onclick="dagUgeSkift(-1)" style="background:none;border:1px solid rgba(30,58,30,.2);border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--forest);">‹</button>
+          <span style="font-family:'DM Mono',monospace;font-size:15px;font-weight:500;min-width:80px;text-align:center;" id="dag-uge-label">Uge —</span>
+          <button onclick="dagUgeSkift(1)" style="background:none;border:1px solid rgba(30,58,30,.2);border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--forest);">›</button>
+          <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);" id="dag-dato-range"></span>
+          <div style="margin-left:auto;display:flex;gap:8px;font-family:'DM Mono',monospace;font-size:10px;align-items:center;">
+            <span style="background:rgba(45,90,45,.12);color:var(--forest);padding:2px 7px;border-radius:3px;">▲ bestilt</span>
+            <span style="background:rgba(30,58,30,.07);color:var(--ink);padding:2px 7px;border-radius:3px;">● solgt</span>
+            <span style="color:var(--danger);padding:2px 7px;">− rest</span>
+            <span style="color:var(--moss);padding:2px 7px;">+ over</span>
+          </div>
+        </div>
+
+        <!-- Tabel -->
+        <div style="overflow-x:auto;">
+          <table class="tbl" id="dag-tbl" style="min-width:700px;">
+            <thead>
+              <tr id="dag-tbl-header">
+                <th style="min-width:160px;text-align:left;">Produkt</th>
+                <!-- Dag-kolonner indsættes af JS -->
+                <th class="num" style="border-left:2px solid rgba(30,58,30,.1);">Total bestilt</th>
+                <th class="num">Total solgt</th>
+                <th class="num">Rest</th>
+              </tr>
+            </thead>
+            <tbody id="dag-tbl-body">
+              <tr><td colspan="11" class="empty">Vælg en uge med bestillingsdata</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="panel" id="p-bestilling">
         <div class="page-hdr">
           <h2>Ugebestilling — bagværk</h2>
@@ -1503,6 +1543,7 @@ const NAV_DEFAULT = [
   {id:'kaffe',       label:'Kaffe',                 group:'Specialrapporter', hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Specialrapporter', hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Indkøb',      hidden:false},
+  {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Indkøb',      hidden:false},
   {id:'svind',       label:'Svind & økonomi',  group:'Indkøb',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Indkøb',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Indkøb',      hidden:false},
@@ -3598,6 +3639,91 @@ async function loadBestilling() {
   </tr>`).join('');
 }
 
+// ── DAGSOVERBLIK: BESTILT VS. SOLGT ───────────────────────────────────────────
+let _dagUge = null, _dagAar = null;
+
+function _isoUgeNu() {
+  const d = new Date();
+  const thu = new Date(d);
+  thu.setDate(d.getDate() - (d.getDay() + 6) % 7 + 3);
+  const yr = new Date(thu.getFullYear(), 0, 4);
+  return { uge: 1 + Math.round(((thu - yr) / 86400000 - 3 + (yr.getDay() + 6) % 7) / 7), aar: thu.getFullYear() };
+}
+
+async function loadDagsoverblik() {
+  if (_dagUge === null) {
+    const iso = _isoUgeNu();
+    _dagUge = iso.uge; _dagAar = iso.aar;
+  }
+  await _loadDagUge(_dagUge, _dagAar);
+}
+
+function dagUgeSkift(delta) {
+  if (_dagUge === null) return;
+  _dagUge += delta;
+  if (_dagUge < 1)  { _dagUge = 52; _dagAar--; }
+  if (_dagUge > 52) { _dagUge = 1;  _dagAar++; }
+  _loadDagUge(_dagUge, _dagAar);
+}
+
+async function _loadDagUge(uge, aar) {
+  document.getElementById('dag-uge-label').textContent = 'Uge ' + uge;
+  document.getElementById('dag-tbl-body').innerHTML =
+    '<tr><td colspan="11" style="padding:20px;text-align:center;color:var(--ash);font-family:\'DM Mono\',monospace;font-size:10px;">Indlæser…</td></tr>';
+
+  const d = await api(`/api/bagvaerk/dag/${uge}?aar=${aar}`);
+  if (!d || !d.produkter || !d.produkter.length) {
+    document.getElementById('dag-dato-range').textContent = '';
+    document.getElementById('dag-tbl-body').innerHTML =
+      '<tr><td colspan="11" class="empty">Ingen bestillingsdata for uge ' + uge + ' · ' + aar + '</td></tr>';
+    return;
+  }
+
+  // Datosæt header
+  const navne = d.dage_navne || ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const datoer = d.dage_datoer || [];
+  document.getElementById('dag-dato-range').textContent =
+    datoer.length ? datoer[0].slice(5).replace('-','/') + ' – ' + datoer[6].slice(5).replace('-','/') + ' · ' + aar : '';
+
+  // Byg tabel-header dag-kolonner
+  const hdr = document.getElementById('dag-tbl-header');
+  // Fjern gamle dag-th (behold første og sidst 3)
+  Array.from(hdr.querySelectorAll('.dag-th')).forEach(el => el.remove());
+  const totalThs = hdr.querySelectorAll('th');
+  navne.forEach((n, i) => {
+    const th = document.createElement('th');
+    th.className = 'num dag-th';
+    th.style.cssText = 'min-width:80px;font-size:9px;letter-spacing:.05em;';
+    th.innerHTML = `<div style="text-transform:uppercase;color:var(--ash);">${n}</div><div style="font-size:8px;color:rgba(0,0,0,.3);">${datoer[i]?.slice(5).replace('-','/') || ''}</div>`;
+    hdr.insertBefore(th, totalThs[totalThs.length - 3]);
+  });
+
+  // Byg rækker
+  const mono = "font-family:'DM Mono',monospace;";
+  document.getElementById('dag-tbl-body').innerHTML = d.produkter.map(p => {
+    const dagCeller = p.dage.map(dag => {
+      const b = dag.bestilt, s = dag.solgt, diff = dag.diff;
+      const diffColor = diff === 0 ? 'var(--ash)' : diff > 0 ? 'var(--danger)' : 'var(--moss)';
+      const diffSign  = diff > 0 ? '+' : '';
+      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.2);">—</td>`;
+      return `<td class="num" style="${mono}vertical-align:middle;">
+        <div style="font-size:11px;color:var(--forest);font-weight:500;">${b || '—'}</div>
+        <div style="font-size:11px;">${s || '0'}</div>
+        <div style="font-size:10px;color:${diffColor};font-weight:500;">${diff !== 0 ? diffSign+diff : '·'}</div>
+      </td>`;
+    }).join('');
+
+    const totDiffColor = p.tot_diff === 0 ? 'var(--ash)' : p.tot_diff > 0 ? 'var(--danger)' : 'var(--moss)';
+    return `<tr>
+      <td style="font-size:13px;">${p.varenavn}</td>
+      ${dagCeller}
+      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:500;">${p.tot_bestilt || '—'}</td>
+      <td class="num" style="${mono}">${p.tot_solgt}</td>
+      <td class="num" style="${mono}color:${totDiffColor};font-weight:500;">${p.tot_diff > 0 ? '+' : ''}${p.tot_diff !== 0 ? p.tot_diff : '·'}</td>
+    </tr>`;
+  }).join('');
+}
+
 async function visBestillingDetalje(uge, aar) {
   const linjer = await api(`/api/bestilling/uge/${uge}?aar=${aar}`);
   if (!linjer || !linjer.length) {
@@ -4188,8 +4314,9 @@ window.showPanel = function(id, el) {
   if (id === 'trend'       && !_trendLoaded) loadTrend(_trendDage);
   if (id === 'aar'         && !_aarLoaded)   loadAar();
   if (id === 'kostpris')   loadKostpris();
-  if (id === 'bestilling') loadBestilling();
-  if (id === 'svind')      loadSvind();
+  if (id === 'bestilling')   loadBestilling();
+  if (id === 'dagsoverblik') loadDagsoverblik();
+  if (id === 'svind')        loadSvind();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
   if (id === 'stamdata')   loadStamdata();

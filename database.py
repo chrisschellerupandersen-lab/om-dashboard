@@ -989,6 +989,84 @@ def hent_bestilling_uge(uge: int, aar: int) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
+    """Bestilt vs. solgt per produkt per dag for en given uge."""
+    from datetime import date as _date, timedelta as _td
+
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    DAGE_NAVNE = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
+    try:
+        mandag = _date.fromisocalendar(int(aar), int(uge), 1)
+    except Exception:
+        return {"uge": uge, "aar": aar, "dage": [], "produkter": []}
+    dage_datoer = [(mandag + _td(days=i)).isoformat() for i in range(7)]
+
+    with _conn() as conn:
+        bestil = conn.execute("""
+            SELECT varenummer, varenavn,
+                   COALESCE(man,0) AS man, COALESCE(tir,0) AS tir,
+                   COALESCE(ons,0) AS ons, COALESCE(tor,0) AS tor,
+                   COALESCE(fre,0) AS fre, COALESCE(loe,0) AS loe,
+                   COALESCE(son,0) AS son
+            FROM ugebestillinger
+            WHERE uge = ? AND aar = ?
+            ORDER BY varenavn
+        """, (uge, aar)).fetchall()
+
+        if not bestil:
+            return {"uge": uge, "aar": aar, "dage": DAGE_NAVNE, "dage_datoer": dage_datoer, "produkter": []}
+
+        skus = [str(b["varenummer"]) for b in bestil if b["varenummer"]]
+
+        # Salg per varenummer per dato for ugen
+        if skus:
+            placeholders_dato = ','.join('?' * len(dage_datoer))
+            placeholders_sku  = ','.join('?' * len(skus))
+            salg_rows = conn.execute(f"""
+                SELECT varenummer, dato, ROUND(SUM(antal), 0) AS antal
+                FROM transaktioner
+                WHERE dato IN ({placeholders_dato})
+                  AND varenummer IN ({placeholders_sku})
+                GROUP BY varenummer, dato
+            """, dage_datoer + skus).fetchall()
+        else:
+            salg_rows = []
+
+    salg_map: Dict = {}
+    for s in salg_rows:
+        vnr = str(s["varenummer"])
+        salg_map.setdefault(vnr, {})[s["dato"]] = int(s["antal"] or 0)
+
+    produkter = []
+    for b in bestil:
+        vnr = str(b["varenummer"]) if b["varenummer"] else ""
+        dage_data = []
+        tot_bestilt = tot_solgt = 0
+        for i, dag in enumerate(DAGE):
+            bestilt = int(b[dag] or 0)
+            solgt   = salg_map.get(vnr, {}).get(dage_datoer[i], 0)
+            diff    = bestilt - solgt
+            tot_bestilt += bestilt
+            tot_solgt   += solgt
+            dage_data.append({"bestilt": bestilt, "solgt": solgt, "diff": diff})
+        produkter.append({
+            "varenummer":  vnr,
+            "varenavn":    b["varenavn"],
+            "dage":        dage_data,
+            "tot_bestilt": tot_bestilt,
+            "tot_solgt":   tot_solgt,
+            "tot_diff":    tot_bestilt - tot_solgt,
+        })
+
+    return {
+        "uge":        uge,
+        "aar":        aar,
+        "dage_navne": DAGE_NAVNE,
+        "dage_datoer": dage_datoer,
+        "produkter":  produkter,
+    }
+
+
 def gem_bager_regnskab(linjer: List[Dict]) -> int:
     with _conn() as conn:
         for r in linjer:

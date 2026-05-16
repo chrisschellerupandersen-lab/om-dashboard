@@ -264,6 +264,15 @@ async def bestilling_opdater(request: Request):
     return {"ok": True, "uge": uge, "aar": aar, "linjer": antal}
 
 
+@app.get("/api/bagvaerk/dag/{uge}")
+async def api_bagvaerk_dag(request: Request, uge: int, aar: Optional[int] = None):
+    _kræv_login(request)
+    if aar is None:
+        from datetime import date
+        aar = date.today().year
+    return database.hent_bagvaerk_dag_sammenligning(uge, aar)
+
+
 @app.get("/api/bager/svind")
 async def api_bager_svind(request: Request, aar: Optional[int] = None):
     _kræv_login(request)

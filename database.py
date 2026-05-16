@@ -1222,7 +1222,7 @@ def hent_tgtg_overblik(aar: int = None) -> Dict:
         u["beregnet_kr"] = round(u["beregnet_kr"], 2)
         bager_kr         = bager_map.get(key)
         u["bager_kr"]    = round(bager_kr, 2) if bager_kr else None
-        u["diff_kr"]     = round(u["beregnet_kr"] - bager_kr, 2) if bager_kr else None
+        u["diff_kr"]     = round(bager_kr - u["beregnet_kr"], 2) if bager_kr else None
         uger.append(u)
 
     return {

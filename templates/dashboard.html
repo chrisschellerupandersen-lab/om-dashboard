@@ -4021,8 +4021,8 @@ async function loadTgtg() {
   const diffSub      = document.getElementById('tgtg-kpi-diff-sub');
   if (ugerMedBegge.length > 0) {
     diffEl.textContent = (totalDiff > 0 ? '+' : '') + totalDiff.toFixed(2) + ' kr';
-    diffEl.className   = 'kpi-v ' + (Math.abs(totalDiff) < 20 ? '' : totalDiff > 0 ? 'dn' : 'up');
-    diffSub.textContent = `over ${ugerMedBegge.length} uger · ${Math.abs(totalDiff) < 20 ? 'udlignet ✓' : totalDiff > 0 ? 'bager underbetaler' : 'bager overbetaler'}`;
+    diffEl.className   = 'kpi-v ' + (Math.abs(totalDiff) < 20 ? '' : totalDiff > 0 ? 'up' : 'dn');
+    diffSub.textContent = `over ${ugerMedBegge.length} uger · ${Math.abs(totalDiff) < 20 ? 'udlignet ✓' : totalDiff > 0 ? 'bager overbetaler' : 'bager underbetaler'}`;
   } else {
     diffEl.textContent  = '—';
     diffSub.textContent = 'ingen fakturaer endnu';
@@ -4070,16 +4070,16 @@ async function loadTgtg() {
         const diff      = r.diff_kr;
         const diffFarve = diff == null ? 'var(--ash)'
                         : Math.abs(diff) < 5    ? 'var(--moss)'
-                        : diff > 0              ? 'var(--danger)'
-                        : '#2d5a2d';
+                        : diff > 0              ? 'var(--moss)'
+                        : 'var(--danger)';
         const diffTxt   = diff == null ? '—'
                         : (diff > 0 ? '+' : '') + diff.toFixed(2) + ' kr';
 
         const ls        = r.lobende_sum;
         const lsFarve   = ls == null ? 'var(--ash)'
                         : Math.abs(ls) < 20     ? 'var(--moss)'   // udlignet
-                        : ls > 0                ? 'var(--danger)'
-                        : '#2d5a2d';
+                        : ls > 0                ? 'var(--moss)'   // bager betaler mere
+                        : 'var(--danger)';                         // bager underbetaler
         const lsTxt     = ls == null ? '—'
                         : (ls > 0 ? '+' : '') + ls.toFixed(2) + ' kr';
         const lsTitle   = ls == null ? '' : Math.abs(ls) < 20

@@ -656,12 +656,20 @@ async def api_debug_varer(request: Request, q: str = ""):
                OR sku IN (SELECT DISTINCT varenummer FROM transaktioner
                           WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%'))
         """, (q, q)).fetchall()
+        kpi = conn.execute("""
+            SELECT COUNT(*) AS rækker,
+                   COUNT(CASE WHEN bon_nr != '' THEN 1 END) AS ikke_tomme,
+                   COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END) AS distinct_bon
+            FROM v_transaktioner WHERE dato = ?
+        """, (seneste,)).fetchone()
     return {
         "seneste_dato": seneste,
-        "linjer_idag": bon["linjer"],
+        "transaktioner_linjer": bon["linjer"],
         "unikke_bon_nr": bon["unikke_bon"],
         "tomme_bon_nr": bon["tomme_bon"],
         "eks_bon_nr": bon["eks_bon"],
+        "v_transaktioner_rækker": kpi["rækker"],
+        "v_distinct_bon": kpi["distinct_bon"],
         "stamdata": [dict(r) for r in stam],
     }
 

@@ -1090,7 +1090,7 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         for i, dag in enumerate(DAGE):
             bestilt = int(b[dag] or 0)
             solgt   = salg_map.get(vnr, {}).get(dage_datoer[i], 0)
-            diff    = bestilt - solgt
+            diff    = solgt - bestilt   # negativt = solgte mindre end bestilt = rødt
             tot_bestilt += bestilt
             tot_solgt   += solgt
             dage_data.append({"bestilt": bestilt, "solgt": solgt, "diff": diff})
@@ -1101,7 +1101,7 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
             "dage":        dage_data,
             "tot_bestilt": tot_bestilt,
             "tot_solgt":   tot_solgt,
-            "tot_diff":    tot_bestilt - tot_solgt,
+            "tot_diff":    tot_solgt - tot_bestilt,   # negativt = under-solgt
         })
 
     return {

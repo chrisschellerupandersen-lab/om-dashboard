@@ -1092,10 +1092,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <button onclick="dagUgeSkift(1)" style="background:none;border:1px solid rgba(30,58,30,.2);border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16px;color:var(--forest);">›</button>
           <span style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);" id="dag-dato-range"></span>
           <div style="margin-left:auto;display:flex;gap:8px;font-family:'DM Mono',monospace;font-size:10px;align-items:center;">
-            <span style="background:rgba(45,90,45,.12);color:var(--forest);padding:2px 7px;border-radius:3px;">▲ bestilt</span>
-            <span style="background:rgba(30,58,30,.07);color:var(--ink);padding:2px 7px;border-radius:3px;">● solgt</span>
-            <span style="color:var(--danger);padding:2px 7px;">− rest</span>
-            <span style="color:var(--moss);padding:2px 7px;">+ over</span>
+            <span style="background:rgba(45,90,45,.12);color:var(--forest);padding:2px 7px;border-radius:3px;font-weight:600;">B indkøbt</span>
+            <span style="background:rgba(30,58,30,.07);color:var(--ink);padding:2px 7px;border-radius:3px;">S solgt</span>
+            <span style="color:var(--danger);padding:2px 7px;font-weight:600;">− under-solgt</span>
+            <span style="color:var(--moss);padding:2px 7px;font-weight:600;">+ over-solgt</span>
           </div>
         </div>
 
@@ -1104,11 +1104,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <table class="tbl" id="dag-tbl" style="min-width:700px;">
             <thead>
               <tr id="dag-tbl-header">
-                <th style="min-width:160px;text-align:left;">Produkt</th>
+                <th style="min-width:160px;text-align:left;font-size:12px;">Produkt</th>
                 <!-- Dag-kolonner indsættes af JS -->
-                <th class="num" style="border-left:2px solid rgba(30,58,30,.1);">Total bestilt</th>
-                <th class="num">Total solgt</th>
-                <th class="num">Rest</th>
+                <th class="num" style="border-left:2px solid rgba(30,58,30,.1);font-size:11px;color:var(--forest);">Tot. indkøbt</th>
+                <th class="num" style="font-size:11px;">Tot. solgt</th>
+                <th class="num" style="font-size:11px;">Diff</th>
               </tr>
             </thead>
             <tbody id="dag-tbl-body">
@@ -3858,14 +3858,20 @@ async function _loadDagUge(uge, aar) {
 
   // Byg tabel-header dag-kolonner
   const hdr = document.getElementById('dag-tbl-header');
-  // Fjern gamle dag-th (behold første og sidst 3)
   Array.from(hdr.querySelectorAll('.dag-th')).forEach(el => el.remove());
   const totalThs = hdr.querySelectorAll('th');
   navne.forEach((n, i) => {
     const th = document.createElement('th');
     th.className = 'num dag-th';
-    th.style.cssText = 'min-width:80px;font-size:9px;letter-spacing:.05em;';
-    th.innerHTML = `<div style="text-transform:uppercase;color:var(--ash);">${n}</div><div style="font-size:8px;color:rgba(0,0,0,.3);">${datoer[i]?.slice(5).replace('-','/') || ''}</div>`;
+    th.style.cssText = 'min-width:90px;';
+    th.innerHTML = `
+      <div style="font-size:13px;font-weight:600;color:var(--forest);">${n}</div>
+      <div style="font-size:10px;color:var(--ash);margin-top:1px;">${datoer[i]?.slice(5).replace('-','/') || ''}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:9px;letter-spacing:.04em;">
+        <span style="color:var(--forest);font-weight:600;">B</span>
+        <span style="color:var(--ink);">S</span>
+        <span style="color:var(--ash);">Δ</span>
+      </div>`;
     hdr.insertBefore(th, totalThs[totalThs.length - 3]);
   });
 
@@ -3874,36 +3880,58 @@ async function _loadDagUge(uge, aar) {
   const nDage = navne.length; // 7
   const colSpanAll = 1 + nDage + 3; // varenavn + 7 dage + total 3
 
+  // diff = solgt - bestilt: negativ = under-solgt (rød), positiv = over-solgt (grøn)
+  function _diffFarve(diff) {
+    return diff === 0 ? 'var(--ash)' : diff > 0 ? 'var(--moss)' : 'var(--danger)';
+  }
+
   function _dagCelle(dag) {
     const b = dag.bestilt, s = dag.solgt, diff = dag.diff;
-    const diffColor = diff === 0 ? 'var(--ash)' : diff > 0 ? 'var(--danger)' : 'var(--moss)';
-    const diffSign  = diff > 0 ? '+' : '';
-    if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.2);">—</td>`;
-    return `<td class="num" style="${mono}vertical-align:middle;">
-      <div style="font-size:11px;color:var(--forest);font-weight:500;">${b || '—'}</div>
-      <div style="font-size:11px;">${s || '0'}</div>
-      <div style="font-size:10px;color:${diffColor};font-weight:500;">${diff !== 0 ? diffSign+diff : '·'}</div>
+    if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);">—</td>`;
+    const dc = _diffFarve(diff);
+    return `<td class="num" style="${mono}vertical-align:top;padding:5px 6px;">
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <span style="font-size:10px;color:var(--ash);font-weight:500;">B</span>
+        <span style="font-size:13px;color:var(--forest);font-weight:600;">${b || '—'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;">
+        <span style="font-size:10px;color:var(--ash);">S</span>
+        <span style="font-size:13px;">${s || '0'}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:2px;border-top:1px solid rgba(0,0,0,.06);padding-top:2px;">
+        <span style="font-size:10px;color:var(--ash);">Δ</span>
+        <span style="font-size:12px;color:${dc};font-weight:600;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
+      </div>
     </td>`;
   }
 
   function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff) {
-    const diffColor = totDiff === 0 ? 'var(--ash)' : totDiff > 0 ? 'var(--danger)' : 'var(--moss)';
+    const dc = _diffFarve(totDiff);
     const dagCeller = dagTotaler.map(([b, s]) => {
-      const diff = b - s;
-      const dc = diff === 0 ? 'var(--ash)' : diff > 0 ? 'var(--danger)' : 'var(--moss)';
-      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.2);">—</td>`;
-      return `<td class="num" style="${mono}vertical-align:middle;background:rgba(30,58,30,.04);">
-        <div style="font-size:11px;color:var(--forest);font-weight:600;">${b || '—'}</div>
-        <div style="font-size:11px;font-weight:600;">${s || '0'}</div>
-        <div style="font-size:10px;color:${dc};font-weight:600;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</div>
+      const diff = s - b;
+      const c = _diffFarve(diff);
+      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);">—</td>`;
+      return `<td class="num" style="${mono}vertical-align:top;padding:5px 6px;background:rgba(30,58,30,.04);">
+        <div style="display:flex;justify-content:space-between;gap:8px;">
+          <span style="font-size:10px;color:var(--ash);font-weight:500;">B</span>
+          <span style="font-size:13px;color:var(--forest);font-weight:700;">${b || '—'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:8px;">
+          <span style="font-size:10px;color:var(--ash);">S</span>
+          <span style="font-size:13px;font-weight:700;">${s || '0'}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:2px;border-top:1px solid rgba(0,0,0,.08);padding-top:2px;">
+          <span style="font-size:10px;color:var(--ash);">Δ</span>
+          <span style="font-size:12px;color:${c};font-weight:700;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
+        </div>
       </td>`;
     }).join('');
-    return `<tr style="background:rgba(30,58,30,.04);border-top:1px solid rgba(30,58,30,.15);">
-      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);font-weight:600;padding:6px 8px;">I alt</td>
+    return `<tr style="background:rgba(30,58,30,.04);border-top:2px solid rgba(30,58,30,.12);">
+      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);font-weight:700;padding:8px;">I alt</td>
       ${dagCeller}
-      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:700;">${totBestilt || '—'}</td>
-      <td class="num" style="${mono}font-weight:700;">${totSolgt}</td>
-      <td class="num" style="${mono}color:${diffColor};font-weight:700;">${totDiff > 0 ? '+' : ''}${totDiff !== 0 ? totDiff : '·'}</td>
+      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:700;font-size:14px;">${totBestilt || '—'}</td>
+      <td class="num" style="${mono}font-weight:700;font-size:14px;">${totSolgt}</td>
+      <td class="num" style="${mono}color:${dc};font-weight:700;font-size:14px;">${totDiff !== 0 ? (totDiff>0?'+':'')+totDiff : '·'}</td>
     </tr>`;
   }
 
@@ -3916,7 +3944,7 @@ async function _loadDagUge(uge, aar) {
     const sek = p.sektion ?? 1;
     // Sektion-skift: indsæt I alt for forrige sektion
     if (curSek !== null && sek !== curSek) {
-      rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotB - sekTotS));
+      rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB));
       sekDagTot = Array.from({length: nDage}, () => [0, 0]);
       sekTotB = 0; sekTotS = 0;
     }
@@ -3932,19 +3960,19 @@ async function _loadDagUge(uge, aar) {
 
     // Produktrække
     const dagCeller = p.dage.map(_dagCelle).join('');
-    const totDiffColor = p.tot_diff === 0 ? 'var(--ash)' : p.tot_diff > 0 ? 'var(--danger)' : 'var(--moss)';
+    const tdc = _diffFarve(p.tot_diff);
     rows.push(`<tr>
       <td style="font-size:13px;">${p.varenavn}</td>
       ${dagCeller}
-      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:500;">${p.tot_bestilt || '—'}</td>
-      <td class="num" style="${mono}">${p.tot_solgt}</td>
-      <td class="num" style="${mono}color:${totDiffColor};font-weight:500;">${p.tot_diff > 0 ? '+' : ''}${p.tot_diff !== 0 ? p.tot_diff : '·'}</td>
+      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:14px;">${p.tot_bestilt || '—'}</td>
+      <td class="num" style="${mono}font-size:14px;">${p.tot_solgt}</td>
+      <td class="num" style="${mono}color:${tdc};font-weight:600;font-size:14px;">${p.tot_diff !== 0 ? (p.tot_diff>0?'+':'')+p.tot_diff : '·'}</td>
     </tr>`);
   });
 
   // Afsluttende I alt for sidste sektion
   if (curSek !== null) {
-    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotB - sekTotS));
+    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB));
   }
 
   document.getElementById('dag-tbl-body').innerHTML = rows.join('');

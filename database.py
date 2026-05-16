@@ -594,7 +594,10 @@ def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
         dage = conn.execute(f"""
             SELECT dato,
                    ROUND(SUM(omsætning), 2) AS omsaetning,
-                   COUNT(*)                  AS linjer
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END AS linjer
             FROM transaktioner
             {where}
             GROUP BY dato

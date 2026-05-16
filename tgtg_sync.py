@@ -78,7 +78,8 @@ def synk_ordrer(client: TgtgClient, pose_map: dict, dage_tilbage: int = 7):
 
     for ordre in ordrer:
         try:
-            # Ordredato
+            # Ordredato (afhentningsdato) → vi trækker 1 dag fra fordi poserne
+            # altid er lavet dagen FØR salget (gårsdagens produktion)
             pickup = ordre.get("pickup_date") or ordre.get("order_date") or ""
             if isinstance(pickup, dict):
                 pickup = pickup.get("date", "")[:10]
@@ -86,6 +87,9 @@ def synk_ordrer(client: TgtgClient, pose_map: dict, dage_tilbage: int = 7):
                 pickup = pickup[:10]
             if not pickup or pickup < str(fra_dato):
                 continue
+            # Skift til produktionsdato: salgsdag - 1
+            produktions_dato = (date.fromisoformat(pickup) - timedelta(days=1)).isoformat()
+            pickup = produktions_dato
 
             # Kun gennemførte ordrer
             status = ordre.get("state", "")

@@ -3887,21 +3887,12 @@ async function _loadDagUge(uge, aar) {
 
   function _dagCelle(dag) {
     const b = dag.bestilt, s = dag.solgt, diff = dag.diff;
-    if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);">—</td>`;
+    if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);padding:6px 10px;">—</td>`;
     const dc = _diffFarve(diff);
-    return `<td class="num" style="${mono}vertical-align:top;padding:6px 8px;">
-      <div style="display:flex;justify-content:space-between;gap:8px;">
-        <span style="font-size:11px;color:var(--ash);font-weight:500;">B</span>
-        <span style="font-size:15px;color:var(--forest);font-weight:600;">${b || '—'}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;gap:8px;">
-        <span style="font-size:11px;color:var(--ash);">S</span>
-        <span style="font-size:15px;">${s || '0'}</span>
-      </div>
-      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px;border-top:1px solid rgba(0,0,0,.06);padding-top:3px;">
-        <span style="font-size:11px;color:var(--ash);">Δ</span>
-        <span style="font-size:14px;color:${dc};font-weight:600;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
-      </div>
+    return `<td class="num" style="${mono}vertical-align:top;padding:6px 10px;">
+      <div style="font-size:15px;color:var(--forest);font-weight:600;">${b || '—'}</div>
+      <div style="font-size:15px;">${s || '0'}</div>
+      <div style="font-size:14px;color:${dc};font-weight:600;margin-top:3px;border-top:1px solid rgba(0,0,0,.06);padding-top:3px;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</div>
     </td>`;
   }
 
@@ -3919,20 +3910,11 @@ async function _loadDagUge(uge, aar) {
     const dagCeller = dagTotaler.map(([b, s]) => {
       const diff = s - b;
       const c = _diffFarve(diff);
-      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);background:rgba(30,58,30,.05);">—</td>`;
-      return `<td class="num" style="${mono}vertical-align:top;padding:6px 8px;background:rgba(30,58,30,.05);">
-        <div style="display:flex;justify-content:space-between;gap:8px;">
-          <span style="font-size:11px;color:var(--ash);font-weight:500;">B</span>
-          <span style="font-size:15px;color:var(--forest);font-weight:700;">${b || '—'}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;gap:8px;">
-          <span style="font-size:11px;color:var(--ash);">S</span>
-          <span style="font-size:15px;font-weight:700;">${s || '0'}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px;border-top:1px solid rgba(0,0,0,.1);padding-top:3px;">
-          <span style="font-size:11px;color:var(--ash);">Δ</span>
-          <span style="font-size:14px;color:${c};font-weight:700;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
-        </div>
+      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);background:rgba(30,58,30,.05);padding:6px 10px;">—</td>`;
+      return `<td class="num" style="${mono}vertical-align:top;padding:6px 10px;background:rgba(30,58,30,.05);">
+        <div style="font-size:15px;color:var(--forest);font-weight:700;">${b || '—'}</div>
+        <div style="font-size:15px;font-weight:700;">${s || '0'}</div>
+        <div style="font-size:14px;color:${c};font-weight:700;margin-top:3px;border-top:1px solid rgba(0,0,0,.1);padding-top:3px;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</div>
       </td>`;
     }).join('');
     return `<tr style="background:rgba(30,58,30,.05);border-top:2px solid rgba(30,58,30,.18);">

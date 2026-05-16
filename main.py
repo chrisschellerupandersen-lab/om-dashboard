@@ -638,17 +638,22 @@ async def api_kontrol_varenumre(request: Request):
 
 @app.get("/api/debug/varer")
 async def api_debug_varer(request: Request, q: str = ""):
-    """Debug: vis varenummer + varenavn fra transaktioner der matcher søgeord."""
+    """Debug: vis varenummer + varenavn fra transaktioner + stamdata-match."""
     _kræv_login(request)
     with database._conn() as conn:
         rows = conn.execute("""
-            SELECT DISTINCT varenummer, varenavn,
+            SELECT DISTINCT t.varenummer, t.varenavn,
                    COUNT(*) AS linjer,
-                   MAX(dato) AS seneste
-            FROM transaktioner
-            WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%')
-            GROUP BY varenummer, varenavn
-            ORDER BY varenavn
+                   MAX(t.dato) AS seneste,
+                   s.sku, s.pris_ex_moms, s.portioner
+            FROM transaktioner t
+            LEFT JOIN varestamdata s
+                ON (t.varenummer != '' AND t.varenummer = s.sku)
+                OR (COALESCE(s.sku,'') = ''
+                    AND LOWER(TRIM(t.varenavn)) = LOWER(TRIM(s.varenavn)))
+            WHERE LOWER(t.varenavn) LIKE LOWER('%'||?||'%')
+            GROUP BY t.varenummer, t.varenavn
+            ORDER BY t.varenavn
         """, (q,)).fetchall()
     return [dict(r) for r in rows]
 

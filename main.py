@@ -638,20 +638,17 @@ async def api_kontrol_varenumre(request: Request):
 
 @app.get("/api/debug/varer")
 async def api_debug_varer(request: Request, q: str = ""):
-    """Debug: sammenlign transaktioner vs v_transaktioner + stamdata for søgeord."""
+    """Debug: bon_nr statistik + stamdata for søgeord."""
     _kræv_login(request)
     with database._conn() as conn:
         seneste = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
-        raa = conn.execute("""
-            SELECT dato, antal, omsætning, kostpris
-            FROM transaktioner
-            WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%') AND dato = ?
-        """, (q, seneste)).fetchall()
-        view = conn.execute("""
-            SELECT dato, antal, omsaetning_ex_moms, vf_korrekt, db_korrekt
-            FROM v_transaktioner
-            WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%') AND dato = ?
-        """, (q, seneste)).fetchall()
+        bon = conn.execute("""
+            SELECT COUNT(*) AS linjer,
+                   COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END) AS unikke_bon,
+                   COUNT(CASE WHEN bon_nr = '' THEN 1 END) AS tomme_bon,
+                   MIN(bon_nr) AS eks_bon
+            FROM transaktioner WHERE dato = ?
+        """, (seneste,)).fetchone()
         stam = conn.execute("""
             SELECT sku, varenavn, pris_ex_moms, portioner
             FROM varestamdata
@@ -661,11 +658,10 @@ async def api_debug_varer(request: Request, q: str = ""):
         """, (q, q)).fetchall()
     return {
         "seneste_dato": seneste,
-        "transaktioner_raa": len(raa),
-        "sum_antal_raa": sum(r["antal"] for r in raa),
-        "v_transaktioner_rækker": len(view),
-        "sum_antal_view": sum(r["antal"] for r in view),
-        "sum_vf_view": round(sum(r["vf_korrekt"] for r in view), 2),
+        "linjer_idag": bon["linjer"],
+        "unikke_bon_nr": bon["unikke_bon"],
+        "tomme_bon_nr": bon["tomme_bon"],
+        "eks_bon_nr": bon["eks_bon"],
         "stamdata": [dict(r) for r in stam],
     }
 

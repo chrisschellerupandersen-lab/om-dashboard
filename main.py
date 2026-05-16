@@ -636,6 +636,24 @@ async def api_kontrol_varenumre(request: Request):
     return database.hent_varenummer_kontrol()
 
 
+@app.get("/api/debug/varer")
+async def api_debug_varer(request: Request, q: str = ""):
+    """Debug: vis varenummer + varenavn fra transaktioner der matcher søgeord."""
+    _kræv_login(request)
+    import database as db
+    with db._conn() as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT varenummer, varenavn,
+                   COUNT(*) AS linjer,
+                   MAX(dato) AS seneste
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%')
+            GROUP BY varenummer, varenavn
+            ORDER BY varenavn
+        """, (q,)).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/aarsplan/vf-detaljer")
 async def api_vf_detaljer(request: Request, aar: int, maaned: int):
     _kræv_login(request)

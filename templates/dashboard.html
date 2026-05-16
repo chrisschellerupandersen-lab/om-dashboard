@@ -1215,6 +1215,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-v" id="tgtg-kpi-snit">—</div>
             <div class="kpi-s">poser / uge</div>
           </div>
+          <div class="kpi-card">
+            <div class="kpi-l">Løbende diff. · år</div>
+            <div class="kpi-v" id="tgtg-kpi-diff">—</div>
+            <div class="kpi-s" id="tgtg-kpi-diff-sub">beregnet vs. faktura</div>
+          </div>
         </div>
 
         <!-- Graf: dagssalg -->
@@ -4008,6 +4013,20 @@ async function loadTgtg() {
   document.getElementById('tgtg-kpi-antal-sub').textContent = `${totAntal} stk solgt`;
   document.getElementById('tgtg-kpi-kr').textContent        = totKr > 0 ? Math.round(totKr).toLocaleString('da-DK') + ' kr' : '—';
   document.getElementById('tgtg-kpi-snit').textContent      = snitAntal;
+
+  // Løbende diff KPI — beregn total difference over uger med begge værdier
+  const ugerMedBegge = (d.uger || []).filter(r => r.diff_kr != null);
+  const totalDiff    = ugerMedBegge.reduce((s, r) => s + r.diff_kr, 0);
+  const diffEl       = document.getElementById('tgtg-kpi-diff');
+  const diffSub      = document.getElementById('tgtg-kpi-diff-sub');
+  if (ugerMedBegge.length > 0) {
+    diffEl.textContent = (totalDiff > 0 ? '+' : '') + totalDiff.toFixed(2) + ' kr';
+    diffEl.className   = 'kpi-v ' + (Math.abs(totalDiff) < 20 ? '' : totalDiff > 0 ? 'dn' : 'up');
+    diffSub.textContent = `over ${ugerMedBegge.length} uger · ${Math.abs(totalDiff) < 20 ? 'udlignet ✓' : totalDiff > 0 ? 'bager underbetaler' : 'bager overbetaler'}`;
+  } else {
+    diffEl.textContent  = '—';
+    diffSub.textContent = 'ingen fakturaer endnu';
+  }
 
   // Dagsgraf
   if (d.dage && d.dage.length) {

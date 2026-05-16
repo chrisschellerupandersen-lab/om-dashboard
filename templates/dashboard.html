@@ -1552,24 +1552,38 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="sd-status" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
         </div>
 
-        <div class="aar2-tbl-wrap">
+        <div class="aar2-tbl-wrap" style="overflow:visible;">
           <div class="aar2-tbl-hdr">
             <span class="aar2-tbl-hdr-l">Produkter</span>
             <span class="aar2-tbl-hdr-r" id="sd-count"></span>
           </div>
-          <table class="aar2-tbl" id="sd-table">
-            <thead><tr>
-              <th style="width:10%;">SKU</th>
-              <th style="width:38%;">Varenavn</th>
-              <th style="width:16%;">Type</th>
-              <th class="num" style="width:14%;">Pris ex moms</th>
-              <th style="width:22%;"></th>
-            </tr></thead>
-            <tbody id="sd-tbody">
-              <tr><td colspan="5" class="empty">Indlæser…</td></tr>
-            </tbody>
-          </table>
+          <div style="max-height:480px;overflow-y:auto;">
+            <table class="aar2-tbl" id="sd-table">
+              <thead style="position:sticky;top:0;z-index:2;background:#fff;"><tr>
+                <th style="width:10%;">SKU</th>
+                <th style="width:38%;">Varenavn</th>
+                <th style="width:16%;">Type</th>
+                <th class="num" style="width:14%;">Pris ex moms</th>
+                <th style="width:22%;"></th>
+              </tr></thead>
+              <tbody id="sd-tbody">
+                <tr><td colspan="5" class="empty">Indlæser…</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        <!-- Varenummer-kontrol -->
+        <div style="margin-top:28px;">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+            <h3 style="font-size:13px;font-weight:700;color:var(--forest);text-transform:uppercase;letter-spacing:.06em;margin:0;">Varenummer-kontrol</h3>
+            <button class="tb-btn" style="font-size:10px;padding:5px 12px;" onclick="loadVnrKontrol()">Kør kontrol</button>
+            <span id="vnr-status" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <p style="font-size:11px;color:var(--ash);margin-bottom:14px;">Matcher varenumre fra ugebestillinger mod kassesalg (seneste 90 dage)</p>
+          <div id="vnr-kontrol-wrap"></div>
+        </div>
+
       </div>
 
     </div>
@@ -4819,6 +4833,96 @@ async function stamGemNy() {
   status.textContent = '✓ Tilføjet';
   setTimeout(() => { status.textContent = ''; }, 2000);
   loadStamdata();
+}
+
+async function loadVnrKontrol() {
+  const wrap = document.getElementById('vnr-kontrol-wrap');
+  const status = document.getElementById('vnr-status');
+  wrap.innerHTML = '<p style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--ash);">Kører kontrol…</p>';
+  status.textContent = '';
+  const d = await api('/api/kontrol/varenumre');
+  if (!d) { wrap.innerHTML = '<p style="color:var(--danger);font-size:11px;">Fejl ved hentning</p>'; return; }
+
+  const mono = 'font-family:\'DM Mono\',monospace;';
+  let html = '';
+
+  // --- Sektion 1: Bestillings-vnr UDEN nogen salgshistorik ---
+  html += `<div style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--danger);">⚠ Bestillings-varenumre uden kassematch (${d.ingen_salg.length})</span>
+    </div>`;
+  if (!d.ingen_salg.length) {
+    html += `<p style="${mono}font-size:11px;color:var(--forest);">✓ Alle bestillings-varenumre er set i kassen</p>`;
+  } else {
+    html += `<div style="border:1px solid rgba(220,38,38,.2);border-radius:8px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr style="background:rgba(220,38,38,.07);">
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;color:var(--danger);">Varenr.</th>
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;color:var(--danger);">Varenavn (fra bestilling)</th>
+        </tr></thead><tbody>`;
+    d.ingen_salg.forEach(r => {
+      html += `<tr style="border-top:1px solid rgba(220,38,38,.1);">
+        <td style="${mono}padding:7px 12px;color:var(--danger);font-weight:600;">${r.varenummer}</td>
+        <td style="${mono}padding:7px 12px;color:rgba(0,0,0,.7);">${r.varenavn}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  // --- Sektion 2: Salgs-vnr (seneste 90 dage) UDEN bestillings-match ---
+  html += `<div style="margin-bottom:20px;">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);">◎ Salgsvarer ikke i nogen bestilling — seneste 90 dage (${d.kun_salg.length})</span>
+    </div>`;
+  if (!d.kun_salg.length) {
+    html += `<p style="${mono}font-size:11px;color:var(--forest);">✓ Ingen salgsvarer uden bestillingspost</p>`;
+  } else {
+    html += `<div style="border:1px solid rgba(200,168,75,.3);border-radius:8px;overflow:hidden;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr style="background:rgba(200,168,75,.1);">
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Varenr.</th>
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Varenavn</th>
+          <th style="${mono}padding:7px 12px;text-align:right;font-weight:700;">Transaktioner</th>
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Seneste salg</th>
+        </tr></thead><tbody>`;
+    d.kun_salg.forEach(r => {
+      html += `<tr style="border-top:1px solid rgba(200,168,75,.15);">
+        <td style="${mono}padding:7px 12px;font-weight:600;">${r.varenummer}</td>
+        <td style="${mono}padding:7px 12px;">${r.varenavn}</td>
+        <td style="${mono}padding:7px 12px;text-align:right;">${r.transaktioner}</td>
+        <td style="${mono}padding:7px 12px;color:var(--ash);">${r.seneste_dato}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+
+  // --- Sektion 3: Korrekte matches ---
+  html += `<div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--forest);">✓ Matches — bestilling ↔ kasse (${d.med_salg.length})</span>
+    </div>
+    <div style="border:1px solid rgba(30,58,30,.12);border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead style="position:sticky;top:0;background:#fff;z-index:1;"><tr style="background:rgba(30,58,30,.05);">
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Varenr.</th>
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Varenavn</th>
+          <th style="${mono}padding:7px 12px;text-align:right;font-weight:700;">Transaktioner</th>
+          <th style="${mono}padding:7px 12px;text-align:left;font-weight:700;">Seneste salg</th>
+        </tr></thead><tbody>`;
+  d.med_salg.forEach(r => {
+    html += `<tr style="border-top:1px solid rgba(30,58,30,.06);">
+      <td style="${mono}padding:7px 12px;font-weight:600;color:var(--forest);">${r.varenummer}</td>
+      <td style="${mono}padding:7px 12px;">${r.varenavn}</td>
+      <td style="${mono}padding:7px 12px;text-align:right;">${r.transaktioner}</td>
+      <td style="${mono}padding:7px 12px;color:var(--ash);">${r.seneste_dato}</td>
+    </tr>`;
+  });
+  html += '</tbody></table></div></div>';
+
+  wrap.innerHTML = html;
+  status.textContent = `${d.med_salg.length} matches · ${d.ingen_salg.length} mangler · ${d.kun_salg.length} kun-salg`;
 }
 
 _navLoad(); _buildNav();

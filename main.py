@@ -629,6 +629,12 @@ async def stamdata_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/kontrol/varenumre")
+async def api_kontrol_varenumre(request: Request):
+    _kræv_login(request)
+    return database.hent_varenummer_kontrol()
+
+
 @app.get("/api/aarsplan/vf-detaljer")
 async def api_vf_detaljer(request: Request, aar: int, maaned: int):
     _kræv_login(request)

@@ -1917,6 +1917,71 @@ def gem_stamdata_bulk(linjer: List[Dict]) -> int:
     return len(linjer)
 
 
+def hent_varenummer_kontrol() -> Dict:
+    """Kontrol: hvilke varenumre fra bestillinger matcher/mangler i transaktioner og vice versa."""
+    with _conn() as conn:
+        # Alle unikke varenumre fra bestillinger (seneste 12 måneder)
+        bestil_rows = conn.execute("""
+            SELECT DISTINCT varenummer, varenavn
+            FROM ugebestillinger
+            WHERE varenummer != '' AND varenummer IS NOT NULL
+            ORDER BY varenummer
+        """).fetchall()
+
+        # Alle unikke varenumre fra transaktioner (seneste 90 dage)
+        salg_rows = conn.execute("""
+            SELECT DISTINCT varenummer, varenavn,
+                   COUNT(*) as transaktioner,
+                   MAX(dato) as seneste_dato
+            FROM transaktioner
+            WHERE varenummer != '' AND varenummer IS NOT NULL
+              AND dato >= date('now', '-90 days')
+            GROUP BY varenummer
+            ORDER BY varenummer
+        """).fetchall()
+
+        # Alle varenumre nogensinde i transaktioner
+        alle_salg_vnr = conn.execute("""
+            SELECT DISTINCT varenummer FROM transaktioner
+            WHERE varenummer != '' AND varenummer IS NOT NULL
+        """).fetchall()
+
+    bestil_map = {str(r["varenummer"]): r["varenavn"] for r in bestil_rows}
+    salg_map   = {str(r["varenummer"]): dict(r) for r in salg_rows}
+    alle_salg  = {str(r["varenummer"]) for r in alle_salg_vnr}
+
+    # Bestillings-vnr uden match i transaktioner (overhovedet)
+    ingen_salg = [
+        {"varenummer": vnr, "varenavn": navn}
+        for vnr, navn in sorted(bestil_map.items())
+        if vnr not in alle_salg
+    ]
+
+    # Bestillings-vnr med match i transaktioner seneste 90 dage
+    med_salg = [
+        {"varenummer": vnr, "varenavn": navn,
+         "transaktioner": salg_map[vnr]["transaktioner"],
+         "seneste_dato":  salg_map[vnr]["seneste_dato"]}
+        for vnr, navn in sorted(bestil_map.items())
+        if vnr in salg_map
+    ]
+
+    # Salgs-vnr (seneste 90 dage) uden match i nogen bestilling
+    kun_salg = [
+        {"varenummer": vnr, "varenavn": info["varenavn"],
+         "transaktioner": info["transaktioner"],
+         "seneste_dato":  info["seneste_dato"]}
+        for vnr, info in sorted(salg_map.items())
+        if vnr not in bestil_map
+    ]
+
+    return {
+        "med_salg":   med_salg,
+        "ingen_salg": ingen_salg,
+        "kun_salg":   kun_salg,
+    }
+
+
 def _stamdata_type_map() -> Dict[str, str]:
     """Returnerer {varenavn.lower(): type} fra varestamdata."""
     with _conn() as conn:

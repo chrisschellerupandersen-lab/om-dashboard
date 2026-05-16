@@ -3889,49 +3889,58 @@ async function _loadDagUge(uge, aar) {
     const b = dag.bestilt, s = dag.solgt, diff = dag.diff;
     if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);">—</td>`;
     const dc = _diffFarve(diff);
-    return `<td class="num" style="${mono}vertical-align:top;padding:5px 6px;">
+    return `<td class="num" style="${mono}vertical-align:top;padding:6px 8px;">
       <div style="display:flex;justify-content:space-between;gap:8px;">
-        <span style="font-size:10px;color:var(--ash);font-weight:500;">B</span>
-        <span style="font-size:13px;color:var(--forest);font-weight:600;">${b || '—'}</span>
+        <span style="font-size:11px;color:var(--ash);font-weight:500;">B</span>
+        <span style="font-size:15px;color:var(--forest);font-weight:600;">${b || '—'}</span>
       </div>
       <div style="display:flex;justify-content:space-between;gap:8px;">
-        <span style="font-size:10px;color:var(--ash);">S</span>
-        <span style="font-size:13px;">${s || '0'}</span>
+        <span style="font-size:11px;color:var(--ash);">S</span>
+        <span style="font-size:15px;">${s || '0'}</span>
       </div>
-      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:2px;border-top:1px solid rgba(0,0,0,.06);padding-top:2px;">
-        <span style="font-size:10px;color:var(--ash);">Δ</span>
-        <span style="font-size:12px;color:${dc};font-weight:600;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
+      <div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px;border-top:1px solid rgba(0,0,0,.06);padding-top:3px;">
+        <span style="font-size:11px;color:var(--ash);">Δ</span>
+        <span style="font-size:14px;color:${dc};font-weight:600;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
       </div>
     </td>`;
   }
 
-  function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff) {
-    const dc = _diffFarve(totDiff);
+  // Sektionsnavne — matcher Excel-templatens 4 sektioner
+  const SEKTION_NAVNE = {
+    1: 'I alt — Brød, flute & focaccia',
+    2: 'I alt — Boller',
+    3: 'I alt — Wienerbrød',
+    4: 'I alt — Kager',
+  };
+
+  function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff, sektion) {
+    const dc    = _diffFarve(totDiff);
+    const label = SEKTION_NAVNE[sektion] || 'I alt';
     const dagCeller = dagTotaler.map(([b, s]) => {
       const diff = s - b;
       const c = _diffFarve(diff);
-      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);">—</td>`;
-      return `<td class="num" style="${mono}vertical-align:top;padding:5px 6px;background:rgba(30,58,30,.04);">
+      if (b === 0 && s === 0) return `<td class="num" style="${mono}color:rgba(0,0,0,.15);background:rgba(30,58,30,.05);">—</td>`;
+      return `<td class="num" style="${mono}vertical-align:top;padding:6px 8px;background:rgba(30,58,30,.05);">
         <div style="display:flex;justify-content:space-between;gap:8px;">
-          <span style="font-size:10px;color:var(--ash);font-weight:500;">B</span>
-          <span style="font-size:13px;color:var(--forest);font-weight:700;">${b || '—'}</span>
+          <span style="font-size:11px;color:var(--ash);font-weight:500;">B</span>
+          <span style="font-size:15px;color:var(--forest);font-weight:700;">${b || '—'}</span>
         </div>
         <div style="display:flex;justify-content:space-between;gap:8px;">
-          <span style="font-size:10px;color:var(--ash);">S</span>
-          <span style="font-size:13px;font-weight:700;">${s || '0'}</span>
+          <span style="font-size:11px;color:var(--ash);">S</span>
+          <span style="font-size:15px;font-weight:700;">${s || '0'}</span>
         </div>
-        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:2px;border-top:1px solid rgba(0,0,0,.08);padding-top:2px;">
-          <span style="font-size:10px;color:var(--ash);">Δ</span>
-          <span style="font-size:12px;color:${c};font-weight:700;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
+        <div style="display:flex;justify-content:space-between;gap:8px;margin-top:3px;border-top:1px solid rgba(0,0,0,.1);padding-top:3px;">
+          <span style="font-size:11px;color:var(--ash);">Δ</span>
+          <span style="font-size:14px;color:${c};font-weight:700;">${diff !== 0 ? (diff>0?'+':'')+diff : '·'}</span>
         </div>
       </td>`;
     }).join('');
-    return `<tr style="background:rgba(30,58,30,.04);border-top:2px solid rgba(30,58,30,.12);">
-      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);font-weight:700;padding:8px;">I alt</td>
+    return `<tr style="background:rgba(30,58,30,.05);border-top:2px solid rgba(30,58,30,.18);">
+      <td style="${mono}font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--forest);font-weight:700;padding:10px 8px;">${label}</td>
       ${dagCeller}
-      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:700;font-size:14px;">${totBestilt || '—'}</td>
-      <td class="num" style="${mono}font-weight:700;font-size:14px;">${totSolgt}</td>
-      <td class="num" style="${mono}color:${dc};font-weight:700;font-size:14px;">${totDiff !== 0 ? (totDiff>0?'+':'')+totDiff : '·'}</td>
+      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:700;font-size:16px;">${totBestilt || '—'}</td>
+      <td class="num" style="${mono}font-weight:700;font-size:16px;">${totSolgt}</td>
+      <td class="num" style="${mono}color:${dc};font-weight:700;font-size:16px;">${totDiff !== 0 ? (totDiff>0?'+':'')+totDiff : '·'}</td>
     </tr>`;
   }
 
@@ -3944,7 +3953,7 @@ async function _loadDagUge(uge, aar) {
     const sek = p.sektion ?? 1;
     // Sektion-skift: indsæt I alt for forrige sektion
     if (curSek !== null && sek !== curSek) {
-      rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB));
+      rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, curSek));
       sekDagTot = Array.from({length: nDage}, () => [0, 0]);
       sekTotB = 0; sekTotS = 0;
     }
@@ -3962,17 +3971,17 @@ async function _loadDagUge(uge, aar) {
     const dagCeller = p.dage.map(_dagCelle).join('');
     const tdc = _diffFarve(p.tot_diff);
     rows.push(`<tr>
-      <td style="font-size:13px;">${p.varenavn}</td>
+      <td style="font-size:15px;padding:8px;">${p.varenavn}</td>
       ${dagCeller}
-      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:14px;">${p.tot_bestilt || '—'}</td>
-      <td class="num" style="${mono}font-size:14px;">${p.tot_solgt}</td>
-      <td class="num" style="${mono}color:${tdc};font-weight:600;font-size:14px;">${p.tot_diff !== 0 ? (p.tot_diff>0?'+':'')+p.tot_diff : '·'}</td>
+      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:16px;">${p.tot_bestilt || '—'}</td>
+      <td class="num" style="${mono}font-size:16px;">${p.tot_solgt}</td>
+      <td class="num" style="${mono}color:${tdc};font-weight:600;font-size:16px;">${p.tot_diff !== 0 ? (p.tot_diff>0?'+':'')+p.tot_diff : '·'}</td>
     </tr>`);
   });
 
   // Afsluttende I alt for sidste sektion
   if (curSek !== null) {
-    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB));
+    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, curSek));
   }
 
   document.getElementById('dag-tbl-body').innerHTML = rows.join('');

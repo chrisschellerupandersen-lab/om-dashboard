@@ -149,12 +149,14 @@ def init_db():
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             SELECT t.*,
+                   t.omsætning / 1.25                      AS omsaetning_ex_moms,
                    CASE WHEN s.pris_ex_moms > 0
                         THEN t.antal * s.pris_ex_moms
-                        ELSE t.kostpris END AS vf_korrekt,
-                   t.omsætning - CASE WHEN s.pris_ex_moms > 0
-                                      THEN t.antal * s.pris_ex_moms
-                                      ELSE t.kostpris END AS db_korrekt
+                        ELSE t.kostpris END                AS vf_korrekt,
+                   t.omsætning / 1.25
+                       - CASE WHEN s.pris_ex_moms > 0
+                              THEN t.antal * s.pris_ex_moms
+                              ELSE t.kostpris END          AS db_korrekt
             FROM transaktioner t
             LEFT JOIN varestamdata s
                 ON t.varenummer != '' AND t.varenummer = s.sku;

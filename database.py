@@ -651,8 +651,8 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 COUNT(DISTINCT dato)                   AS faktiske_dage,
                 ROUND(SUM(omsætning), 2)               AS omsaetning,
                 ROUND(SUM(kostpris),  2)               AS kostpris,
-                ROUND(SUM(avance),    2)               AS avance,
-                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+                ROUND(SUM(avance)-SUM(omsætning)*0.2, 2) AS avance,
+                ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner
             WHERE strftime('%Y', dato) = ?
             GROUP BY maaned
@@ -664,7 +664,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
                    ROUND(SUM(omsætning), 2) AS omsaetning,
                    ROUND(SUM(kostpris),  2) AS kostpris,
                    ROUND(SUM(avance),    2) AS avance,
-                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
+                   ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner WHERE strftime('%Y-%m', dato) = ?
         """, (f"{aar-1}-12",)).fetchone()
 
@@ -674,7 +674,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
             base_row = conn.execute("""
                 SELECT
                     ROUND(SUM(omsætning)/NULLIF(COUNT(DISTINCT dato),0), 2) AS kr_pr_dag,
-                    ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)      AS gpm
+                    ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1)      AS gpm
                 FROM transaktioner
                 WHERE dato >= date(?, '-28 days')
             """, (seneste,)).fetchone()
@@ -789,7 +789,7 @@ def hent_trend_analyse(periode_dage: int = 21, aar: int = None) -> Dict:
                 ROUND(SUM(CASE WHEN dato > ? THEN omsætning  ELSE 0 END), 2) AS ny_omsat,
                 ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN antal      ELSE 0 END), 1) AS gl_antal,
                 ROUND(SUM(CASE WHEN dato > ? AND dato <= ? THEN omsætning  ELSE 0 END), 2) AS gl_omsat,
-                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
+                ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct
             FROM transaktioner
             WHERE dato > ? AND varenavn != '' {aar_extra}
             GROUP BY varenavn
@@ -835,8 +835,8 @@ def hent_kaffe_analyse(aar: int = None) -> Dict:
             SELECT
                 ROUND(SUM(antal), 0)                                      AS total_antal,
                 ROUND(SUM(omsætning), 2)                                  AS total_omsaetning,
-                ROUND(SUM(avance), 2)                                     AS total_avance,
-                ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
+                ROUND(SUM(avance)-SUM(omsætning)*0.2, 2)                  AS total_avance,
+                ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1)       AS db_pct,
                 ROUND(SUM(omsætning)/NULLIF(SUM(antal),0), 2)            AS gns_pris
             FROM transaktioner
             WHERE {_KAFFE_WHERE} {aar_extra}
@@ -850,7 +850,7 @@ def hent_kaffe_analyse(aar: int = None) -> Dict:
             SELECT varenavn,
                    ROUND(SUM(antal), 0)                                   AS antal,
                    ROUND(SUM(omsætning), 2)                               AS omsaetning,
-                   ROUND(SUM(avance)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
+                   ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
             FROM transaktioner
             WHERE {_KAFFE_WHERE} {aar_extra}
             GROUP BY varenavn
@@ -960,7 +960,10 @@ def hent_dashboard_data() -> Dict:
 
         avance_pct = 0.0
         if totaler["omsætning"] > 0:
-            avance_pct = (totaler["avance"] / totaler["omsætning"]) * 100
+            # avance fra Shopbox = omsætning_inkl - kostpris_ex (blander moms)
+            # Korrekt ex-moms GPM: (avance - omsætning*0.2) / (omsætning/1.25) * 100
+            avance_ex = totaler["avance"] - totaler["omsætning"] * 0.2
+            avance_pct = avance_ex / (totaler["omsætning"] / 1.25) * 100
 
         senest = conn.execute(
             "SELECT indlæst_dato FROM uploads ORDER BY id DESC LIMIT 1"

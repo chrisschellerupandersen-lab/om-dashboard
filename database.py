@@ -142,6 +142,7 @@ def init_db():
         for sql in [
             "ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1",
             "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
+            "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
         ]:
             try:
                 conn.execute(sql)
@@ -942,8 +943,8 @@ def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
             conn.execute("""
                 INSERT INTO ugebestillinger
                     (uge, aar, varenummer, varenavn, pris_ex_moms,
-                     man, tir, ons, tor, fre, loe, son, total_antal, total_pris)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                     man, tir, ons, tor, fre, loe, son, total_antal, total_pris, sektion)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, (
                 uge, aar,
                 linje.get("varenummer", ""),
@@ -954,6 +955,7 @@ def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
                 linje.get("son", 0),
                 linje.get("total_antal", 0),
                 linje.get("total_pris", 0),
+                linje.get("sektion", 1),
             ))
     return len(linjer)
 
@@ -1003,14 +1005,14 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
 
     with _conn() as conn:
         bestil = conn.execute("""
-            SELECT varenummer, varenavn,
+            SELECT varenummer, varenavn, COALESCE(sektion,1) AS sektion,
                    COALESCE(man,0) AS man, COALESCE(tir,0) AS tir,
                    COALESCE(ons,0) AS ons, COALESCE(tor,0) AS tor,
                    COALESCE(fre,0) AS fre, COALESCE(loe,0) AS loe,
                    COALESCE(son,0) AS son
             FROM ugebestillinger
             WHERE uge = ? AND aar = ?
-            ORDER BY varenavn
+            ORDER BY rowid ASC
         """, (uge, aar)).fetchall()
 
         if not bestil:
@@ -1052,6 +1054,7 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         produkter.append({
             "varenummer":  vnr,
             "varenavn":    b["varenavn"],
+            "sektion":     int(b["sektion"] or 1),
             "dage":        dage_data,
             "tot_bestilt": tot_bestilt,
             "tot_solgt":   tot_solgt,

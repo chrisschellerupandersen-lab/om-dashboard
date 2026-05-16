@@ -1157,25 +1157,8 @@ def gem_tgtg_dagssalg(linjer: List[Dict]) -> int:
                     kreditering=excluded.kreditering
             """, (r["dato"], r.get("item_id",""), r["pose_navn"], r["antal"], kreditering))
 
-        # Opdater bager_regnskab.tgtg for berørte uger automatisk
-        datoer = list({r["dato"] for r in linjer})
-        for dato in datoer:
-            from datetime import date as _d
-            d   = _d.fromisoformat(dato)
-            iso = d.isocalendar()
-            uge, aar = iso[1], iso[0]
-            # Summer alle tgtg_dagssalg for den uge
-            mandag  = _d.fromisocalendar(aar, uge, 1).isoformat()
-            soendag = _d.fromisocalendar(aar, uge, 7).isoformat()
-            total = conn.execute("""
-                SELECT COALESCE(SUM(kreditering),0) FROM tgtg_dagssalg
-                WHERE dato BETWEEN ? AND ?
-            """, (mandag, soendag)).fetchone()[0]
-            conn.execute("""
-                INSERT INTO bager_regnskab (uge, aar, tgtg)
-                VALUES (?,?,?)
-                ON CONFLICT(uge,aar) DO UPDATE SET tgtg=excluded.tgtg
-            """, (uge, aar, round(total, 2)))
+        # bager_regnskab.tgtg opdateres IKKE herfra — den manuelle bager-faktura
+        # (fra bager_retur_sync.py) er kilden til bager_kr i sammenligningen
     return len(linjer)
 
 

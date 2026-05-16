@@ -1247,7 +1247,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="card">
           <div class="aar2-chart-hdr">
             <span class="aar2-chart-ttl">Per uge — beregnet vs. bager-faktura</span>
-            <span class="aar2-chart-sub">difference = beregnet − faktura</span>
+            <span class="aar2-chart-sub">difference = beregnet − faktura · løbende sum afslører systematisk offset</span>
           </div>
           <table style="width:100%;border-collapse:collapse;">
             <thead>
@@ -1257,10 +1257,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BEREGNET KR</th>
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BAGER FAKTURA</th>
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">DIFFERENCE</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Akkumuleret difference over alle uger — nærmer den sig 0 er offset systematisk">LØB. SUM</th>
               </tr>
             </thead>
             <tbody id="tgtg-uge-tbody">
-              <tr><td colspan="5" class="empty">Indlæser…</td></tr>
+              <tr><td colspan="6" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4031,29 +4032,61 @@ async function loadTgtg() {
       </tr>`).join('')
     : '<tr><td colspan="4" class="empty">Ingen data — kør tgtg_sync.py</td></tr>';
 
-  // Uge-tabel: beregnet vs. bager-faktura
-  document.getElementById('tgtg-uge-tbody').innerHTML = (d.uger || []).length
-    ? (d.uger || []).map(r => {
+  // Uge-tabel: beregnet vs. bager-faktura med løbende sum
+  // Sorter ældste først for løbende sum, vis nyeste øverst
+  const ugerSortered = [...(d.uger || [])].sort((a,b) =>
+    a.aar !== b.aar ? a.aar - b.aar : a.uge - b.uge);
+
+  let lobendeSum = 0;
+  const ugerMedSum = ugerSortered.map(r => {
+    if (r.diff_kr != null) lobendeSum = Math.round((lobendeSum + r.diff_kr) * 100) / 100;
+    return { ...r, lobende_sum: r.diff_kr != null ? lobendeSum : null };
+  });
+  // Vis nyeste øverst
+  ugerMedSum.reverse();
+
+  document.getElementById('tgtg-uge-tbody').innerHTML = ugerMedSum.length
+    ? ugerMedSum.map(r => {
         const harBager  = r.bager_kr != null;
         const diff      = r.diff_kr;
         const diffFarve = diff == null ? 'var(--ash)'
-                        : Math.abs(diff) < 5 ? 'var(--moss)'     // ~match
-                        : diff > 0 ? 'var(--danger)'              // vi beregner mere end bager betaler
-                        : '#2d5a2d';                               // bager betaler mere
+                        : Math.abs(diff) < 5    ? 'var(--moss)'
+                        : diff > 0              ? 'var(--danger)'
+                        : '#2d5a2d';
         const diffTxt   = diff == null ? '—'
                         : (diff > 0 ? '+' : '') + diff.toFixed(2) + ' kr';
-        const diffTitle = diff == null ? '' : diff > 0
-                        ? 'Bager krediterer mindre end beregnet'
-                        : 'Bager krediterer mere end beregnet';
+
+        const ls        = r.lobende_sum;
+        const lsFarve   = ls == null ? 'var(--ash)'
+                        : Math.abs(ls) < 20     ? 'var(--moss)'   // udlignet
+                        : ls > 0                ? 'var(--danger)'
+                        : '#2d5a2d';
+        const lsTxt     = ls == null ? '—'
+                        : (ls > 0 ? '+' : '') + ls.toFixed(2) + ' kr';
+        const lsTitle   = ls == null ? '' : Math.abs(ls) < 20
+                        ? 'Summer sig ud — offset er tilfaeldigt'
+                        : Math.abs(ls) > 50
+                        ? 'Stor akkumuleret difference — tjek om dato-offset er korrekt'
+                        : '';
         return `<tr>
           <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
           <td class="num" style="${mono}font-size:13px;">${r.total_antal}</td>
           <td class="num" style="${mono}font-size:13px;color:var(--forest);">${r.beregnet_kr.toFixed(2)} kr</td>
           <td class="num" style="${mono}font-size:13px;color:var(--ash);">${harBager ? r.bager_kr.toFixed(2) + ' kr' : '—'}</td>
-          <td class="num" style="${mono}font-size:13px;font-weight:500;color:${diffFarve};" title="${diffTitle}">${diffTxt}</td>
+          <td class="num" style="${mono}font-size:13px;font-weight:500;color:${diffFarve};">${diffTxt}</td>
+          <td class="num" style="${mono}font-size:13px;font-weight:600;color:${lsFarve};" title="${lsTitle}">${lsTxt}</td>
         </tr>`;
-      }).join('')
-    : '<tr><td colspan="5" class="empty">Ingen data endnu</td></tr>';
+      }).join('') +
+      // Totalrække
+      `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
+        <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);padding:6px 8px;">Total</td>
+        <td class="num" style="${mono}font-size:13px;font-weight:500;">${ugerMedSum.reduce((s,r)=>s+(r.total_antal||0),0)}</td>
+        <td class="num" style="${mono}font-size:13px;font-weight:500;color:var(--forest);">${ugerMedSum.reduce((s,r)=>s+(r.beregnet_kr||0),0).toFixed(2)} kr</td>
+        <td class="num" style="${mono}font-size:13px;font-weight:500;color:var(--ash);">${ugerMedSum.filter(r=>r.bager_kr!=null).reduce((s,r)=>s+(r.bager_kr||0),0).toFixed(2)} kr</td>
+        <td class="num" style="${mono}font-size:13px;font-weight:600;">${(()=>{const t=ugerMedSum.filter(r=>r.diff_kr!=null).reduce((s,r)=>s+(r.diff_kr||0),0);return (t>0?'+':'')+t.toFixed(2)+' kr';})()}</td>
+        <td></td>
+      </tr>`
+    : '<tr><td colspan="6" class="empty">Ingen data endnu</td></tr>';
 }
 
 

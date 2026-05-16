@@ -3565,7 +3565,6 @@ let _bestillingLoaded = false;
 
 async function loadBestilling() {
   if (_bestillingLoaded) return;
-  _bestillingLoaded = true;
   const uger = await api(`/api/bestilling/uger?aar=${VALGT_AAR}`);
   if (!uger || !uger.length) {
     document.getElementById('bestilling-uger-tbody').innerHTML =
@@ -3573,6 +3572,7 @@ async function loadBestilling() {
     document.getElementById('bestilling-uger-antal').textContent = '0';
     return;
   }
+  _bestillingLoaded = true;
 
   document.getElementById('bestilling-uger-antal').textContent = uger.length;
   document.getElementById('bestilling-uger-lbl').textContent = uger.length + ' uger importeret';

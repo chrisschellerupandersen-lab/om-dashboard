@@ -638,38 +638,40 @@ async def api_kontrol_varenumre(request: Request):
 
 @app.get("/api/debug/varer")
 async def api_debug_varer(request: Request, q: str = ""):
-    """Debug: bon_nr statistik + stamdata for søgeord."""
+    """Debug: transaktioner + VF + stamdata for søgeord på seneste dato."""
     _kræv_login(request)
     with database._conn() as conn:
         seneste = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
-        bon = conn.execute("""
-            SELECT COUNT(*) AS linjer,
-                   COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END) AS unikke_bon,
-                   COUNT(CASE WHEN bon_nr = '' THEN 1 END) AS tomme_bon,
-                   MIN(bon_nr) AS eks_bon
-            FROM transaktioner WHERE dato = ?
-        """, (seneste,)).fetchone()
+        raa = conn.execute("""
+            SELECT varenavn, varenummer,
+                   SUM(antal) AS antal,
+                   SUM(omsætning) AS omsaetning,
+                   SUM(kostpris) AS kostpris_shopbox
+            FROM transaktioner
+            WHERE dato = ? AND LOWER(varenavn) LIKE LOWER('%'||?||'%')
+            GROUP BY varenavn, varenummer
+        """, (seneste, q)).fetchall()
+        view = conn.execute("""
+            SELECT varenavn, varenummer,
+                   SUM(antal) AS antal,
+                   SUM(omsaetning_ex_moms) AS oms_ex,
+                   SUM(vf_korrekt) AS vf,
+                   SUM(db_korrekt) AS db
+            FROM v_transaktioner
+            WHERE dato = ? AND LOWER(varenavn) LIKE LOWER('%'||?||'%')
+            GROUP BY varenavn, varenummer
+        """, (seneste, q)).fetchall()
         stam = conn.execute("""
             SELECT sku, varenavn, pris_ex_moms, portioner
             FROM varestamdata
             WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%')
                OR sku IN (SELECT DISTINCT varenummer FROM transaktioner
-                          WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%'))
+                          WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%') AND varenummer != '')
         """, (q, q)).fetchall()
-        kpi = conn.execute("""
-            SELECT COUNT(*) AS rækker,
-                   COUNT(CASE WHEN bon_nr != '' THEN 1 END) AS ikke_tomme,
-                   COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END) AS distinct_bon
-            FROM v_transaktioner WHERE dato = ?
-        """, (seneste,)).fetchone()
     return {
         "seneste_dato": seneste,
-        "transaktioner_linjer": bon["linjer"],
-        "unikke_bon_nr": bon["unikke_bon"],
-        "tomme_bon_nr": bon["tomme_bon"],
-        "eks_bon_nr": bon["eks_bon"],
-        "v_transaktioner_rækker": kpi["rækker"],
-        "v_distinct_bon": kpi["distinct_bon"],
+        "transaktioner": [dict(r) for r in raa],
+        "v_transaktioner": [dict(r) for r in view],
         "stamdata": [dict(r) for r in stam],
     }
 

@@ -2,15 +2,15 @@
 TGTG daglig sync — henter salgsdata fra Too Good To Go Store Portal
 og uploader til Railway-dashboardet.
 
-Opsætning (første gang):
-  1. Åbn store.toogoodtogo.com/stores/206880475109994944/sales/206880476083086176
-  2. Åbn DevTools → Console → indsæt indholdet af tgtg_export_session.js
-  3. Kør: python tgtg_sync.py --from-session tgtg_session.json
+Første gang (opret dedikeret TGTG-profil og log ind):
+  python tgtg_sync.py --setup
 
-Daglig kørsel (ingen browser nødvendig):
+Daglig kørsel:
   python tgtg_sync.py              # i dag + i går
   python tgtg_sync.py --dato 2026-05-16  # specifik dato
   python tgtg_sync.py --dage 7           # seneste 7 dage
+
+Kræver:  pip install playwright requests
 """
 
 import argparse
@@ -26,7 +26,9 @@ RAILWAY_URL    = "https://om-dashboard-production-0f3a.up.railway.app"
 WEBHOOK_SECRET = "OM-Greve-2026-Hemlig"
 STORE_ID       = "206880475109994944"
 TGTG_BASE      = "https://store.toogoodtogo.com"
-SESSION_FILE   = Path(__file__).parent / "tgtg_session.json"
+
+# Dedikeret profil-mappe til TGTG-automation (adskilt fra din normale Chrome)
+PROFILE_DIR    = Path(__file__).parent / ".tgtg_chrome_profile"
 
 POSE_TYPER = [
     {"item_id": "206880476083086176", "navn": "Lykkepose ( Økologisk)",  "kreditpris": 49},
@@ -38,73 +40,90 @@ POSE_TYPER = [
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def load_session() -> tuple[requests.Session, str]:
-    """Indlæs cookies + CSRF fra SESSION_FILE. Kast fejl med vejledning hvis mangler."""
-    if not SESSION_FILE.exists():
-        print(f"""
-FEJL: {SESSION_FILE} ikke fundet.
+def open_browser(headless: bool = False):
+    """Åbn browser med dedikeret TGTG-profil (ikke din normale Chrome)."""
+    from playwright.sync_api import sync_playwright
 
-Gør følgende:
-  1. Åbn: store.toogoodtogo.com/stores/{STORE_ID}/sales/{POSE_TYPER[0]['item_id']}
-  2. Åbn DevTools (F12) → Console
-  3. Kør dette script for at gemme session:
-
-     python tgtg_sync.py --export-session
-
-  Eller kopier/indsæt indholdet af tgtg_export_session.js manuelt.
-""")
-        raise SystemExit(1)
-
-    data = json.loads(SESSION_FILE.read_text(encoding="utf-8"))
-    sess = requests.Session()
-    for name, value in data.get("cookies", {}).items():
-        sess.cookies.set(name, value, domain="store.toogoodtogo.com")
-
-    # Refresh CSRF ved at hente en frisk token via auth-session endpoint
-    csrf = refresh_csrf(sess, data.get("csrf", ""))
-    return sess, csrf
+    PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    p = sync_playwright().start()
+    browser = p.chromium.launch_persistent_context(
+        user_data_dir=str(PROFILE_DIR),
+        headless=headless,
+        args=["--disable-blink-features=AutomationControlled"],
+    )
+    return p, browser
 
 
-def refresh_csrf(sess: requests.Session, fallback_csrf: str = "") -> str:
+def setup_profile():
     """
-    Forsøg at hente et fresh CSRF-token via auth/v3/session.
-    Fald tilbage på gestet token hvis det fejler.
+    Åbn browser (synligt) og vent på at brugeren logger ind.
+    Sessionen gemmes i PROFILE_DIR til fremtidige kørsler.
     """
+    print(f"\nÅbner browser med TGTG-profil i: {PROFILE_DIR}")
+    print("1. Log ind på store.toogoodtogo.com med greve@organicmarket.dk")
+    print("2. Naviger til Økonomi-siden")
+    print("3. Luk browser-vinduet når du er logget ind\n")
+
+    p, browser = open_browser(headless=False)
+    page = browser.new_page()
+    page.goto(f"{TGTG_BASE}/stores/{STORE_ID}", wait_until="domcontentloaded")
+
+    print("Browser åben — log ind og luk vinduet når du er klar...")
     try:
-        r = sess.post(
-            f"{TGTG_BASE}/web/auth/v3/session",
-            headers={"Content-Type": "application/json", "Accept": "application/json",
-                     "X-Requested-With": "XMLHttpRequest"},
-            json={}, timeout=10,
+        # Vent indtil browser lukkes manuelt
+        page.wait_for_event("close", timeout=300_000)
+    except Exception:
+        pass
+
+    browser.close()
+    p.stop()
+    print(f"[OK] Profil gemt i {PROFILE_DIR}. Kør nu: python tgtg_sync.py")
+
+
+def get_csrf_token(page) -> str:
+    """Navigér til salgs-siden og fang CSRF-token fra XHR-requests."""
+    csrf_holder = {}
+
+    def on_request(request):
+        token = (request.headers.get("x-csrf-token")
+                 or request.headers.get("X-CSRF-Token"))
+        if token and not csrf_holder.get("csrf"):
+            csrf_holder["csrf"] = token
+
+    page.on("request", on_request)
+
+    sales_url = f"{TGTG_BASE}/stores/{STORE_ID}/sales/{POSE_TYPER[0]['item_id']}"
+    page.goto(sales_url, wait_until="networkidle", timeout=30_000)
+
+    # Klik på datofelt for at trigge orders-kald og fange CSRF
+    try:
+        page.locator("input[type='text']").first.click()
+        page.wait_for_timeout(1500)
+    except Exception:
+        pass
+
+    csrf = csrf_holder.get("csrf")
+    if not csrf:
+        raise RuntimeError(
+            "Ingen CSRF-token fundet.\n"
+            f"Er du logget ind? Kør: python tgtg_sync.py --setup"
         )
-        if r.status_code == 200:
-            # Token kan ligge i response-header eller i Set-Cookie
-            token = r.headers.get("X-CSRF-Token") or r.headers.get("x-csrf-token")
-            if token:
-                print(f"[OK] Fresh CSRF fra auth/v3/session")
-                return token
-    except Exception as e:
-        print(f"[WARN] auth/v3/session fejlede: {e}")
-
-    if fallback_csrf:
-        print(f"[INFO] Bruger gemt CSRF-token (kan være udløbet)")
-        return fallback_csrf
-
-    raise RuntimeError("Ingen CSRF-token tilgængelig. Kør --export-session igen.")
+    return csrf
 
 
 def fetch_sales(session: requests.Session, csrf: str, item_id: str, dato: str) -> int:
-    """Hent antal solgte poser for én item/dato."""
-    url = f"{TGTG_BASE}/web/mystore/item/v4/{item_id}/sales"
-    headers = {
-        "Content-Type":     "application/json",
-        "Accept":           "application/json",
-        "X-CSRF-Token":     csrf,
-        "X-Requested-With": "XMLHttpRequest",
-    }
-    r = session.post(url, headers=headers,
-                     json={"paging": {"size": 50, "page": 0}, "period": "DAY", "startDate": dato},
-                     timeout=15)
+    """Hent antal solgte poser for én item/dato (max 50 pr. side)."""
+    r = session.post(
+        f"{TGTG_BASE}/web/mystore/item/v4/{item_id}/sales",
+        headers={
+            "Content-Type":     "application/json",
+            "Accept":           "application/json",
+            "X-CSRF-Token":     csrf,
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        json={"paging": {"size": 50, "page": 0}, "period": "DAY", "startDate": dato},
+        timeout=15,
+    )
     if r.status_code == 200:
         return r.json().get("paging", {}).get("totalElements", 0)
     print(f"  [WARN] {item_id}/{dato}: HTTP {r.status_code} — {r.text[:80]}")
@@ -112,6 +131,7 @@ def fetch_sales(session: requests.Session, csrf: str, item_id: str, dato: str) -
 
 
 def upload_to_railway(linjer: list):
+    """Upload pose-definitioner og dagssalg til Railway."""
     r = requests.post(f"{RAILWAY_URL}/api/tgtg/poser", json={
         "secret": WEBHOOK_SECRET,
         "poser":  [{"item_id": p["item_id"], "navn": p["navn"], "kreditpris": p["kreditpris"]}
@@ -130,82 +150,65 @@ def upload_to_railway(linjer: list):
 
 
 def sync_dates(datoer: list):
-    sess, csrf = load_session()
-    linjer = []
+    """Hent TGTG-salg for de givne datoer og upload til Railway."""
+    p, browser = open_browser(headless=True)
+    page = browser.new_page()
 
-    for dato in datoer:
-        for pose in POSE_TYPER:
-            antal = fetch_sales(sess, csrf, pose["item_id"], dato)
-            if antal > 0:
-                linjer.append({
-                    "dato":      dato,
-                    "pose_navn": pose["navn"],
-                    "antal":     antal,
-                    "item_id":   pose["item_id"],
-                })
-                print(f"  {dato}  {pose['navn']:<30} × {antal}")
-            time.sleep(0.3)
+    try:
+        csrf = get_csrf_token(page)
+        print(f"[OK] CSRF fanget")
+
+        # Opret requests-session med cookies fra Playwright-browseren
+        sess = requests.Session()
+        for cookie in browser.cookies():
+            if "toogoodtogo" in cookie.get("domain", ""):
+                sess.cookies.set(
+                    cookie["name"], cookie["value"],
+                    domain=cookie.get("domain", "").lstrip(".")
+                )
+
+        linjer = []
+        for dato in datoer:
+            for pose in POSE_TYPER:
+                antal = fetch_sales(sess, csrf, pose["item_id"], dato)
+                if antal > 0:
+                    linjer.append({
+                        "dato":      dato,
+                        "pose_navn": pose["navn"],
+                        "antal":     antal,
+                        "item_id":   pose["item_id"],
+                    })
+                    print(f"  {dato}  {pose['navn']:<30} × {antal}")
+                time.sleep(0.3)
+
+    finally:
+        browser.close()
+        p.stop()
 
     if linjer:
         upload_to_railway(linjer)
     else:
         print("Ingen salg fundet for de valgte datoer.")
 
-
-def export_session_js():
-    """Print det JavaScript der skal køres i browseren for at gemme session."""
-    js = f"""
-// Kør dette i DevTools Console på store.toogoodtogo.com
-// Det gemmer cookies + CSRF til en fil som tgtg_sync.py kan bruge.
-(async () => {{
-  // Fang CSRF via en API-kald
-  const orig = window.XMLHttpRequest;
-  let csrf = null;
-  window.XMLHttpRequest = function() {{
-    const x = new orig();
-    const oh = x.setRequestHeader.bind(x);
-    x.setRequestHeader = (n,v) => {{ if (n && n.toLowerCase().includes('csrf')) csrf = v; return oh(n,v); }};
-    return x;
-  }};
-  // Trigger en API-kald ved at navigere
-  await new Promise(r => setTimeout(r, 2000));
-  window.XMLHttpRequest = orig;
-
-  const session = {{
-    csrf: csrf || window._xsrf?.value || '',
-    cookies: Object.fromEntries(
-      document.cookie.split(';')
-        .map(c => c.trim().split('='))
-        .filter(c => c.length === 2)
-        .map(([k,v]) => [k.trim(), v.trim()])
-    ),
-    saved: new Date().toISOString()
-  }};
-
-  const blob = new Blob([JSON.stringify(session, null, 2)], {{type: 'application/json'}});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'tgtg_session.json';
-  a.click();
-  console.log('Session gemt! Flyt tgtg_session.json til dashboard-mappen.');
-}})();
-"""
-    print(js)
-    print(f"\nEfter download: flyt tgtg_session.json til:")
-    print(f"  {SESSION_FILE}")
+    return linjer
 
 
 def main():
     parser = argparse.ArgumentParser(description="TGTG → Railway sync")
-    parser.add_argument("--dato",           help="Specifik dato (YYYY-MM-DD)")
-    parser.add_argument("--dage",    type=int, default=2, help="Antal dage bagud (default: 2)")
-    parser.add_argument("--export-session", action="store_true",
-                        help="Print JavaScript til browser-console for at gemme session")
+    parser.add_argument("--setup", action="store_true",
+                        help="Første gang: åbn browser og log ind på TGTG")
+    parser.add_argument("--dato", help="Specifik dato (YYYY-MM-DD)")
+    parser.add_argument("--dage", type=int, default=2,
+                        help="Antal dage bagud (default: 2 = i dag + i går)")
     args = parser.parse_args()
 
-    if args.export_session:
-        export_session_js()
+    if args.setup:
+        setup_profile()
         return
+
+    if not PROFILE_DIR.exists():
+        print("Profil-mappe ikke fundet. Kør først: python tgtg_sync.py --setup")
+        raise SystemExit(1)
 
     if args.dato:
         datoer = [args.dato]

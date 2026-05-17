@@ -1277,11 +1277,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SOLGT STK</th>
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITERING</th>
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">VAREFORBRUG</th>
+                <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">TAB KR</th>
                 <th style="text-align:right;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">% TAB</th>
               </tr>
             </thead>
             <tbody id="tgtg-pose-tbody">
-              <tr><td colspan="6" class="empty">Indlæser…</td></tr>
+              <tr><td colspan="7" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4158,19 +4159,23 @@ async function loadTgtg() {
 
   document.getElementById('tgtg-pose-tbody').innerHTML = (d.per_pose || []).length
     ? (d.per_pose || []).map(p => {
+        const hasKost = p.vareforbrug > 0;
+        const tabKr  = hasKost ? Math.round(p.vareforbrug - p.total_kr) : null;
         const tabPct = p.tab_pct != null ? p.tab_pct.toFixed(1) + ' %' : '—';
-        const tabClr = p.tab_pct != null ? (p.tab_pct > 40 ? 'color:#c0392b;' : p.tab_pct > 30 ? 'color:#e67e22;' : 'color:var(--ash);') : '';
-        const vf = p.vareforbrug > 0 ? Math.round(p.vareforbrug).toLocaleString('da-DK') + ' kr' : '—';
+        const tabClr = p.tab_pct != null ? (p.tab_pct > 40 ? 'color:#c0392b;font-weight:600;' : p.tab_pct > 30 ? 'color:#e67e22;font-weight:500;' : 'color:var(--ash);') : '';
+        const vf     = hasKost ? Math.round(p.vareforbrug).toLocaleString('da-DK') + ' kr' : '—';
+        const tabKrTxt = tabKr != null ? tabKr.toLocaleString('da-DK') + ' kr' : '—';
         return `<tr>
           <td style="font-size:13px;padding:6px 8px;">${p.pose_navn}</td>
           <td class="num" style="${mono}font-size:12px;color:var(--ash);">${(poserPriser[p.pose_navn]||0).toFixed(2)} kr</td>
           <td class="num" style="${mono}font-size:13px;">${p.total_antal}</td>
           <td class="num" style="${mono}font-size:13px;color:var(--forest);font-weight:500;">${Math.round(p.total_kr).toLocaleString('da-DK')} kr</td>
           <td class="num" style="${mono}font-size:12px;color:var(--ash);">${vf}</td>
-          <td class="num" style="${mono}font-size:12px;font-weight:500;${tabClr}">${tabPct}</td>
+          <td class="num" style="${mono}font-size:12px;${tabClr}">${tabKrTxt}</td>
+          <td class="num" style="${mono}font-size:12px;${tabClr}">${tabPct}</td>
         </tr>`;
       }).join('')
-    : '<tr><td colspan="6" class="empty">Ingen data — kør tgtg_sync.py</td></tr>';
+    : '<tr><td colspan="7" class="empty">Ingen data — kør tgtg_sync.py</td></tr>';
 
   // Uge-tabel: beregnet vs. bager-faktura med løbende sum
   // Sorter ældste først for løbende sum, vis nyeste øverst

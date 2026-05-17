@@ -139,7 +139,8 @@ def upload_to_railway(linjer: list):
     """Upload pose-definitioner og dagssalg til Railway."""
     r = requests.post(f"{RAILWAY_URL}/api/tgtg/poser", json={
         "secret": WEBHOOK_SECRET,
-        "poser":  [{"item_id": p["item_id"], "navn": p["navn"], "kreditpris": p["kreditpris"]}
+        "poser":  [{"item_id": p["item_id"], "navn": p["navn"],
+                    "kreditpris": p["kreditpris"], "kostpris_pose": p.get("kostpris_pose", 0)}
                    for p in POSE_TYPER],
     }, timeout=20)
     r.raise_for_status()

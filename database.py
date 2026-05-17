@@ -91,11 +91,12 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS tgtg_poser (
-                id           INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_id      TEXT    DEFAULT '',
-                navn         TEXT    NOT NULL,
-                kreditpris   REAL    NOT NULL DEFAULT 0,
-                aktiv        INTEGER DEFAULT 1,
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id        TEXT    DEFAULT '',
+                navn           TEXT    NOT NULL,
+                kreditpris     REAL    NOT NULL DEFAULT 0,
+                kostpris_pose  REAL    DEFAULT 0,
+                aktiv          INTEGER DEFAULT 1,
                 UNIQUE(navn) ON CONFLICT REPLACE
             );
 
@@ -110,6 +111,13 @@ def init_db():
                 UNIQUE(dato, pose_navn) ON CONFLICT REPLACE
             );
             CREATE INDEX IF NOT EXISTS idx_tgtg_dato ON tgtg_dagssalg(dato);
+            -- Migration: tilføj kostpris_pose hvis den mangler
+            """)
+            try:
+                conn.execute("ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0")
+            except Exception:
+                pass
+            conn.executescript("""
 
             CREATE TABLE IF NOT EXISTS bestilling_manuel (
                 uge        INTEGER NOT NULL,
@@ -1166,17 +1174,21 @@ def gem_bager_regnskab(linjer: List[Dict]) -> int:
 
 
 def gem_tgtg_poser(poser: List[Dict]) -> int:
-    """Gem/opdater pose-definitioner (navn, kreditpris, item_id)."""
+    """Gem/opdater pose-definitioner (navn, kreditpris, kostpris_pose, item_id)."""
     with _conn() as conn:
         for p in poser:
             conn.execute("""
-                INSERT INTO tgtg_poser (item_id, navn, kreditpris, aktiv)
-                VALUES (?,?,?,1)
+                INSERT INTO tgtg_poser (item_id, navn, kreditpris, kostpris_pose, aktiv)
+                VALUES (?,?,?,?,1)
                 ON CONFLICT(navn) DO UPDATE SET
                     item_id=excluded.item_id,
                     kreditpris=excluded.kreditpris,
+                    kostpris_pose=CASE WHEN excluded.kostpris_pose > 0
+                                       THEN excluded.kostpris_pose
+                                       ELSE tgtg_poser.kostpris_pose END,
                     aktiv=1
-            """, (p.get("item_id",""), p["navn"], p["kreditpris"]))
+            """, (p.get("item_id",""), p["navn"], p["kreditpris"],
+                  p.get("kostpris_pose", 0)))
     return len(poser)
 
 
@@ -1242,7 +1254,7 @@ def hent_tgtg_overblik(aar: int = None) -> Dict:
         """, aar_params).fetchall()
 
         poser = conn.execute(
-            "SELECT item_id, navn, kreditpris FROM tgtg_poser WHERE aktiv=1 ORDER BY navn"
+            "SELECT item_id, navn, kreditpris, kostpris_pose FROM tgtg_poser WHERE aktiv=1 ORDER BY navn"
         ).fetchall()
 
     # Aggreger til ISO-uger i Python
@@ -1265,10 +1277,23 @@ def hent_tgtg_overblik(aar: int = None) -> Dict:
         u["diff_kr"]     = round(bager_kr - u["beregnet_kr"], 2) if bager_kr else None
         uger.append(u)
 
+    # Berig per_pose med kostpris_pose, vareforbrug og % tab
+    kostpris_map = {r["navn"]: r["kostpris_pose"] for r in poser}
+    per_pose_list = []
+    for r in per_pose:
+        d = dict(r)
+        kp = kostpris_map.get(d["pose_navn"], 0) or 0
+        vareforbrug = round(d["total_antal"] * kp, 2)
+        tab_pct = round((vareforbrug - d["total_kr"]) / vareforbrug * 100, 1) if vareforbrug > 0 else None
+        d["kostpris_pose"] = kp
+        d["vareforbrug"]   = vareforbrug
+        d["tab_pct"]       = tab_pct
+        per_pose_list.append(d)
+
     return {
         "dage":     [dict(r) for r in dage_rows],
         "uger":     uger,
-        "per_pose": [dict(r) for r in per_pose],
+        "per_pose": per_pose_list,
         "poser":    [dict(r) for r in poser],
     }
 

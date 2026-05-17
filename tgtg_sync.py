@@ -31,11 +31,16 @@ TGTG_BASE      = "https://store.toogoodtogo.com"
 PROFILE_DIR    = Path(__file__).parent / ".tgtg_chrome_profile"
 
 POSE_TYPER = [
-    {"item_id": "206880476083086176", "navn": "Lykkepose ( Økologisk)",  "kreditpris": 49},
-    {"item_id": "206881838829236480", "navn": "Brødposen ( Økologisk)",  "kreditpris": 45},
-    {"item_id": "206882511213524800", "navn": "Wienerbrødsposen",        "kreditpris": 49},
-    {"item_id": "210383102918979712", "navn": "4x Fatelavnsboller",      "kreditpris": 40},
-    {"item_id": "210383866617850400", "navn": "Kagepose",                "kreditpris": 45},
+    # kostpris_pose = faktisk kostpris for indholdet i posen
+    # Brødposen:      2 brød (24 kr) + 3 boller (6,40 kr) = 67,20 kr
+    # Lykkepose:      1 brød (24 kr) + 3 boller (6,40 kr) + 2 wienerbrød (12 kr) = 67,20 kr
+    # Wienerbrødsposen: 6 wienerbrød (12 kr) = 72,00 kr
+    # Kagepose:       6 kager (15,30 kr) = 91,80 kr
+    {"item_id": "206880476083086176", "navn": "Lykkepose ( Økologisk)",  "kreditpris": 49, "kostpris_pose": 67.20},
+    {"item_id": "206881838829236480", "navn": "Brødposen ( Økologisk)",  "kreditpris": 45, "kostpris_pose": 67.20},
+    {"item_id": "206882511213524800", "navn": "Wienerbrødsposen",        "kreditpris": 49, "kostpris_pose": 72.00},
+    {"item_id": "210383102918979712", "navn": "4x Fatelavnsboller",      "kreditpris": 40, "kostpris_pose":  0.00},
+    {"item_id": "210383866617850400", "navn": "Kagepose",                "kreditpris": 45, "kostpris_pose": 91.80},
 ]
 # ─────────────────────────────────────────────────────────────────────────────
 

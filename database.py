@@ -149,10 +149,10 @@ def init_db():
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
-                -- Boner hvor mindst én vare har omsætning=0 men kostpris>0 (menu-split)
+                -- Boner hvor mindst én vare har omsætning<=0 men kostpris>0 (menu-split eller rabatlinje)
                 SELECT dato, bon_nr
                 FROM transaktioner
-                WHERE bon_nr != '' AND omsætning = 0 AND kostpris > 0
+                WHERE bon_nr != '' AND omsætning <= 0 AND kostpris > 0
                 GROUP BY dato, bon_nr
             ),
             bon_totals AS (

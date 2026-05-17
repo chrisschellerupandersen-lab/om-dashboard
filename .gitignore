@@ -1,0 +1,5 @@
+.tgtg_chrome_profile/
+__pycache__/
+*.pyc
+*.pyo
+tgtg_tokens.json

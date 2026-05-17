@@ -172,8 +172,9 @@ def init_db():
                 conn.execute(sql)
             except Exception:
                 pass  # kolonnen eksisterer allerede
-        # Oprydning: slet forældede stamdata-rækker der ikke vises i UI
-        conn.execute("DELETE FROM varestamdata WHERE varenavn = 'ØKO - Foccacia'")
+        # Oprydning: slet alle "ØKO - " stamdata-rækker importeret fra bestilling
+        # (disse forstyrrer VF-beregningen — Shopbox' kostpris bruges i stedet)
+        conn.execute("DELETE FROM varestamdata WHERE varenavn LIKE 'ØKO - %'")
 
 
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:

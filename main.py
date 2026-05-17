@@ -590,6 +590,18 @@ async def api_tgtg_poser(request: Request):
     return {"ok": True, "poser": n}
 
 
+@app.post("/api/tgtg/nulstil")
+async def api_tgtg_nulstil(request: Request):
+    """Slet al TGTG-data og pose-definitioner (til genindlæsning)."""
+    body = await request.json()
+    if body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Ugyldigt secret")
+    with database._conn() as conn:
+        conn.execute("DELETE FROM tgtg_dagssalg")
+        conn.execute("DELETE FROM tgtg_poser")
+    return {"ok": True, "besked": "Al TGTG-data slettet"}
+
+
 # ── VARESTAMDATA ──────────────────────────────────────────────────────────────
 
 @app.get("/api/stamdata")

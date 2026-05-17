@@ -602,6 +602,19 @@ async def api_tgtg_nulstil(request: Request):
     return {"ok": True, "besked": "Al TGTG-data slettet"}
 
 
+# ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
+
+@app.get("/api/spild/dagsniveau")
+async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
+    _kræv_login(request)
+    if uge is None or aar is None:
+        from datetime import date
+        iso = date.today().isocalendar()
+        uge = iso[1]
+        aar = iso[0]
+    return database.hent_spild_dagsniveau(int(uge), int(aar))
+
+
 # ── VARESTAMDATA ──────────────────────────────────────────────────────────────
 
 @app.get("/api/stamdata")

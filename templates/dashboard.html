@@ -1417,6 +1417,87 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- SPILD-RAPPORT -->
+      <div class="panel" id="p-spild">
+        <div class="page-hdr">
+          <h2>Spild-rapport</h2>
+          <p>Dagsniveau per uge · Bestilt → Kassesalg + TGTG → Spild %</p>
+          <button onclick="loadSpild(true);" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+
+        <!-- Uge-navigator -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:18px;">
+          <button id="spild-prev-btn" onclick="_spildNav(-1)" style="background:rgba(30,58,30,.08);border:1px solid rgba(30,58,30,.15);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">←</button>
+          <span id="spild-uge-lbl" style="font-weight:600;font-size:15px;min-width:140px;text-align:center;">Uge — —</span>
+          <button id="spild-next-btn" onclick="_spildNav(1)" style="background:rgba(30,58,30,.08);border:1px solid rgba(30,58,30,.15);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;">→</button>
+          <span id="spild-dato-range" style="font-size:11px;color:var(--ash);margin-left:4px;"></span>
+        </div>
+
+        <!-- KPI-chips -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;" id="spild-kpi-row">
+          <div class="card" style="padding:14px 16px;text-align:center;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">BESTILT</div>
+            <div id="spild-k-bestilt" style="font-size:24px;font-weight:700;color:var(--ink);">—</div>
+            <div style="font-size:11px;color:var(--ash);">stk i alt</div>
+          </div>
+          <div class="card" style="padding:14px 16px;text-align:center;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">KASSESALG</div>
+            <div id="spild-k-kasse" style="font-size:24px;font-weight:700;color:var(--forest);">—</div>
+            <div id="spild-k-kasse-pct" style="font-size:11px;color:var(--ash);">stk</div>
+          </div>
+          <div class="card" style="padding:14px 16px;text-align:center;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">TGTG</div>
+            <div id="spild-k-tgtg" style="font-size:24px;font-weight:700;color:var(--moss);">—</div>
+            <div style="font-size:11px;color:var(--ash);">poser</div>
+          </div>
+          <div class="card" style="padding:14px 16px;text-align:center;border-left:3px solid var(--danger);" id="spild-k-spild-card">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">SPILD</div>
+            <div id="spild-k-spild" style="font-size:24px;font-weight:700;">—</div>
+            <div id="spild-k-spild-sub" style="font-size:11px;color:var(--ash);">stk (—%)</div>
+          </div>
+        </div>
+
+        <!-- Dag-heatmap tabel -->
+        <div class="card" style="margin-bottom:14px;overflow-x:auto;">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Dagsniveau · bestilt → solgt → spild</span></div>
+          <table style="width:100%;border-collapse:collapse;min-width:600px;" id="spild-dag-tbl">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+                <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">DAG</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BESTILT</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KASSESALG</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">TGTG</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">EFFEKTIVT</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD STK</th>
+                <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD %</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">4U SNIT %</th>
+              </tr>
+            </thead>
+            <tbody id="spild-dag-tbody">
+              <tr><td colspan="8" class="empty">Vælg en uge…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Kategori + Anbefalinger side om side -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+          <!-- Kategori-fordeling -->
+          <div class="card">
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Kassesalg per kategori</span></div>
+            <div id="spild-kat-list" style="padding:4px 0;">
+              <div class="empty">Indlæser…</div>
+            </div>
+          </div>
+          <!-- Anbefalinger -->
+          <div class="card">
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Anbefalinger</span></div>
+            <div id="spild-anb-list" style="padding:4px 0;">
+              <div class="empty">Indlæser…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- BESTILLINGSBEREGNER -->
       <div class="panel" id="p-beregner">
         <div class="page-hdr">
@@ -1677,6 +1758,7 @@ const NAV_SVG = {
   trend:        '<path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/>',
   bestilling:   '<path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/>',
   svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
+  spild:        '<path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 2v4l3 1.5-.7 1.3L7 9V4h1zm-5 6.5l1.4-1.4 1 1-1.4 1.4-1-1zm9-1.4l1.4 1.4-1 1-1.4-1.4 1-1z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
@@ -1697,6 +1779,7 @@ const NAV_DEFAULT = [
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',  hidden:false},
   {id:'tgtg',        label:'Too Good To Go',        group:'Bageri & indkøb',  hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',  hidden:false},
+  {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Rapporter',        hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Rapporter',        hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',   hidden:false},
@@ -4396,6 +4479,181 @@ async function loadSvind(force = false) {
   addSvindAlert(gnsSvind, data[data.length-1]?.uge);
 }
 
+// ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
+let _spildLoaded = false, _spildUge = null, _spildAar = null;
+
+async function loadSpild(force = false) {
+  if (!force && _spildLoaded) return;
+  const today = new Date();
+  // ISO uge
+  const d = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  const isoWeek = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+  if (!_spildUge) { _spildUge = isoWeek; _spildAar = today.getFullYear(); }
+  await _spildHent(_spildUge, _spildAar);
+  _spildLoaded = true;
+}
+
+async function _spildHent(uge, aar) {
+  _spildUge = uge; _spildAar = aar;
+  const MONO = "font-family:'DM Mono',monospace;";
+  document.getElementById('spild-uge-lbl').textContent = `Uge ${uge} · ${aar}`;
+  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="8" class="empty">Henter…</td></tr>';
+
+  let d;
+  try {
+    const r = await fetch(`/api/spild/dagsniveau?uge=${uge}&aar=${aar}`);
+    d = await r.json();
+  } catch(e) {
+    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="8" class="empty">Fejl ved hentning</td></tr>';
+    return;
+  }
+
+  // Dato-range label
+  if (d.dato_start && d.dato_slut) {
+    const fmtDato = s => new Date(s).toLocaleDateString('da-DK',{day:'numeric',month:'short'});
+    document.getElementById('spild-dato-range').textContent = `${fmtDato(d.dato_start)} – ${fmtDato(d.dato_slut)}`;
+  }
+
+  // KPI-chips
+  document.getElementById('spild-k-bestilt').textContent = (d.total_bestilt||0).toLocaleString('da-DK');
+  document.getElementById('spild-k-kasse').textContent   = (d.total_kassesalg||0).toLocaleString('da-DK');
+  document.getElementById('spild-k-kasse-pct').textContent = d.total_bestilt > 0
+    ? `${Math.round(d.total_kassesalg/d.total_bestilt*100)} % af bestilt` : 'stk';
+  document.getElementById('spild-k-tgtg').textContent    = (d.total_tgtg||0).toLocaleString('da-DK');
+
+  const spildPct = d.total_svind_pct;
+  const spildClr = spildPct == null ? 'var(--ink)' : spildPct > 35 ? '#c0392b' : spildPct > 20 ? '#e67e22' : spildPct > 10 ? '#f39c12' : 'var(--moss)';
+  document.getElementById('spild-k-spild').style.color = spildClr;
+  document.getElementById('spild-k-spild').textContent  = (d.total_svind||0).toLocaleString('da-DK');
+  document.getElementById('spild-k-spild-sub').textContent = spildPct != null ? `stk (${spildPct.toFixed(1)} %)` : 'stk';
+  document.getElementById('spild-k-spild-card').style.borderLeftColor = spildClr;
+
+  // Dag-heatmap
+  function spildFarve(pct) {
+    if (pct == null) return 'transparent';
+    if (pct > 40) return 'rgba(192,57,43,.12)';
+    if (pct > 25) return 'rgba(230,126,34,.10)';
+    if (pct > 12) return 'rgba(243,156,18,.08)';
+    return 'rgba(39,174,96,.08)';
+  }
+  function spildTxtFarve(pct) {
+    if (pct == null) return 'var(--ink)';
+    if (pct > 40) return '#c0392b';
+    if (pct > 25) return '#e67e22';
+    if (pct > 12) return '#f39c12';
+    return 'var(--moss)';
+  }
+
+  const tbody = document.getElementById('spild-dag-tbody');
+  if (!d.dage || !d.dage.length) {
+    tbody.innerHTML = '<tr><td colspan="8" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
+  } else {
+    let rows = '';
+    for (const dag of d.dage) {
+      if (!dag.har_data) continue;
+      const pct    = dag.svind_pct;
+      const bgClr  = spildFarve(pct);
+      const txtClr = spildTxtFarve(pct);
+      const avgPct = dag.avg_svind_pct_4u;
+
+      // Mini progress bar for spild%
+      const barW   = pct != null ? Math.min(100, pct) : 0;
+      const barClr = spildTxtFarve(pct);
+      const bar    = pct != null
+        ? `<div style="display:flex;align-items:center;gap:6px;min-width:120px;">
+             <div style="flex:1;height:6px;background:rgba(30,58,30,.1);border-radius:3px;overflow:hidden;">
+               <div style="width:${barW}%;height:100%;background:${barClr};border-radius:3px;transition:width .4s;"></div>
+             </div>
+             <span style="${MONO}font-size:12px;font-weight:700;color:${txtClr};min-width:38px;">${pct.toFixed(1)} %</span>
+           </div>`
+        : '<span style="color:var(--ash);">—</span>';
+
+      const avgTxt = avgPct != null
+        ? `<span style="${MONO}font-size:11px;color:${spildTxtFarve(avgPct)};">${avgPct.toFixed(1)} %</span>`
+        : '<span style="color:var(--ash);font-size:11px;">—</span>';
+
+      const deltaIcon = (pct != null && avgPct != null)
+        ? (pct > avgPct + 8 ? ' <span style="color:#c0392b;">↑</span>' : pct < avgPct - 8 ? ' <span style="color:var(--moss);">↓</span>' : '')
+        : '';
+
+      rows += `<tr style="background:${bgClr};border-bottom:1px solid rgba(30,58,30,.06);">
+        <td style="padding:10px 10px;font-size:13px;font-weight:600;">${dag.dag_label}<br><span style="${MONO}font-size:10px;color:var(--ash);font-weight:400;">${dag.dato}</span></td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.bestilt > 0 ? dag.bestilt : '<span style="color:var(--ash);">—</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--forest);">${dag.kassesalg > 0 ? dag.kassesalg : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? dag.tgtg : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
+        <td style="padding:10px;">${bar}${deltaIcon}</td>
+        <td class="num" style="padding:10px;">${avgTxt}</td>
+      </tr>`;
+    }
+
+    // Totalrække
+    rows += `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.04);">
+      <td style="${MONO}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);padding:8px 10px;">Total uge</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_bestilt||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--forest);">${d.total_kassesalg||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_effektivt||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:${spildClr};">${d.total_svind||0}</td>
+      <td style="padding:8px 10px;">
+        <span style="${MONO}font-size:13px;font-weight:700;color:${spildClr};">${spildPct != null ? spildPct.toFixed(1)+' %' : '—'}</span>
+      </td>
+      <td></td>
+    </tr>`;
+    tbody.innerHTML = rows || '<tr><td colspan="8" class="empty">Ingen dage med bestillingsdata</td></tr>';
+  }
+
+  // Kategori-fordeling
+  const katList = document.getElementById('spild-kat-list');
+  if (d.kategorier && d.kategorier.length) {
+    const maxKat = Math.max(...d.kategorier.map(k => k.kassesalg));
+    katList.innerHTML = d.kategorier.slice(0, 8).map(k => {
+      const pct = maxKat > 0 ? k.kassesalg / maxKat * 100 : 0;
+      return `<div style="padding:6px 8px;border-bottom:1px solid rgba(30,58,30,.06);">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
+          <span style="font-size:12px;">${k.kat}</span>
+          <span style="${MONO}font-size:11px;color:var(--ash);">${k.kassesalg} stk · ${Math.round(k.omsaetning).toLocaleString('da-DK')} kr</span>
+        </div>
+        <div style="height:4px;background:rgba(30,58,30,.08);border-radius:2px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:var(--forest);border-radius:2px;"></div>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    katList.innerHTML = '<div class="empty">Ingen salgsdata denne uge</div>';
+  }
+
+  // Anbefalinger
+  const anbList = document.getElementById('spild-anb-list');
+  if (d.anbefalinger && d.anbefalinger.length) {
+    const anbIkon = {advarsel: '⚠️', mulighed: '💡', info: 'ℹ️'};
+    const anbFarve = {advarsel: '#c0392b', mulighed: 'var(--moss)', info: 'var(--ash)'};
+    anbList.innerHTML = d.anbefalinger.map(a => `
+      <div style="padding:8px 10px;border-bottom:1px solid rgba(30,58,30,.06);display:flex;gap:8px;align-items:flex-start;">
+        <span style="font-size:14px;flex-shrink:0;">${anbIkon[a.type]||'•'}</span>
+        <div>
+          <span style="font-size:11px;font-weight:600;color:${anbFarve[a.type]||'var(--ink)'};">${a.dag}</span>
+          <p style="margin:2px 0 0;font-size:12px;color:var(--ink);line-height:1.4;">${a.besked}</p>
+        </div>
+      </div>`).join('');
+  } else {
+    anbList.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--moss);">✓ Ingen kritiske anbefalinger denne uge</div>';
+  }
+}
+
+function _spildNav(retning) {
+  if (!_spildUge) return;
+  let uge = _spildUge + retning;
+  let aar = _spildAar;
+  if (uge < 1) { uge = 52; aar--; }
+  if (uge > 52) { uge = 1; aar++; }
+  _spildHent(uge, aar);
+}
+
 // ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
 let _bernUge = null, _bernAar = null, _bernBusy = false;
 
@@ -4851,6 +5109,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'svind')        loadSvind();
+  if (id === 'spild')        loadSpild();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
   if (id === 'stamdata')   loadStamdata();

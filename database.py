@@ -1473,6 +1473,334 @@ def hent_mangler_kostpris() -> Dict:
     }
 
 
+# ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
+
+def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
+    """Dag-niveau spild-data for en ISO-uge.
+
+    TGTG-offset: TGTG solgt på dato D stammer fra produktion D-1.
+    Så for produktionsdag D hentes tgtg_dagssalg WHERE dato = D+1.
+    """
+    from datetime import date as _date, timedelta
+
+    # Mandag i ISO-ugen
+    jan4 = _date(aar, 1, 4)
+    man = jan4 - timedelta(days=jan4.weekday()) + timedelta(weeks=uge - 1)
+
+    dag_navne   = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    dag_labels  = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
+
+    datoer = [man + timedelta(days=i) for i in range(7)]
+    dato_start = datoer[0].isoformat()
+    dato_slut  = datoer[6].isoformat()
+
+    # Navigation
+    prev_uge = uge - 1
+    prev_aar = aar
+    if prev_uge < 1:
+        prev_uge = 52
+        prev_aar = aar - 1
+    next_uge = uge + 1
+    next_aar = aar
+    if next_uge > 52:
+        next_uge = 1
+        next_aar = aar + 1
+
+    _KAFFE_LIKE = (
+        "LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+        "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+        "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%' "
+        "OR LOWER(varenavn) LIKE '%macchiato%' OR LOWER(varenavn) LIKE '%cortado%' "
+        "OR LOWER(varenavn) LIKE '%lungo%' OR LOWER(varenavn) LIKE '%mocha%'"
+    )
+    _WIENER_LIKE = (
+        "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%bmo%' "
+        "OR LOWER(varenavn) LIKE '%bolle%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
+        "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
+    )
+
+    try:
+        with _conn() as conn:
+            # ── Bestillinger per dag for denne uge ──────────────────────────
+            # ugebestillinger kolonner: man, tir, ons, tor, fre, loe, son
+            bestil_rows = conn.execute("""
+                SELECT
+                    SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
+                    SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
+                    SUM(son) AS son
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
+            """, (uge, aar)).fetchone()
+
+            bestil_per_dag = {}
+            if bestil_rows:
+                for dag in dag_navne:
+                    bestil_per_dag[dag] = int(bestil_rows[dag] or 0)
+
+            # ── Kassesalg per dato ────────────────────────────────────────────
+            # Matcher varenumre fra bestillinger (ekskl. kaffe/drikkevarer)
+            dato_liste = [d.isoformat() for d in datoer]
+            placeholders = ','.join('?' * 7)
+            kasse_rows = conn.execute(f"""
+                SELECT dato, ROUND(SUM(antal), 0) AS antal
+                FROM transaktioner
+                WHERE dato IN ({placeholders})
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                  )
+                GROUP BY dato
+            """, dato_liste).fetchall()
+            kasse_map = {r['dato']: int(r['antal'] or 0) for r in kasse_rows}
+
+            # ── TGTG per dato (D+1 offset) ────────────────────────────────────
+            # Produktionsdag D → tgtg_dagssalg.dato = D+1
+            tgtg_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
+            tgtg_rows = conn.execute(f"""
+                SELECT dato, SUM(antal) AS antal
+                FROM tgtg_dagssalg
+                WHERE dato IN ({placeholders})
+                GROUP BY dato
+            """, tgtg_datoer).fetchall()
+            # Map: produktionsdato → tgtg antal
+            tgtg_map = {}
+            for r in tgtg_rows:
+                prod_dato = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
+                tgtg_map[prod_dato] = int(r['antal'] or 0)
+
+            # ── KW kombos per dato ────────────────────────────────────────────
+            # COUNT(DISTINCT bon_nr) på boner der har BÅDE kaffe og wiener
+            kw_rows = conn.execute(f"""
+                SELECT dato, COUNT(DISTINCT bon_nr) AS kw_antal
+                FROM transaktioner
+                WHERE dato IN ({placeholders})
+                  AND bon_nr != ''
+                  AND bon_nr IN (
+                      SELECT bon_nr FROM transaktioner
+                      WHERE dato IN ({placeholders}) AND ({_KAFFE_LIKE})
+                  )
+                  AND bon_nr IN (
+                      SELECT bon_nr FROM transaktioner
+                      WHERE dato IN ({placeholders}) AND ({_WIENER_LIKE})
+                  )
+                GROUP BY dato
+            """, dato_liste + dato_liste + dato_liste).fetchall()
+            kw_map = {r['dato']: int(r['kw_antal'] or 0) for r in kw_rows}
+
+            # ── Kategori-fordeling kassesalg denne uge ────────────────────────
+            kat_rows = conn.execute(f"""
+                SELECT
+                    COALESCE(NULLIF(kategori,''), 'Ukendt') AS kat,
+                    ROUND(SUM(antal), 0) AS kassesalg,
+                    ROUND(SUM(omsætning), 2) AS omsaetning
+                FROM transaktioner
+                WHERE dato IN ({placeholders})
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                  )
+                GROUP BY kat
+                ORDER BY kassesalg DESC
+            """, dato_liste).fetchall()
+            kategorier = [dict(r) for r in kat_rows]
+
+            # ── Historiske snit: seneste 4 uger per ugedag ────────────────────
+            # Beregn de 4 foregående uger (ekskl. indeværende)
+            hist_bestil: Dict[str, list] = {d: [] for d in dag_navne}
+            hist_svind_pct: Dict[str, list] = {d: [] for d in dag_navne}
+
+            for w in range(1, 5):
+                h_uge = uge - w
+                h_aar = aar
+                while h_uge < 1:
+                    h_uge += 52
+                    h_aar -= 1
+                h_jan4 = _date(h_aar, 1, 4)
+                h_man = h_jan4 - timedelta(days=h_jan4.weekday()) + timedelta(weeks=h_uge - 1)
+                h_datoer = [(h_man + timedelta(days=i)).isoformat() for i in range(7)]
+
+                h_bestil = conn.execute("""
+                    SELECT
+                        SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
+                        SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
+                        SUM(son) AS son
+                    FROM ugebestillinger
+                    WHERE uge = ? AND aar = ?
+                """, (h_uge, h_aar)).fetchone()
+                if not h_bestil:
+                    continue
+
+                h_kasse_rows = conn.execute(f"""
+                    SELECT dato, ROUND(SUM(antal), 0) AS antal
+                    FROM transaktioner
+                    WHERE dato IN ({placeholders})
+                      AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                          SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                          FROM ugebestillinger
+                          WHERE varenummer != '' AND varenummer != '0'
+                      )
+                    GROUP BY dato
+                """, h_datoer).fetchall()
+                h_kasse_map = {r['dato']: int(r['antal'] or 0) for r in h_kasse_rows}
+
+                h_tgtg_datoer = [(_date.fromisoformat(d) + timedelta(days=1)).isoformat() for d in h_datoer]
+                h_tgtg_rows = conn.execute(f"""
+                    SELECT dato, SUM(antal) AS antal
+                    FROM tgtg_dagssalg
+                    WHERE dato IN ({placeholders})
+                    GROUP BY dato
+                """, h_tgtg_datoer).fetchall()
+                h_tgtg_map = {}
+                for r in h_tgtg_rows:
+                    prod_d = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
+                    h_tgtg_map[prod_d] = int(r['antal'] or 0)
+
+                for i, dag in enumerate(dag_navne):
+                    b = int(h_bestil[dag] or 0)
+                    if b <= 0:
+                        continue
+                    dato_str = h_datoer[i]
+                    k = h_kasse_map.get(dato_str, 0)
+                    t = h_tgtg_map.get(dato_str, 0)
+                    eff = k + t
+                    svind = max(0, b - eff)
+                    sp = round(svind / b * 100, 1)
+                    hist_bestil[dag].append(b)
+                    hist_svind_pct[dag].append(sp)
+
+    except Exception as e:
+        return {"error": str(e), "uge": uge, "aar": aar}
+
+    # ── Byg dage ─────────────────────────────────────────────────────────────
+    dage = []
+    total_bestilt    = 0
+    total_kassesalg  = 0
+    total_tgtg       = 0
+    total_kw         = 0
+    total_effektivt  = 0
+    total_svind      = 0
+
+    for i, dag in enumerate(dag_navne):
+        dato_str = datoer[i].isoformat()
+        bestilt  = bestil_per_dag.get(dag, 0)
+        kassesalg = kasse_map.get(dato_str, 0)
+        tgtg      = tgtg_map.get(dato_str, 0)
+        kw        = kw_map.get(dato_str, 0)
+
+        effektivt = kassesalg + tgtg
+        svind     = max(0, bestilt - effektivt) if bestilt > 0 else None
+        svind_pct = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
+
+        avg_bestilt = round(sum(hist_bestil[dag]) / len(hist_bestil[dag]), 1) if hist_bestil[dag] else None
+        avg_svind_pct = round(sum(hist_svind_pct[dag]) / len(hist_svind_pct[dag]), 1) if hist_svind_pct[dag] else None
+
+        har_data = bestilt > 0 or kassesalg > 0
+
+        if har_data:
+            total_bestilt   += bestilt
+            total_kassesalg += kassesalg
+            total_tgtg      += tgtg
+            total_kw        += kw
+            total_effektivt += effektivt
+            if svind is not None:
+                total_svind += svind
+
+        dage.append({
+            'dag':              dag,
+            'dag_label':        dag_labels[i],
+            'dato':             dato_str,
+            'bestilt':          bestilt,
+            'kassesalg':        kassesalg,
+            'tgtg':             tgtg,
+            'kw':               kw,
+            'effektivt':        effektivt,
+            'svind':            svind,
+            'svind_pct':        svind_pct,
+            'har_data':         har_data,
+            'avg_bestilt_4u':   avg_bestilt,
+            'avg_svind_pct_4u': avg_svind_pct,
+        })
+
+    total_svind_pct = round(total_svind / total_bestilt * 100, 1) if total_bestilt > 0 else None
+
+    # ── Anbefalinger ─────────────────────────────────────────────────────────
+    anbefalinger = []
+    for dag_d in dage:
+        if not dag_d['har_data'] or dag_d['bestilt'] <= 0:
+            continue
+        dag_lbl = dag_d['dag_label']
+        sp      = dag_d['svind_pct']
+        svind_n = dag_d['svind'] or 0
+        bestilt = dag_d['bestilt']
+        avg_sp  = dag_d['avg_svind_pct_4u']
+        avg_b   = dag_d['avg_bestilt_4u']
+
+        if sp is not None and sp > 35:
+            anbefalinger.append({
+                'type': 'advarsel',
+                'dag': dag_lbl,
+                'prioritet': 1,
+                'besked': f'Høj spild — reducer bestilling {dag_lbl} med ~{round(svind_n * 0.6)} stk',
+            })
+        elif sp is not None and sp > 20:
+            anbefalinger.append({
+                'type': 'advarsel',
+                'dag': dag_lbl,
+                'prioritet': 2,
+                'besked': f'Forhøjet spild — overvej at reducere med ~{round(svind_n * 0.4)} stk',
+            })
+
+        if sp is not None and sp < 5 and bestilt > 8:
+            anbefalinger.append({
+                'type': 'mulighed',
+                'dag': dag_lbl,
+                'prioritet': 2,
+                'besked': f'Lav spild — tjek om du sælger ud for tidligt',
+            })
+
+        if avg_b is not None and avg_b > 0 and bestilt > avg_b * 1.25:
+            pct = round(bestilt / avg_b * 100 - 100)
+            anbefalinger.append({
+                'type': 'info',
+                'dag': dag_lbl,
+                'prioritet': 3,
+                'besked': f'Bestilling {pct}% over historisk snit',
+            })
+
+        if sp is not None and avg_sp is not None and sp > avg_sp + 15:
+            anbefalinger.append({
+                'type': 'advarsel',
+                'dag': dag_lbl,
+                'prioritet': 2,
+                'besked': f'Spild højere end normalt for denne dag ({sp}% vs snit {avg_sp}%)',
+            })
+
+    anbefalinger.sort(key=lambda x: -x['prioritet'])
+
+    return {
+        'uge':              uge,
+        'aar':              aar,
+        'dato_start':       dato_start,
+        'dato_slut':        dato_slut,
+        'dage':             dage,
+        'kategorier':       kategorier,
+        'total_bestilt':    total_bestilt,
+        'total_kassesalg':  total_kassesalg,
+        'total_tgtg':       total_tgtg,
+        'total_kw':         total_kw,
+        'total_effektivt':  total_effektivt,
+        'total_svind':      total_svind,
+        'total_svind_pct':  total_svind_pct,
+        'anbefalinger':     anbefalinger,
+        'prev_uge':         prev_uge,
+        'prev_aar':         prev_aar,
+        'next_uge':         next_uge,
+        'next_aar':         next_aar,
+    }
+
+
 # ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
 
 _SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,

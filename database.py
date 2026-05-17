@@ -1760,6 +1760,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     dage = []
     total_bestilt    = 0
     total_kassesalg  = 0
+    total_rester     = 0
     total_tgtg       = 0
     total_tgtg_poser = 0
     total_kw         = 0
@@ -1778,11 +1779,16 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         retur_mulig = retur_per_dag.get(dag, 0)
         tgtg_poser_dag = tgtg_poser_map.get(dato_str, 0)
 
+        # Rester = hvad der er tilovers ved lukketid inden TGTG sælger næste dag
+        # KW tælles ikke fra — wienerbrød er allerede i kassesalg
+        rester = max(0, bestilt - kassesalg - kbmo) if bestilt > 0 else 0
+
         effektivt   = kassesalg + tgtg + kbmo
         # Retur kan højst være det der faktisk er til overs efter salg
         retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
         svind       = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
         svind_pct   = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
+        rester_pct  = round(rester / bestilt * 100, 1) if bestilt > 0 else None
 
         avg_bestilt = round(sum(hist_bestil[dag]) / len(hist_bestil[dag]), 1) if hist_bestil[dag] else None
         avg_svind_pct = round(sum(hist_svind_pct[dag]) / len(hist_svind_pct[dag]), 1) if hist_svind_pct[dag] else None
@@ -1792,6 +1798,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         if har_data:
             total_bestilt      += bestilt
             total_kassesalg    += kassesalg
+            total_rester       += rester
             total_tgtg         += tgtg
             total_tgtg_poser   += tgtg_poser_dag
             total_kw           += kw
@@ -1807,10 +1814,12 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'dato':             dato_str,
             'bestilt':          bestilt,
             'kassesalg':        kassesalg,
-            'tgtg':             tgtg,
-            'tgtg_poser':       tgtg_poser_dag,
             'kw':               kw,
             'kbmo':             kbmo,
+            'rester':           rester,
+            'rester_pct':       rester_pct,
+            'tgtg':             tgtg,
+            'tgtg_poser':       tgtg_poser_dag,
             'retur_mulig':      retur_mulig,
             'effektivt':        effektivt,
             'svind':            svind,
@@ -1820,7 +1829,8 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'avg_svind_pct_4u': avg_svind_pct,
         })
 
-    total_svind_pct = round(total_svind / total_bestilt * 100, 1) if total_bestilt > 0 else None
+    total_svind_pct  = round(total_svind  / total_bestilt * 100, 1) if total_bestilt > 0 else None
+    total_rester_pct = round(total_rester / total_bestilt * 100, 1) if total_bestilt > 0 else None
 
     # ── Anbefalinger ─────────────────────────────────────────────────────────
     anbefalinger = []
@@ -1885,6 +1895,8 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'kategorier':       kategorier,
         'total_bestilt':    total_bestilt,
         'total_kassesalg':  total_kassesalg,
+        'total_rester':     total_rester,
+        'total_rester_pct': total_rester_pct,
         'total_tgtg':       total_tgtg,
         'total_tgtg_poser': total_tgtg_poser,
         'total_kw':         total_kw,

@@ -1148,7 +1148,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </tr>
             </thead>
             <tbody id="dag-tbl-body">
-              <tr><td colspan="11" class="empty">Vælg en uge med bestillingsdata</td></tr>
+              <tr><td colspan="12" class="empty">Vælg en uge med bestillingsdata</td></tr>
             </tbody>
           </table>
         </div>
@@ -1434,7 +1434,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- KPI-chips -->
-        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;" id="spild-kpi-row">
+        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;" id="spild-kpi-row">
           <div class="card" style="padding:14px 16px;text-align:center;">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">BESTILT</div>
             <div id="spild-k-bestilt" style="font-size:24px;font-weight:700;color:var(--ink);">—</div>
@@ -1444,6 +1444,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">KASSESALG</div>
             <div id="spild-k-kasse" style="font-size:24px;font-weight:700;color:var(--forest);">—</div>
             <div id="spild-k-kasse-pct" style="font-size:11px;color:var(--ash);">stk</div>
+          </div>
+          <div class="card" style="padding:14px 16px;text-align:center;border-left:3px solid #e67e22;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">RESTER</div>
+            <div id="spild-k-rester" style="font-size:24px;font-weight:700;color:#e67e22;">—</div>
+            <div id="spild-k-rester-sub" style="font-size:11px;color:var(--ash);">ved lukketid</div>
           </div>
           <div class="card" style="padding:14px 16px;text-align:center;">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">TGTG</div>
@@ -1473,6 +1478,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KASSESALG</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Wienerbrød kombo">KW</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Bolle med Ost kombo">KBMO</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:#e67e22;" title="Rester ved lukketid inden TGTG sælger næste dag">RESTER</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">TGTG</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">EFFEKTIVT</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:#6b9e6b;" title="Kan returneres til bageren (boller 10%, wienerbrød 13,5%)">RETUR</th>
@@ -1482,7 +1488,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </tr>
             </thead>
             <tbody id="spild-dag-tbody">
-              <tr><td colspan="11" class="empty">Vælg en uge…</td></tr>
+              <tr><td colspan="12" class="empty">Vælg en uge…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4028,7 +4034,7 @@ async function _loadDagUge(uge, aar) {
   if (!d || !d.produkter || !d.produkter.length) {
     document.getElementById('dag-dato-range').textContent = '';
     document.getElementById('dag-tbl-body').innerHTML =
-      '<tr><td colspan="11" class="empty">Ingen bestillingsdata for uge ' + uge + ' · ' + aar + '</td></tr>';
+      '<tr><td colspan="12" class="empty">Ingen bestillingsdata for uge ' + uge + ' · ' + aar + '</td></tr>';
     return;
   }
 
@@ -4508,14 +4514,14 @@ async function _spildHent(uge, aar) {
   _spildUge = uge; _spildAar = aar;
   const MONO = "font-family:'DM Mono',monospace;";
   document.getElementById('spild-uge-lbl').textContent = `Uge ${uge} · ${aar}`;
-  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="11" class="empty">Henter…</td></tr>';
+  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="12" class="empty">Henter…</td></tr>';
 
   let d;
   try {
     const r = await fetch(`/api/spild/dagsniveau?uge=${uge}&aar=${aar}`);
     d = await r.json();
   } catch(e) {
-    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="11" class="empty">Fejl ved hentning</td></tr>';
+    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="12" class="empty">Fejl ved hentning</td></tr>';
     return;
   }
 
@@ -4533,6 +4539,11 @@ async function _spildHent(uge, aar) {
   document.getElementById('spild-k-tgtg').textContent    = (d.total_tgtg||0).toLocaleString('da-DK');
   document.getElementById('spild-k-tgtg-sub').textContent = d.total_tgtg_poser > 0
     ? `${d.total_tgtg_poser} poser` : 'poser';
+
+  const totalRester = d.total_rester || 0;
+  document.getElementById('spild-k-rester').textContent = totalRester.toLocaleString('da-DK');
+  document.getElementById('spild-k-rester-sub').textContent = d.total_rester_pct != null
+    ? `${d.total_rester_pct.toFixed(1)} % ved lukketid` : 'ved lukketid';
 
   const totalRetur = d.total_retur || 0;
   document.getElementById('spild-k-retur').textContent = totalRetur.toLocaleString('da-DK');
@@ -4564,7 +4575,7 @@ async function _spildHent(uge, aar) {
 
   const tbody = document.getElementById('spild-dag-tbody');
   if (!d.dage || !d.dage.length) {
-    tbody.innerHTML = '<tr><td colspan="11" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="12" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
   } else {
     let rows = '';
     for (const dag of d.dage) {
@@ -4602,6 +4613,7 @@ async function _spildHent(uge, aar) {
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--forest);">${dag.kassesalg > 0 ? dag.kassesalg : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kwTxt}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kbmoTxt}</td>
+        <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${dag.rester > 0 ? '#e67e22' : 'var(--ash)'};" title="Rester ved lukketid: ${dag.rester_pct != null ? dag.rester_pct+'%' : '—'}">${dag.rester > 0 ? dag.rester : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? `${dag.tgtg}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${dag.tgtg_poser}p)</span>` : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:#6b9e6b;" title="Kan returneres til bageren">${dag.retur_mulig > 0 ? dag.retur_mulig : '<span style="color:var(--ash);">0</span>'}</td>
@@ -4618,6 +4630,7 @@ async function _spildHent(uge, aar) {
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--forest);">${d.total_kassesalg||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kw||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kbmo||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:#e67e22;">${d.total_rester||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${d.total_tgtg_poser||0}p)</span></td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_effektivt||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:#6b9e6b;">${d.total_retur||0}</td>
@@ -4627,7 +4640,7 @@ async function _spildHent(uge, aar) {
       </td>
       <td></td>
     </tr>`;
-    tbody.innerHTML = rows || '<tr><td colspan="11" class="empty">Ingen dage med bestillingsdata</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="12" class="empty">Ingen dage med bestillingsdata</td></tr>';
   }
 
   // Kategori-fordeling
@@ -4913,7 +4926,7 @@ async function loadBernUge(uge, aar) {
             <th class="num">Kr/stk</th>
             <th class="num">Kr total</th>
           </tr></thead>
-          <tbody>${bodyRows || '<tr><td colspan="11" class="empty">Ingen produkter — kør bestilling_sync.py</td></tr>'}</tbody>
+          <tbody>${bodyRows || '<tr><td colspan="12" class="empty">Ingen produkter — kør bestilling_sync.py</td></tr>'}</tbody>
           <tfoot><tr><td>I alt</td>${footDage}
             <td class="num" style="font-weight:700;">${d.total_stk.toLocaleString('da-DK')}</td>
             <td class="num">—</td>

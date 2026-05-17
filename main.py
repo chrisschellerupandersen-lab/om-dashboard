@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import FastAPI, Request, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 import database
@@ -15,6 +16,17 @@ import parser as xlsx_parser
 
 app = FastAPI(title="Organic Market Dashboard")
 templates = Jinja2Templates(directory="templates")
+
+# CORS: tillad kald fra TGTG Store Portal (til browser-baseret sync)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://store.toogoodtogo.com",
+        "https://om-dashboard-production-0f3a.up.railway.app",
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+)
 
 SECRET_KEY        = os.environ.get("SECRET_KEY",         "skift-mig-i-railway-variables")
 WEBHOOK_SECRET    = os.environ.get("WEBHOOK_SECRET",     "OM-Greve-2026-Hemlig")

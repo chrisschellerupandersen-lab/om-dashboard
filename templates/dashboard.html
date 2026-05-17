@@ -1309,6 +1309,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </tbody>
           </table>
         </div>
+
+        <!-- Pose-definitioner -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Pose-definitioner · beregningsgrundlag</span></div>
+          <div id="tgtg-pose-def-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:4px 0 8px;">
+            <div class="empty" style="grid-column:1/-1;">Indlæser…</div>
+          </div>
+        </div>
       </div>
 
       <!-- SVIND & ØKONOMI -->
@@ -4232,6 +4240,61 @@ async function loadTgtg() {
         <td></td>
       </tr>`
     : '<tr><td colspan="6" class="empty">Ingen data endnu</td></tr>';
+
+  // Pose-definitioner
+  const POSE_INDHOLD = {
+    'Brødposen ( Økologisk)':  { indhold: [['Brød', 2, 24.00], ['Boller', 3, 6.40]], emoji: '🍞' },
+    'Lykkepose ( Økologisk)':  { indhold: [['Brød', 1, 24.00], ['Boller', 3, 6.40], ['Wienerbrød', 2, 12.00]], emoji: '🌟' },
+    'Wienerbrødsposen':        { indhold: [['Wienerbrød', 6, 12.00]], emoji: '🥐' },
+    'Kagepose':                { indhold: [['Kager', 6, 15.30]], emoji: '🎂' },
+    '4x Fatelavnsboller':      { indhold: [['Fatelavnsboller', 4, null]], emoji: '🎭' },
+  };
+
+  const grid = document.getElementById('tgtg-pose-def-grid');
+  const poserData = (d.poser || []);
+  if (!poserData.length) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">Ingen pose-definitioner</div>';
+  } else {
+    grid.innerHTML = poserData.map(p => {
+      const def = POSE_INDHOLD[p.navn] || { indhold: [], emoji: '📦' };
+      const kp  = p.kostpris_pose || 0;
+      const margin = kp > 0 ? ((p.kreditpris - kp) / kp * 100).toFixed(1) : null;
+      const marginClr = margin == null ? 'var(--ash)' : margin >= 0 ? 'var(--moss)' : margin > -35 ? '#e67e22' : '#c0392b';
+      const indholdRkr = def.indhold.map(([vare, antal, pris]) =>
+        `<tr>
+          <td style="padding:2px 0;font-size:12px;color:var(--ink);">${antal} × ${vare}</td>
+          <td style="padding:2px 0;font-size:11px;color:var(--ash);text-align:right;${mono}">${pris != null ? (antal * pris).toFixed(2) + ' kr' : '—'}</td>
+        </tr>`
+      ).join('');
+      return `
+        <div style="background:rgba(30,58,30,.03);border:1px solid rgba(30,58,30,.1);border-radius:10px;padding:14px 16px;">
+          <div style="font-size:15px;font-weight:600;color:var(--forest);margin-bottom:10px;">${def.emoji} ${p.navn}</div>
+          <table style="width:100%;border-collapse:collapse;margin-bottom:10px;">
+            <thead>
+              <tr style="border-bottom:1px solid rgba(30,58,30,.1);">
+                <th style="text-align:left;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);padding-bottom:4px;">INDHOLD</th>
+                <th style="text-align:right;${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);padding-bottom:4px;">KOST</th>
+              </tr>
+            </thead>
+            <tbody>${indholdRkr}</tbody>
+          </table>
+          <div style="border-top:1px solid rgba(30,58,30,.1);padding-top:8px;display:flex;flex-direction:column;gap:4px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">KOSTPRIS</span>
+              <span style="${mono}font-size:13px;font-weight:600;color:var(--ink);">${kp > 0 ? kp.toFixed(2) + ' kr' : '—'}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <span style="${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">KREDITPRIS (TGTG)</span>
+              <span style="${mono}font-size:13px;font-weight:600;color:var(--forest);">${p.kreditpris.toFixed(2)} kr</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px;">
+              <span style="${mono}font-size:9px;letter-spacing:.07em;color:var(--ash);">MARGIN</span>
+              <span style="${mono}font-size:13px;font-weight:700;color:${marginClr};">${margin != null ? (margin > 0 ? '+' : '') + margin + ' %' : '—'}</span>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  }
 }
 
 

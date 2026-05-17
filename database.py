@@ -1522,6 +1522,17 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "LOWER(varenavn) LIKE '%bolle%ost%' OR LOWER(varenavn) LIKE '%ost%bolle%' "
         "OR LOWER(varenavn) LIKE '%bolle m.%ost%' OR LOWER(varenavn) LIKE '%bmo%'"
     )
+    # Returprocenter — hvad der KAN sendes retur til bageren hvis ikke solgt
+    RETUR_BOLLER_PCT  = 0.10
+    RETUR_WIENER_PCT  = 0.135
+    # Varenavn-match i bestillinger (ikke transaktioner)
+    _BOLLE_BESTIL = (
+        "LOWER(varenavn) LIKE '%boller%' OR LOWER(varenavn) LIKE '%bolle%'"
+    )
+    _WIENER_BESTIL = (
+        "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
+        "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
+    )
 
     try:
         with _conn() as conn:
@@ -1540,6 +1551,31 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             if bestil_rows:
                 for dag in dag_navne:
                     bestil_per_dag[dag] = int(bestil_rows[dag] or 0)
+
+            # ── Retur-mulig per dag: boller 10%, wienerbrød 13,5% ─────────────
+            bestil_boller_row = conn.execute(f"""
+                SELECT
+                    SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
+                    SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
+                    SUM(son) AS son
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
+                  AND ({_BOLLE_BESTIL})
+            """, (uge, aar)).fetchone()
+            bestil_wiener_row = conn.execute(f"""
+                SELECT
+                    SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
+                    SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
+                    SUM(son) AS son
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
+                  AND ({_WIENER_BESTIL})
+            """, (uge, aar)).fetchone()
+            retur_per_dag = {}
+            for dag in dag_navne:
+                b_b = float(bestil_boller_row[dag] or 0) if bestil_boller_row else 0.0
+                b_w = float(bestil_wiener_row[dag] or 0) if bestil_wiener_row else 0.0
+                retur_per_dag[dag] = int(round(b_b * RETUR_BOLLER_PCT + b_w * RETUR_WIENER_PCT))
 
             # ── Kassesalg per dato ────────────────────────────────────────────
             # Matcher varenumre fra bestillinger (ekskl. kaffe/drikkevarer)
@@ -1703,6 +1739,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     total_kw         = 0
     total_kbmo       = 0
     total_effektivt  = 0
+    total_retur      = 0
     total_svind      = 0
 
     for i, dag in enumerate(dag_navne):
@@ -1710,11 +1747,12 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         bestilt  = bestil_per_dag.get(dag, 0)
         kassesalg = kasse_map.get(dato_str, 0)
         tgtg      = tgtg_map.get(dato_str, 0)
-        kw        = kw_map.get(dato_str, 0)
-        kbmo      = kbmo_map.get(dato_str, 0)
+        kw          = kw_map.get(dato_str, 0)
+        kbmo        = kbmo_map.get(dato_str, 0)
+        retur_mulig = retur_per_dag.get(dag, 0)
 
         effektivt = kassesalg + tgtg + kbmo
-        svind     = max(0, bestilt - effektivt) if bestilt > 0 else None
+        svind     = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
         svind_pct = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
 
         avg_bestilt = round(sum(hist_bestil[dag]) / len(hist_bestil[dag]), 1) if hist_bestil[dag] else None
@@ -1729,6 +1767,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             total_kw        += kw
             total_kbmo      += kbmo
             total_effektivt += effektivt
+            total_retur     += retur_mulig
             if svind is not None:
                 total_svind += svind
 
@@ -1741,6 +1780,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'tgtg':             tgtg,
             'kw':               kw,
             'kbmo':             kbmo,
+            'retur_mulig':      retur_mulig,
             'effektivt':        effektivt,
             'svind':            svind,
             'svind_pct':        svind_pct,
@@ -1818,6 +1858,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'total_kw':         total_kw,
         'total_kbmo':       total_kbmo,
         'total_effektivt':  total_effektivt,
+        'total_retur':      total_retur,
         'total_svind':      total_svind,
         'total_svind_pct':  total_svind_pct,
         'anbefalinger':     anbefalinger,

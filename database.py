@@ -208,6 +208,21 @@ def init_db():
         # (disse forstyrrer VF-beregningen — Shopbox' kostpris bruges i stedet)
         conn.execute("DELETE FROM varestamdata WHERE LOWER(varenavn) LIKE 'øko - %'")
 
+        # Seed: sæt korrekte enheder_per_pose på kendte TGTG-pose-typer
+        # Kører altid så eksisterende rækker opdateres uden at vente på næste sync
+        _TGTG_ENHEDER = [
+            ("206880476083086176", 6),  # Lykkepose: 1 brød + 3 boller + 2 wienerbrød
+            ("206881838829236480", 5),  # Brødposen: 2 brød + 3 boller
+            ("206882511213524800", 6),  # Wienerbrødsposen: 6 wienerbrød
+            ("210383102918979712", 4),  # 4x Fatelavnsboller
+            ("210383866617850400", 6),  # Kagepose: 6 kager
+        ]
+        for item_id, enheder in _TGTG_ENHEDER:
+            conn.execute(
+                "UPDATE tgtg_poser SET enheder_per_pose=? WHERE item_id=?",
+                (enheder, item_id)
+            )
+
 
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
     with _conn() as conn:

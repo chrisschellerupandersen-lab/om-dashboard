@@ -91,12 +91,13 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS tgtg_poser (
-                id             INTEGER PRIMARY KEY AUTOINCREMENT,
-                item_id        TEXT    DEFAULT '',
-                navn           TEXT    NOT NULL,
-                kreditpris     REAL    NOT NULL DEFAULT 0,
-                kostpris_pose  REAL    DEFAULT 0,
-                aktiv          INTEGER DEFAULT 1,
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                item_id           TEXT    DEFAULT '',
+                navn              TEXT    NOT NULL,
+                kreditpris        REAL    NOT NULL DEFAULT 0,
+                kostpris_pose     REAL    DEFAULT 0,
+                enheder_per_pose  INTEGER DEFAULT 1,
+                aktiv             INTEGER DEFAULT 1,
                 UNIQUE(navn) ON CONFLICT REPLACE
             );
 
@@ -197,6 +198,7 @@ def init_db():
             "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
             "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
             "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
+            "ALTER TABLE tgtg_poser ADD COLUMN enheder_per_pose INTEGER DEFAULT 1",
         ]:
             try:
                 conn.execute(sql)
@@ -1168,21 +1170,24 @@ def gem_bager_regnskab(linjer: List[Dict]) -> int:
 
 
 def gem_tgtg_poser(poser: List[Dict]) -> int:
-    """Gem/opdater pose-definitioner (navn, kreditpris, kostpris_pose, item_id)."""
+    """Gem/opdater pose-definitioner (navn, kreditpris, kostpris_pose, enheder_per_pose, item_id)."""
     with _conn() as conn:
         for p in poser:
             conn.execute("""
-                INSERT INTO tgtg_poser (item_id, navn, kreditpris, kostpris_pose, aktiv)
-                VALUES (?,?,?,?,1)
+                INSERT INTO tgtg_poser (item_id, navn, kreditpris, kostpris_pose, enheder_per_pose, aktiv)
+                VALUES (?,?,?,?,?,1)
                 ON CONFLICT(navn) DO UPDATE SET
                     item_id=excluded.item_id,
                     kreditpris=excluded.kreditpris,
                     kostpris_pose=CASE WHEN excluded.kostpris_pose > 0
                                        THEN excluded.kostpris_pose
                                        ELSE tgtg_poser.kostpris_pose END,
+                    enheder_per_pose=CASE WHEN excluded.enheder_per_pose > 0
+                                          THEN excluded.enheder_per_pose
+                                          ELSE tgtg_poser.enheder_per_pose END,
                     aktiv=1
             """, (p.get("item_id",""), p["navn"], p["kreditpris"],
-                  p.get("kostpris_pose", 0)))
+                  p.get("kostpris_pose", 0), p.get("enheder_per_pose", 1)))
     return len(poser)
 
 
@@ -1594,20 +1599,25 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste).fetchall()
             kasse_map = {r['dato']: int(r['antal'] or 0) for r in kasse_rows}
 
-            # ── TGTG per dato (D+1 offset) ────────────────────────────────────
+            # ── TGTG per dato (D+1 offset) — i stk (antal × enheder_per_pose) ──
             # Produktionsdag D → tgtg_dagssalg.dato = D+1
             tgtg_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
             tgtg_rows = conn.execute(f"""
-                SELECT dato, SUM(antal) AS antal
-                FROM tgtg_dagssalg
-                WHERE dato IN ({placeholders})
-                GROUP BY dato
+                SELECT ds.dato,
+                       SUM(ds.antal) AS poser,
+                       SUM(ds.antal * COALESCE(tp.enheder_per_pose, 1)) AS stk
+                FROM tgtg_dagssalg ds
+                LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
+                WHERE ds.dato IN ({placeholders})
+                GROUP BY ds.dato
             """, tgtg_datoer).fetchall()
-            # Map: produktionsdato → tgtg antal
-            tgtg_map = {}
+            # Map: produktionsdato → {poser, stk}
+            tgtg_map  = {}  # stk (til spildberegning)
+            tgtg_poser_map = {}  # antal poser (til visning)
             for r in tgtg_rows:
                 prod_dato = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
-                tgtg_map[prod_dato] = int(r['antal'] or 0)
+                tgtg_map[prod_dato]       = int(r['stk']   or 0)
+                tgtg_poser_map[prod_dato] = int(r['poser'] or 0)
 
             # ── KW kombos per dato ────────────────────────────────────────────
             # COUNT(DISTINCT bon_nr) på boner der har BÅDE kaffe og wiener
@@ -1736,6 +1746,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     total_bestilt    = 0
     total_kassesalg  = 0
     total_tgtg       = 0
+    total_tgtg_poser = 0
     total_kw         = 0
     total_kbmo       = 0
     total_effektivt  = 0
@@ -1750,6 +1761,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         kw          = kw_map.get(dato_str, 0)
         kbmo        = kbmo_map.get(dato_str, 0)
         retur_mulig = retur_per_dag.get(dag, 0)
+        tgtg_poser_dag = tgtg_poser_map.get(dato_str, 0)
 
         effektivt = kassesalg + tgtg + kbmo
         svind     = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
@@ -1761,13 +1773,14 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         har_data = bestilt > 0 or kassesalg > 0
 
         if har_data:
-            total_bestilt   += bestilt
-            total_kassesalg += kassesalg
-            total_tgtg      += tgtg
-            total_kw        += kw
-            total_kbmo      += kbmo
-            total_effektivt += effektivt
-            total_retur     += retur_mulig
+            total_bestilt      += bestilt
+            total_kassesalg    += kassesalg
+            total_tgtg         += tgtg
+            total_tgtg_poser   += tgtg_poser_dag
+            total_kw           += kw
+            total_kbmo         += kbmo
+            total_effektivt    += effektivt
+            total_retur        += retur_mulig
             if svind is not None:
                 total_svind += svind
 
@@ -1778,6 +1791,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'bestilt':          bestilt,
             'kassesalg':        kassesalg,
             'tgtg':             tgtg,
+            'tgtg_poser':       tgtg_poser_dag,
             'kw':               kw,
             'kbmo':             kbmo,
             'retur_mulig':      retur_mulig,
@@ -1855,6 +1869,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'total_bestilt':    total_bestilt,
         'total_kassesalg':  total_kassesalg,
         'total_tgtg':       total_tgtg,
+        'total_tgtg_poser': total_tgtg_poser,
         'total_kw':         total_kw,
         'total_kbmo':       total_kbmo,
         'total_effektivt':  total_effektivt,

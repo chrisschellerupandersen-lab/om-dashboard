@@ -1448,7 +1448,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div class="card" style="padding:14px 16px;text-align:center;">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">TGTG</div>
             <div id="spild-k-tgtg" style="font-size:24px;font-weight:700;color:var(--moss);">—</div>
-            <div style="font-size:11px;color:var(--ash);">poser</div>
+            <div id="spild-k-tgtg-sub" style="font-size:11px;color:var(--ash);">poser</div>
           </div>
           <div class="card" style="padding:14px 16px;text-align:center;border-left:3px solid var(--danger);" id="spild-k-spild-card">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">SPILD</div>
@@ -4526,6 +4526,8 @@ async function _spildHent(uge, aar) {
   document.getElementById('spild-k-kasse-pct').textContent = d.total_bestilt > 0
     ? `${Math.round(d.total_kassesalg/d.total_bestilt*100)} % af bestilt` : 'stk';
   document.getElementById('spild-k-tgtg').textContent    = (d.total_tgtg||0).toLocaleString('da-DK');
+  document.getElementById('spild-k-tgtg-sub').textContent = d.total_tgtg_poser > 0
+    ? `${d.total_tgtg_poser} poser` : 'poser';
 
   const spildPct = d.total_svind_pct;
   const spildClr = spildPct == null ? 'var(--ink)' : spildPct > 35 ? '#c0392b' : spildPct > 20 ? '#e67e22' : spildPct > 10 ? '#f39c12' : 'var(--moss)';
@@ -4590,7 +4592,7 @@ async function _spildHent(uge, aar) {
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--forest);">${dag.kassesalg > 0 ? dag.kassesalg : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kwTxt}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kbmoTxt}</td>
-        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? dag.tgtg : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? `${dag.tgtg}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${dag.tgtg_poser}p)</span>` : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:#6b9e6b;" title="Kan returneres til bageren">${dag.retur_mulig > 0 ? dag.retur_mulig : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
@@ -4606,7 +4608,7 @@ async function _spildHent(uge, aar) {
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--forest);">${d.total_kassesalg||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kw||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kbmo||0}</td>
-      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${d.total_tgtg_poser||0}p)</span></td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_effektivt||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:#6b9e6b;">${d.total_retur||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:${spildClr};">${d.total_svind||0}</td>

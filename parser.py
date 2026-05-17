@@ -257,8 +257,93 @@ def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
     return _parse_rækker_generisk(alle_rækker)
 
 
+def _fix_bundle_split(transaktioner: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Shopbox eksporterer menu-bundles på to måder:
+      1) Én komponent får hele bundle-prisen, resten får 0 kr
+      2) Komponenter får deres detailpris, én komponent får negativt restbeløb
+
+    For type 1: fordel total bon-omsætning proportionalt efter kostpris.
+    For type 2: find mindste gruppe (inkl. negativ vare) der summerer til
+                positivt heltal → fordel kun den gruppe. Andre varer rører vi ikke.
+    """
+    from collections import defaultdict
+    from itertools import combinations
+
+    def er_hel(v: float, tol: float = 0.02) -> bool:
+        return v > 0 and abs(v - round(v)) < tol
+
+    def find_bundle(neg_item: Dict, kandidater: List[Dict]) -> List[Dict] | None:
+        for size in range(len(kandidater) + 1):
+            for subset in combinations(kandidater, size):
+                total = neg_item["omsætning"] + sum(t["omsætning"] for t in subset)
+                if er_hel(total):
+                    return [neg_item] + list(subset)
+        return None
+
+    def fordel(gruppe: List[Dict]) -> List[Dict]:
+        total_oms  = sum(t["omsætning"] for t in gruppe)
+        total_kost = sum(t["kostpris"]  for t in gruppe)
+        if total_kost <= 0 or total_oms <= 0:
+            return gruppe
+        return [{**t, "omsætning": round(total_oms * t["kostpris"] / total_kost, 2)}
+                for t in gruppe]
+
+    grupper: dict = defaultdict(list)
+    ingen_bon: list = []
+    for t in transaktioner:
+        if t.get("bon_nr"):
+            grupper[(t["dato"], t["bon_nr"])].append(t)
+        else:
+            ingen_bon.append(t)
+
+    resultat = list(ingen_bon)
+
+    for gruppe in grupper.values():
+        negative  = [t for t in gruppe if t["omsætning"] <  0 and t["kostpris"] > 0]
+        nul_varer = [t for t in gruppe if t["omsætning"] == 0 and t["kostpris"] > 0]
+
+        # Normal bon — ingen bundle-problemer
+        if not negative and not nul_varer:
+            resultat.extend(gruppe)
+            continue
+
+        # Type 1: simpel menu-split (0-omsætning komponenter)
+        if nul_varer and not negative:
+            resultat.extend(fordel(gruppe))
+            continue
+
+        # Type 2: én komponent har fået negativt restbeløb
+        i_bundle: set = set()
+        bundle_grupper: list = []
+        kandidater = [t for t in gruppe if t["omsætning"] > 0]
+
+        for neg in negative:
+            tilg   = [c for c in kandidater if id(c) not in i_bundle]
+            bundle = find_bundle(neg, tilg)
+            if bundle:
+                bundle_grupper.append(bundle)
+                for t in bundle:
+                    i_bundle.add(id(t))
+            else:
+                # Kan ikke identificere bundle — behold uændret
+                i_bundle.add(id(neg))
+                resultat.append(dict(neg))
+
+        for bundle in bundle_grupper:
+            resultat.extend(fordel(bundle))
+
+        # Ikke-bundle varer forbliver uændrede
+        for t in gruppe:
+            if id(t) not in i_bundle:
+                resultat.append(dict(t))
+
+    return resultat
+
+
 def parse_shopbox_xlsx(file_bytes: bytes) -> List[Dict[str, Any]]:
     try:
-        return _parse_xlsx(file_bytes)
+        transaktioner = _parse_xlsx(file_bytes)
     except Exception:
-        return _parse_csv(file_bytes)
+        transaktioner = _parse_csv(file_bytes)
+    return _fix_bundle_split(transaktioner)

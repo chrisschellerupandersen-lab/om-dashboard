@@ -1778,9 +1778,11 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         retur_mulig = retur_per_dag.get(dag, 0)
         tgtg_poser_dag = tgtg_poser_map.get(dato_str, 0)
 
-        effektivt = kassesalg + tgtg + kbmo
-        svind     = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
-        svind_pct = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
+        effektivt   = kassesalg + tgtg + kbmo
+        # Retur kan højst være det der faktisk er til overs efter salg
+        retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
+        svind       = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
+        svind_pct   = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
 
         avg_bestilt = round(sum(hist_bestil[dag]) / len(hist_bestil[dag]), 1) if hist_bestil[dag] else None
         avg_svind_pct = round(sum(hist_svind_pct[dag]) / len(hist_svind_pct[dag]), 1) if hist_svind_pct[dag] else None

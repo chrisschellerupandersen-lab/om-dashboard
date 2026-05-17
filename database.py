@@ -1554,12 +1554,17 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
     )
     # Kager holdes UDENFOR dagsniveauberegning — købes til 4-5 dage
-    # og vises i egen ugentlig sektion
-    _KAGE_BESTIL = (
-        "LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%tærte%' "
-        "OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%' "
-        "OR LOWER(varenavn) LIKE '%cheesecake%'"
-    )
+    # Matches præcist via varestamdata.type = 'Kage' (SKU eller varenavn)
+    _KAGE_FILTER = """(
+        CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+            SELECT CAST(CAST(sku AS REAL) AS INTEGER)
+            FROM varestamdata
+            WHERE LOWER(type) = 'kage' AND sku != '' AND sku != '0'
+        )
+        OR LOWER(varenavn) IN (
+            SELECT LOWER(varenavn) FROM varestamdata WHERE LOWER(type) = 'kage'
+        )
+    )"""
 
     try:
         with _conn() as conn:
@@ -1572,7 +1577,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                     SUM(son) AS son
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
-                  AND NOT ({_KAGE_BESTIL})
+                  AND NOT {_KAGE_FILTER}
             """, (uge, aar)).fetchone()
 
             bestil_per_dag = {}
@@ -1589,7 +1594,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
                   AND ({_BOLLE_BESTIL})
-                  AND NOT ({_KAGE_BESTIL})
+                  AND NOT {_KAGE_FILTER}
             """, (uge, aar)).fetchone()
             bestil_wiener_row = conn.execute(f"""
                 SELECT
@@ -1599,7 +1604,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
                   AND ({_WIENER_BESTIL})
-                  AND NOT ({_KAGE_BESTIL})
+                  AND NOT {_KAGE_FILTER}
             """, (uge, aar)).fetchone()
             retur_per_dag = {}
             for dag in dag_navne:
@@ -1619,7 +1624,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                       FROM ugebestillinger
                       WHERE varenummer != '' AND varenummer != '0'
-                        AND NOT ({_KAGE_BESTIL})
+                        AND NOT {_KAGE_FILTER}
                   )
                 GROUP BY dato
             """, dato_liste).fetchall()
@@ -1694,7 +1699,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                       FROM ugebestillinger
                       WHERE varenummer != '' AND varenummer != '0'
-                        AND NOT ({_KAGE_BESTIL})
+                        AND NOT {_KAGE_FILTER}
                   )
                 GROUP BY kat
                 ORDER BY kassesalg DESC
@@ -1707,7 +1712,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                        (man+tir+ons+tor+fre+loe+son) AS uge_total
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
-                  AND ({_KAGE_BESTIL})
+                  AND {_KAGE_FILTER}
                 ORDER BY uge_total DESC
             """, (uge, aar)).fetchall()
             kage_varer_bestil = {r['varenavn']: int(r['uge_total'] or 0)
@@ -1724,7 +1729,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                       FROM ugebestillinger
                       WHERE varenummer != '' AND varenummer != '0'
-                        AND ({_KAGE_BESTIL})
+                        AND {_KAGE_FILTER}
                   )
                 GROUP BY varenavn
             """, dato_liste).fetchall()
@@ -1779,7 +1784,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                         SUM(son) AS son
                     FROM ugebestillinger
                     WHERE uge = ? AND aar = ?
-                      AND NOT ({_KAGE_BESTIL})
+                      AND NOT {_KAGE_FILTER}
                 """, (h_uge, h_aar)).fetchone()
                 if not h_bestil:
                     continue

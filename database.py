@@ -148,18 +148,46 @@ def init_db():
 
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
-            SELECT t.*,
-                   t.omsætning / 1.25                      AS omsaetning_ex_moms,
+            WITH bon_has_zero AS (
+                -- Boner hvor mindst én vare har omsætning=0 men kostpris>0 (menu-split)
+                SELECT dato, bon_nr
+                FROM transaktioner
+                WHERE bon_nr != '' AND omsætning = 0 AND kostpris > 0
+                GROUP BY dato, bon_nr
+            ),
+            bon_totals AS (
+                SELECT t.dato, t.bon_nr,
+                       SUM(t.omsætning) AS bon_oms,
+                       SUM(t.kostpris)  AS bon_kost
+                FROM transaktioner t
+                INNER JOIN bon_has_zero b ON t.dato = b.dato AND t.bon_nr = b.bon_nr
+                GROUP BY t.dato, t.bon_nr
+            ),
+            t_korr AS (
+                -- Fordel bon-omsætning proportionalt efter kostpris for menu-boner
+                SELECT t.*,
+                       CASE
+                           WHEN bt.bon_nr IS NOT NULL
+                                AND bt.bon_kost > 0
+                                AND bt.bon_oms  > 0
+                           THEN bt.bon_oms * t.kostpris / bt.bon_kost
+                           ELSE t.omsætning
+                       END AS omsætning_korr
+                FROM transaktioner t
+                LEFT JOIN bon_totals bt ON t.dato = bt.dato AND t.bon_nr = bt.bon_nr
+            )
+            SELECT tc.*,
+                   tc.omsætning_korr / 1.25 AS omsaetning_ex_moms,
                    CASE WHEN s.pris_ex_moms > 0
-                        THEN t.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                        ELSE t.kostpris END                AS vf_korrekt,
-                   t.omsætning / 1.25
+                        THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                        ELSE tc.kostpris END AS vf_korrekt,
+                   tc.omsætning_korr / 1.25
                        - CASE WHEN s.pris_ex_moms > 0
-                              THEN t.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                              ELSE t.kostpris END          AS db_korrekt
-            FROM transaktioner t
+                              THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                              ELSE tc.kostpris END AS db_korrekt
+            FROM t_korr tc
             LEFT JOIN varestamdata s
-                ON t.varenummer != '' AND t.varenummer = s.sku;
+                ON tc.varenummer != '' AND tc.varenummer = s.sku;
         """)
         # Migrationer til eksisterende tabeller
         for sql in [

@@ -259,13 +259,16 @@ def _parse_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
 
 def _fix_bundle_split(transaktioner: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Shopbox eksporterer menu-bundles på to måder:
+    Shopbox fordeler menu-bundle-priser på tre måder:
       1) Én komponent får hele bundle-prisen, resten får 0 kr
-      2) Komponenter får deres detailpris, én komponent får negativt restbeløb
+      2) Komponenter får detailpris, én komponent får negativt restbeløb
+      3) Komponenter får uens priser men ingen er nul/negativ (Shopbox type 3)
 
-    For type 1: fordel total bon-omsætning proportionalt efter kostpris.
-    For type 2: find mindste gruppe (inkl. negativ vare) der summerer til
-                positivt heltal → fordel kun den gruppe. Andre varer rører vi ikke.
+    Algoritme:
+      Case A (nul/negativ til stede): alle seeds behandles samlet — find mindste
+        gruppe af positive varer der gør totalen til et positivt heltal.
+      Case B (alle positive): find grupper af varer med ikke-hel per-styk pris
+        der summerer til et positivt heltal (min. 2 varer) og omfordel.
     """
     from collections import defaultdict
     from itertools import combinations
@@ -273,19 +276,20 @@ def _fix_bundle_split(transaktioner: List[Dict[str, Any]]) -> List[Dict[str, Any
     def er_hel(v: float, tol: float = 0.02) -> bool:
         return v > 0 and abs(v - round(v)) < tol
 
-    def find_bundle(neg_item: Dict, kandidater: List[Dict]) -> List[Dict] | None:
-        for size in range(len(kandidater) + 1):
+    def find_gruppe(seeds: list, kandidater: list, min_k: int = 0) -> list | None:
+        seed_sum = sum(t["omsætning"] for t in seeds)
+        for size in range(min_k, len(kandidater) + 1):
             for subset in combinations(kandidater, size):
-                total = neg_item["omsætning"] + sum(t["omsætning"] for t in subset)
+                total = seed_sum + sum(t["omsætning"] for t in subset)
                 if er_hel(total):
-                    return [neg_item] + list(subset)
+                    return list(seeds) + list(subset)
         return None
 
-    def fordel(gruppe: List[Dict]) -> List[Dict]:
+    def fordel(gruppe: list) -> list:
         total_oms  = sum(t["omsætning"] for t in gruppe)
         total_kost = sum(t["kostpris"]  for t in gruppe)
         if total_kost <= 0 or total_oms <= 0:
-            return gruppe
+            return [dict(t) for t in gruppe]
         return [{**t, "omsætning": round(total_oms * t["kostpris"] / total_kost, 2)}
                 for t in gruppe]
 
@@ -300,43 +304,50 @@ def _fix_bundle_split(transaktioner: List[Dict[str, Any]]) -> List[Dict[str, Any
     resultat = list(ingen_bon)
 
     for gruppe in grupper.values():
-        negative  = [t for t in gruppe if t["omsætning"] <  0 and t["kostpris"] > 0]
-        nul_varer = [t for t in gruppe if t["omsætning"] == 0 and t["kostpris"] > 0]
+        nul_neg = [t for t in gruppe if t["omsætning"] <= 0 and t["kostpris"] > 0]
+        positiv = [t for t in gruppe if t["omsætning"] >  0]
 
-        # Normal bon — ingen bundle-problemer
-        if not negative and not nul_varer:
+        if nul_neg:
+            # Case A: nul/negative seeds — find donors fra positive varer
+            bundle = find_gruppe(nul_neg, positiv, min_k=0)
+            if bundle:
+                bids = {id(t) for t in bundle}
+                resultat.extend(fordel(bundle))
+                for t in gruppe:
+                    if id(t) not in bids:
+                        resultat.append(dict(t))
+            else:
+                resultat.extend([dict(t) for t in gruppe])
+            continue
+
+        # Case B: alle positive — find grupper med ikke-hel per-styk pris
+        def ikke_hel_pu(t: dict) -> bool:
+            return (t["antal"] > 0 and t["kostpris"] > 0
+                    and not er_hel(t["omsætning"] / t["antal"]))
+
+        kandidater   = [t for t in gruppe if ikke_hel_pu(t)]
+        individuelle = [t for t in gruppe if not ikke_hel_pu(t)]
+
+        if len(kandidater) < 2:
             resultat.extend(gruppe)
             continue
 
-        # Type 1: simpel menu-split (0-omsætning komponenter)
-        if nul_varer and not negative:
-            resultat.extend(fordel(gruppe))
-            continue
-
-        # Type 2: én komponent har fået negativt restbeløb
         i_bundle: set = set()
-        bundle_grupper: list = []
-        kandidater = [t for t in gruppe if t["omsætning"] > 0]
-
-        for neg in negative:
-            tilg   = [c for c in kandidater if id(c) not in i_bundle]
-            bundle = find_bundle(neg, tilg)
-            if bundle:
-                bundle_grupper.append(bundle)
-                for t in bundle:
-                    i_bundle.add(id(t))
-            else:
-                # Kan ikke identificere bundle — behold uændret
-                i_bundle.add(id(neg))
-                resultat.append(dict(neg))
-
-        for bundle in bundle_grupper:
+        while True:
+            tilg = [k for k in kandidater if id(k) not in i_bundle]
+            if len(tilg) < 2:
+                break
+            bundle = find_gruppe([], tilg, min_k=2)
+            if not bundle:
+                break
+            for t in bundle:
+                i_bundle.add(id(t))
             resultat.extend(fordel(bundle))
 
-        # Ikke-bundle varer forbliver uændrede
-        for t in gruppe:
+        for t in kandidater:
             if id(t) not in i_bundle:
                 resultat.append(dict(t))
+        resultat.extend(individuelle)
 
     return resultat
 

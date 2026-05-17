@@ -41,9 +41,9 @@ POSE_TYPER = [
     # 4x Fatelavnsboller:4 boller                                                    = —         → 4 stk
     {"item_id": "206880476083086176", "navn": "Lykkepose ( Økologisk)",  "kreditpris": 67.75, "kostpris_pose": 67.20, "enheder_per_pose": 6},
     {"item_id": "206881838829236480", "navn": "Brødposen ( Økologisk)",  "kreditpris": 41.22, "kostpris_pose": 67.20, "enheder_per_pose": 5},
-    {"item_id": "206882511213524800", "navn": "Wienerbrødsposen",        "kreditpris":  0.00, "kostpris_pose": 72.00, "enheder_per_pose": 6},
-    {"item_id": "210383102918979712", "navn": "4x Fatelavnsboller",      "kreditpris": 40, "kostpris_pose":  0.00, "enheder_per_pose": 4},
-    {"item_id": "210383866617850400", "navn": "Kagepose",                "kreditpris": 45, "kostpris_pose": 91.80, "enheder_per_pose": 6},
+    {"item_id": "206882511213524800", "navn": "Wienerbrødsposen",        "kreditpris": 60.12, "kostpris_pose": 72.00, "enheder_per_pose": 6},
+    {"item_id": "210383102918979712", "navn": "4x Fatelavnsboller",      "kreditpris": 40.00, "kostpris_pose":  0.00, "enheder_per_pose": 4},
+    {"item_id": "210383866617850400", "navn": "Kagepose",                "kreditpris": 50.13, "kostpris_pose": 91.80, "enheder_per_pose": 6},
 ]
 # ─────────────────────────────────────────────────────────────────────────────
 

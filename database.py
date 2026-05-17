@@ -214,9 +214,9 @@ def init_db():
             # (item_id, enheder_per_pose, kreditpris)
             ("206880476083086176", 6, 67.75),  # Lykkepose
             ("206881838829236480", 5, 41.22),  # Brødposen
-            ("206882511213524800", 6,  0.00),  # Wienerbrødsposen
+            ("206882511213524800", 6, 60.12),  # Wienerbrødsposen
             ("210383102918979712", 4, 40.00),  # 4x Fatelavnsboller
-            ("210383866617850400", 6, 45.00),  # Kagepose
+            ("210383866617850400", 6, 50.13),  # Kagepose
         ]
         for item_id, enheder, kreditpris in _TGTG_SEED:
             conn.execute(

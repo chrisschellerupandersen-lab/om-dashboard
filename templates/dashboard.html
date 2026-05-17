@@ -1434,7 +1434,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- KPI-chips -->
-        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;" id="spild-kpi-row">
+        <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;" id="spild-kpi-row">
           <div class="card" style="padding:14px 16px;text-align:center;">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">BESTILT</div>
             <div id="spild-k-bestilt" style="font-size:24px;font-weight:700;color:var(--ink);">—</div>
@@ -1450,8 +1450,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div id="spild-k-tgtg" style="font-size:24px;font-weight:700;color:var(--moss);">—</div>
             <div id="spild-k-tgtg-sub" style="font-size:11px;color:var(--ash);">poser</div>
           </div>
+          <div class="card" style="padding:14px 16px;text-align:center;border-left:3px solid #6b9e6b;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">RETUR</div>
+            <div id="spild-k-retur" style="font-size:24px;font-weight:700;color:#6b9e6b;">—</div>
+            <div id="spild-k-retur-sub" style="font-size:11px;color:var(--ash);">stk til bageren</div>
+          </div>
           <div class="card" style="padding:14px 16px;text-align:center;border-left:3px solid var(--danger);" id="spild-k-spild-card">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">SPILD</div>
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--ash);margin-bottom:4px;">NETTO SPILD</div>
             <div id="spild-k-spild" style="font-size:24px;font-weight:700;">—</div>
             <div id="spild-k-spild-sub" style="font-size:11px;color:var(--ash);">stk (—%)</div>
           </div>
@@ -4528,6 +4533,11 @@ async function _spildHent(uge, aar) {
   document.getElementById('spild-k-tgtg').textContent    = (d.total_tgtg||0).toLocaleString('da-DK');
   document.getElementById('spild-k-tgtg-sub').textContent = d.total_tgtg_poser > 0
     ? `${d.total_tgtg_poser} poser` : 'poser';
+
+  const totalRetur = d.total_retur || 0;
+  document.getElementById('spild-k-retur').textContent = totalRetur.toLocaleString('da-DK');
+  document.getElementById('spild-k-retur-sub').textContent = d.total_bestilt > 0
+    ? `${Math.round(totalRetur/d.total_bestilt*100)} % af bestilt` : 'stk til bageren';
 
   const spildPct = d.total_svind_pct;
   const spildClr = spildPct == null ? 'var(--ink)' : spildPct > 35 ? '#c0392b' : spildPct > 20 ? '#e67e22' : spildPct > 10 ? '#f39c12' : 'var(--moss)';

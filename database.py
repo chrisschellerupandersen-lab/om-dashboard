@@ -1554,17 +1554,24 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
     )
     # Kager holdes UDENFOR dagsniveauberegning — købes til 4-5 dage
-    # Matches præcist via varestamdata.type = 'Kage' (SKU eller varenavn)
-    _KAGE_FILTER = """(
-        CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
-            SELECT CAST(CAST(sku AS REAL) AS INTEGER)
-            FROM varestamdata
-            WHERE LOWER(type) = 'kage' AND sku != '' AND sku != '0'
-        )
-        OR LOWER(varenavn) IN (
-            SELECT LOWER(varenavn) FROM varestamdata WHERE LOWER(type) = 'kage'
-        )
-    )"""
+    # SKU'erne er fra Varestamdata.xlsx Type='Kage' (stabile Shopbox-id'er)
+    _KAGE_SKUS = (
+        10210,  # Studenterbrod - halv plade
+        10342,  # Trøstammer
+        10345,  # Napoleonshat
+        10075,  # Cookies
+        10077,  # Kokostoppe
+        10078,  # Romkugler m. choko
+        10076,  # Hindbærsnitter
+        12433,  # Honningbomber
+        12431,  # Honninghjerter
+        14051,  # Banan Kage
+        13657,  # Banan muffin
+        10053,  # Brownie
+        10079,  # Æble-kanel muffin
+    )
+    _KAGE_SKU_LIST = ','.join(str(s) for s in _KAGE_SKUS)
+    _KAGE_FILTER = f"(CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({_KAGE_SKU_LIST}))"
 
     try:
         with _conn() as conn:

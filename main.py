@@ -668,11 +668,18 @@ async def api_debug_varer(request: Request, q: str = ""):
                OR sku IN (SELECT DISTINCT varenummer FROM transaktioner
                           WHERE LOWER(varenavn) LIKE LOWER('%'||?||'%') AND varenummer != '')
         """, (q, q)).fetchall()
+        rækker = conn.execute("""
+            SELECT bon_nr, varenavn, varenummer, antal, omsætning, kostpris
+            FROM transaktioner
+            WHERE dato = ? AND LOWER(varenavn) LIKE LOWER('%'||?||'%')
+            ORDER BY bon_nr, varenavn
+        """, (seneste, q)).fetchall()
     return {
         "seneste_dato": seneste,
         "transaktioner": [dict(r) for r in raa],
         "v_transaktioner": [dict(r) for r in view],
         "stamdata": [dict(r) for r in stam],
+        "rækker": [dict(r) for r in rækker],
     }
 
 

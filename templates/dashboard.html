@@ -1495,9 +1495,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <!-- Kategori + Anbefalinger side om side -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-          <!-- Kategori-fordeling -->
+          <!-- Kategori-fordeling (ekskl. kager) -->
           <div class="card">
-            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Kassesalg per kategori</span></div>
+            <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Kassesalg per kategori · bagværk</span></div>
             <div id="spild-kat-list" style="padding:4px 0;">
               <div class="empty">Indlæser…</div>
             </div>
@@ -1508,6 +1508,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div id="spild-anb-list" style="padding:4px 0;">
               <div class="empty">Indlæser…</div>
             </div>
+          </div>
+        </div>
+
+        <!-- Kage-sektion (ugentlig, købes til 4-5 dage) -->
+        <div class="card" style="margin-bottom:14px;">
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">🎂 Kager · ugentlig oversigt</span>
+            <span style="font-size:10px;color:var(--ash);font-style:italic;">Købes til 4-5 dage — vises separat fra dagsniveauberegning</span>
+          </div>
+          <div id="spild-kage-section">
+            <div class="empty">Indlæser…</div>
           </div>
         </div>
       </div>
@@ -4678,6 +4689,60 @@ async function _spildHent(uge, aar) {
       </div>`).join('');
   } else {
     anbList.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--moss);">✓ Ingen kritiske anbefalinger denne uge</div>';
+  }
+
+  // Kage-sektion (ugentlig)
+  const kageEl = document.getElementById('spild-kage-section');
+  const kg = d.kager;
+  if (!kg || kg.bestilt === 0) {
+    kageEl.innerHTML = '<div class="empty" style="padding:12px;">Ingen kager i bestillingen denne uge</div>';
+  } else {
+    const kSpildClr = kg.svind_pct > 25 ? '#c0392b' : kg.svind_pct > 12 ? '#e67e22' : 'var(--moss)';
+    let kRows = (kg.varer || []).map(v => {
+      const vPct = v.svind_pct != null ? v.svind_pct : 0;
+      const vClr = vPct > 25 ? '#c0392b' : vPct > 12 ? '#e67e22' : 'var(--ash)';
+      return `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
+        <td style="padding:7px 10px;font-size:13px;">${v.varenavn}</td>
+        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;">${v.bestilt}</td>
+        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;color:var(--forest);">${v.solgt}</td>
+        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;font-weight:600;color:${vClr};">${v.svind}</td>
+        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;color:${vClr};">${v.svind_pct != null ? v.svind_pct.toFixed(1)+' %' : '—'}</td>
+      </tr>`;
+    }).join('');
+    kageEl.innerHTML = `
+      <div style="display:flex;gap:20px;padding:12px 10px 8px;border-bottom:1px solid rgba(30,58,30,.10);">
+        <div style="text-align:center;min-width:70px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BESTILT UGE</div>
+          <div style="font-size:22px;font-weight:700;color:var(--ink);">${kg.bestilt}</div>
+        </div>
+        <div style="text-align:center;min-width:70px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SOLGT</div>
+          <div style="font-size:22px;font-weight:700;color:var(--forest);">${kg.kassesalg}</div>
+        </div>
+        <div style="text-align:center;min-width:70px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD STK</div>
+          <div style="font-size:22px;font-weight:700;color:${kSpildClr};">${kg.svind}</div>
+        </div>
+        <div style="text-align:center;min-width:70px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD %</div>
+          <div style="font-size:22px;font-weight:700;color:${kSpildClr};">${kg.svind_pct != null ? kg.svind_pct.toFixed(1)+' %' : '—'}</div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;padding-left:10px;">
+          <div style="width:100%;height:8px;background:rgba(30,58,30,.08);border-radius:4px;overflow:hidden;">
+            <div style="width:${Math.min(100,kg.svind_pct||0)}%;height:100%;background:${kSpildClr};border-radius:4px;"></div>
+          </div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+          <th style="text-align:left;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">VARENAVN</th>
+          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">BESTILT UGE</th>
+          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SOLGT</th>
+          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SPILD STK</th>
+          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SPILD %</th>
+        </tr></thead>
+        <tbody>${kRows}</tbody>
+      </table>`;
   }
 }
 

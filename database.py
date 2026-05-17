@@ -1553,18 +1553,26 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
         "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
     )
+    # Kager holdes UDENFOR dagsniveauberegning — købes til 4-5 dage
+    # og vises i egen ugentlig sektion
+    _KAGE_BESTIL = (
+        "LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%tærte%' "
+        "OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%' "
+        "OR LOWER(varenavn) LIKE '%cheesecake%'"
+    )
 
     try:
         with _conn() as conn:
             # ── Bestillinger per dag for denne uge ──────────────────────────
             # ugebestillinger kolonner: man, tir, ons, tor, fre, loe, son
-            bestil_rows = conn.execute("""
+            bestil_rows = conn.execute(f"""
                 SELECT
                     SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
                     SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
                     SUM(son) AS son
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
+                  AND NOT ({_KAGE_BESTIL})
             """, (uge, aar)).fetchone()
 
             bestil_per_dag = {}
@@ -1581,6 +1589,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
                   AND ({_BOLLE_BESTIL})
+                  AND NOT ({_KAGE_BESTIL})
             """, (uge, aar)).fetchone()
             bestil_wiener_row = conn.execute(f"""
                 SELECT
@@ -1590,6 +1599,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
                   AND ({_WIENER_BESTIL})
+                  AND NOT ({_KAGE_BESTIL})
             """, (uge, aar)).fetchone()
             retur_per_dag = {}
             for dag in dag_navne:
@@ -1609,6 +1619,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                       FROM ugebestillinger
                       WHERE varenummer != '' AND varenummer != '0'
+                        AND NOT ({_KAGE_BESTIL})
                   )
                 GROUP BY dato
             """, dato_liste).fetchall()
@@ -1671,7 +1682,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste + dato_liste + dato_liste).fetchall()
             kbmo_map = {r['dato']: int(r['kbmo_antal'] or 0) for r in kbmo_rows}
 
-            # ── Kategori-fordeling kassesalg denne uge ────────────────────────
+            # ── Kategori-fordeling kassesalg denne uge (ekskl. kager) ───────────
             kat_rows = conn.execute(f"""
                 SELECT
                     COALESCE(NULLIF(kategori,''), 'Ukendt') AS kat,
@@ -1683,11 +1694,68 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                       FROM ugebestillinger
                       WHERE varenummer != '' AND varenummer != '0'
+                        AND NOT ({_KAGE_BESTIL})
                   )
                 GROUP BY kat
                 ORDER BY kassesalg DESC
             """, dato_liste).fetchall()
             kategorier = [dict(r) for r in kat_rows]
+
+            # ── Kage-sektion: ugentlige tal (købes til 4-5 dage) ─────────────
+            kage_bestil_rows = conn.execute(f"""
+                SELECT varenavn,
+                       (man+tir+ons+tor+fre+loe+son) AS uge_total
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
+                  AND ({_KAGE_BESTIL})
+                ORDER BY uge_total DESC
+            """, (uge, aar)).fetchall()
+            kage_varer_bestil = {r['varenavn']: int(r['uge_total'] or 0)
+                                 for r in kage_bestil_rows}
+            kage_bestilt_total = sum(kage_varer_bestil.values())
+
+            # Kassesalg af kager for ugen
+            kage_kasse_rows = conn.execute(f"""
+                SELECT COALESCE(varenavn,'') AS varenavn,
+                       ROUND(SUM(antal), 0) AS antal
+                FROM transaktioner
+                WHERE dato IN ({placeholders})
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                        AND ({_KAGE_BESTIL})
+                  )
+                GROUP BY varenavn
+            """, dato_liste).fetchall()
+            kage_kassesalg_map = {r['varenavn']: int(r['antal'] or 0)
+                                  for r in kage_kasse_rows}
+            kage_kassesalg_total = sum(kage_kassesalg_map.values())
+
+            # Byg kage-vareliste
+            kage_varer = []
+            for navn, bestilt_k in sorted(kage_varer_bestil.items(),
+                                          key=lambda x: -x[1]):
+                solgt_k = kage_kassesalg_map.get(navn, 0)
+                svind_k = max(0, bestilt_k - solgt_k)
+                pct_k   = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
+                kage_varer.append({
+                    'varenavn': navn,
+                    'bestilt':  bestilt_k,
+                    'solgt':    solgt_k,
+                    'svind':    svind_k,
+                    'svind_pct': pct_k,
+                })
+            kage_svind_total = max(0, kage_bestilt_total - kage_kassesalg_total)
+            kage_svind_pct   = round(kage_svind_total / kage_bestilt_total * 100, 1) \
+                               if kage_bestilt_total > 0 else None
+            kage_sektion = {
+                'bestilt':   kage_bestilt_total,
+                'kassesalg': kage_kassesalg_total,
+                'svind':     kage_svind_total,
+                'svind_pct': kage_svind_pct,
+                'varer':     kage_varer,
+            }
 
             # ── Historiske snit: seneste 4 uger per ugedag ────────────────────
             # Beregn de 4 foregående uger (ekskl. indeværende)
@@ -1704,13 +1772,14 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 h_man = h_jan4 - timedelta(days=h_jan4.weekday()) + timedelta(weeks=h_uge - 1)
                 h_datoer = [(h_man + timedelta(days=i)).isoformat() for i in range(7)]
 
-                h_bestil = conn.execute("""
+                h_bestil = conn.execute(f"""
                     SELECT
                         SUM(man) AS man, SUM(tir) AS tir, SUM(ons) AS ons,
                         SUM(tor) AS tor, SUM(fre) AS fre, SUM(loe) AS loe,
                         SUM(son) AS son
                     FROM ugebestillinger
                     WHERE uge = ? AND aar = ?
+                      AND NOT ({_KAGE_BESTIL})
                 """, (h_uge, h_aar)).fetchone()
                 if not h_bestil:
                     continue
@@ -1893,6 +1962,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'dato_slut':        dato_slut,
         'dage':             dage,
         'kategorier':       kategorier,
+        'kager':            kage_sektion,
         'total_bestilt':    total_bestilt,
         'total_kassesalg':  total_kassesalg,
         'total_rester':     total_rester,

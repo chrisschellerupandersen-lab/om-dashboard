@@ -1514,9 +1514,13 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "OR LOWER(varenavn) LIKE '%lungo%' OR LOWER(varenavn) LIKE '%mocha%'"
     )
     _WIENER_LIKE = (
-        "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%bmo%' "
-        "OR LOWER(varenavn) LIKE '%bolle%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
+        "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
         "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
+    )
+    # KBMO = Kaffe + Bolle med Ost: 1 bolle ryger per kombosalg
+    _BOLLE_OST_LIKE = (
+        "LOWER(varenavn) LIKE '%bolle%ost%' OR LOWER(varenavn) LIKE '%ost%bolle%' "
+        "OR LOWER(varenavn) LIKE '%bolle m.%ost%' OR LOWER(varenavn) LIKE '%bmo%'"
     )
 
     try:
@@ -1587,6 +1591,24 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 GROUP BY dato
             """, dato_liste + dato_liste + dato_liste).fetchall()
             kw_map = {r['dato']: int(r['kw_antal'] or 0) for r in kw_rows}
+
+            # ── KBMO kombos per dato (Kaffe + Bolle med Ost = 1 bolle) ──────────
+            kbmo_rows = conn.execute(f"""
+                SELECT dato, COUNT(DISTINCT bon_nr) AS kbmo_antal
+                FROM transaktioner
+                WHERE dato IN ({placeholders})
+                  AND bon_nr != ''
+                  AND bon_nr IN (
+                      SELECT bon_nr FROM transaktioner
+                      WHERE dato IN ({placeholders}) AND ({_KAFFE_LIKE})
+                  )
+                  AND bon_nr IN (
+                      SELECT bon_nr FROM transaktioner
+                      WHERE dato IN ({placeholders}) AND ({_BOLLE_OST_LIKE})
+                  )
+                GROUP BY dato
+            """, dato_liste + dato_liste + dato_liste).fetchall()
+            kbmo_map = {r['dato']: int(r['kbmo_antal'] or 0) for r in kbmo_rows}
 
             # ── Kategori-fordeling kassesalg denne uge ────────────────────────
             kat_rows = conn.execute(f"""
@@ -1679,6 +1701,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     total_kassesalg  = 0
     total_tgtg       = 0
     total_kw         = 0
+    total_kbmo       = 0
     total_effektivt  = 0
     total_svind      = 0
 
@@ -1688,8 +1711,9 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         kassesalg = kasse_map.get(dato_str, 0)
         tgtg      = tgtg_map.get(dato_str, 0)
         kw        = kw_map.get(dato_str, 0)
+        kbmo      = kbmo_map.get(dato_str, 0)
 
-        effektivt = kassesalg + tgtg
+        effektivt = kassesalg + tgtg + kbmo
         svind     = max(0, bestilt - effektivt) if bestilt > 0 else None
         svind_pct = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
 
@@ -1703,6 +1727,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             total_kassesalg += kassesalg
             total_tgtg      += tgtg
             total_kw        += kw
+            total_kbmo      += kbmo
             total_effektivt += effektivt
             if svind is not None:
                 total_svind += svind
@@ -1715,6 +1740,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'kassesalg':        kassesalg,
             'tgtg':             tgtg,
             'kw':               kw,
+            'kbmo':             kbmo,
             'effektivt':        effektivt,
             'svind':            svind,
             'svind_pct':        svind_pct,
@@ -1790,6 +1816,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'total_kassesalg':  total_kassesalg,
         'total_tgtg':       total_tgtg,
         'total_kw':         total_kw,
+        'total_kbmo':       total_kbmo,
         'total_effektivt':  total_effektivt,
         'total_svind':      total_svind,
         'total_svind_pct':  total_svind_pct,

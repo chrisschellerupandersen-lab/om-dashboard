@@ -1466,6 +1466,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">DAG</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BESTILT</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">KASSESALG</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Wienerbrød kombo">KW</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Bolle med Ost kombo">KBMO</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">TGTG</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">EFFEKTIVT</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD STK</th>
@@ -1474,7 +1476,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </tr>
             </thead>
             <tbody id="spild-dag-tbody">
-              <tr><td colspan="8" class="empty">Vælg en uge…</td></tr>
+              <tr><td colspan="10" class="empty">Vælg en uge…</td></tr>
             </tbody>
           </table>
         </div>
@@ -4500,14 +4502,14 @@ async function _spildHent(uge, aar) {
   _spildUge = uge; _spildAar = aar;
   const MONO = "font-family:'DM Mono',monospace;";
   document.getElementById('spild-uge-lbl').textContent = `Uge ${uge} · ${aar}`;
-  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="8" class="empty">Henter…</td></tr>';
+  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="10" class="empty">Henter…</td></tr>';
 
   let d;
   try {
     const r = await fetch(`/api/spild/dagsniveau?uge=${uge}&aar=${aar}`);
     d = await r.json();
   } catch(e) {
-    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="8" class="empty">Fejl ved hentning</td></tr>';
+    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="10" class="empty">Fejl ved hentning</td></tr>';
     return;
   }
 
@@ -4549,7 +4551,7 @@ async function _spildHent(uge, aar) {
 
   const tbody = document.getElementById('spild-dag-tbody');
   if (!d.dage || !d.dage.length) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
   } else {
     let rows = '';
     for (const dag of d.dage) {
@@ -4579,10 +4581,14 @@ async function _spildHent(uge, aar) {
         ? (pct > avgPct + 8 ? ' <span style="color:#c0392b;">↑</span>' : pct < avgPct - 8 ? ' <span style="color:var(--moss);">↓</span>' : '')
         : '';
 
+      const kwTxt   = dag.kw   > 0 ? dag.kw   : '<span style="color:var(--ash);">0</span>';
+      const kbmoTxt = dag.kbmo > 0 ? dag.kbmo : '<span style="color:var(--ash);">0</span>';
       rows += `<tr style="background:${bgClr};border-bottom:1px solid rgba(30,58,30,.06);">
         <td style="padding:10px 10px;font-size:13px;font-weight:600;">${dag.dag_label}<br><span style="${MONO}font-size:10px;color:var(--ash);font-weight:400;">${dag.dato}</span></td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.bestilt > 0 ? dag.bestilt : '<span style="color:var(--ash);">—</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--forest);">${dag.kassesalg > 0 ? dag.kassesalg : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kwTxt}</td>
+        <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kbmoTxt}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? dag.tgtg : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
@@ -4596,6 +4602,8 @@ async function _spildHent(uge, aar) {
       <td style="${MONO}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);padding:8px 10px;">Total uge</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_bestilt||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--forest);">${d.total_kassesalg||0}</td>
+      <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kw||0}</td>
+      <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kbmo||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_effektivt||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:${spildClr};">${d.total_svind||0}</td>
@@ -4604,7 +4612,7 @@ async function _spildHent(uge, aar) {
       </td>
       <td></td>
     </tr>`;
-    tbody.innerHTML = rows || '<tr><td colspan="8" class="empty">Ingen dage med bestillingsdata</td></tr>';
+    tbody.innerHTML = rows || '<tr><td colspan="10" class="empty">Ingen dage med bestillingsdata</td></tr>';
   }
 
   // Kategori-fordeling

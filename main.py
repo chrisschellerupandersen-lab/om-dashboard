@@ -637,11 +637,21 @@ async def api_kontrol_varenumre(request: Request):
 
 
 @app.get("/api/debug/varer")
-async def api_debug_varer(request: Request, q: str = ""):
-    """Debug: transaktioner + VF + stamdata for søgeord på seneste dato."""
+async def api_debug_varer(request: Request, q: str = "", bon: str = ""):
+    """Debug: transaktioner + VF + stamdata for søgeord på seneste dato.
+    Brug ?bon=NNNNN-... for at se alle varer på én specifik bon."""
     _kræv_login(request)
     with database._conn() as conn:
         seneste = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        if bon:
+            # Vis alle rækker på en specifik bon
+            bon_rækker = conn.execute("""
+                SELECT bon_nr, varenavn, varenummer, antal, omsætning, kostpris
+                FROM transaktioner
+                WHERE bon_nr = ?
+                ORDER BY varenavn
+            """, (bon,)).fetchall()
+            return {"bon": bon, "rækker": [dict(r) for r in bon_rækker]}
         raa = conn.execute("""
             SELECT varenavn, varenummer,
                    SUM(antal) AS antal,

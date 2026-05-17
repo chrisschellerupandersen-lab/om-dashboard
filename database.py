@@ -111,13 +111,6 @@ def init_db():
                 UNIQUE(dato, pose_navn) ON CONFLICT REPLACE
             );
             CREATE INDEX IF NOT EXISTS idx_tgtg_dato ON tgtg_dagssalg(dato);
-            -- Migration: tilføj kostpris_pose hvis den mangler
-            """)
-            try:
-                conn.execute("ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0")
-            except Exception:
-                pass
-            conn.executescript("""
 
             CREATE TABLE IF NOT EXISTS bestilling_manuel (
                 uge        INTEGER NOT NULL,
@@ -203,6 +196,7 @@ def init_db():
             "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
             "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
             "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
+            "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)

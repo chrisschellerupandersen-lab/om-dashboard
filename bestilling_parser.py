@@ -44,24 +44,45 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
         if m_aar:
             aar = int(m_aar.group(1))
 
-    def _bestem_sektion(varenavn: str) -> int:
-        """Kategoriser produkt i 1 af 4 sektioner via nøgleord."""
+    # Kage-SKU'er (Shopbox-id'er fra Varestamdata.xlsx Type='Kage')
+    _KAGE_SKUS = {
+        10210, 10342, 10345, 10075, 10077, 10078, 10076,
+        12433, 12431, 14051, 13657, 10053, 10079,
+    }
+
+    def _bestem_sektion(varenavn: str, varenummer: str = '') -> int:
+        """Kategoriser produkt i 1 af 4 sektioner.
+        SKU-match på kendte kage-SKU'er slår nøgleord.
+        """
+        # Præcis kage-match via SKU (slår alt andet)
+        try:
+            if int(float(varenummer)) in _KAGE_SKUS:
+                return 4
+        except (ValueError, TypeError):
+            pass
+
         n = varenavn.lower()
-        # Boller — matcher på 'bolle', 'birkes', 'musli', 'teboller', 'tebirkes',
-        #          'grovbirkes', 'grøskar' m.fl.
-        if any(k in n for k in ('bolle', 'musli', 'teboller', 'tebirkes',
-                                 'grovbirkes', 'grøskar')):
-            return 2
-        # Wienerbrød
+
+        # Kager — tjekkes FØR boller så 'fastelavnsbolle' ikke snupper kager
+        if any(k in n for k in ('studenterbr', 'stammer', 'amagerkag',
+                                 'napoleonshat', 'cookie', 'kokostoppe',
+                                 'romkugl', 'muffin', 'brownie', 'honning',
+                                 'banan kage', 'citron snit', 'snitter',
+                                 'kage')):
+            return 4
+
+        # Wienerbrød — tjekkes FØR boller (fastelavnsbolle er wienerbrød)
         if any(k in n for k in ('croissant', 'snegl', 'snurrer', 'frøsnapper',
                                  'wienerstang', 'kanelstang', 'spandauer',
-                                 'marcipan', 'romsnegl', 'wienerbr')):
+                                 'marcipan', 'romsnegl', 'wienerbr',
+                                 'tebirkes', 'grovbirkes', 'fastelavns')):
             return 3
-        # Kager
-        if any(k in n for k in ('studenterbr', 'stammer', 'napoleonshat',
-                                 'cookie', 'kokostoppe', 'romkugl', 'hindbær',
-                                 'muffin', 'brownie')):
-            return 4
+
+        # Boller
+        if any(k in n for k in ('bolle', 'musli', 'teboller', 'grøskar',
+                                 'hveder')):
+            return 2
+
         # Default: Brød, flute & focaccia
         return 1
 
@@ -106,7 +127,7 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
             "fre": fre, "loe": loe, "son": son,
             "total_antal":  total_antal,
             "total_pris":   _tal(row[12] if len(row) > 12 else None),
-            "sektion":      _bestem_sektion(varenavn),
+            "sektion":      _bestem_sektion(varenavn, vnr),
         })
 
     return {"uge": uge, "aar": aar, "linjer": linjer}

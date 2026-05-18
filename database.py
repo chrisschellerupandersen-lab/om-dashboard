@@ -208,6 +208,23 @@ def init_db():
         # (disse forstyrrer VF-beregningen — Shopbox' kostpris bruges i stedet)
         conn.execute("DELETE FROM varestamdata WHERE LOWER(varenavn) LIKE 'øko - %'")
 
+        # Fix: ret sektion på ugebestillinger der er fejlkategoriseret
+        # Kager (SKU-baseret) → sektion 4
+        _KAGE_SKUS_STR = '10210,10342,10345,10075,10077,10078,10076,12433,12431,14051,13657,10053,10079'
+        conn.execute(f"""
+            UPDATE ugebestillinger SET sektion=4
+            WHERE CAST(CAST(varenummer AS REAL) AS INTEGER)
+                  IN ({_KAGE_SKUS_STR})
+        """)
+        # Wienerbrød-varer der fejlagtigt havner i sektion 2 (boller) → sektion 3
+        conn.execute("""
+            UPDATE ugebestillinger SET sektion=3
+            WHERE sektion=2
+              AND (LOWER(varenavn) LIKE '%tebirkes%'
+                   OR LOWER(varenavn) LIKE '%grovbirkes%'
+                   OR LOWER(varenavn) LIKE '%fastelavns%')
+        """)
+
         # Seed: sæt korrekte værdier på kendte TGTG-pose-typer
         # Kører altid så eksisterende rækker opdateres uden at vente på næste sync
         _TGTG_SEED = [

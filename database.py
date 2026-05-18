@@ -2323,12 +2323,23 @@ def _kat(varenavn: str, stamdata_map: Dict = None) -> str:
         return 'Flute'
     if 'bolle' in n:
         return 'Boller'
-    # Studenterbrød er kage trods "brød" i navnet
-    if ('brød' in n or 'brod' in n) and 'wiener' not in n and 'studenter' not in n:
-        return 'Brød'
-    if 'wiener' in n or 'spandauer' in n:
+    # Wienerbrød — tjekkes FØR brød/kage så croissant/snegl ikke lander forkert
+    if any(k in n for k in ('wiener', 'spandauer', 'croissant', 'snegl', 'snurrer',
+                             'tebirkes', 'grovbirkes', 'fastelavns', 'wienerstang',
+                             'kanelstang', 'frøsnapper', 'marcipan', 'romsnegl')):
         return 'Wiener'
-    # Alt andet (croissant, brownie, cookies, træstammer, romkugler osv.) → Kage
+    # Studenterbrød er kage trods "brød" i navnet
+    if ('brød' in n or 'brod' in n) and 'studenter' not in n:
+        return 'Brød'
+    # Brød-varer uden 'brød' i varenavn (focaccia, formbrød mv.)
+    if any(k in n for k in ('focaccia', 'foccacia', 'formbrød', 'franskbrød')):
+        return 'Brød'
+    # Kager — eksplicit match
+    if any(k in n for k in ('kage', 'cookie', 'muffin', 'brownie', 'romkugl',
+                             'kokostoppe', 'napoleonshat', 'studenterbr',
+                             'snitter', 'stammer', 'honningbomb', 'honninghjerter')):
+        return 'Kage'
+    # Fallback
     return 'Kage'
 
 

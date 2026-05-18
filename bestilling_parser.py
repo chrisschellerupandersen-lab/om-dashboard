@@ -44,31 +44,17 @@ def parse_bestilling_xlsx(path: str) -> Dict[str, Any]:
         if m_aar:
             aar = int(m_aar.group(1))
 
-    # Kage-SKU'er (Shopbox-id'er fra Varestamdata.xlsx Type='Kage')
-    _KAGE_SKUS = {
-        10210, 10342, 10345, 10075, 10077, 10078, 10076,
-        12433, 12431, 14051, 13657, 10053, 10079,
-    }
-
     def _bestem_sektion(varenavn: str, varenummer: str = '') -> int:
-        """Kategoriser produkt i 1 af 4 sektioner.
-        SKU-match på kendte kage-SKU'er slår nøgleord.
+        """Kategoriser produkt i 1 af 4 sektioner baseret på varenavn.
+        Bagerens varenumre ≠ Shopbox SKU'er, så kun varenavn bruges.
         """
-        # Præcis kage-match via SKU (slår alt andet)
-        try:
-            if int(float(varenummer)) in _KAGE_SKUS:
-                return 4
-        except (ValueError, TypeError):
-            pass
-
         n = varenavn.lower()
 
         # Kager — tjekkes FØR boller så 'fastelavnsbolle' ikke snupper kager
-        if any(k in n for k in ('studenterbr', 'stammer', 'amagerkag',
-                                 'napoleonshat', 'cookie', 'kokostoppe',
-                                 'romkugl', 'muffin', 'brownie', 'honning',
-                                 'banan kage', 'citron snit', 'snitter',
-                                 'kage')):
+        if any(k in n for k in ('studenterbr', 'stammer', 'napoleonshat',
+                                 'cookie', 'kokostoppe', 'romkugl', 'muffin',
+                                 'brownie', 'honningbomb', 'honninghjerter',
+                                 'snitter', 'kage')):
             return 4
 
         # Wienerbrød — tjekkes FØR boller (fastelavnsbolle er wienerbrød)

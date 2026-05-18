@@ -224,12 +224,21 @@ def init_db():
                OR LOWER(varenavn) LIKE '%wienerstang%'
                OR LOWER(varenavn) LIKE '%kanelstang%'
         """)
-        # Kager (SKU-baseret, præcis) → sektion 4
-        _KAGE_SKUS_STR = '10210,10342,10345,10075,10077,10078,10076,12433,12431,14051,13657,10053,10079'
-        conn.execute(f"""
+        # Kager (varenavn-baseret, da bagerens varenumre ≠ Shopbox SKU'er) → sektion 4
+        conn.execute("""
             UPDATE ugebestillinger SET sektion=4
-            WHERE CAST(CAST(varenummer AS REAL) AS INTEGER)
-                  IN ({_KAGE_SKUS_STR})
+            WHERE LOWER(varenavn) LIKE '%kage%'
+               OR LOWER(varenavn) LIKE '%cookie%'
+               OR LOWER(varenavn) LIKE '%muffin%'
+               OR LOWER(varenavn) LIKE '%brownie%'
+               OR LOWER(varenavn) LIKE '%romkugl%'
+               OR LOWER(varenavn) LIKE '%kokostoppe%'
+               OR LOWER(varenavn) LIKE '%napoleonshat%'
+               OR LOWER(varenavn) LIKE '%studenterbr%'
+               OR LOWER(varenavn) LIKE '%snitter%'
+               OR LOWER(varenavn) LIKE '%stammer%'
+               OR LOWER(varenavn) LIKE '%honningbomb%'
+               OR LOWER(varenavn) LIKE '%honninghjerter%'
         """)
 
         # Seed: sæt korrekte værdier på kendte TGTG-pose-typer
@@ -1614,25 +1623,23 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
         "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
     )
-    # Kager holdes UDENFOR dagsniveauberegning — købes til 4-5 dage
-    # SKU'erne er fra Varestamdata.xlsx Type='Kage' (stabile Shopbox-id'er)
-    _KAGE_SKUS = (
-        10210,  # Studenterbrod - halv plade
-        10342,  # Trøstammer
-        10345,  # Napoleonshat
-        10075,  # Cookies
-        10077,  # Kokostoppe
-        10078,  # Romkugler m. choko
-        10076,  # Hindbærsnitter
-        12433,  # Honningbomber
-        12431,  # Honninghjerter
-        14051,  # Banan Kage
-        13657,  # Banan muffin
-        10053,  # Brownie
-        10079,  # Æble-kanel muffin
+    # Kager identificeres på varenavn — bagerens varenumre i ugebestillinger
+    # er IKKE Shopbox SKU'er, så varenavn-mønstre er den eneste pålidelige metode.
+    _KAGE_VN = (
+        "LOWER(varenavn) LIKE '%kage%'"
+        " OR LOWER(varenavn) LIKE '%cookie%'"
+        " OR LOWER(varenavn) LIKE '%muffin%'"
+        " OR LOWER(varenavn) LIKE '%brownie%'"
+        " OR LOWER(varenavn) LIKE '%romkugl%'"
+        " OR LOWER(varenavn) LIKE '%kokostoppe%'"
+        " OR LOWER(varenavn) LIKE '%napoleonshat%'"
+        " OR LOWER(varenavn) LIKE '%studenterbr%'"
+        " OR LOWER(varenavn) LIKE '%snitter%'"
+        " OR LOWER(varenavn) LIKE '%stammer%'"
+        " OR LOWER(varenavn) LIKE '%honningbomb%'"
+        " OR LOWER(varenavn) LIKE '%honninghjerter%'"
     )
-    _KAGE_SKU_LIST = ','.join(str(s) for s in _KAGE_SKUS)
-    _KAGE_FILTER = f"(CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({_KAGE_SKU_LIST}))"
+    _KAGE_FILTER = f"({_KAGE_VN})"
 
     try:
         with _conn() as conn:
@@ -1787,18 +1794,13 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                                  for r in kage_bestil_rows}
             kage_bestilt_total = sum(kage_varer_bestil.values())
 
-            # Kassesalg af kager for ugen
+            # Kassesalg af kager for ugen — matcher direkte på varenavn i transaktioner
             kage_kasse_rows = conn.execute(f"""
                 SELECT COALESCE(varenavn,'') AS varenavn,
                        ROUND(SUM(antal), 0) AS antal
                 FROM transaktioner
                 WHERE dato IN ({placeholders})
-                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
-                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
-                      FROM ugebestillinger
-                      WHERE varenummer != '' AND varenummer != '0'
-                        AND {_KAGE_FILTER}
-                  )
+                  AND ({_KAGE_VN})
                 GROUP BY varenavn
             """, dato_liste).fetchall()
             kage_kassesalg_map = {r['varenavn']: int(r['antal'] or 0)

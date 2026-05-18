@@ -552,6 +552,28 @@ async def mobilepay_gem(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/mobilepay/dagssalg")
+async def mobilepay_dagssalg(request: Request):
+    """Webhook: modtager daglig MP-omsætning fra mobilepay_sync.py."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    if body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Forkert secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        return {"ok": True, "linjer": 0}
+    count = database.gem_mobilepay_dag(linjer)
+    return {"ok": True, "linjer": count}
+
+
+@app.get("/api/mobilepay/dag")
+async def api_mobilepay_dag(request: Request, fra: str = None, til: str = None):
+    _kræv_login(request)
+    return database.hent_mobilepay_dag(fra, til)
+
+
 @app.get("/api/salg/mangler-kostpris")
 async def api_mangler_kostpris(request: Request):
     _kræv_login(request)

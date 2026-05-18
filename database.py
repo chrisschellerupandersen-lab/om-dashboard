@@ -131,6 +131,13 @@ def init_db():
                 UNIQUE(aar, maaned) ON CONFLICT REPLACE
             );
 
+            CREATE TABLE IF NOT EXISTS mobilepay_dag (
+                dato            TEXT    PRIMARY KEY,
+                omsaetning_inkl REAL    NOT NULL DEFAULT 0,
+                kilde           TEXT    DEFAULT 'api',
+                indlæst         TEXT    DEFAULT (datetime('now','localtime'))
+            );
+
             CREATE TABLE IF NOT EXISTS varestamdata (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 sku          TEXT    DEFAULT '',
@@ -513,10 +520,67 @@ def _mp_uge_netto(aar: int, maaned: int) -> float:
 
 
 def _mp_map_alle() -> Dict:
-    """Returnerer {(aar, maaned): omsaetning_inkl_moms}."""
+    """Returnerer {(aar, maaned): omsaetning_inkl_moms}.
+    Foretrækker daglig data (mobilepay_dag) over manuelle månedstotaler."""
+    from datetime import date as _d
     with _conn() as conn:
-        rows = conn.execute("SELECT aar, maaned, omsaetning FROM mobilepay").fetchall()
-    return {(r["aar"], r["maaned"]): r["omsaetning"] for r in rows}
+        # Daglig data → aggregér til måneder
+        dag_rows = conn.execute(
+            "SELECT dato, omsaetning_inkl FROM mobilepay_dag"
+        ).fetchall()
+        maaned_map: Dict = {}
+        for r in dag_rows:
+            dt = _d.fromisoformat(r["dato"])
+            key = (dt.year, dt.month)
+            maaned_map[key] = maaned_map.get(key, 0.0) + r["omsaetning_inkl"]
+        # Manuel månedstotal som fallback for måneder uden daglig data
+        mnd_rows = conn.execute("SELECT aar, maaned, omsaetning FROM mobilepay").fetchall()
+        for r in mnd_rows:
+            key = (r["aar"], r["maaned"])
+            if key not in maaned_map:
+                maaned_map[key] = r["omsaetning"]
+    return maaned_map
+
+
+def _mp_dag_map(fra_dato: str, til_dato: str) -> Dict:
+    """Returnerer {dato_str: omsaetning_inkl} for daglig MP-data i perioden."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT dato, omsaetning_inkl FROM mobilepay_dag WHERE dato BETWEEN ? AND ?",
+            (fra_dato, til_dato)
+        ).fetchall()
+    return {r["dato"]: r["omsaetning_inkl"] for r in rows}
+
+
+def gem_mobilepay_dag(linjer: list) -> int:
+    """Gem/opdater daglig MobilePay-omsætning. linjer = [{dato, omsaetning_inkl, kilde?}]"""
+    with _conn() as conn:
+        count = 0
+        for l in linjer:
+            conn.execute("""
+                INSERT INTO mobilepay_dag (dato, omsaetning_inkl, kilde)
+                VALUES (?, ?, ?)
+                ON CONFLICT(dato) DO UPDATE SET
+                    omsaetning_inkl = excluded.omsaetning_inkl,
+                    kilde           = excluded.kilde,
+                    indlæst         = datetime('now','localtime')
+            """, (l["dato"], l["omsaetning_inkl"], l.get("kilde", "api")))
+            count += 1
+    return count
+
+
+def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]:
+    with _conn() as conn:
+        if fra_dato and til_dato:
+            rows = conn.execute(
+                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag WHERE dato BETWEEN ? AND ? ORDER BY dato DESC",
+                (fra_dato, til_dato)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag ORDER BY dato DESC LIMIT 90"
+            ).fetchall()
+    return [dict(r) for r in rows]
 
 
 def hent_uger(aar: int = None) -> List[Dict]:

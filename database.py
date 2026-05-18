@@ -1139,12 +1139,9 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         return {"uge": uge, "aar": aar, "dage": [], "produkter": []}
     dage_datoer = [(mandag + _td(days=i)).isoformat() for i in range(7)]
 
-    # Sektion beregnes dynamisk fra varenavn — pålideligere end gemt kolonne
+    # Sektion beregnes dynamisk fra varenavn — bagerens varenumre ≠ Shopbox SKU'er
     _SEK_CASE = """
         CASE
-          WHEN CAST(CAST(varenummer AS REAL) AS INTEGER)
-               IN (10210,10342,10345,10075,10077,10078,10076,
-                   12433,12431,14051,13657,10053,10079) THEN 4
           WHEN LOWER(varenavn) LIKE '%kage%'
             OR LOWER(varenavn) LIKE '%cookie%'
             OR LOWER(varenavn) LIKE '%muffin%'

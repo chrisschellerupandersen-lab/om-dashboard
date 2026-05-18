@@ -2223,18 +2223,19 @@ def _events_for_aar(aar: int) -> Dict:
     ev[(pw, py)] = {
         "factor": 1.15,
         "navn": f"Pinse ({_dname(pinse)}. {pinse.strftime('%b')})",
-        "note": "Søndagsleverance dækker søndag + mandag",
+        "note": "Fre/Lør/Søn stiger — Søn er Pinsesøndag. Mandag (2. Pinsedag) håndteres i næste uge",
         "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.10,"loe":1.20,"son":1.40},
     }
 
-    # ── 2. Pinsedag (mandag efter pinse — lukket) ────────────────────────
+    # ── 2. Pinsedag (mandag efter pinse — Organic Market ÅBEN) ──────────
+    # De fleste butikker lukket → øget trafik til de få åbne
     pinse_man = pinse + timedelta(days=1)
     pw2, py2 = _yw(pinse_man)
     if (pw2, py2) != (pw, py):
         ev[(pw2, py2)] = {
-            "factor": 0.88, "navn": "2. Pinsedag — mandag lukket",
-            "note": "Reducer første leverance mandag",
-            "dag_fak": {"man":0.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
+            "factor": 1.10, "navn": "2. Pinsedag — åben (de fleste lukket)",
+            "note": "Mandag helligdag — en af få åbne butikker, forvent øget trafik",
+            "dag_fak": {"man":1.25,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
         }
 
     # ── Grundlovsdag (5. juni — oftest fredag) ───────────────────────────

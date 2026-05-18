@@ -10,20 +10,23 @@ Daglig kørsel:
   python mobilepay_sync.py --dato 2026-05-16
   python mobilepay_sync.py --dage 7
 
-Konfiguration via miljøvariabler eller .env-fil:
-  MP_API_KEY        = din API-nøgle fra portal.mobilepay.dk / portal.vippsmobilepay.com
-  MP_LEDGER_ID      = ledger-ID (find med --list-ledgers)
+Konfiguration i .env-fil (samme mappe som scriptet):
+  MP_CLIENT_ID     = fra portal.vippsmobilepay.com → Developers
+  MP_CLIENT_SECRET = fra portal.vippsmobilepay.com → Developers
+  MP_MSN           = dit merchant serial number (f.eks. 2084977)
+  MP_LEDGER_ID     = find med --list-ledgers
 
-Kræver:  pip install requests python-dotenv
+Kræver:  pip install requests
 """
 
 import argparse
 import os
+import time
 import requests
 from datetime import date, timedelta
 from pathlib import Path
 
-# ── Indlæs .env hvis den findes ──────────────────────────────────────────────
+# ── Indlæs .env ───────────────────────────────────────────────────────────────
 _env = Path(__file__).parent / ".env"
 if _env.exists():
     for line in _env.read_text(encoding="utf-8").splitlines():
@@ -36,87 +39,140 @@ if _env.exists():
 RAILWAY_URL    = "https://om-dashboard-production-0f3a.up.railway.app"
 WEBHOOK_SECRET = "OM-Greve-2026-Hemlig"
 
-MP_API_KEY   = os.environ.get("MP_API_KEY", "")
-MP_LEDGER_ID = os.environ.get("MP_LEDGER_ID", "")
+MP_CLIENT_ID     = os.environ.get("MP_CLIENT_ID", "")
+MP_CLIENT_SECRET = os.environ.get("MP_CLIENT_SECRET", "")
+MP_MSN           = os.environ.get("MP_MSN", "")
+MP_LEDGER_ID     = os.environ.get("MP_LEDGER_ID", "")
 
-# Vipps MobilePay Report API (dansk produktion)
-MP_BASE = "https://api.vippsmobilepay.com"
+# Vipps MobilePay API endpoints
+MP_BASE       = "https://api.vippsmobilepay.com"
+TOKEN_URL     = f"{MP_BASE}/accesstoken/get"
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Token-cache
+_token_cache = {"token": None, "expires_at": 0}
 
-def _headers() -> dict:
-    if not MP_API_KEY:
+
+def get_token() -> str:
+    """Hent OAuth2 Bearer-token via client credentials. Caches til udløb."""
+    global _token_cache
+    if _token_cache["token"] and time.time() < _token_cache["expires_at"] - 60:
+        return _token_cache["token"]
+
+    if not MP_CLIENT_ID or not MP_CLIENT_SECRET:
         raise RuntimeError(
-            "MP_API_KEY mangler.\n"
-            "Sæt den i .env-filen: MP_API_KEY=din_nøgle_her"
+            "MP_CLIENT_ID eller MP_CLIENT_SECRET mangler i .env-filen."
         )
+
+    # Vipps MobilePay: client_id + client_secret sendes som headers
+    r = requests.post(
+        TOKEN_URL,
+        headers={
+            "client_id":     MP_CLIENT_ID,
+            "client_secret": MP_CLIENT_SECRET,
+            "Content-Type":  "application/json",
+        },
+        timeout=15,
+    )
+
+    if r.status_code != 200:
+        raise RuntimeError(
+            f"Token-hentning fejlede: HTTP {r.status_code}\n{r.text[:300]}"
+        )
+
+    data = r.json()
+    token = data.get("access_token") or data.get("token")
+    if not token:
+        raise RuntimeError(f"Ingen access_token i svar: {data}")
+
+    expires_in = int(data.get("expires_in", 3600))
+    _token_cache = {"token": token, "expires_at": time.time() + expires_in}
+    return token
+
+
+def _auth_headers() -> dict:
     return {
-        "Authorization": f"Bearer {MP_API_KEY}",
+        "Authorization": f"Bearer {get_token()}",
         "Accept":        "application/json",
+        "Merchant-Serial-Number": MP_MSN,
     }
 
 
 def list_ledgers():
     """Vis alle ledgers tilknyttet API-nøglen."""
-    r = requests.get(f"{MP_BASE}/report/v2/ledgers", headers=_headers(), timeout=15)
+    r = requests.get(
+        f"{MP_BASE}/report/v2/ledgers",
+        headers=_auth_headers(),
+        timeout=15,
+    )
     if r.status_code != 200:
-        print(f"[FEJL] HTTP {r.status_code}: {r.text[:200]}")
+        print(f"[FEJL] HTTP {r.status_code}: {r.text[:300]}")
         return
+
     data = r.json()
-    ledgers = data.get("ledgers") or data.get("items") or (data if isinstance(data, list) else [])
+    ledgers = (
+        data.get("ledgers")
+        or data.get("items")
+        or (data if isinstance(data, list) else [])
+    )
+
     if not ledgers:
-        print("Ingen ledgers fundet. Tjek at din API-nøgle er korrekt.")
+        print("Ingen ledgers fundet. Tjek credentials og MSN.")
         print("Råsvar:", data)
         return
+
     print(f"\nFundne ledgers ({len(ledgers)}):\n")
     for l in ledgers:
         lid  = l.get("ledgerId") or l.get("id") or "?"
-        name = l.get("name") or l.get("currency") or ""
-        print(f"  {lid}  {name}")
-    print(f"\nSæt i .env:  MP_LEDGER_ID={ledgers[0].get('ledgerId', ledgers[0].get('id', ''))}")
+        name = l.get("name") or l.get("currency") or l.get("type") or ""
+        curr = l.get("currency") or ""
+        print(f"  {lid}  {curr}  {name}")
+
+    first_id = ledgers[0].get("ledgerId") or ledgers[0].get("id") or ""
+    print(f"\nSæt i .env:  MP_LEDGER_ID={first_id}")
 
 
 def fetch_dag(dato: str) -> float:
-    """Hent total indgående omsætning (inkl. moms) for én dato.
-    Returnerer 0.0 hvis ingen data. Dato-format: YYYY-MM-DD.
-    """
+    """Hent total indgående omsætning (inkl. moms) for én dato (YYYY-MM-DD)."""
     if not MP_LEDGER_ID:
         raise RuntimeError(
             "MP_LEDGER_ID mangler.\n"
-            "Kør først: python mobilepay_sync.py --list-ledgers\n"
-            "Sæt derefter i .env: MP_LEDGER_ID=..."
+            "Kør:  python mobilepay_sync.py --list-ledgers\n"
+            "Sæt derefter MP_LEDGER_ID=... i .env"
         )
 
     url = f"{MP_BASE}/report/v2/ledgers/{MP_LEDGER_ID}/funds/dates/{dato}"
-    r = requests.get(url, headers=_headers(), timeout=15)
+    r = requests.get(url, headers=_auth_headers(), timeout=15)
 
     if r.status_code == 404:
-        return 0.0  # ingen transaktioner den dag
+        return 0.0
     if r.status_code != 200:
         print(f"  [WARN] {dato}: HTTP {r.status_code} — {r.text[:100]}")
         return 0.0
 
     data = r.json()
+    entries = (
+        data.get("items")
+        or data.get("entries")
+        or (data if isinstance(data, list) else [])
+    )
 
-    # Summér alle positive beløb (captures/salg) — beløb er i øre
     total_oere = 0
-    entries = data.get("items") or data.get("entries") or (data if isinstance(data, list) else [])
     for e in entries:
         entry_type = (e.get("entryType") or e.get("type") or "").lower()
-        amount = e.get("amount") or e.get("grossAmount") or 0
-        # Tag kun indgående salg (ikke refunds/fees)
+        # Kun indgående salg — ikke refunds/fees
         if entry_type in ("capture", "sale", "payment", ""):
+            amount = e.get("amount") or e.get("grossAmount") or 0
             if isinstance(amount, dict):
                 amount = amount.get("value") or amount.get("amount") or 0
-            if amount > 0:
+            if isinstance(amount, (int, float)) and amount > 0:
                 total_oere += amount
 
-    # Konvertér fra øre til kr
+    # API returnerer beløb i øre
     return round(total_oere / 100, 2)
 
 
 def upload_til_railway(linjer: list):
-    """Upload daglige MP-beløb til Railway."""
     r = requests.post(
         f"{RAILWAY_URL}/api/mobilepay/dagssalg",
         json={"secret": WEBHOOK_SECRET, "linjer": linjer},
@@ -128,24 +184,20 @@ def upload_til_railway(linjer: list):
 
 
 def sync_dates(datoer: list):
-    """Hent MP-omsætning for de givne datoer og upload til Railway."""
     linjer = []
     for dato in datoer:
         omsat = fetch_dag(dato)
+        linjer.append({
+            "dato":            dato,
+            "omsaetning_inkl": omsat,
+            "kilde":           "api",
+        })
         if omsat > 0:
-            linjer.append({
-                "dato":            dato,
-                "omsaetning_inkl": omsat,
-                "kilde":           "api",
-            })
             print(f"  {dato}  {omsat:>10,.2f} kr")
         else:
             print(f"  {dato}  —")
 
-    if linjer:
-        upload_til_railway(linjer)
-    else:
-        print("Ingen MobilePay-omsætning fundet for de valgte datoer.")
+    upload_til_railway(linjer)
     return linjer
 
 

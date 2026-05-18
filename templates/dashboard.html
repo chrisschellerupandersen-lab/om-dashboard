@@ -2107,7 +2107,7 @@ async function loadAll() {
 
   buildForside(kpi, dage, uger, idag, katUge);
   if (kpi) { buildAlerts(kpi); buildDagProgress(kpi); }
-  buildDag(kpi, timer, timerForrige);
+  buildDag(kpi, timer, timerForrige, timerSnit);
   buildUge(uger);
   buildTime(timerSnit);
   buildKategorier(kategorier);
@@ -2582,7 +2582,7 @@ function buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, nUger) {
   sc.style.display = '';
 }
 
-function buildDag(kpi, timer, timerForrige) {
+function buildDag(kpi, timer, timerForrige, timerSnit) {
   if (kpi && kpi.dag) {
     const dag = kpi.dag;
     document.getElementById('dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
@@ -2662,6 +2662,16 @@ function buildDag(kpi, timer, timerForrige) {
     const prevData = alleTimer.map(h => prevMap[h] != null ? Math.round(prevMap[h]) : null);
     const hasPrev  = prevData.some(v => v != null);
 
+    // Gennemsnit for dagens ugedag (1=Man … 7=Søn, ISO)
+    const todayJS = new Date().getDay(); // 0=Søn, 1=Man …
+    const todayISO = todayJS === 0 ? 7 : todayJS;
+    const snitMap = {};
+    (timerSnit || []).forEach(r => {
+      if (r.ugedag === todayISO) snitMap[r.time_start] = r.snit_omsaetning;
+    });
+    const snitData = alleTimer.map(h => snitMap[h] != null ? Math.round(snitMap[h]) : null);
+    const hasSnit  = snitData.some(v => v != null);
+
     const datasets = [{
       label: 'I dag',
       data: alleTimer.map(h => Math.round(idagMap[h] ?? 0)),
@@ -2669,7 +2679,7 @@ function buildDag(kpi, timer, timerForrige) {
       borderColor: barBorders,
       borderWidth: 1,
       borderRadius: 2,
-      order: 2,
+      order: 3,
     }];
 
     if (hasPrev) {
@@ -2685,6 +2695,23 @@ function buildDag(kpi, timer, timerForrige) {
         pointBackgroundColor: 'rgba(100,100,100,.5)',
         tension: 0.2,
         spanGaps: false,
+        order: 2,
+      });
+    }
+
+    if (hasSnit) {
+      datasets.push({
+        label: 'Normalt snit',
+        type: 'line',
+        data: snitData,
+        borderColor: 'rgba(180,130,30,.75)',
+        backgroundColor: 'transparent',
+        borderWidth: 2,
+        borderDash: [6, 3],
+        pointRadius: 2,
+        pointBackgroundColor: 'rgba(180,130,30,.75)',
+        tension: 0.3,
+        spanGaps: false,
         order: 1,
       });
     }
@@ -2695,7 +2722,7 @@ function buildDag(kpi, timer, timerForrige) {
         y: { ticks: { font: { size:11 }, callback: v => Math.round(v)+' kr' }}
       },
       plugins: {
-        legend: { display: hasPrev, labels: { font: { size:10 }, boxWidth:12 }}
+        legend: { display: hasPrev || hasSnit, labels: { font: { size:10 }, boxWidth:12 }}
       }
     });
   } else {

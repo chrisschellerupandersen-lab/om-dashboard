@@ -208,21 +208,28 @@ def init_db():
         # (disse forstyrrer VF-beregningen — Shopbox' kostpris bruges i stedet)
         conn.execute("DELETE FROM varestamdata WHERE LOWER(varenavn) LIKE 'øko - %'")
 
-        # Fix: ret sektion på ugebestillinger der er fejlkategoriseret
-        # Kager (SKU-baseret) → sektion 4
+        # Fix: ret sektion direkte fra varenavn-regler (kører ved hver opstart)
+        # Wienerbrød-varer der fejlagtigt fik sektion=2 eller 4 → 3
+        conn.execute("""
+            UPDATE ugebestillinger SET sektion=3
+            WHERE LOWER(varenavn) LIKE '%tebirkes%'
+               OR LOWER(varenavn) LIKE '%grovbirkes%'
+               OR LOWER(varenavn) LIKE '%fastelavns%'
+               OR LOWER(varenavn) LIKE '%croissant%'
+               OR LOWER(varenavn) LIKE '%snegl%'
+               OR LOWER(varenavn) LIKE '%snurrer%'
+               OR LOWER(varenavn) LIKE '%frøsnapper%'
+               OR LOWER(varenavn) LIKE '%spandauer%'
+               OR LOWER(varenavn) LIKE '%wienerbr%'
+               OR LOWER(varenavn) LIKE '%wienerstang%'
+               OR LOWER(varenavn) LIKE '%kanelstang%'
+        """)
+        # Kager (SKU-baseret, præcis) → sektion 4
         _KAGE_SKUS_STR = '10210,10342,10345,10075,10077,10078,10076,12433,12431,14051,13657,10053,10079'
         conn.execute(f"""
             UPDATE ugebestillinger SET sektion=4
             WHERE CAST(CAST(varenummer AS REAL) AS INTEGER)
                   IN ({_KAGE_SKUS_STR})
-        """)
-        # Wienerbrød-varer der fejlagtigt havner i sektion 2 (boller) → sektion 3
-        conn.execute("""
-            UPDATE ugebestillinger SET sektion=3
-            WHERE sektion=2
-              AND (LOWER(varenavn) LIKE '%tebirkes%'
-                   OR LOWER(varenavn) LIKE '%grovbirkes%'
-                   OR LOWER(varenavn) LIKE '%fastelavns%')
         """)
 
         # Seed: sæt korrekte værdier på kendte TGTG-pose-typer
@@ -1123,16 +1130,52 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         return {"uge": uge, "aar": aar, "dage": [], "produkter": []}
     dage_datoer = [(mandag + _td(days=i)).isoformat() for i in range(7)]
 
+    # Sektion beregnes dynamisk fra varenavn — pålideligere end gemt kolonne
+    _SEK_CASE = """
+        CASE
+          WHEN CAST(CAST(varenummer AS REAL) AS INTEGER)
+               IN (10210,10342,10345,10075,10077,10078,10076,
+                   12433,12431,14051,13657,10053,10079) THEN 4
+          WHEN LOWER(varenavn) LIKE '%kage%'
+            OR LOWER(varenavn) LIKE '%cookie%'
+            OR LOWER(varenavn) LIKE '%muffin%'
+            OR LOWER(varenavn) LIKE '%brownie%'
+            OR LOWER(varenavn) LIKE '%romkugl%'
+            OR LOWER(varenavn) LIKE '%kokostoppe%'
+            OR LOWER(varenavn) LIKE '%napoleonshat%'
+            OR LOWER(varenavn) LIKE '%studenterbr%'
+            OR LOWER(varenavn) LIKE '%snitter%' THEN 4
+          WHEN LOWER(varenavn) LIKE '%croissant%'
+            OR LOWER(varenavn) LIKE '%snegl%'
+            OR LOWER(varenavn) LIKE '%snurrer%'
+            OR LOWER(varenavn) LIKE '%tebirkes%'
+            OR LOWER(varenavn) LIKE '%grovbirkes%'
+            OR LOWER(varenavn) LIKE '%fastelavns%'
+            OR LOWER(varenavn) LIKE '%wienerbr%'
+            OR LOWER(varenavn) LIKE '%wienerstang%'
+            OR LOWER(varenavn) LIKE '%kanelstang%'
+            OR LOWER(varenavn) LIKE '%spandauer%'
+            OR LOWER(varenavn) LIKE '%frøsnapper%'
+            OR LOWER(varenavn) LIKE '%marcipan%'
+            OR LOWER(varenavn) LIKE '%romsnegl%' THEN 3
+          WHEN LOWER(varenavn) LIKE '%bolle%'
+            OR LOWER(varenavn) LIKE '%musli%'
+            OR LOWER(varenavn) LIKE '%hveder%' THEN 2
+          ELSE 1
+        END
+    """
+
     with _conn() as conn:
-        bestil = conn.execute("""
-            SELECT varenummer, varenavn, COALESCE(sektion,1) AS sektion,
+        bestil = conn.execute(f"""
+            SELECT varenummer, varenavn,
+                   ({_SEK_CASE}) AS sektion,
                    COALESCE(man,0) AS man, COALESCE(tir,0) AS tir,
                    COALESCE(ons,0) AS ons, COALESCE(tor,0) AS tor,
                    COALESCE(fre,0) AS fre, COALESCE(loe,0) AS loe,
                    COALESCE(son,0) AS son
             FROM ugebestillinger
             WHERE uge = ? AND aar = ?
-            ORDER BY COALESCE(sektion,1) ASC, rowid ASC
+            ORDER BY ({_SEK_CASE}) ASC, rowid ASC
         """, (uge, aar)).fetchall()
 
         if not bestil:

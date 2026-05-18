@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import math
 from typing import List, Dict, Any, Optional
 
 DB_PATH = os.environ.get("DB_PATH", "dashboard.db")
@@ -1386,6 +1387,7 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
     Fallback: tgtg_kr ÷ 38 kr/pose hvis ingen tgtg_dagssalg data.
     """
     TGTG_KR_PR_POSE = 38.0
+    TGTG_ENHEDER_PR_POSE = 5.5  # gns. enheder pr. pose (Lykke=6, Brød=5, Wiener=6)
 
     from datetime import date as _date
 
@@ -1421,17 +1423,19 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             key = (iso[1], iso[0])
             kw_map[key] = kw_map.get(key, 0) + (r["kw_stk"] or 0)
 
-        # TGTG faktisk stk fra tgtg_dagssalg (dato er allerede produktionsdato = salgsdag-1)
+        # TGTG faktisk stk fra tgtg_dagssalg — antal × enheder_per_pose (ikke bare poser)
         tgtg_dage = conn.execute("""
-            SELECT dato, SUM(antal) AS antal
-            FROM tgtg_dagssalg
-            GROUP BY dato
+            SELECT ds.dato,
+                   SUM(ds.antal * COALESCE(tp.enheder_per_pose, 1)) AS stk
+            FROM tgtg_dagssalg ds
+            LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
+            GROUP BY ds.dato
         """).fetchall()
         tgtg_stk_map: Dict = {}
         for r in tgtg_dage:
             iso = _date.fromisoformat(r["dato"]).isocalendar()
             key = (iso[1], iso[0])
-            tgtg_stk_map[key] = tgtg_stk_map.get(key, 0) + int(r["antal"] or 0)
+            tgtg_stk_map[key] = tgtg_stk_map.get(key, 0) + int(r["stk"] or 0)
 
         aar_filter1 = "AND b.aar = ?" if aar else ""
         aar_filter2 = "AND u.aar = ?" if aar else ""
@@ -1491,7 +1495,7 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             tgtg_stk       = int(tgtg_stk_actual)
             tgtg_stk_kilde = "faktisk"
         else:
-            tgtg_stk       = round(d["tgtg"] / TGTG_KR_PR_POSE) if d.get("tgtg") else 0
+            tgtg_stk       = round(d["tgtg"] / TGTG_KR_PR_POSE * TGTG_ENHEDER_PR_POSE) if d.get("tgtg") else 0
             tgtg_stk_kilde = "estimat"
 
         # MobilePay netto pro-ratet til ugen (mandag bestemmer måned)
@@ -1695,7 +1699,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             for dag in dag_navne:
                 b_b = float(bestil_boller_row[dag] or 0) if bestil_boller_row else 0.0
                 b_w = float(bestil_wiener_row[dag] or 0) if bestil_wiener_row else 0.0
-                retur_per_dag[dag] = int(round(b_b * RETUR_BOLLER_PCT + b_w * RETUR_WIENER_PCT))
+                retur_per_dag[dag] = math.ceil(b_b * RETUR_BOLLER_PCT + b_w * RETUR_WIENER_PCT)
 
             # ── Kassesalg per dato ────────────────────────────────────────────
             # Matcher varenumre fra bestillinger (ekskl. kaffe/drikkevarer)

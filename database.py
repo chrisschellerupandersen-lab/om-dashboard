@@ -1612,13 +1612,26 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     # Returprocenter — hvad der KAN sendes retur til bageren hvis ikke solgt
     RETUR_BOLLER_PCT  = 0.10
     RETUR_WIENER_PCT  = 0.135
-    # Varenavn-match i bestillinger (ikke transaktioner)
+    # Varenavn-match i bestillinger — ALLE bolle- og wienerbrøds-varianter
     _BOLLE_BESTIL = (
-        "LOWER(varenavn) LIKE '%boller%' OR LOWER(varenavn) LIKE '%bolle%'"
+        "LOWER(varenavn) LIKE '%bolle%'"
+        " OR LOWER(varenavn) LIKE '%hveder%'"
+        " OR LOWER(varenavn) LIKE '%musli%'"
+        " OR LOWER(varenavn) LIKE '%teboller%'"
     )
     _WIENER_BESTIL = (
-        "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
-        "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'"
+        "LOWER(varenavn) LIKE '%wiener%'"
+        " OR LOWER(varenavn) LIKE '%croissant%'"
+        " OR LOWER(varenavn) LIKE '%snegl%'"
+        " OR LOWER(varenavn) LIKE '%snurrer%'"
+        " OR LOWER(varenavn) LIKE '%tebirkes%'"
+        " OR LOWER(varenavn) LIKE '%grovbirkes%'"
+        " OR LOWER(varenavn) LIKE '%fastelavns%'"
+        " OR LOWER(varenavn) LIKE '%spandauer%'"
+        " OR LOWER(varenavn) LIKE '%frøsnapper%'"
+        " OR LOWER(varenavn) LIKE '%kanelstang%'"
+        " OR LOWER(varenavn) LIKE '%wienerstang%'"
+        " OR LOWER(varenavn) LIKE '%marcipan%'"
     )
     # Kager identificeres på varenavn — bagerens varenumre i ugebestillinger
     # er IKKE Shopbox SKU'er, så varenavn-mønstre er den eneste pålidelige metode.

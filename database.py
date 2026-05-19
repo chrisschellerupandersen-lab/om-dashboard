@@ -908,24 +908,17 @@ def hent_aarsdata(aar: int = None) -> Dict:
         _DAG_NAVNE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
         bestil_map = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows}
 
+        # Tildel hele ugens netto-faktura til mandagens måned (konsistent med modal)
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
                 fakt = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
                 if fakt <= 0:
                     continue
-                key = (int(br["aar"]), int(br["uge"]))
                 mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
-                bestil = bestil_map.get(key)
-                dag_vaerdier = [float(bestil[d] or 0) for d in _DAG_NAVNE] if bestil else []
-                total_bestil = sum(dag_vaerdier) if dag_vaerdier else 0.0
-                for i, dag_navn in enumerate(_DAG_NAVNE):
-                    dag = mon + _td(days=i)
-                    if dag.year != aar:
-                        continue
-                    vaegt = (dag_vaerdier[i] / total_bestil) if total_bestil > 0 else (1.0 / 7.0)
-                    faktura_maaned[dag.month] = round(
-                        faktura_maaned.get(dag.month, 0.0) + fakt * vaegt, 2
+                if mon.year == aar:
+                    faktura_maaned[mon.month] = round(
+                        faktura_maaned.get(mon.month, 0.0) + fakt, 2
                     )
             except Exception:
                 pass

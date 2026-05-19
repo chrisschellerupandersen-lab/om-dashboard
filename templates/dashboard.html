@@ -1392,7 +1392,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                   <th class="num" colspan="2" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">INDKØBT</th>
                   <th class="num" colspan="3" style="border-bottom:2px solid rgba(74,124,74,.4);font-size:8px;letter-spacing:.07em;color:var(--moss);padding-bottom:2px;">SOLGT I STK</th>
                   <th class="num" colspan="2" style="border-bottom:2px solid rgba(155,52,32,.3);font-size:8px;letter-spacing:.07em;color:#9b3420;padding-bottom:2px;">SVIND</th>
-                  <th class="num" colspan="4" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">ØKONOMI KR</th>
+                  <th class="num" colspan="6" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">ØKONOMI KR</th>
                 </tr>
                 <tr>
                   <th style="width:7%;">Uge</th>
@@ -1403,14 +1403,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                   <th class="num" style="width:7%;" title="Too Good To Go — faktiske poser (estimat hvis ingen sync)">TGTG stk</th>
                   <th class="num" style="width:7%;">Svind stk</th>
                   <th class="num" style="width:7%;">Svind %</th>
-                  <th class="num" style="width:7%;">TGTG kr</th>
-                  <th class="num" style="width:7%;">Retur i alt</th>
-                  <th class="num" style="width:7%;" title="MobilePay netto pro-ratet til ugen">MobilePay</th>
-                  <th class="num" style="width:8%;" title="Netto justeret for MobilePay">Netto adj.</th>
+                  <th class="num" style="width:6%;">TGTG kr</th>
+                  <th class="num" style="width:6%;">Retur i alt</th>
+                  <th class="num" style="width:6%;" title="Shopbox omsætning inkl. moms for ugen">Shopbox kr</th>
+                  <th class="num" style="width:6%;" title="MobilePay netto (ex-moms) for de præcise dage i ugen">MobilePay</th>
+                  <th class="num" style="width:7%;" title="Shopbox netto + MobilePay netto — total omsætning ex-moms">Total omsat</th>
+                  <th class="num" style="width:7%;" title="Brødkost (indkøb − retur) minus MobilePay — hvad Shopbox skal dække">Netto adj.</th>
                 </tr>
               </thead>
               <tbody id="svind-tbody">
-                <tr><td colspan="13" class="empty">Indlæser…</td></tr>
+                <tr><td colspan="15" class="empty">Indlæser…</td></tr>
               </tbody>
             </table>
           </div>
@@ -4538,8 +4540,12 @@ async function loadSvind(force = false) {
       <td class="num" style="${svindCls}${mono}">${svindTxt}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.tgtg > 0 ? Math.round(r.tgtg).toLocaleString('da-DK') : '—'}</td>
       <td class="num" style="${mono}color:var(--ash);">${Math.round(r.retur_ialt || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}color:var(--forest);">${r.shopbox_inkl > 0 ? Math.round(r.shopbox_inkl).toLocaleString('da-DK') : '—'}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') : '—'}</td>
-      <td class="num" style="${mono}font-weight:500;">${r.netto_kr_adj != null ? Math.round(r.netto_kr_adj).toLocaleString('da-DK') : Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
+      <td class="num" style="${mono}font-weight:600;color:${(r.total_omsat_netto||0) >= (r.netto_kr||0) ? 'var(--moss)' : 'var(--danger)'};">
+        ${r.total_omsat_netto > 0 ? Math.round(r.total_omsat_netto).toLocaleString('da-DK') : '—'}
+      </td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${r.netto_kr_adj != null ? Math.round(r.netto_kr_adj).toLocaleString('da-DK') : Math.round(r.netto_kr || 0).toLocaleString('da-DK')}</td>
     </tr>`;
   }).join('');
 

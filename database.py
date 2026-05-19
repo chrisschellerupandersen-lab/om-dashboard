@@ -1488,6 +1488,18 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
     from datetime import date as _date
 
     with _conn() as conn:
+        # Shopbox total omsætning per dag (inkl. moms) → summeres til ISO-uge
+        shopbox_dage = conn.execute("""
+            SELECT dato, ROUND(SUM(omsætning), 2) AS dagomsat
+            FROM v_transaktioner
+            GROUP BY dato
+        """).fetchall()
+        shopbox_uge_map: Dict = {}
+        for r in shopbox_dage:
+            iso = _date.fromisoformat(r["dato"]).isocalendar()
+            key = (iso[1], iso[0])   # (uge, aar)
+            shopbox_uge_map[key] = shopbox_uge_map.get(key, 0.0) + (r["dagomsat"] or 0.0)
+
         # Kassesalg bagværk per dag — matcher varenummer fra bestillinger
         kasse_dage = conn.execute("""
             SELECT dato, ROUND(SUM(antal), 0) AS kassesalg_stk
@@ -1600,11 +1612,19 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
         except Exception:
             mp_netto = 0.0
 
-        d["kassesalg_stk"]  = kassesalg
-        d["kw_stk"]         = kw_stk
-        d["tgtg_stk"]       = tgtg_stk
-        d["tgtg_stk_kilde"] = tgtg_stk_kilde
-        d["mp_netto"]      = mp_netto
+        # Shopbox omsætning for ugen (inkl. moms) + netto ex-moms
+        shopbox_inkl  = round(shopbox_uge_map.get((d["uge"], d["aar"]), 0.0) or 0.0, 0)
+        shopbox_netto = round(shopbox_inkl / 1.25, 0)
+
+        d["kassesalg_stk"]    = kassesalg
+        d["kw_stk"]           = kw_stk
+        d["tgtg_stk"]         = tgtg_stk
+        d["tgtg_stk_kilde"]   = tgtg_stk_kilde
+        d["shopbox_inkl"]     = shopbox_inkl
+        d["shopbox_netto"]    = shopbox_netto
+        d["mp_netto"]         = mp_netto
+        # Total netto omsætning = Shopbox netto + MobilePay netto
+        d["total_omsat_netto"] = round(shopbox_netto + mp_netto, 0)
         # Netto justeret: hvad kostede brødet minus hvad vi fik ind (inkl. MobilePay)
         if d.get("netto_kr") is not None:
             d["netto_kr_adj"] = round(d["netto_kr"] - mp_netto, 0)

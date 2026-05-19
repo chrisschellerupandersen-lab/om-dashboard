@@ -691,6 +691,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
+        <!-- BAGER RETUR DENNE UGE -->
+        <div id="bager-retur-strip" style="display:none;margin-bottom:12px;">
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR WIENERBRØD · UGE <span id="bager-retur-uge">—</span></div>
+              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-wien-v">—</div>
+              <div style="font-size:11px;color:var(--ash);">kr krediteret</div>
+            </div>
+            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR BOLLER · UGE <span id="bager-retur-uge2">—</span></div>
+              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-boller-v">—</div>
+              <div style="font-size:11px;color:var(--ash);">kr krediteret</div>
+            </div>
+            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR I ALT inkl. TGTG</div>
+              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-ialt-v">—</div>
+              <div style="font-size:11px;color:var(--ash);">kr krediteret på faktura</div>
+            </div>
+          </div>
+        </div>
+
         <!-- ALERT STRIP -->
         <div id="alert-strip" style="display:none;margin-bottom:12px;">
           <div id="alert-chips" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -2372,6 +2393,21 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     const dag      = kpi.dag      || {};
     const uge      = kpi.uge      || {};
     const prevUge  = kpi.prev_uge || {};
+
+    // ── Bager retur denne uge ─────────────────────────────────────────────
+    const bagerUge = kpi.bager_uge;
+    const retStrip = document.getElementById('bager-retur-strip');
+    if (bagerUge && (bagerUge.retur_wiener > 0 || bagerUge.retur_boller > 0)) {
+      const ugeNr = kpi.bager_iso_uge || '—';
+      document.getElementById('bager-retur-uge').textContent  = ugeNr;
+      document.getElementById('bager-retur-uge2').textContent = ugeNr;
+      document.getElementById('bager-retur-wien-v').textContent   = Math.round(bagerUge.retur_wiener).toLocaleString('da-DK') + ' kr';
+      document.getElementById('bager-retur-boller-v').textContent = Math.round(bagerUge.retur_boller).toLocaleString('da-DK') + ' kr';
+      document.getElementById('bager-retur-ialt-v').textContent   = Math.round(bagerUge.retur_ialt).toLocaleString('da-DK') + ' kr';
+      retStrip.style.display = '';
+    } else {
+      retStrip.style.display = 'none';
+    }
 
     // ── Dag-kasser ────────────────────────────────────────────────────────
     if (dag.transak > 0) {

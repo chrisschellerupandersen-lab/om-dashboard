@@ -467,6 +467,13 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato >= ? AND dato <= ?
         """, (prev_mtd_start, prev_mtd_end)).fetchone()
 
+        # Retur boller + wienerbrød for indeværende ISO-uge
+        iso = _sd.isocalendar()
+        bager_uge_row = conn.execute("""
+            SELECT retur_wiener, retur_boller, retur_ialt, tgtg, faktura
+            FROM bager_regnskab WHERE uge = ? AND aar = ?
+        """, (iso[1], iso[0])).fetchone()
+
     return {
         "dag":              dict(dag)               if dag               else None,
         "uge":              dict(uge)               if uge               else None,
@@ -482,6 +489,8 @@ def hent_kpi(aar: int = None) -> Dict:
         "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,
         "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
         "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
+        "bager_uge":        dict(bager_uge_row)     if bager_uge_row     else None,
+        "bager_iso_uge":    iso[1],
     }
 
 

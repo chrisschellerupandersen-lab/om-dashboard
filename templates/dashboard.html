@@ -2176,14 +2176,14 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     }
 
     // Omsætning dag (overblik-kort)
+    const senesteTime = kpi.seneste_time;
+    const timeLabel = senesteTime != null ? ' kl. ' + senesteTime + ':00' : '';
     if (dag.omsaetning != null) {
       document.getElementById('kpi-dag-omsat').textContent = kr(dag.omsaetning);
       // Ring: snit 40 kunder × 65 kr/kurv = 2.600 kr/dag normalt → 8.000 kr = fuld ring
       setRing('ring-dag-omsat-ov', Math.min(100, dag.omsaetning / 8000 * 100), 'var(--amber)');
       // Subtext: vs. samme dag + samme time sidste uge
       const prevOmsat = (kpi.prev_dag || {}).omsaetning;
-      const senesteTime = kpi.seneste_time;
-      const timeLabel = senesteTime != null ? ' kl. ' + senesteTime + ':00' : '';
       if (prevOmsat > 0) {
         const pct = ((dag.omsaetning / prevOmsat) - 1) * 100;
         document.getElementById('kpi-dag-omsat-sub').textContent =

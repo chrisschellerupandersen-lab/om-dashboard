@@ -3349,7 +3349,10 @@ function buildAar() {
   const gpmEst    = faktGPM ?? c.gpm;
   const breakEven = gpmEst > 0 ? Math.round(snit_faste / (gpmEst/100)) : 0;
   const yearPct   = totOmsat > 0 ? Math.round(ytdOmsat/totOmsat*100) : 0;
-  const expYTD    = fMaaneder.length > 0 ? maaneder.slice(0, fMaaneder.length).reduce((s,r) => s+r.omsat, 0) : 0;
+  // expYTD = PLANLAGT omsætning for de måneder vi har faktisk data for (ikke aktuel omsætning)
+  const expYTD    = fMaaneder.length > 0
+    ? fMaaneder.reduce((s,r) => s + Math.round(c.base * (1+c.vaekst/100) * c.saeson[r.m-1] * r.dage), 0)
+    : 0;
   const tempo     = expYTD > 0 ? Math.round(ytdOmsat/expYTD*100) : null;
   const haevet    = (c.haevet||0) * 12;
   const nettoCF   = totRes - haevet;
@@ -3490,16 +3493,16 @@ function buildAar() {
   const cBgFd = 'rgba(30,58,30,.65)', cBgEd = 'rgba(200,168,75,.45)';
 
   mk('c-aar-res','bar', chartData.map(r=>r.label),
-    [{ data:chartData.map(r=>+(r.res/1000).toFixed(1)),
+    [{ label:'Resultat', data:chartData.map(r=>+(r.res/1000).toFixed(1)),
        backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgF:cBgE), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
-      plugins:{ tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
   mk('c-aar-db','bar', chartData.map(r=>r.label),
-    [{ data:chartData.map(r=>+(r.avance/1000).toFixed(1)),
+    [{ label:'DB', data:chartData.map(r=>+(r.avance/1000).toFixed(1)),
        backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgFd:cBgEd), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
-      plugins:{ tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
   // ── Tabel ── alle felter allerede beregnet i maaneder-array ──────────────
   const tblRows = maaneder.map(r => ({

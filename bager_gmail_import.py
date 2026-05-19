@@ -265,16 +265,16 @@ def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
             if not re.search(r"retur|wiener|boller|tgtg", l_lower):
                 b_kvali = _hent_sidst_tal_paa_linje(l)
 
-        # Subtotal — faktura beløb ex moms (foretrukket)
-        elif re.search(r"subtotal", l_lower):
+        # Levering iflg. specifikation — bruttobeløb (netto_kr = faktura − retur_ialt = Subtotal)
+        elif re.search(r"levering", l_lower):
             faktura = _hent_sidst_tal_paa_linje(l)
 
-        # Fallback: Total DKK hvis subtotal ikke findes
+        # Fallback: Subtotal hvis ingen leveringslinje
+        elif not faktura and re.search(r"subtotal", l_lower):
+            faktura = _hent_sidst_tal_paa_linje(l)
+
+        # Fallback: Total DKK
         elif not faktura and re.search(r"total\s+dkk\s*:", l_lower):
-            faktura = _hent_sidst_tal_paa_linje(l)
-
-        # Fallback: "Total:" hvis heller ikke Total DKK findes
-        elif not faktura and re.search(r"^total\s*:", l_lower):
             faktura = _hent_sidst_tal_paa_linje(l)
 
     # Retur i alt = sum af alle kreditposter

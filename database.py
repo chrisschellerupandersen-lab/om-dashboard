@@ -1598,6 +1598,7 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
                 ROUND(SUM(u.total_antal), 0) AS bestilt_stk,
                 ROUND(SUM(u.total_pris),  2) AS bestilt_kr,
                 0, 0, 0, 0, 0,
+                0                            AS faktura,
                 ROUND(SUM(u.total_pris), 2)  AS netto_kr
             FROM ugebestillinger u
             WHERE NOT EXISTS (

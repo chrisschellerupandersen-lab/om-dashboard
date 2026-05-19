@@ -2656,7 +2656,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       const dToday   = new Date(); dToday.setHours(12,0,0,0);
       const d        = dToday > dSeneste ? dToday : dSeneste;
       const thu  = new Date(d); thu.setDate(d.getDate() + (4 - (d.getDay()||7)));
-      const y1   = new Date(thu.getFullYear(), 0, 4);
+      const y1   = new Date(thu.getFullYear(), 0, 1);
       const week = Math.ceil(((thu - y1) / 86400000 + 1) / 7);
       document.getElementById('tb-week').textContent = `Uge ${week} · ${d.getFullYear()}`;
       document.getElementById('hdr-forside-sub').textContent =
@@ -4358,7 +4358,7 @@ function _isoUgeNu() {
   const d = new Date();
   const thu = new Date(d);
   thu.setDate(d.getDate() - (d.getDay() + 6) % 7 + 3);
-  const yr = new Date(thu.getFullYear(), 0, 4);
+  const yr = new Date(thu.getFullYear(), 0, 1);
   return { uge: 1 + Math.round(((thu - yr) / 86400000 - 3 + (yr.getDay() + 6) % 7) / 7), aar: thu.getFullYear() };
 }
 

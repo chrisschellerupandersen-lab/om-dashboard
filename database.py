@@ -540,6 +540,47 @@ def _mp_uge_netto(aar: int, maaned: int) -> float:
     return round((row["omsaetning"] / 1.25) / days * 7, 2)
 
 
+# Cache til dag-fordelingsnøgle (beregnes én gang per process)
+_DAG_NØGLE_CACHE: Optional[List[float]] = None
+
+def _dag_fordeling_nøgle() -> List[float]:
+    """Returnerer fordelingsnøgle [man, tir, ons, tor, fre, loe, son] som andele (sum=1.0).
+    Beregnet fra gennemsnitlig dagsomsætning i transaktioner.
+    Fallback: uniform 1/7 hvis ingen data."""
+    global _DAG_NØGLE_CACHE
+    if _DAG_NØGLE_CACHE is not None:
+        return _DAG_NØGLE_CACHE
+    try:
+        with _conn() as conn:
+            rows = conn.execute("""
+                SELECT
+                    -- strftime %w: 0=søn, 1=man, 2=tir, 3=ons, 4=tor, 5=fre, 6=loe
+                    CAST(strftime('%w', dato) AS INTEGER) AS dow,
+                    AVG(dag_oms) AS snit
+                FROM (
+                    SELECT dato, SUM(omsætning) AS dag_oms
+                    FROM transaktioner
+                    GROUP BY dato
+                )
+                GROUP BY dow
+            """).fetchall()
+        # Byg liste [man, tir, ons, tor, fre, loe, son] (Python weekday: 0=man)
+        # SQLite %w: 0=søn=6, 1=man=0, 2=tir=1, 3=ons=2, 4=tor=3, 5=fre=4, 6=loe=5
+        dow_map = {r["dow"]: r["snit"] or 0.0 for r in rows}
+        sqlite_til_python = {1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6}
+        snit = [dow_map.get(sqlite_dow, 0.0) for sqlite_dow, _ in
+                sorted(sqlite_til_python.items(), key=lambda x: x[1])]
+        total = sum(snit)
+        if total > 0:
+            nøgle = [s / total for s in snit]
+        else:
+            nøgle = [1.0 / 7.0] * 7
+    except Exception:
+        nøgle = [1.0 / 7.0] * 7
+    _DAG_NØGLE_CACHE = nøgle
+    return nøgle
+
+
 def _mp_map_alle() -> Dict:
     """Returnerer {(aar, maaned): omsaetning_inkl_moms}.
     Foretrækker daglig data (mobilepay_dag) over manuelle månedstotaler."""
@@ -908,26 +949,21 @@ def hent_aarsdata(aar: int = None) -> Dict:
         _DAG_NAVNE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
         bestil_map = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows}
 
-        # Fordel ugens netto-faktura per dag vægtet efter bestillingsbeløb.
-        # Fx uge 18 (april/maj): fre-søn er store dage → maj får den rigtige andel.
+        # Fordel ugens netto-faktura per dag vægtet efter historisk salgsfordeling.
+        nøgle = _dag_fordeling_nøgle()
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
                 fakt = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
                 if fakt <= 0:
                     continue
-                key = (int(br["aar"]), int(br["uge"]))
                 mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
-                bestil = bestil_map.get(key)
-                dag_vaerdier = [float(bestil[d] or 0) for d in _DAG_NAVNE] if bestil else []
-                total_bestil = sum(dag_vaerdier) if dag_vaerdier else 0.0
                 for i in range(7):
                     dag = mon + _td(days=i)
                     if dag.year != aar:
                         continue
-                    vaegt = (dag_vaerdier[i] / total_bestil) if total_bestil > 0 else (1.0 / 7.0)
                     faktura_maaned[dag.month] = round(
-                        faktura_maaned.get(dag.month, 0.0) + fakt * vaegt, 2
+                        faktura_maaned.get(dag.month, 0.0) + fakt * nøgle[i], 2
                     )
             except Exception:
                 pass
@@ -3091,51 +3127,40 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
                 uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
             dag += _td(days=1)
 
-        # Hent bager_regnskab — fordel netto dag-vægtet så kun månedsdelen vises
-        _DAG_NAVNE_VF = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
-        bestil_rows_vf = conn.execute("""
-            SELECT uge, aar,
-                   SUM(man*pris_ex_moms) AS man, SUM(tir*pris_ex_moms) AS tir,
-                   SUM(ons*pris_ex_moms) AS ons, SUM(tor*pris_ex_moms) AS tor,
-                   SUM(fre*pris_ex_moms) AS fre, SUM(loe*pris_ex_moms) AS loe,
-                   SUM(son*pris_ex_moms) AS son,
-                   ROUND(SUM(total_pris),2) AS total_kr
-            FROM ugebestillinger GROUP BY uge, aar
-        """).fetchall()
-        bestil_map_vf = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows_vf}
-
+        # Hent bager_regnskab — fordel netto med historisk salgsfordelingsnøgle
+        nøgle_vf = _dag_fordeling_nøgle()
         bager_rækker = []
         for (y, w) in sorted(uger_i_maaned):
             row = conn.execute("""
-                SELECT b.uge, b.aar, b.faktura, b.retur_ialt
+                SELECT b.uge, b.aar, b.faktura, b.retur_ialt,
+                       COALESCE(u.bestilt_kr, 0) AS bestilt_kr_uge
                 FROM bager_regnskab b
+                LEFT JOIN (
+                    SELECT uge, aar, ROUND(SUM(total_pris),2) AS bestilt_kr
+                    FROM ugebestillinger GROUP BY uge, aar
+                ) u ON u.uge = b.uge AND u.aar = b.aar
                 WHERE b.uge=? AND b.aar=?
             """, (w, y)).fetchone()
             if not row or (row["faktura"] or 0) <= 0:
                 continue
             fakt_netto = round((row["faktura"] or 0) - (row["retur_ialt"] or 0), 2)
             mon_dato = _date.fromisocalendar(y, w, 1)
-            bestil = bestil_map_vf.get((y, w))
-            dag_v = [float(bestil[d] or 0) for d in _DAG_NAVNE_VF] if bestil else []
-            total_b = sum(dag_v) if dag_v else 0.0
-            # Beregn andel der falder i denne måned
+            # Beregn andel der falder i denne måned via fordelingsnøglen
             netto_maaned = 0.0
-            bestilt_maaned = 0.0
+            vaegt_maaned = 0.0
             for i in range(7):
                 dag = mon_dato + _td(days=i)
-                if dag.month != maaned or dag.year != aar:
-                    continue
-                vaegt = (dag_v[i] / total_b) if total_b > 0 else (1.0 / 7.0)
-                netto_maaned += fakt_netto * vaegt
-                if dag_v:
-                    bestilt_maaned += dag_v[i]
+                if dag.month == maaned and dag.year == aar:
+                    netto_maaned += fakt_netto * nøgle_vf[i]
+                    vaegt_maaned += nøgle_vf[i]
             if netto_maaned > 0:
+                bestilt_andel = round((row["bestilt_kr_uge"] or 0) * vaegt_maaned, 2)
                 bager_rækker.append({
                     "uge": w, "aar": y,
                     "faktura":    round(row["faktura"] or 0, 2),
                     "retur_ialt": round(row["retur_ialt"] or 0, 2),
                     "netto":      round(netto_maaned, 2),
-                    "bestilt_kr": round(bestilt_maaned, 2),
+                    "bestilt_kr": bestilt_andel,
                 })
 
         # Andet VF per kategori for måneden (Shopbox kostpris, non-bager)

@@ -851,6 +851,21 @@ async def api_vf_detaljer(request: Request, aar: int, maaned: int):
     return database.hent_vf_detaljer(aar, maaned)
 
 
+@app.get("/api/bager/fordelingsnoegle")
+async def api_fordelingsnoegle(request: Request):
+    """Vis den beregnede dagsnøgle til fordeling af bager-fakturaer."""
+    _kræv_login(request)
+    nøgle = database._dag_fordeling_nøgle()
+    navne = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lordag","Sondag"]
+    return {
+        "noegle": [
+            {"dag": navne[i], "andel_pct": round(nøgle[i]*100, 1)}
+            for i in range(7)
+        ],
+        "note": "Beregnet fra gennemsnitlig dagsomsaetning i transaktioner"
+    }
+
+
 @app.get("/api/faste-omk")
 async def api_faste_omk(request: Request, aar: int):
     _kræv_login(request)

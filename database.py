@@ -362,7 +362,8 @@ def hent_kpi(aar: int = None) -> Dict:
             WHERE dato >= ? AND dato <= ?
         """, (uge_mandag, seneste_dato)).fetchone()
 
-        snit_where = f"WHERE strftime('%Y', dato) = '{aar}'" if aar else ""
+        # Ugesnit: udeluk indeværende uge (delvis) og brug kun afsluttede uger
+        snit_where = f"WHERE strftime('%Y', dato) = '{aar}' AND dato < ?" if aar else "WHERE dato < ?"
         snit_row = conn.execute(f"""
             SELECT AVG(uge_total) AS snit_uge FROM (
                 SELECT SUM(omsætning) AS uge_total
@@ -371,7 +372,7 @@ def hent_kpi(aar: int = None) -> Dict:
                 GROUP BY strftime('%Y-%W', dato)
                 ORDER BY dato DESC LIMIT 12
             )
-        """).fetchone()
+        """, (uge_mandag,) if not aar else (uge_mandag,)).fetchone()
 
         # Dagssnit: gennemsnit af dagstotaler over seneste 28 dage med data
         dag_snit_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""

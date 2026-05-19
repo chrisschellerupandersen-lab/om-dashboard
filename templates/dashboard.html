@@ -3358,9 +3358,13 @@ function buildAar() {
   const gpmEst    = faktGPM ?? c.gpm;
   const breakEven = gpmEst > 0 ? Math.round(snit_faste / (gpmEst/100)) : 0;
   const yearPct   = totOmsat > 0 ? Math.round(ytdOmsat/totOmsat*100) : 0;
-  // expYTD = PLANLAGT omsætning for de måneder vi har faktisk data for (ikke aktuel omsætning)
+  // expYTD = PLANLAGT omsætning for præcis de dage vi har data for
+  // Afsluttede måneder: full month dage. Indeværende delvis måned: faktDage (ikke 31)
   const expYTD    = fMaaneder.length > 0
-    ? fMaaneder.reduce((s,r) => s + Math.round(c.base * (1+c.vaekst/100) * c.saeson[r.m-1] * r.dage), 0)
+    ? fMaaneder.reduce((s,r) => {
+        const planDage = (r.faktDage != null && r.faktDage < r.dage) ? r.faktDage : r.dage;
+        return s + Math.round(c.base * (1+c.vaekst/100) * c.saeson[r.m-1] * planDage);
+      }, 0)
     : 0;
   const tempo     = expYTD > 0 ? Math.round(ytdOmsat/expYTD*100) : null;
   const haevet    = (c.haevet||0) * 12;

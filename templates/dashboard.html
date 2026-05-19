@@ -2401,20 +2401,25 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     // ── Bager retur denne uge ─────────────────────────────────────────────
     const bagerRetur = kpi.bager_retur;
     const retStrip = document.getElementById('bager-retur-strip');
-    if (bagerRetur && (bagerRetur.wien_retur_kr > 0 || bagerRetur.boller_retur_kr > 0)) {
+    if (bagerRetur && (bagerRetur.wien_retur_stk > 0 || bagerRetur.boller_retur_stk > 0)) {
       const ugeNr = kpi.bager_iso_uge || '—';
+      const erPrognose = bagerRetur.kilde === 'prognose';
       document.getElementById('bager-retur-uge').textContent  = ugeNr;
       document.getElementById('bager-retur-uge2').textContent = ugeNr;
       // Wienerbrød
       const wStk = bagerRetur.wien_retur_stk;
       const wBest = bagerRetur.wien_bestilt_stk;
-      document.getElementById('bager-retur-wien-v').textContent  = wStk != null ? wStk + ' stk' : Math.round(bagerRetur.wien_retur_kr).toLocaleString('da-DK') + ' kr';
-      document.getElementById('bager-retur-wien-sub').textContent = wBest ? `af ${wBest} bestilt` : 'retur denne uge';
+      document.getElementById('bager-retur-wien-v').textContent  = wStk != null ? wStk + ' stk' : '—';
+      document.getElementById('bager-retur-wien-sub').textContent = wBest
+        ? (erPrognose ? `prognose · af ${wBest} bestilt` : `af ${wBest} bestilt`)
+        : 'retur denne uge';
       // Boller
       const bStk = bagerRetur.boller_retur_stk;
       const bBest = bagerRetur.boller_bestilt_stk;
-      document.getElementById('bager-retur-boller-v').textContent  = bStk != null ? bStk + ' stk' : Math.round(bagerRetur.boller_retur_kr).toLocaleString('da-DK') + ' kr';
-      document.getElementById('bager-retur-boller-sub').textContent = bBest ? `af ${bBest} bestilt` : 'retur denne uge';
+      document.getElementById('bager-retur-boller-v').textContent  = bStk != null ? bStk + ' stk' : '—';
+      document.getElementById('bager-retur-boller-sub').textContent = bBest
+        ? (erPrognose ? `prognose · af ${bBest} bestilt` : `af ${bBest} bestilt`)
+        : 'retur denne uge';
       retStrip.style.display = '';
     } else {
       retStrip.style.display = 'none';

@@ -499,20 +499,40 @@ def hent_kpi(aar: int = None) -> Dict:
             pris_per_stk = bestil_kr / bestil_stk
             return round(retur_kr / pris_per_stk)
 
+        w_stk = int(bestil_wien["stk"])  if (bestil_wien and bestil_wien["stk"]) else None
+        w_kr  = bestil_wien["kr"]        if (bestil_wien and bestil_wien["kr"])  else None
+        b_stk = int(bestil_boller["stk"]) if (bestil_boller and bestil_boller["stk"]) else None
+        b_kr  = bestil_boller["kr"]       if (bestil_boller and bestil_boller["kr"])  else None
+
+        # Altid vis retur-prognose baseret på bestilling (10% boller, 13,5% wiener)
+        # Hvis faktura for ugen findes, brug faktiske retur-kr til at beregne stk
+        RETUR_BOLLER = 0.10
+        RETUR_WIENER = 0.135
         bager_retur_info = None
-        if bager_uge_row:
-            w_stk = bestil_wien["stk"] if bestil_wien else None
-            w_kr  = bestil_wien["kr"]  if bestil_wien else None
-            b_stk = bestil_boller["stk"] if bestil_boller else None
-            b_kr  = bestil_boller["kr"]  if bestil_boller else None
+        if w_stk or b_stk:
+            if bager_uge_row and (bager_uge_row["retur_wiener"] or bager_uge_row["retur_boller"]):
+                # Faktiske retur fra faktura
+                wien_stk   = _retur_stk(bager_uge_row["retur_wiener"], w_stk, w_kr)
+                boller_stk = _retur_stk(bager_uge_row["retur_boller"], b_stk, b_kr)
+                wien_kr    = bager_uge_row["retur_wiener"]
+                boller_kr  = bager_uge_row["retur_boller"]
+                kilde      = "faktura"
+            else:
+                # Prognose: 10% boller, 13,5% wiener
+                wien_stk   = round(w_stk * RETUR_WIENER) if w_stk else None
+                boller_stk = round(b_stk * RETUR_BOLLER) if b_stk else None
+                wien_kr    = round(w_kr * RETUR_WIENER, 2) if w_kr else None
+                boller_kr  = round(b_kr * RETUR_BOLLER, 2) if b_kr else None
+                kilde      = "prognose"
             bager_retur_info = {
-                "wien_retur_stk":   _retur_stk(bager_uge_row["retur_wiener"], w_stk, w_kr),
-                "wien_bestilt_stk": int(w_stk) if w_stk else None,
-                "wien_retur_kr":    bager_uge_row["retur_wiener"],
-                "boller_retur_stk":   _retur_stk(bager_uge_row["retur_boller"], b_stk, b_kr),
-                "boller_bestilt_stk": int(b_stk) if b_stk else None,
-                "boller_retur_kr":    bager_uge_row["retur_boller"],
-                "retur_ialt":  bager_uge_row["retur_ialt"],
+                "wien_retur_stk":     wien_stk,
+                "wien_bestilt_stk":   w_stk,
+                "wien_retur_kr":      wien_kr,
+                "boller_retur_stk":   boller_stk,
+                "boller_bestilt_stk": b_stk,
+                "boller_retur_kr":    boller_kr,
+                "retur_ialt": bager_uge_row["retur_ialt"] if bager_uge_row else None,
+                "kilde": kilde,
             }
 
     return {

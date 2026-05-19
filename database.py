@@ -3076,20 +3076,18 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
     """Ugevis bageri-faktura + kategori-niveau andet VF for en enkelt måned."""
     from datetime import date as _date, timedelta as _td
     with _conn() as conn:
-        # Hvilke ISO-uger falder (overvejende) i denne måned?
-        # Vi bruger uger hvor mandag ligger i måneden.
+        # Hvilke ISO-uger falder i denne måned?
+        # En uge tilhører den måned hvor MANDAG ligger — så hver uge tæller kun én gang.
         first = _date(aar, maaned, 1)
         last  = _date(aar, maaned + 1, 1) - _td(days=1) if maaned < 12 else _date(aar, 12, 31)
 
-        # Find alle ISO-uger hvor mindst én dag er i måneden
         uger_i_maaned = set()
         dag = first
         while dag <= last:
-            uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
-            dag += _td(days=7)
-        # Inkludér ugen for første dag og sidste dag
-        uger_i_maaned.add(first.isocalendar()[:2])
-        uger_i_maaned.add(last.isocalendar()[:2])
+            mandag = dag - _td(days=dag.weekday())  # mandag i ugen
+            if first <= mandag <= last:
+                uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
+            dag += _td(days=1)
 
         # Hent bager_regnskab for disse uger
         bager_rækker = []

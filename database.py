@@ -398,11 +398,19 @@ def hent_kpi(aar: int = None) -> Dict:
             WHERE dato >= ? AND dato <= ?
         """, (prev_uge_start, prev_uge_end)).fetchone()
 
-        # Samme dag forrige uge (seneste_dato - 7 dage)
+        # Seneste registrerede time i dag — bruges til fair sammenligning
+        seneste_time = conn.execute("""
+            SELECT MAX(time_start) FROM transaktioner
+            WHERE dato = ? AND time_start >= 0
+        """, (seneste_dato,)).fetchone()[0]
+
+        # Samme dag forrige uge — kun op til samme time som i dag
         prev_dag_dato = conn.execute(
             "SELECT date(?, '-7 days')", (seneste_dato,)
         ).fetchone()[0]
-        prev_dag_row = conn.execute("""
+        time_filter = "AND time_start <= ?" if seneste_time is not None else ""
+        time_params = (seneste_time,) if seneste_time is not None else ()
+        prev_dag_row = conn.execute(f"""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
                    COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
@@ -411,9 +419,10 @@ def hent_kpi(aar: int = None) -> Dict:
                    CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
                         THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
                         ELSE COUNT(*)
-                   END                         AS transak
-            FROM v_transaktioner WHERE dato = ?
-        """, (prev_dag_dato,)).fetchone()
+                   END                         AS transak,
+                   MAX(time_start)             AS til_time
+            FROM v_transaktioner WHERE dato = ? {time_filter}
+        """, (prev_dag_dato,) + time_params).fetchone()
 
         # Samme dag 2 uger siden (seneste_dato - 14 dage)
         prev_prev_dag_dato = conn.execute(
@@ -465,6 +474,7 @@ def hent_kpi(aar: int = None) -> Dict:
         "prev_uge_end":     prev_uge_end,
         "prev_dag":         dict(prev_dag_row)      if prev_dag_row      else None,
         "prev_dag_dato":    prev_dag_dato,
+        "seneste_time":     seneste_time,
         "prev_prev_dag":    dict(prev_prev_dag_row) if prev_prev_dag_row else None,
         "mtd":              dict(mtd_row)           if mtd_row           else None,
         "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,

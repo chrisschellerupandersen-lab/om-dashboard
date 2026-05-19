@@ -336,6 +336,16 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato = ?
         """, (seneste_dato,)).fetchone()
 
+        # Beregn ISO-ugens mandag og "forrige uge samme periode"
+        from datetime import date as _kpi_date, timedelta as _kpi_td
+        _sd        = _kpi_date.fromisoformat(seneste_dato)
+        _uge_man   = _sd - _kpi_td(days=_sd.weekday())   # mandag i indeværende ISO-uge
+        _prev_man  = _uge_man  - _kpi_td(days=7)         # mandag forrige uge
+        _prev_end  = _sd       - _kpi_td(days=7)         # samme ugedag forrige uge
+        uge_mandag = _uge_man.isoformat()
+        prev_uge_start = _prev_man.isoformat()
+        prev_uge_end   = _prev_end.isoformat()
+
         seneste_yw = conn.execute(
             "SELECT strftime('%Y-%W', ?)", (seneste_dato,)
         ).fetchone()[0]
@@ -349,8 +359,8 @@ def hent_kpi(aar: int = None) -> Dict:
                         ELSE 0 END               AS db_pct,
                    COUNT(DISTINCT dato)          AS antal_dage
             FROM v_transaktioner
-            WHERE strftime('%Y-%W', dato) = ?
-        """, (seneste_yw,)).fetchone()
+            WHERE dato >= ? AND dato <= ?
+        """, (uge_mandag, seneste_dato)).fetchone()
 
         snit_where = f"WHERE strftime('%Y', dato) = '{aar}'" if aar else ""
         snit_row = conn.execute(f"""
@@ -375,22 +385,18 @@ def hent_kpi(aar: int = None) -> Dict:
             )
         """).fetchone()
 
-        # Forrige uge med data (til uge-over-uge DB-sammenligning)
-        prev_extra = f"AND strftime('%Y', dato) = '{aar}'" if aar else ""
-        prev_uge_row = conn.execute(f"""
+        # Forrige uge — SAMME periode som indeværende (mandag til samme ugedag)
+        # Fx tirsdag uge 21 → sammenlignes mod mandag+tirsdag uge 20
+        prev_uge_row = conn.execute("""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
                    COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
-                        ELSE 0 END             AS db_pct
+                        ELSE 0 END             AS db_pct,
+                   COUNT(DISTINCT dato)        AS antal_dage
             FROM v_transaktioner
-            WHERE strftime('%Y-%W', dato) = (
-                SELECT DISTINCT strftime('%Y-%W', dato)
-                FROM transaktioner
-                WHERE strftime('%Y-%W', dato) < ? {prev_extra}
-                ORDER BY dato DESC LIMIT 1
-            )
-        """, (seneste_yw,)).fetchone()
+            WHERE dato >= ? AND dato <= ?
+        """, (prev_uge_start, prev_uge_end)).fetchone()
 
         # Samme dag forrige uge (seneste_dato - 7 dage)
         prev_dag_dato = conn.execute(
@@ -451,16 +457,19 @@ def hent_kpi(aar: int = None) -> Dict:
         """, (prev_mtd_start, prev_mtd_end)).fetchone()
 
     return {
-        "dag":           dict(dag)               if dag               else None,
-        "uge":           dict(uge)               if uge               else None,
-        "prev_uge":      dict(prev_uge_row)      if prev_uge_row      else None,
-        "prev_dag":      dict(prev_dag_row)      if prev_dag_row      else None,
-        "prev_dag_dato": prev_dag_dato,
-        "prev_prev_dag": dict(prev_prev_dag_row) if prev_prev_dag_row else None,
-        "mtd":           dict(mtd_row)           if mtd_row           else None,
-        "prev_mtd":      dict(prev_mtd_row)      if prev_mtd_row      else None,
-        "snit_uge":      snit_row["snit_uge"]    if snit_row          else None,
-        "snit_dag":      dag_snit_row["snit_dag"] if dag_snit_row     else None,
+        "dag":              dict(dag)               if dag               else None,
+        "uge":              dict(uge)               if uge               else None,
+        "uge_mandag":       uge_mandag,
+        "prev_uge":         dict(prev_uge_row)      if prev_uge_row      else None,
+        "prev_uge_start":   prev_uge_start,
+        "prev_uge_end":     prev_uge_end,
+        "prev_dag":         dict(prev_dag_row)      if prev_dag_row      else None,
+        "prev_dag_dato":    prev_dag_dato,
+        "prev_prev_dag":    dict(prev_prev_dag_row) if prev_prev_dag_row else None,
+        "mtd":              dict(mtd_row)           if mtd_row           else None,
+        "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,
+        "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
+        "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
     }
 
 

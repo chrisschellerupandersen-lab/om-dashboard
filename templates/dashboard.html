@@ -2183,7 +2183,10 @@ function buildForside(kpi, dage, uger, idag, katUge) {
 
     // ── Uge-kasser ────────────────────────────────────────────────────────
     document.getElementById('kpi-uge-omsat').textContent = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
-    document.getElementById('kpi-uge-dage').textContent  = uge.antal_dage != null ? uge.antal_dage + ' dage denne uge' : '—';
+    const ugeDage = uge.antal_dage || 0;
+    const prevUgeDage = (kpi.prev_uge || {}).antal_dage || 0;
+    document.getElementById('kpi-uge-dage').textContent  =
+      ugeDage ? ugeDage + ' dage · vs. ' + prevUgeDage + ' dage forrige uge' : '—';
 
     if (uge.vareforbrug > 0) {
       document.getElementById('kpi-uge-vf').textContent = 'VF ' + kr(uge.vareforbrug);
@@ -2231,7 +2234,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       const d = uge.db_kr - prevUge.db_kr;
       vsUgeEl.textContent = (d >= 0 ? '+' : '') + Math.round(d).toLocaleString('da-DK') + ' kr';
       vsUgeEl.className   = 'kpi-v ' + (d >= 0 ? 'up' : 'dn');
-      vsUgeSub.textContent = 'forrige: ' + Math.round(prevUge.db_kr).toLocaleString('da-DK') + ' kr · ' + prevUge.db_pct.toFixed(1) + '%';
+      vsUgeSub.textContent = 'forrige uge ' + (prevUgeDage||'?') + ' dage: ' + Math.round(prevUge.db_kr).toLocaleString('da-DK') + ' kr · ' + prevUge.db_pct.toFixed(1) + '%';
       ovCmp('ov-cmp-uge', d >= 0);
     } else if (uge.db_kr != null) {
       vsUgeEl.textContent  = kr(uge.db_kr);

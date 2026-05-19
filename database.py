@@ -879,11 +879,13 @@ def hent_aarsdata(aar: int = None) -> Dict:
             except Exception:
                 pass
 
-        # MobilePay netto per måned (÷1.25)
-        mp_rows = conn.execute(
-            "SELECT maaned, omsaetning FROM mobilepay WHERE aar=?", (aar,)
-        ).fetchall()
-        mp_netto_maaned: Dict = {r["maaned"]: round(r["omsaetning"] / 1.25, 0) for r in mp_rows}
+        # MobilePay netto per måned (÷1.25) — henter fra begge kilder via _mp_map_alle
+        _mp_all = _mp_map_alle()
+        mp_netto_maaned: Dict = {
+            m: round(v / 1.25, 0)
+            for (y, m), v in _mp_all.items()
+            if y == aar and v > 0
+        }
 
         # Kostpris for IKKE-bagværk per måned (Shopbox er korrekt for disse)
         ikke_bager_rows = conn.execute("""

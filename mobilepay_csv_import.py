@@ -2,6 +2,10 @@
 MobilePay portal CSV-import — parser eksport fra portal.vippsmobilepay.com
 og uploader daglig omsætning til Railway-dashboardet.
 
+Understøtter to eksport-formater:
+  - Afregningsrapport: Salgssted,MSN,Land,...,Bogføringsdato,Type,Beløb,...
+  - Salgsoversigt:     Dato,Salgssted,Salg,...
+
 Eksporter fra portalen:
   Gå til Salgssted-oversigten → vælg dato-periode → klik Eksportér CSV
 
@@ -29,22 +33,39 @@ WEBHOOK_SECRET = "OM-Greve-2026-Hemlig"
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _tal(s: str) -> float:
-    """Parsér dansk tal-format: '1.234,56 kr.' → 1234.56"""
+def _tal(s):
+    # type: (str) -> float
+    """Parsér tal — håndterer dansk format (1.234,56) og engelsk (-84.16)."""
     if s is None:
         return 0.0
     s = str(s).strip()
     s = re.sub(r'[^\d,.\-]', '', s)   # fjern 'kr.', mellemrum osv.
-    s = s.replace('.', '').replace(',', '.')
+    if not s or s == '-':
+        return 0.0
+    # Hvis komma er til stede → dansk format: "1.234,56"
+    if ',' in s:
+        s = s.replace('.', '').replace(',', '.')
+    else:
+        # Ingen komma — afgør om punktum er decimal- eller tusind-separator
+        parts = s.lstrip('-').split('.')
+        if len(parts) == 2 and len(parts[1]) in (1, 2):
+            # "84.16" eller "8.5" → decimal — behold som den er
+            pass
+        else:
+            # "1.234" (3 decimaler) → tusind-separator → fjern
+            s = s.replace('.', '')
     try:
         return float(s)
     except (ValueError, TypeError):
         return 0.0
 
 
-def _dato(s: str) -> str | None:
-    """Parsér dansk dato 'DD.MM.YYYY' eller 'YYYY-MM-DD' → 'YYYY-MM-DD'"""
+def _dato(s):
+    # type: (str) -> object
+    """Parsér dato 'DD.MM.YYYY', 'YYYY-MM-DD' eller 'YYYY-MM-DD HH:MM:SS' → 'YYYY-MM-DD'"""
     s = str(s).strip()
+    # Trim tid-del hvis til stede: "2026-01-16 01:27:31" → "2026-01-16"
+    s = s.split(' ')[0].split('T')[0]
     for fmt in ('%d.%m.%Y', '%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
         try:
             return datetime.strptime(s, fmt).date().isoformat()
@@ -53,18 +74,25 @@ def _dato(s: str) -> str | None:
     return None
 
 
-def _find_kolonne(headers: list, kandidater: list) -> int | None:
+def _find_kolonne(headers, kandidater):
+    # type: (list, list) -> object
     """Find kolonneindeks ved at matche mod mulige kolonnenavne (case-insensitiv)."""
     hl = [h.lower().strip() for h in headers]
     for k in kandidater:
         kl = k.lower().strip()
+        # Forsøg eksakt match først
+        for i, h in enumerate(hl):
+            if h == kl:
+                return i
+        # Derefter delvis match
         for i, h in enumerate(hl):
             if kl in h or h in kl:
                 return i
     return None
 
 
-def parse_csv(path: str) -> list:
+def parse_csv(path):
+    # type: (str) -> list
     """Parsér MobilePay portal CSV/Excel — returnerer [{dato, omsaetning_inkl}]."""
     p = Path(path)
 
@@ -76,9 +104,7 @@ def parse_csv(path: str) -> list:
             ws = wb.active
             rows = [list(row) for row in ws.iter_rows(values_only=True)]
         except ImportError:
-            print("[FEJL] openpyxl ikke installeret. Kør: pip install openpyxl")
-            sys.exit(1)
-        # Første ikke-tomme række = headers
+            raise RuntimeError("openpyxl ikke installeret. Kør: pip install openpyxl")
         headers = None
         data_rows = []
         for row in rows:
@@ -90,12 +116,15 @@ def parse_csv(path: str) -> list:
     else:
         # ── CSV ───────────────────────────────────────────────────────────────
         raw = p.read_bytes()
+        text = None
         for enc in ('utf-8-sig', 'cp1252', 'latin-1'):
             try:
                 text = raw.decode(enc)
                 break
             except UnicodeDecodeError:
                 continue
+        if text is None:
+            raise RuntimeError("Kan ikke afkode fil — prøv at gemme som UTF-8")
 
         # Detektér separator
         sample = text[:2000]
@@ -106,34 +135,38 @@ def parse_csv(path: str) -> list:
         data_rows = rows_raw[1:]
 
     if not headers:
-        print("[FEJL] Ingen kolonneoverskrifter fundet i filen.")
-        sys.exit(1)
+        raise RuntimeError("Ingen kolonneoverskrifter fundet i filen.")
 
-    # Kolonner vi leder efter
-    i_dato  = _find_kolonne(headers, ['dato', 'date', 'dag'])
-    i_salg  = _find_kolonne(headers, ['salg', 'sale', 'omsætning', 'amount', 'beløb'])
-    i_ref   = _find_kolonne(headers, ['udbetalingsreference', 'reference', 'ref'])
+    # ── Kolonne-detektion ─────────────────────────────────────────────────────
+    # Dato: 'Bogføringsdato' (afregningsrapport) eller 'Dato'/'Date'
+    i_dato = _find_kolonne(headers, ['bogføringsdato', 'dato', 'date', 'dag', 'planlagt udbetalingsdato'])
+
+    # Beløb: 'Beløb' (afregningsrapport) eller 'Salg'/'Omsætning'
+    # Vigtigt: 'beløb' SKAL stå før 'salg' så 'Salgssted' ikke matches
+    i_salg = _find_kolonne(headers, ['beløb', 'nettobeløb', 'omsætning', 'amount', 'salg', 'sale'])
 
     if i_dato is None or i_salg is None:
-        print(f"[FEJL] Kan ikke finde Dato/Salg-kolonner.")
-        print(f"Fundne kolonner: {headers}")
-        sys.exit(1)
+        raise RuntimeError(
+            f"Kan ikke finde Dato/Beløb-kolonner.\nFundne kolonner: {headers}"
+        )
 
     print(f"Parsér '{p.name}'  ({len(data_rows)} rækker)")
-    print(f"Kolonner: Dato={headers[i_dato]!r}  Salg={headers[i_salg]!r}"
-          + (f"  Ref={headers[i_ref]!r}" if i_ref is not None else ''))
+    print(f"Kolonner: Dato={headers[i_dato]!r}  Beløb={headers[i_salg]!r}")
 
     linjer = []
     for row in data_rows:
-        if not any(c.strip() for c in row):
+        if not any(c.strip() if isinstance(c, str) else c for c in row):
             continue
         try:
-            dato  = _dato(row[i_dato]) if i_dato < len(row) else None
-            salg  = _tal(row[i_salg]) if i_salg < len(row) else 0.0
+            dato = _dato(row[i_dato]) if i_dato < len(row) else None
+            salg = _tal(row[i_salg]) if i_salg < len(row) else 0.0
         except Exception:
             continue
-        if dato is None or salg <= 0:
+        if dato is None or salg == 0:
             continue
+        # Afregningsrapport-beløb er negative (udbetaling fra MobilePay → konto)
+        # → vi gemmer absolut-værdien som omsætning
+        salg = abs(salg)
         linjer.append({
             "dato":            dato,
             "omsaetning_inkl": round(salg, 2),
@@ -141,7 +174,7 @@ def parse_csv(path: str) -> list:
         })
 
     # Aggregér hvis flere rækker per dato
-    agg: dict = {}
+    agg = {}
     for l in linjer:
         d = l["dato"]
         agg[d] = agg.get(d, 0.0) + l["omsaetning_inkl"]
@@ -151,7 +184,8 @@ def parse_csv(path: str) -> list:
     return result
 
 
-def upload_til_railway(linjer: list):
+def upload_til_railway(linjer):
+    # type: (list) -> None
     r = requests.post(
         f"{RAILWAY_URL}/api/mobilepay/dagssalg",
         json={"secret": WEBHOOK_SECRET, "linjer": linjer},
@@ -174,7 +208,11 @@ def main():
         print(f"[FEJL] Fil ikke fundet: {args.fil}")
         sys.exit(1)
 
-    linjer = parse_csv(args.fil)
+    try:
+        linjer = parse_csv(args.fil)
+    except RuntimeError as e:
+        print(f"[FEJL] {e}")
+        sys.exit(1)
 
     # Dato-filter
     if args.fra:

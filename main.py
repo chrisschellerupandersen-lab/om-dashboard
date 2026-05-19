@@ -578,23 +578,28 @@ async def api_mobilepay_dag(request: Request, fra: str = None, til: str = None):
 async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
     """Browser CSV/Excel upload fra MobilePay portal."""
     _kræv_login(request)
-    import tempfile, sys
+    import tempfile, importlib
     from pathlib import Path as _Path
-    # Gem upload midlertidigt
     suffix = _Path(fil.filename).suffix.lower() if fil.filename else ".csv"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(await fil.read())
-        tmp_path = tmp.name
+    tmp_path = None
     try:
-        # Genbrug parse-logik fra mobilepay_csv_import
-        sys.path.insert(0, str(_Path(__file__).parent))
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(await fil.read())
+            tmp_path = tmp.name
         import mobilepay_csv_import as _mp_csv
+        importlib.reload(_mp_csv)
         linjer = _mp_csv.parse_csv(tmp_path)
+    except Exception as exc:
+        return {"ok": False, "fejl": str(exc)}
     finally:
-        import os as _os
-        _os.unlink(tmp_path)
+        if tmp_path:
+            try:
+                import os as _os; _os.unlink(tmp_path)
+            except OSError:
+                pass
     if not linjer:
-        return {"ok": True, "linjer": 0, "besked": "Ingen gyldige rækker fundet i filen"}
+        return {"ok": True, "linjer": 0, "dage": 0, "total": 0,
+                "besked": "Ingen gyldige rækker fundet — tjek at filen er en Afregningsrapport eller Salgsoversigt fra portalen"}
     count = database.gem_mobilepay_dag(linjer)
     total = sum(l["omsaetning_inkl"] for l in linjer)
     return {"ok": True, "linjer": count, "dage": len(linjer), "total": round(total, 2)}

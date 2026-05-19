@@ -5241,6 +5241,7 @@ async function mpUploadCsv() {
     const resp = await fetch('/api/mobilepay/upload-csv', { method: 'POST', body: fd });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.detail || 'HTTP ' + resp.status);
+    if (data.ok === false) throw new Error(data.fejl || 'Ukendt fejl');
     statusEl.style.color = 'var(--moss)';
     if (data.dage > 0) {
       statusEl.textContent = `✓ ${data.dage} dage importeret · total ${Math.round(data.total).toLocaleString('da-DK')} kr`;

@@ -229,7 +229,7 @@ def main():
     for l in linjer:
         print(f"  {l['dato']}  {l['omsaetning_inkl']:>10,.2f} kr")
         total += l["omsaetning_inkl"]
-    print(f"  {'─'*30}")
+    print(f"  {'-'*30}")
     print(f"  Total        {total:>10,.2f} kr\n")
 
     if args.vis:

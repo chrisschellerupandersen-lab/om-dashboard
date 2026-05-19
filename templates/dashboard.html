@@ -698,21 +698,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <!-- BAGER RETUR DENNE UGE -->
         <div id="bager-retur-strip" style="display:none;margin-bottom:12px;">
-          <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR WIENERBRØD · UGE <span id="bager-retur-uge">—</span></div>
-              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-wien-v">—</div>
-              <div style="font-size:11px;color:var(--ash);" id="bager-retur-wien-sub">stk af — bestilt</div>
+          <div class="kpi-row-2">
+            <div class="kpi" style="background:var(--danger-bg,#fff5f5);border-color:var(--danger);">
+              <div class="kpi-l" style="color:var(--danger);letter-spacing:.08em;">RETUR BOLLER · UGE <span id="bager-retur-uge2">—</span></div>
+              <div class="kpi-v" id="bager-retur-boller-v" style="color:var(--danger);font-size:32px;">—</div>
+              <div class="kpi-s" id="bager-retur-boller-sub" style="color:var(--danger);opacity:.7;">stk af — bestilt</div>
             </div>
-            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR BOLLER · UGE <span id="bager-retur-uge2">—</span></div>
-              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-boller-v">—</div>
-              <div style="font-size:11px;color:var(--ash);" id="bager-retur-boller-sub">stk af — bestilt</div>
-            </div>
-            <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR I ALT inkl. TGTG</div>
-              <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-ialt-v">—</div>
-              <div style="font-size:11px;color:var(--ash);">kr krediteret på faktura</div>
+            <div class="kpi" style="background:var(--danger-bg,#fff5f5);border-color:var(--danger);">
+              <div class="kpi-l" style="color:var(--danger);letter-spacing:.08em;">RETUR WIENERBRØD · UGE <span id="bager-retur-uge">—</span></div>
+              <div class="kpi-v" id="bager-retur-wien-v" style="color:var(--danger);font-size:32px;">—</div>
+              <div class="kpi-s" id="bager-retur-wien-sub" style="color:var(--danger);opacity:.7;">stk af — bestilt</div>
             </div>
           </div>
         </div>
@@ -2420,8 +2415,6 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       const bBest = bagerRetur.boller_bestilt_stk;
       document.getElementById('bager-retur-boller-v').textContent  = bStk != null ? bStk + ' stk' : Math.round(bagerRetur.boller_retur_kr).toLocaleString('da-DK') + ' kr';
       document.getElementById('bager-retur-boller-sub').textContent = bBest ? `af ${bBest} bestilt` : 'retur denne uge';
-      // Retur i alt
-      document.getElementById('bager-retur-ialt-v').textContent = Math.round(bagerRetur.retur_ialt).toLocaleString('da-DK') + ' kr';
       retStrip.style.display = '';
     } else {
       retStrip.style.display = 'none';

@@ -410,7 +410,7 @@ def main():
 
         parsed.append(data)
 
-    print(f"\n{'─'*40}")
+    print(f"\n{'-'*40}")
     total_fakt = sum(d["faktura"] for d in parsed)
     print(f"Total faktura: {total_fakt:>10,.2f} kr\n")
 

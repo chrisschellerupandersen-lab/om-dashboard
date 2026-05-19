@@ -1966,39 +1966,90 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste).fetchall()
             kategorier = [dict(r) for r in kat_rows]
 
-            # ── Kage-sektion: ugentlige tal (købes til 4-5 dage) ─────────────
+            # ── Kage-sektion: ugentlige tal — SKU-baseret matching ───────────
             kage_bestil_rows = conn.execute(f"""
+                SELECT varenavn, varenummer,
+                       (man+tir+ons+tor+fre+loe+son) AS uge_total
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
+                  AND {_KAGE_FILTER}
+                  AND varenummer != '' AND varenummer != '0'
+                ORDER BY uge_total DESC
+            """, (uge, aar)).fetchall()
+            # Fallback: kager uden varenummer matches på varenavn
+            kage_bestil_ingen_sku = conn.execute(f"""
                 SELECT varenavn,
                        (man+tir+ons+tor+fre+loe+son) AS uge_total
                 FROM ugebestillinger
                 WHERE uge = ? AND aar = ?
                   AND {_KAGE_FILTER}
+                  AND (varenummer = '' OR varenummer = '0' OR varenummer IS NULL)
                 ORDER BY uge_total DESC
             """, (uge, aar)).fetchall()
-            kage_varer_bestil = {r['varenavn']: int(r['uge_total'] or 0)
-                                 for r in kage_bestil_rows}
-            kage_bestilt_total = sum(kage_varer_bestil.values())
 
-            # Kassesalg af kager for ugen — normaliseret varenavn-matching
+            # SKU → {varenavn, bestilt}
+            kage_sku_map = {
+                str(int(float(r['varenummer']))): {'varenavn': r['varenavn'],
+                                                    'bestilt': int(r['uge_total'] or 0)}
+                for r in kage_bestil_rows if r['varenummer']
+            }
+            kage_bestilt_total = sum(v['bestilt'] for v in kage_sku_map.values())
+            kage_bestilt_total += sum(int(r['uge_total'] or 0) for r in kage_bestil_ingen_sku)
+
+            # Kassesalg per SKU fra transaktioner
             kage_kasse_rows = conn.execute(f"""
-                SELECT COALESCE(varenavn,'') AS varenavn,
+                SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS sku,
+                       COALESCE(varenavn,'') AS varenavn,
                        ROUND(SUM(antal), 0) AS antal
                 FROM transaktioner
                 WHERE dato IN ({placeholders})
-                  AND ({_KAGE_VN})
-                GROUP BY varenavn
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                        AND {_KAGE_FILTER}
+                  )
+                GROUP BY sku
             """, dato_liste).fetchall()
-            # Normaliseret opslag: lowercase + trim
-            kage_kassesalg_norm = {r['varenavn'].strip().lower(): int(r['antal'] or 0)
-                                   for r in kage_kasse_rows}
-            kage_kassesalg_total = sum(kage_kassesalg_norm.values())
+            kage_sku_solgt = {str(r['sku']): int(r['antal'] or 0) for r in kage_kasse_rows}
+            kage_kassesalg_total = sum(kage_sku_solgt.values())
 
-            # Byg kage-vareliste
+            # Byg kage-vareliste (SKU-matchede)
             kage_varer = []
-            for navn, bestilt_k in sorted(kage_varer_bestil.items(),
-                                          key=lambda x: -x[1]):
-                solgt_k = kage_kassesalg_norm.get(navn.strip().lower(), 0)
-                svind_k = max(0, bestilt_k - solgt_k)
+            for sku, info in sorted(kage_sku_map.items(), key=lambda x: -x[1]['bestilt']):
+                bestilt_k = info['bestilt']
+                solgt_k   = kage_sku_solgt.get(sku, 0)
+                svind_k   = max(0, bestilt_k - solgt_k)
+                pct_k     = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
+                kage_varer.append({
+                    'varenavn': info['varenavn'],
+                    'bestilt':  bestilt_k,
+                    'solgt':    solgt_k,
+                    'svind':    svind_k,
+                    'svind_pct': pct_k,
+                })
+            # Tilføj kager uden SKU (varenavn-fallback)
+            kage_norm_solgt = {r['varenavn'].strip().lower(): int(r['antal'] or 0)
+                               for r in conn.execute(f"""
+                SELECT varenavn, ROUND(SUM(antal),0) AS antal
+                FROM transaktioner WHERE dato IN ({placeholders}) AND ({_KAGE_VN})
+                GROUP BY varenavn
+            """, dato_liste).fetchall()}
+            for r in kage_bestil_ingen_sku:
+                bestilt_k = int(r['uge_total'] or 0)
+                solgt_k   = kage_norm_solgt.get(r['varenavn'].strip().lower(), 0)
+                svind_k   = max(0, bestilt_k - solgt_k)
+                pct_k     = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
+                kage_varer.append({
+                    'varenavn': r['varenavn'],
+                    'bestilt':  bestilt_k,
+                    'solgt':    solgt_k,
+                    'svind':    svind_k,
+                    'svind_pct': pct_k,
+                })
+            kage_svind_total = max(0, kage_bestilt_total - kage_kassesalg_total)
+            kage_svind_pct   = round(kage_svind_total / kage_bestilt_total * 100, 1) \
+                               if kage_bestilt_total > 0 else None
                 pct_k   = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
                 kage_varer.append({
                     'varenavn': navn,

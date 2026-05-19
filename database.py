@@ -552,6 +552,35 @@ def _mp_dag_map(fra_dato: str, til_dato: str) -> Dict:
     return {r["dato"]: r["omsaetning_inkl"] for r in rows}
 
 
+def _mp_uge_netto(iso_aar: int, iso_uge: int) -> float:
+    """Returner MobilePay netto (÷1.25) for en ISO-uge.
+    Bruger daglig data hvis tilgængelig, ellers pro-rater månedstotal."""
+    from datetime import date as _d, timedelta as _td
+    from calendar import monthrange as _mr
+    mandag = _d.fromisocalendar(iso_aar, iso_uge, 1)
+    sondag = mandag + _td(days=6)
+
+    with _conn() as conn:
+        # Check om der er daglig data for nogen dag i ugen
+        dag_rows = conn.execute(
+            "SELECT dato, omsaetning_inkl FROM mobilepay_dag WHERE dato BETWEEN ? AND ?",
+            (mandag.isoformat(), sondag.isoformat())
+        ).fetchall()
+
+    if dag_rows:
+        # Eksakt: sum af faktiske dage i ugen
+        total_inkl = sum(r["omsaetning_inkl"] for r in dag_rows)
+        return round(total_inkl / 1.25, 0)
+
+    # Fallback: pro-rater månedstotal (ugens mandag bestemmer måned)
+    mp = _mp_map_alle()
+    mp_inkl = mp.get((mandag.year, mandag.month), 0.0)
+    if not mp_inkl:
+        return 0.0
+    days = _mr(mandag.year, mandag.month)[1]
+    return round((mp_inkl / 1.25) / days * 7, 0)
+
+
 def gem_mobilepay_dag(linjer: list) -> int:
     """Gem/opdater daglig MobilePay-omsætning. linjer = [{dato, omsaetning_inkl, kilde?}]"""
     with _conn() as conn:
@@ -607,13 +636,14 @@ def hent_uger(aar: int = None) -> List[Dict]:
             ORDER BY dato ASC
         """, params).fetchall()
 
-    mp = _mp_map_alle()
     resultat = []
     for r in rows:
         d = _date.fromisoformat(r["min_dato"])
-        days = monthrange(d.year, d.month)[1]
-        mp_inkl = mp.get((d.year, d.month), 0.0)
-        mp_netto = round((mp_inkl / 1.25) / days * 7, 0) if mp_inkl else 0.0
+        iso = d.isocalendar()
+        try:
+            mp_netto = _mp_uge_netto(iso[0], iso[1])
+        except Exception:
+            mp_netto = 0.0
         row = dict(r)
         row["mp_netto"] = mp_netto
         resultat.append(row)
@@ -1564,12 +1594,9 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             tgtg_stk       = round(d["tgtg"] / TGTG_KR_PR_POSE * TGTG_ENHEDER_PR_POSE) if d.get("tgtg") else 0
             tgtg_stk_kilde = "estimat"
 
-        # MobilePay netto pro-ratet til ugen (mandag bestemmer måned)
+        # MobilePay netto: brug faktiske daglige data hvis tilgængelige, ellers pro-rata
         try:
-            mon = _date.fromisocalendar(d["aar"], d["uge"], 1)
-            days = _monthrange(mon.year, mon.month)[1]
-            mp_inkl = mp.get((mon.year, mon.month), 0.0)
-            mp_netto = round((mp_inkl / 1.25) / days * 7, 0) if mp_inkl else 0.0
+            mp_netto = _mp_uge_netto(int(d["aar"]), int(d["uge"]))
         except Exception:
             mp_netto = 0.0
 

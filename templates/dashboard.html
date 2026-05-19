@@ -6135,26 +6135,37 @@ async function vfDrillDown(aar, maaned, type) {
       body.innerHTML = `<p style="${mono}font-size:10px;color:var(--ash);">Ingen bager-fakturaer registreret for denne måned.</p>`;
       return;
     }
-    const total = d.bager_vf.reduce((s,r) => s+(r.faktura||0), 0);
+    const rows = d.bager_vf.map(r => ({
+      ...r,
+      netto: (r.faktura||0) - (r.retur_ialt||0),
+      diff:  ((r.faktura||0) - (r.retur_ialt||0)) - (r.bestilt_kr||0),
+    }));
+    const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
+    const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);
+    const diffClr = v => v > 0 ? 'color:var(--danger)' : v < 0 ? 'color:var(--moss)' : 'color:var(--ash)';
+    const dkDiff  = v => (v >= 0 ? '+' : '') + dk(v) + ' kr';
     body.innerHTML = `
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="border-bottom:2px solid rgba(30,58,30,.15);">
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;letter-spacing:.08em;color:var(--ash);">UGE</th>
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">ÅR</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BESTILT KR</th>
-          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">FAKTURA</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">VF (NETTO)</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">DIFF</th>
         </tr></thead>
         <tbody>
-          ${d.bager_vf.map(r => `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
+          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
             <td style="padding:8px 8px;font-weight:500;">Uge ${r.uge}</td>
             <td style="padding:8px 8px;${mono}font-size:11px;color:var(--ash);">${r.aar}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bestilt_kr>0?dk(r.bestilt_kr)+' kr':'—'}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${dk(r.faktura)} kr</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${dk(r.netto)} kr</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr(r.diff)}">${dkDiff(r.diff)}</td>
           </tr>`).join('')}
         </tbody>
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
           <td colspan="3" style="padding:10px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:14px;font-weight:600;color:var(--forest);">${dk(total)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:14px;font-weight:600;color:var(--forest);">${dk(totalNetto)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${diffClr(totalDiff)}">${dkDiff(totalDiff)}</td>
         </tr></tfoot>
       </table>`;
   } else {

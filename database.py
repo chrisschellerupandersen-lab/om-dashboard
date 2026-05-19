@@ -2598,13 +2598,37 @@ def gem_mobilepay(aar: int, maaned: int, omsaetning: float):
 
 
 def hent_mobilepay() -> List[Dict]:
+    """Returnerer månedlig MobilePay-omsætning — daglige data foretrækkes frem for manuelle."""
+    from datetime import date as _date
     with _conn() as conn:
-        rows = conn.execute("""
-            SELECT aar, maaned, omsaetning
-            FROM mobilepay
-            ORDER BY aar DESC, maaned DESC
+        # Daglige data aggregeret til måneder
+        dag_rows = conn.execute("""
+            SELECT CAST(strftime('%Y', dato) AS INTEGER) AS aar,
+                   CAST(strftime('%m', dato) AS INTEGER) AS maaned,
+                   SUM(omsaetning_inkl) AS omsaetning,
+                   'dag' AS kilde
+            FROM mobilepay_dag
+            GROUP BY aar, maaned
         """).fetchall()
-    return [dict(r) for r in rows]
+        # Manuelle månedsposter
+        mnd_rows = conn.execute("""
+            SELECT aar, maaned, omsaetning, 'manuel' AS kilde
+            FROM mobilepay
+        """).fetchall()
+
+    merged: Dict = {}
+    # Manuel data som udgangspunkt
+    for r in mnd_rows:
+        key = (r["aar"], r["maaned"])
+        merged[key] = {"aar": r["aar"], "maaned": r["maaned"],
+                       "omsaetning": r["omsaetning"], "kilde": "manuel"}
+    # Daglige data overskriver manuelle (mere præcise)
+    for r in dag_rows:
+        key = (r["aar"], r["maaned"])
+        merged[key] = {"aar": r["aar"], "maaned": r["maaned"],
+                       "omsaetning": round(r["omsaetning"], 2), "kilde": "dag"}
+
+    return sorted(merged.values(), key=lambda x: (x["aar"], x["maaned"]), reverse=True)
 
 
 # ── VARESTAMDATA ──────────────────────────────────────────────────────────────

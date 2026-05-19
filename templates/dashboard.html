@@ -1660,8 +1660,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th>Måned</th>
                 <th>År</th>
                 <th class="num">Omsætning (kr)</th>
+                <th style="font-size:10px;color:var(--ash);">Kilde</th>
               </tr></thead>
-              <tbody id="mp-tbody"><tr><td colspan="3" class="empty">Indlæser…</td></tr></tbody>
+              <tbody id="mp-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -5196,14 +5197,23 @@ async function loadMobilepay() {
       <td style="font-size:14px;">${MND_NAVN[r.maaned]}</td>
       <td style="${mono}font-size:13px;">${r.aar}</td>
       <td class="num">
-        <span class="mp-omsat" contenteditable="true"
-          data-aar="${r.aar}" data-maaned="${r.maaned}"
-          onblur="mpOpdater(this)"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-          onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/[^0-9.]/g,'');document.execCommand('insertText',false,t);"
-          style="${mono}font-size:13px;cursor:text;border-bottom:1px dashed rgba(30,58,30,.3);padding:1px 3px;"
-        >${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')}</span>
-        <span style="${mono}font-size:11px;color:var(--ash);"> kr</span>
+        ${r.kilde === 'dag'
+          ? `<span style="${mono}font-size:13px;">${Math.round(r.omsaetning).toLocaleString('da-DK')}</span>
+             <span style="${mono}font-size:11px;color:var(--ash);"> kr</span>`
+          : `<span class="mp-omsat" contenteditable="true"
+               data-aar="${r.aar}" data-maaned="${r.maaned}"
+               onblur="mpOpdater(this)"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+               onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/[^0-9.]/g,'');document.execCommand('insertText',false,t);"
+               style="${mono}font-size:13px;cursor:text;border-bottom:1px dashed rgba(30,58,30,.3);padding:1px 3px;"
+             >${Math.round(oms(r.omsaetning)).toLocaleString('da-DK')}</span>
+             <span style="${mono}font-size:11px;color:var(--ash);"> kr</span>`
+        }
+      </td>
+      <td style="font-size:11px;color:var(--ash);white-space:nowrap;">
+        ${r.kilde === 'dag'
+          ? '<span style="color:var(--moss);">✓ CSV</span>'
+          : '<span style="color:var(--ash);">manuel</span>'}
       </td>
     </tr>`).join('');
 }

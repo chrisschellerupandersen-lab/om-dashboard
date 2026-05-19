@@ -2050,17 +2050,6 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             kage_svind_total = max(0, kage_bestilt_total - kage_kassesalg_total)
             kage_svind_pct   = round(kage_svind_total / kage_bestilt_total * 100, 1) \
                                if kage_bestilt_total > 0 else None
-                pct_k   = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
-                kage_varer.append({
-                    'varenavn': navn,
-                    'bestilt':  bestilt_k,
-                    'solgt':    solgt_k,
-                    'svind':    svind_k,
-                    'svind_pct': pct_k,
-                })
-            kage_svind_total = max(0, kage_bestilt_total - kage_kassesalg_total)
-            kage_svind_pct   = round(kage_svind_total / kage_bestilt_total * 100, 1) \
-                               if kage_bestilt_total > 0 else None
             kage_sektion = {
                 'bestilt':   kage_bestilt_total,
                 'kassesalg': kage_kassesalg_total,

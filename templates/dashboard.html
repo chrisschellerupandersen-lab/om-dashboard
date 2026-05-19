@@ -968,8 +968,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Måned</th>
-                <th class="num">Omsat</th>
-                <th class="num">Netto omsat</th>
+                <th class="num" title="Shopbox omsætning inkl. moms">Omsat</th>
+                <th class="num" title="MobilePay netto (ex-moms) — faktiske daglige data" style="color:rgba(100,200,100,.8);">MobilePay</th>
+                <th class="num" title="Total netto = Shopbox ÷1.25 + MobilePay">Netto omsat</th>
                 <th class="num">Bageri VF</th>
                 <th class="num">Andet VF</th>
                 <th class="num">VF i alt</th>
@@ -3324,13 +3325,13 @@ function buildAar() {
       const db_kr   = Math.round(netto - vfTot);
       const gpm     = netto > 0 ? db_kr / netto * 100 : 0;
       return { m, dage, faktDage:f.faktiske_dage, type:'faktisk',
-               omsat:f.omsaetning, netto, bagerVF, andetVF, vfTot,
+               omsat:f.omsaetning, mpNetto, netto, bagerVF, andetVF, vfTot,
                avance:db_kr, gpm, faste, res:Math.round(db_kr - faste) };
     }
     const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
     const avance = Math.round(omsat * c.gpm / 100);
     const netto  = Math.round(omsat / 1.25);
-    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, netto,
+    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, mpNetto:0, netto,
              bagerVF:null, andetVF:null, vfTot:null,
              avance, gpm:c.gpm, faste, res:avance - faste };
   });
@@ -3513,6 +3514,7 @@ function buildAar() {
     type:    r.type,
     isIndev: aar===thisYear && r.m===thisMonth,
     omsat:   r.omsat,
+    mpNetto: r.mpNetto || 0,
     netto:   r.type==='faktisk' ? r.netto  : null,
     bagerVF: r.type==='faktisk' ? r.bagerVF : null,
     andetVF: r.type==='faktisk' ? r.andetVF : null,
@@ -3539,6 +3541,7 @@ function buildAar() {
     return `<tr class="${r.isIndev?'indev':''}">
       <td><strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
       <td class="num">${dk(r.omsat)}</td>
+      <td class="num" style="${mono}color:var(--moss);">${r.mpNetto > 0 ? dk(r.mpNetto) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
       <td class="num" style="${ash}">${r.netto!=null?dk(r.netto):'—'}</td>
       <td class="num" style="${ash}${r.bagerVF>0?clk:''}" title="${r.bagerVF>0?'Klik for ugeoversigt':''}"
           onclick="${r.bagerVF>0?`vfDrillDown(${aar},${mi},'bager')`:''}">

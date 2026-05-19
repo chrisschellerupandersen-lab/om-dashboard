@@ -888,7 +888,7 @@ def hent_aarsdata(aar: int = None) -> Dict:
         # Fallback til 1/7 uniform hvis ingen bestillingsdata findes for ugen.
         from datetime import timedelta as _td
         bager_rows = conn.execute(
-            "SELECT uge, aar, faktura FROM bager_regnskab WHERE aar=? OR aar=?",
+            "SELECT uge, aar, faktura, retur_ialt FROM bager_regnskab WHERE aar=? OR aar=?",
             (aar, aar - 1)
         ).fetchall()
 
@@ -911,8 +911,8 @@ def hent_aarsdata(aar: int = None) -> Dict:
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
-                fakt = br["faktura"] or 0
-                if fakt == 0:
+                fakt = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
+                if fakt <= 0:
                     continue
                 key = (int(br["aar"]), int(br["uge"]))
                 mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)

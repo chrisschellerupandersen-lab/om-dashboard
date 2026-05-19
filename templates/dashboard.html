@@ -6137,8 +6137,8 @@ async function vfDrillDown(aar, maaned, type) {
     }
     const rows = d.bager_vf.map(r => ({
       ...r,
-      netto: (r.faktura||0) - (r.retur_ialt||0),
-      diff:  ((r.faktura||0) - (r.retur_ialt||0)) - (r.bestilt_kr||0),
+      netto: r.netto ?? ((r.faktura||0) - (r.retur_ialt||0)),
+      diff:  (r.netto ?? ((r.faktura||0) - (r.retur_ialt||0))) - (r.bestilt_kr||0),
     }));
     const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
     const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);

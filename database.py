@@ -1578,7 +1578,6 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             tgtg_stk_map[key] = tgtg_stk_map.get(key, 0) + int(r["stk"] or 0)
 
         aar_filter1 = "AND b.aar = ?" if aar else ""
-        aar_filter2 = "AND u.aar = ?" if aar else ""
         aar_params  = (aar,) if aar else ()
         rows = conn.execute(f"""
             SELECT
@@ -1592,22 +1591,8 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
             WHERE 1=1 {aar_filter1}
             GROUP BY b.uge, b.aar
-            UNION ALL
-            -- Uger med bestilling men uden bager_regnskab endnu
-            SELECT
-                u.uge, u.aar,
-                ROUND(SUM(u.total_antal), 0) AS bestilt_stk,
-                ROUND(SUM(u.total_pris),  2) AS bestilt_kr,
-                0, 0, 0, 0, 0,
-                0                            AS faktura,
-                ROUND(SUM(u.total_pris), 2)  AS netto_kr
-            FROM ugebestillinger u
-            WHERE NOT EXISTS (
-                SELECT 1 FROM bager_regnskab b WHERE b.uge = u.uge AND b.aar = u.aar
-            ) {aar_filter2}
-            GROUP BY u.uge, u.aar
-            ORDER BY aar DESC, uge DESC
-        """, aar_params + aar_params).fetchall()
+            ORDER BY b.aar DESC, b.uge DESC
+        """, aar_params).fetchall()
 
     from calendar import monthrange as _monthrange
     from datetime import date as _today_date

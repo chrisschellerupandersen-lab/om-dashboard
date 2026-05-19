@@ -1630,6 +1630,24 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="mp-status" style="font-size:11px;color:var(--moss);margin-top:8px;min-height:16px;"></div>
         </div>
 
+        <!-- Portal CSV upload -->
+        <div class="card" style="margin-bottom:16px;max-width:560px;">
+          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Importer portal-eksport (CSV / Excel)</span></div>
+          <p style="font-size:12px;color:var(--ash);margin:6px 0 10px;">
+            Eksportér fra <strong>portal.vippsmobilepay.com</strong> → Salgssted-oversigt → vælg periode → Eksportér CSV.<br>
+            Benyttes til at importere betalinger til 97016-nummeret.
+          </p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input type="file" id="mp-csv-fil" accept=".csv,.xlsx,.xls"
+              style="font-size:13px;padding:5px;border:1px solid rgba(30,58,30,.2);border-radius:4px;background:var(--white);flex:1;min-width:200px;">
+            <button onclick="mpUploadCsv()" id="mp-csv-btn"
+              style="padding:7px 18px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;">
+              Upload
+            </button>
+          </div>
+          <div id="mp-csv-status" style="font-size:11px;margin-top:8px;min-height:16px;"></div>
+        </div>
+
         <!-- Tabel -->
         <div class="aar2-tbl-wrap">
           <div class="aar2-tbl-hdr">
@@ -5204,6 +5222,36 @@ async function mpGem() {
   statusEl.textContent = MND_NAVN[maaned] + ' ' + aar + ' gemt ✓';
   setTimeout(() => statusEl.textContent = '', 3000);
   loadMobilepay();
+}
+
+async function mpUploadCsv() {
+  const fil = document.getElementById('mp-csv-fil').files[0];
+  const statusEl = document.getElementById('mp-csv-status');
+  if (!fil) { statusEl.style.color = 'var(--crimson)'; statusEl.textContent = 'Vælg en CSV- eller Excel-fil først.'; return; }
+  statusEl.style.color = 'var(--ash)';
+  statusEl.textContent = 'Uploader…';
+  const btn = document.getElementById('mp-csv-btn');
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('fil', fil);
+    const resp = await fetch('/api/mobilepay/upload-csv', { method: 'POST', body: fd });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.detail || 'HTTP ' + resp.status);
+    statusEl.style.color = 'var(--moss)';
+    if (data.dage > 0) {
+      statusEl.textContent = `✓ ${data.dage} dage importeret · total ${Math.round(data.total).toLocaleString('da-DK')} kr`;
+    } else {
+      statusEl.textContent = data.besked || '✓ Ingen nye dage (data allerede importeret)';
+    }
+    document.getElementById('mp-csv-fil').value = '';
+    loadMobilepay();
+  } catch(e) {
+    statusEl.style.color = 'var(--crimson)';
+    statusEl.textContent = 'Fejl: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 async function mpOpdater(span) {

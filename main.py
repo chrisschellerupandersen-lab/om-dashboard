@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
@@ -572,6 +572,32 @@ async def mobilepay_dagssalg(request: Request):
 async def api_mobilepay_dag(request: Request, fra: str = None, til: str = None):
     _kræv_login(request)
     return database.hent_mobilepay_dag(fra, til)
+
+
+@app.post("/api/mobilepay/upload-csv")
+async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
+    """Browser CSV/Excel upload fra MobilePay portal."""
+    _kræv_login(request)
+    import tempfile, sys
+    from pathlib import Path as _Path
+    # Gem upload midlertidigt
+    suffix = _Path(fil.filename).suffix.lower() if fil.filename else ".csv"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(await fil.read())
+        tmp_path = tmp.name
+    try:
+        # Genbrug parse-logik fra mobilepay_csv_import
+        sys.path.insert(0, str(_Path(__file__).parent))
+        import mobilepay_csv_import as _mp_csv
+        linjer = _mp_csv.parse_csv(tmp_path)
+    finally:
+        import os as _os
+        _os.unlink(tmp_path)
+    if not linjer:
+        return {"ok": True, "linjer": 0, "besked": "Ingen gyldige rækker fundet i filen"}
+    count = database.gem_mobilepay_dag(linjer)
+    total = sum(l["omsaetning_inkl"] for l in linjer)
+    return {"ok": True, "linjer": count, "dage": len(linjer), "total": round(total, 2)}
 
 
 @app.get("/api/salg/mangler-kostpris")

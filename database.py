@@ -1358,9 +1358,20 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
 
 def gem_bager_regnskab(linjer: List[Dict]) -> int:
     with _conn() as conn:
+        # Fjern duplikate rækker (gamle imports uden UNIQUE constraint)
+        conn.execute("""
+            DELETE FROM bager_regnskab WHERE id NOT IN (
+                SELECT MAX(id) FROM bager_regnskab GROUP BY uge, aar
+            )
+        """)
+        # Opret unikt index hvis det ikke findes (migration for eksisterende databaser)
+        conn.execute("""
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_bager_uge_aar
+            ON bager_regnskab(uge, aar)
+        """)
         for r in linjer:
             conn.execute("""
-                INSERT INTO bager_regnskab
+                INSERT OR REPLACE INTO bager_regnskab
                     (uge, aar, retur_wiener, retur_boller, tgtg, b_kvali, retur_ialt, faktura)
                 VALUES (?,?,?,?,?,?,?,?)
             """, (r["uge"], r["aar"], r.get("retur_wiener", 0), r.get("retur_boller", 0),
@@ -1574,7 +1585,8 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
                 ROUND(SUM(u.total_antal), 0)                   AS bestilt_stk,
                 ROUND(SUM(u.total_pris),  2)                   AS bestilt_kr,
                 b.retur_wiener, b.retur_boller, b.tgtg, b.b_kvali, b.retur_ialt,
-                ROUND(SUM(u.total_pris) - b.retur_ialt, 2)    AS netto_kr
+                b.faktura,
+                ROUND(b.faktura - b.retur_ialt, 2)             AS netto_kr
             FROM bager_regnskab b
             LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
             WHERE 1=1 {aar_filter1}

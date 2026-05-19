@@ -96,6 +96,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 /* KPI */
 .kpi-row{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;}
+.kpi-row-4{display:grid;grid-template-columns:220px 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-5{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-6{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
 .kpi-row-8{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;}
@@ -511,6 +513,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   /* KPI-rækker: 2 kolonner, første fuld bredde */
   .kpi-row{grid-template-columns:1fr 1fr;gap:8px;}
   .kpi-row > *:first-child{grid-column:1/-1;}
+  .kpi-row-2{grid-template-columns:1fr 1fr;gap:8px;}
+  .kpi-row-4{grid-template-columns:1fr 1fr;gap:8px;}
+  .kpi-row-4 > *:first-child{grid-column:1/-1;}
   .kpi-row-5{grid-template-columns:1fr 1fr;gap:8px;}
   .kpi-row-5 > *:first-child{grid-column:1/-1;}
   .kpi-row-6{grid-template-columns:1fr 1fr;gap:8px;}
@@ -1771,7 +1776,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- KPI-række -->
-        <div class="kpi-row-6" style="margin-bottom:16px;">
+        <div class="kpi-row-4" style="margin-bottom:12px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
             <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
@@ -1792,15 +1797,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-v" id="bern-vaekst">—</div>
             <div class="kpi-s" id="bern-vaekst-sub"></div>
           </div>
-          <div class="kpi">
-            <div class="kpi-l">Retur boller</div>
-            <div class="kpi-v" id="bern-retur-boller">—</div>
-            <div class="kpi-s" id="bern-retur-boller-sub">10% af bestilt</div>
+        </div>
+
+        <!-- Retur KPI-kort -->
+        <div class="kpi-row-2" style="margin-bottom:16px;">
+          <div class="kpi" style="background:var(--danger-bg,#fff5f5);border-color:var(--danger);">
+            <div class="kpi-l" style="color:var(--danger);letter-spacing:.08em;">RETUR BOLLER · DENNE UGE</div>
+            <div class="kpi-v" id="bern-retur-boller" style="color:var(--danger);font-size:32px;">—</div>
+            <div class="kpi-s" id="bern-retur-boller-sub" style="color:var(--danger);opacity:.7;">10% af bestilt</div>
           </div>
-          <div class="kpi">
-            <div class="kpi-l">Retur wienerbrød</div>
-            <div class="kpi-v" id="bern-retur-wiener">—</div>
-            <div class="kpi-s" id="bern-retur-wiener-sub">13,5% af bestilt</div>
+          <div class="kpi" style="background:var(--danger-bg,#fff5f5);border-color:var(--danger);">
+            <div class="kpi-l" style="color:var(--danger);letter-spacing:.08em;">RETUR WIENERBRØD · DENNE UGE</div>
+            <div class="kpi-v" id="bern-retur-wiener" style="color:var(--danger);font-size:32px;">—</div>
+            <div class="kpi-s" id="bern-retur-wiener-sub" style="color:var(--danger);opacity:.7;">13,5% af bestilt</div>
           </div>
         </div>
 
@@ -5409,7 +5418,7 @@ async function loadBernUge(uge, aar) {
   }
 
   // KPI-række: skjul beregner-felter ved faktisk bestilling
-  const kpiCols = document.querySelectorAll('#p-beregner .kpi-row-6 .kpi:not(:first-child)');
+  const kpiCols = document.querySelectorAll('#p-beregner .kpi-row-4 .kpi:not(:first-child)');
   kpiCols.forEach(el => el.style.opacity = d.faktisk ? '.25' : '');
 
   // KPI

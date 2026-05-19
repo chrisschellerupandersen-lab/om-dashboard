@@ -514,6 +514,68 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
     return buf.getvalue()
 
 
+@app.post("/api/bager/upload-pdf")
+async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
+    """Parse bager-faktura PDF med Claude og returner ekstraherede felter."""
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+    try:
+        pdf_bytes = await fil.read()
+        pdf_b64   = __import__("base64").b64encode(pdf_bytes).decode()
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=512,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": pdf_b64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": (
+                            "Dette er en ugentlig bageri-faktura til Organic Market Greve.\n"
+                            "Ekstraher præcist følgende felter og returner KUN valid JSON (ingen forklaring):\n"
+                            "{\n"
+                            '  "uge": <ugenummer som heltal>,\n'
+                            '  "aar": <årstal som heltal>,\n'
+                            '  "retur_wiener": <returneret wienerbrød antal stk, 0 hvis ikke nævnt>,\n'
+                            '  "retur_boller": <returnerede boller antal stk, 0 hvis ikke nævnt>,\n'
+                            '  "tgtg": <Too Good To Go antal stk, 0 hvis ikke nævnt>,\n'
+                            '  "b_kvali": <kvalitetskreditering beløb i kr (positivt tal), 0 hvis ikke nævnt>,\n'
+                            '  "retur_ialt": <total returkredit i kr (positivt tal), 0 hvis ikke nævnt>,\n'
+                            '  "faktura": <faktura total at betale i kr, 0 hvis ikke nævnt>\n'
+                            "}"
+                        ),
+                    },
+                ],
+            }],
+        )
+        import json as _json
+        raw = msg.content[0].text.strip()
+        # Trim markdown code fences hvis til stede
+        raw = raw.strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
+        data = _json.loads(raw)
+        # Valider felter
+        for f in ("uge", "aar", "retur_wiener", "retur_boller", "tgtg", "b_kvali", "retur_ialt", "faktura"):
+            if f not in data:
+                data[f] = 0
+        return {"ok": True, "data": data}
+    except Exception as exc:
+        return {"ok": False, "fejl": str(exc)}
+
+
 @app.post("/api/bager/retur-opdater")
 async def bager_retur_opdater(request: Request):
     try:

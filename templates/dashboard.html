@@ -1371,6 +1371,98 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
         </div>
 
+        <!-- BAGER PDF UPLOAD -->
+        <div class="aar2-tbl-wrap" style="margin-bottom:14px;">
+          <div class="aar2-tbl-hdr" style="cursor:pointer;" onclick="bagerPdfToggle(this)">
+            <span class="aar2-tbl-hdr-l">&#128220; Importer bager-faktura (PDF)</span>
+            <span class="aar2-tbl-hdr-r" id="bager-pdf-lbl">klik for at &aring;bne &#9662;</span>
+          </div>
+          <div id="bager-pdf-wrap" style="display:none;padding:16px 20px;border-top:1px solid rgba(30,58,30,.08);">
+            <p style="font-size:12px;color:var(--ash);margin-bottom:12px;">
+              Tr&aelig;k PDF-fakturaen fra din mail herind — Claude l&aelig;ser tallene automatisk.
+            </p>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label id="bager-pdf-dropzone"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;
+                       border:2px dashed rgba(30,58,30,.25);border-radius:8px;padding:14px 20px;
+                       cursor:pointer;font-size:13px;color:var(--ash);min-width:220px;transition:all .2s;">
+                <span>&#128196;</span>
+                <span id="bager-pdf-fname">V&aelig;lg eller slip PDF her</span>
+                <input type="file" id="bager-pdf-fil" accept=".pdf" style="display:none;"
+                  onchange="bagerPdfValgt(this)">
+              </label>
+              <button id="bager-pdf-btn" onclick="bagerPdfUpload()"
+                style="background:var(--forest);color:#fff;border:none;border-radius:6px;
+                       padding:10px 18px;font-size:13px;cursor:pointer;display:none;">
+                &#129302; L&aelig;s faktura
+              </button>
+              <span id="bager-pdf-status" style="font-size:12px;color:var(--ash);"></span>
+            </div>
+
+            <!-- Preview: vises n&aring;r Claude har ekstraheret data -->
+            <div id="bager-pdf-preview" style="display:none;margin-top:16px;padding:14px 16px;
+                 background:rgba(30,58,30,.04);border-radius:8px;border:1px solid rgba(30,58,30,.1);">
+              <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;
+                   text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Ekstraherede v&aelig;rdier — ret om n&oslash;dvendigt</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px;">
+                <label style="font-size:12px;color:var(--ash);">Uge
+                  <input id="bp-uge" type="number" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">&#197;r
+                  <input id="bp-aar" type="number" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">Faktura (kr)
+                  <input id="bp-faktura" type="number" step="0.01" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">Retur i alt (kr)
+                  <input id="bp-retur_ialt" type="number" step="0.01" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">Retur wiener (stk)
+                  <input id="bp-retur_wiener" type="number" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">Retur boller (stk)
+                  <input id="bp-retur_boller" type="number" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">TGTG (stk)
+                  <input id="bp-tgtg" type="number" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+                <label style="font-size:12px;color:var(--ash);">B-kvali kredit (kr)
+                  <input id="bp-b_kvali" type="number" step="0.01" class="inline-edit"
+                    style="display:block;margin-top:3px;padding:5px 8px;border:1px solid rgba(30,58,30,.2);
+                    border-radius:4px;width:100%;font-size:14px;font-family:'DM Mono',monospace;">
+                </label>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <button onclick="bagerPdfGem()"
+                  style="background:var(--moss);color:#fff;border:none;border-radius:6px;
+                         padding:9px 20px;font-size:13px;cursor:pointer;font-weight:500;">
+                  &#10003; Gem til dashboard
+                </button>
+                <button onclick="document.getElementById('bager-pdf-preview').style.display='none';"
+                  style="background:none;border:1px solid rgba(30,58,30,.2);color:var(--ash);
+                         border-radius:6px;padding:9px 14px;font-size:12px;cursor:pointer;">
+                  Annuller
+                </button>
+                <span id="bager-pdf-gem-status" style="font-size:12px;color:var(--ash);"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- BESTILLINGSHISTORIK CHART -->
         <div class="card" id="svind-hist-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -4487,6 +4579,120 @@ async function loadTgtg() {
 // ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
 let _svindLoaded = false;
 let _svindTs     = 0;
+
+// ── BAGER PDF UPLOAD ─────────────────────────────────────────────────────────
+
+function bagerPdfToggle(hdr) {
+  const wrap = document.getElementById('bager-pdf-wrap');
+  const lbl  = document.getElementById('bager-pdf-lbl');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? '' : 'none';
+  lbl.textContent = open ? 'skjul ▴' : 'klik for at \xe5bne ▾';
+}
+
+function bagerPdfValgt(input) {
+  const fname = document.getElementById('bager-pdf-fname');
+  const btn   = document.getElementById('bager-pdf-btn');
+  if (input.files && input.files[0]) {
+    fname.textContent = input.files[0].name;
+    btn.style.display = '';
+  }
+}
+
+// Drag-and-drop
+(function() {
+  const dz = document.getElementById('bager-pdf-dropzone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--moss)'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.style.borderColor = '';
+    const file = e.dataTransfer.files[0];
+    if (file && file.name.toLowerCase().endsWith('.pdf')) {
+      const input = document.getElementById('bager-pdf-fil');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      bagerPdfValgt(input);
+    }
+  });
+})();
+
+async function bagerPdfUpload() {
+  const fil = document.getElementById('bager-pdf-fil').files[0];
+  const statusEl = document.getElementById('bager-pdf-status');
+  const btn = document.getElementById('bager-pdf-btn');
+  if (!fil) return;
+  statusEl.style.color = 'var(--ash)';
+  statusEl.textContent = 'Claude l\xe6ser PDF…';
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('fil', fil);
+    const resp = await fetch('/api/bager/upload-pdf', { method: 'POST', body: fd });
+    const result = await resp.json();
+    if (!result.ok) throw new Error(result.fejl || 'Ukendt fejl');
+    const d = result.data;
+    // Udfyld preview-felter
+    document.getElementById('bp-uge').value        = d.uge        || '';
+    document.getElementById('bp-aar').value        = d.aar        || new Date().getFullYear();
+    document.getElementById('bp-faktura').value    = d.faktura    || 0;
+    document.getElementById('bp-retur_ialt').value = d.retur_ialt || 0;
+    document.getElementById('bp-retur_wiener').value = d.retur_wiener || 0;
+    document.getElementById('bp-retur_boller').value = d.retur_boller || 0;
+    document.getElementById('bp-tgtg').value       = d.tgtg       || 0;
+    document.getElementById('bp-b_kvali').value    = d.b_kvali    || 0;
+    document.getElementById('bager-pdf-preview').style.display = '';
+    document.getElementById('bager-pdf-gem-status').textContent = '';
+    statusEl.style.color = 'var(--moss)';
+    statusEl.textContent = '✓ Data ekstraheret — kontroller og gem';
+  } catch(e) {
+    statusEl.style.color = 'var(--crimson)';
+    statusEl.textContent = 'Fejl: ' + e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function bagerPdfGem() {
+  const gemStatus = document.getElementById('bager-pdf-gem-status');
+  const linje = {
+    uge:          parseInt(document.getElementById('bp-uge').value)         || 0,
+    aar:          parseInt(document.getElementById('bp-aar').value)         || new Date().getFullYear(),
+    faktura:      parseFloat(document.getElementById('bp-faktura').value)   || 0,
+    retur_ialt:   parseFloat(document.getElementById('bp-retur_ialt').value)|| 0,
+    retur_wiener: parseInt(document.getElementById('bp-retur_wiener').value)|| 0,
+    retur_boller: parseInt(document.getElementById('bp-retur_boller').value)|| 0,
+    tgtg:         parseInt(document.getElementById('bp-tgtg').value)        || 0,
+    b_kvali:      parseFloat(document.getElementById('bp-b_kvali').value)   || 0,
+  };
+  if (!linje.uge) { gemStatus.textContent = 'Ugeno. mangler'; gemStatus.style.color='var(--crimson)'; return; }
+  gemStatus.style.color = 'var(--ash)';
+  gemStatus.textContent = 'Gemmer…';
+  const resp = await fetch('/api/bager/retur-opdater', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ secret: 'OM-Greve-2026-Hemlig', linjer: [linje] }),
+  });
+  const r = await resp.json();
+  if (r.ok) {
+    gemStatus.style.color = 'var(--moss)';
+    gemStatus.textContent = '✓ Uge ' + linje.uge + ' gemt!';
+    document.getElementById('bager-pdf-preview').style.display = 'none';
+    document.getElementById('bager-pdf-fil').value = '';
+    document.getElementById('bager-pdf-fname').textContent = 'V\xe6lg eller slip PDF her';
+    document.getElementById('bager-pdf-btn').style.display = 'none';
+    document.getElementById('bager-pdf-status').textContent = '';
+    _svindLoaded = false;
+    loadSvind(true);
+  } else {
+    gemStatus.style.color = 'var(--crimson)';
+    gemStatus.textContent = 'Fejl: ' + (r.detail || JSON.stringify(r));
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 async function loadSvind(force = false) {
   const nu = Date.now();

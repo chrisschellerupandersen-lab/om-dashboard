@@ -23,7 +23,6 @@ import io
 import os
 import re
 import sys
-import requests
 from datetime import datetime
 from pathlib import Path
 
@@ -186,6 +185,7 @@ def parse_csv(path):
 
 def upload_til_railway(linjer):
     # type: (list) -> None
+    import requests
     r = requests.post(
         f"{RAILWAY_URL}/api/mobilepay/dagssalg",
         json={"secret": WEBHOOK_SECRET, "linjer": linjer},

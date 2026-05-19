@@ -107,7 +107,7 @@ def _find_emails(service, kun_nye: bool = True) -> list[dict]:
             continue
 
         full = service.users().messages().get(
-            userId="me", messageId=msg_id, format="full"
+            userId="me", id=msg_id, format="full"
         ).execute()
 
         headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
@@ -208,23 +208,29 @@ def _tal(s) -> float:
 
 def _find_tal(pattern: str, tekst: str, flags=re.IGNORECASE) -> float:
     """Find første tal efter regex-mønster."""
-    m = re.search(pattern + r"[:\s]*([0-9][0-9.,\s]*)", tekst, flags)
-    if m:
-        return _tal(m.group(1).strip().split()[0])
+    m = re.search(r"(?:" + pattern + r")[:\s]*([0-9][0-9.,\s]*)", tekst, flags)
+    if m and m.group(1) is not None:
+        parts = m.group(1).strip().split()
+        if parts:
+            return _tal(parts[0])
+    return 0.0
+
+
+def _hent_sidst_tal_paa_linje(linje: str) -> float:
+    """Finder det sidste tal på en linje (typisk beløbet i en fakturalinje)."""
+    # Find alle tal på linjen (dansk format: 1.234,56 eller -1.234,56)
+    tal = re.findall(r"-?[0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|-?[0-9]+(?:,[0-9]+)?", linje)
+    if tal:
+        return abs(_tal(tal[-1]))  # Returner absolut beløb (kreditter er negative i PDF)
     return 0.0
 
 
 def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
     """
-    Forsøg at parse nøgletal fra PDF-tekst.
+    Parser nøgletal fra bager-faktura PDF.
 
-    Vi søger efter typiske mønstre i en bageri-faktura:
-      - Retur wienerbrød / Wiener: antal stk
-      - Retur boller / Boller: antal stk
-      - TGTG / Too Good To Go: antal
-      - Kvalitetskreditering / B-kvali: beløb kr
-      - Retur i alt / Kredit: beløb kr
-      - Faktura i alt / Total: beløb kr
+    Format: "Beskrivelse pct 1 -beloeb -beloeb" på separate linjer.
+    Eks: "Retur wienerbrød u. kerner 13,5% 1 -641,52 -641,52"
     """
     # Uge fra PDF (hvis ikke allerede fundet fra emnelinjen)
     if not uge:
@@ -232,43 +238,54 @@ def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
         if m:
             uge = int(m.group(1))
 
-    # Retur wienerbrød (stk)
-    retur_wiener = _find_tal(r"retur\s*wiener|wiener.*retur|retur.*wienerbrød", tekst)
-    if not retur_wiener:
-        retur_wiener = _find_tal(r"wiener\b", tekst)
+    retur_wiener = 0.0
+    retur_boller = 0.0
+    tgtg = 0.0
+    b_kvali = 0.0
+    faktura = 0.0
 
-    # Retur boller (stk)
-    retur_boller = _find_tal(r"retur\s*boller|boller.*retur", tekst)
-    if not retur_boller:
-        retur_boller = _find_tal(r"\bboller\b", tekst)
+    for linje in tekst.splitlines():
+        l = linje.strip()
+        l_lower = l.lower()
 
-    # TGTG
-    tgtg = _find_tal(r"too\s*good\s*to\s*go|tgtg", tekst)
+        # Retur wienerbrød — beløb på linjen
+        if re.search(r"retur\s+wien", l_lower):
+            retur_wiener = _hent_sidst_tal_paa_linje(l)
 
-    # Kvalitetskreditering (kr)
-    b_kvali = _find_tal(r"kvali|kvalitet|kredit(?!ering\s+i\s+alt)", tekst)
+        # Retur boller — beløb på linjen
+        elif re.search(r"retur\s+boller", l_lower):
+            retur_boller = _hent_sidst_tal_paa_linje(l)
 
-    # Retur / kredit i alt (kr)
-    retur_ialt = _find_tal(r"retur\s*i\s*alt|kredit\s*i\s*alt|total\s*retur|kreditnota\s*i\s*alt", tekst)
-    if not retur_ialt:
-        retur_ialt = _find_tal(r"retur\b", tekst)
+        # TGTG kreditering
+        elif re.search(r"tgtg|too\s*good\s*to\s*go", l_lower):
+            tgtg = _hent_sidst_tal_paa_linje(l)
 
-    # Faktura total (kr) — det vi skylder
-    faktura = _find_tal(r"faktura\s*i\s*alt|total\s*faktura|at\s*betale|betalings\s*beløb|netto\s*(?:i\s*alt)?", tekst)
-    if not faktura:
-        # Prøv med "I alt" alene — kan være fakturatotalen
-        faktura = _find_tal(r"\bi\s*alt\b", tekst)
+        # B-kvalitetskreditering / kvalitets-kredit
+        elif re.search(r"kvali|b-?kredit|kvalitets", l_lower):
+            if not re.search(r"retur|wiener|boller|tgtg", l_lower):
+                b_kvali = _hent_sidst_tal_paa_linje(l)
+
+        # Total DKK — faktura total
+        elif re.search(r"total\s+dkk\s*:", l_lower):
+            faktura = _hent_sidst_tal_paa_linje(l)
+
+        # Alternativt: "I alt" med moms inkluderet (hvis Total DKK ikke findes)
+        elif not faktura and re.search(r"^total\s*:", l_lower):
+            faktura = _hent_sidst_tal_paa_linje(l)
+
+    # Retur i alt = sum af alle kreditposter
+    retur_ialt = round(retur_wiener + retur_boller + tgtg + b_kvali, 2)
 
     return {
         "uge":          uge,
         "aar":          aar,
-        "retur_wiener": round(retur_wiener),
-        "retur_boller": round(retur_boller),
-        "tgtg":         round(tgtg),
+        "retur_wiener": round(retur_wiener, 2),
+        "retur_boller": round(retur_boller, 2),
+        "tgtg":         round(tgtg, 2),
         "b_kvali":      round(b_kvali, 2),
-        "retur_ialt":   round(retur_ialt, 2),
+        "retur_ialt":   retur_ialt,
         "faktura":      round(faktura, 2),
-        "_raa_tekst":   tekst,   # gemmes til debug
+        "_raa_tekst":   tekst,
     }
 
 
@@ -325,7 +342,8 @@ def main():
     parser = argparse.ArgumentParser(description="Bager Gmail → Railway")
     parser.add_argument("--vis",   action="store_true", help="Vis uden upload")
     parser.add_argument("--alle",  action="store_true", help="Hent alle (ikke kun nye)")
-    parser.add_argument("--raatekst", action="store_true", help="Vis rå PDF-tekst")
+    parser.add_argument("--auto",  action="store_true", help="Upload automatisk uden bekraeftelse")
+    parser.add_argument("--raatekst", action="store_true", help="Vis raa PDF-tekst")
     parser.add_argument("--pdf",   help="Parse enkelt lokal PDF-fil direkte")
     parser.add_argument("--uge",   type=int, help="Filtrer til specifik uge")
     args = parser.parse_args()
@@ -347,10 +365,11 @@ def main():
             print("─────────────────────────────────────────────────────\n")
         _vis_resultat(data)
         if not args.vis:
-            svar = input("\nUpload til Railway? [J/n] ").strip().lower()
-            if svar not in ("", "j", "ja", "y", "yes"):
-                print("Afbrudt.")
-                return
+            if not args.auto:
+                svar = input("\nUpload til Railway? [J/n] ").strip().lower()
+                if svar not in ("", "j", "ja", "y", "yes"):
+                    print("Afbrudt.")
+                    return
             _upload([data])
         return
 
@@ -369,7 +388,7 @@ def main():
     print(f"\nFundet {len(fakturaer)} faktura(er):\n")
     parsed = []
     for f in fakturaer:
-        print(f"  → {f['subject']}  ({f['att_name']})")
+        print(f"  -> {f['subject']}  ({f['att_name']})")
         pdf_bytes = _hent_pdf_bytes(service, f["msg_id"], f["att_id"])
         data = _parse_pdf(pdf_bytes, uge=f["uge"], aar=f["aar"])
         data["_msg_id"] = f["msg_id"]
@@ -395,10 +414,11 @@ def main():
         print("(--vis tilstand — ingen upload)")
         return
 
-    svar = input("Upload til Railway? [J/n] ").strip().lower()
-    if svar not in ("", "j", "ja", "y", "yes"):
-        print("Afbrudt.")
-        return
+    if not args.auto:
+        svar = input("Upload til Railway? [J/n] ").strip().lower()
+        if svar not in ("", "j", "ja", "y", "yes"):
+            print("Afbrudt.")
+            return
 
     _upload(parsed)
 

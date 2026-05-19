@@ -4,3 +4,5 @@ __pycache__/
 *.pyo
 tgtg_tokens.json
 .env
+gmail_token.json
+gmail_credentials.json

@@ -1651,10 +1651,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="mp-csv-status" style="font-size:11px;margin-top:8px;min-height:16px;"></div>
         </div>
 
-        <!-- Tabel -->
-        <div class="aar2-tbl-wrap">
+        <!-- Månedsoversigt -->
+        <div class="aar2-tbl-wrap" style="margin-bottom:16px;">
           <div class="aar2-tbl-hdr">
-            <span class="aar2-tbl-hdr-l">Alle registrerede måneder</span>
+            <span class="aar2-tbl-hdr-l">Månedsoversigt</span>
             <span class="aar2-tbl-hdr-r" id="mp-tbl-lbl"></span>
           </div>
           <div style="overflow-x:auto;">
@@ -1666,6 +1666,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="font-size:10px;color:var(--ash);">Kilde</th>
               </tr></thead>
               <tbody id="mp-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Daglige transaktioner -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr" style="cursor:pointer;" onclick="mpToggleDag(this)">
+            <span class="aar2-tbl-hdr-l">Daglige transaktioner</span>
+            <span class="aar2-tbl-hdr-r" id="mp-dag-lbl">klik for at vise ▾</span>
+          </div>
+          <div id="mp-dag-wrap" style="display:none;overflow-x:auto;">
+            <table class="aar2-tbl">
+              <thead><tr>
+                <th>Dato</th>
+                <th class="num">Beløb inkl. moms</th>
+                <th class="num">Netto ex-moms</th>
+                <th style="font-size:10px;color:var(--ash);">Kilde</th>
+              </tr></thead>
+              <tbody id="mp-dag-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -5277,13 +5296,75 @@ async function mpUploadCsv() {
       statusEl.textContent = data.besked || '✓ Ingen nye dage (data allerede importeret)';
     }
     document.getElementById('mp-csv-fil').value = '';
+    _mpDagLoaded = false;
     loadMobilepay();
+    // Genindlæs dagsliste hvis den er åben
+    const dagWrap = document.getElementById('mp-dag-wrap');
+    if (dagWrap && dagWrap.style.display !== 'none') loadMobilepayDag();
   } catch(e) {
     statusEl.style.color = 'var(--crimson)';
     statusEl.textContent = 'Fejl: ' + e.message;
   } finally {
     btn.disabled = false;
   }
+}
+
+let _mpDagLoaded = false;
+
+function mpToggleDag(hdr) {
+  const wrap = document.getElementById('mp-dag-wrap');
+  const lbl  = document.getElementById('mp-dag-lbl');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? '' : 'none';
+  lbl.textContent = open ? 'skjul ▴' : 'klik for at vise ▾';
+  if (open && !_mpDagLoaded) loadMobilepayDag();
+}
+
+async function loadMobilepayDag() {
+  _mpDagLoaded = true;
+  const tbody = document.getElementById('mp-dag-tbody');
+  tbody.innerHTML = '<tr><td colspan="4" class="empty" style="padding:16px;">Indlæser…</td></tr>';
+  const data = await api('/api/mobilepay/dag');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">Ingen daglige transaktioner endnu — upload en CSV-fil ovenfor</td></tr>';
+    document.getElementById('mp-dag-lbl').textContent = '0 transaktioner';
+    return;
+  }
+  document.getElementById('mp-dag-lbl').textContent = data.length + ' dage · skjul ▴';
+  const mono = "font-family:'DM Mono',monospace;";
+  const kildeLabel = k => k === 'csv-portal' ? '<span style="color:var(--moss);">CSV</span>'
+                        : k === 'api'        ? '<span style="color:var(--ash);">API</span>'
+                        : k === 'api-feed'   ? '<span style="color:var(--ash);">Feed</span>'
+                        : `<span style="color:var(--ash);">${k||'—'}</span>`;
+  // Grupper per måned med subtotaler
+  let html = '', prevMaaned = null, maanedSum = 0;
+  const flush = (m) => {
+    if (m == null) return '';
+    return `<tr style="background:rgba(30,58,30,.04);border-top:1px solid rgba(30,58,30,.1);">
+      <td style="${mono}font-size:10px;color:var(--ash);padding:4px 16px;">${m}</td>
+      <td class="num" style="${mono}font-size:11px;font-weight:500;color:var(--forest);">${Math.round(maanedSum).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(maanedSum/1.25).toLocaleString('da-DK')} kr</td>
+      <td></td>
+    </tr>`;
+  };
+  for (const r of data) {
+    const d = new Date(r.dato);
+    const mKey = `${AAR_MND_NAVNE[d.getMonth()]} ${d.getFullYear()}`;
+    if (prevMaaned && mKey !== prevMaaned) {
+      html += flush(prevMaaned);
+      maanedSum = 0;
+    }
+    prevMaaned = mKey;
+    maanedSum += r.omsaetning_inkl;
+    html += `<tr>
+      <td style="${mono}font-size:13px;">${fmtDato(r.dato)}</td>
+      <td class="num" style="${mono}">${r.omsaetning_inkl.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}color:var(--ash);">${(r.omsaetning_inkl/1.25).toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td>${kildeLabel(r.kilde)}</td>
+    </tr>`;
+  }
+  html += flush(prevMaaned);
+  tbody.innerHTML = html;
 }
 
 async function mpOpdater(span) {

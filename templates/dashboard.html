@@ -1321,6 +1321,117 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
 
       <!-- SVIND & ØKONOMI -->
+      <!-- BAGER REGNSKAB PANEL -->
+      <div class="panel" id="p-bager">
+        <div class="page-hdr">
+          <h2>Bager regnskab</h2>
+          <p>Alle uger &mdash; faktura, retur &amp; svind oversigt</p>
+          <button onclick="_bagerLoaded=false;loadBager();" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">&#8635; Opdater</button>
+        </div>
+
+        <!-- KPI-r&aelig;kke -->
+        <div class="kpi-row" id="bager-kpi-row">
+          <div class="kpi">
+            <div class="kpi-v" id="bager-kpi-uger">—</div>
+            <div class="kpi-l">Uger med faktura</div>
+            <div class="kpi-s" id="bager-kpi-uger-sub"></div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-v" id="bager-kpi-faktura">—</div>
+            <div class="kpi-l">Total faktura</div>
+            <div class="kpi-s">inkl. moms</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-v" id="bager-kpi-retur">—</div>
+            <div class="kpi-l">Total retur</div>
+            <div class="kpi-s">wiener + boller + TGTG</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-v" id="bager-kpi-netto">—</div>
+            <div class="kpi-l">Netto bagerregning</div>
+            <div class="kpi-s">faktura &minus; retur</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-v" id="bager-kpi-svind">—</div>
+            <div class="kpi-l">Gns. svind</div>
+            <div class="kpi-s">uger med kassesalg</div>
+          </div>
+        </div>
+
+        <!-- PDF Multi-upload -->
+        <div class="aar2-tbl-wrap" style="margin-bottom:14px;">
+          <div class="aar2-tbl-hdr" style="cursor:pointer;" onclick="bagerUploadToggle(this)">
+            <span class="aar2-tbl-hdr-l">&#128220; Importer bager-fakturaer (PDF)</span>
+            <span class="aar2-tbl-hdr-r" id="bager-upload-lbl">klik for at &aring;bne &#9662;</span>
+          </div>
+          <div id="bager-upload-wrap" style="display:none;padding:16px 20px;border-top:1px solid rgba(30,58,30,.08);">
+            <p style="font-size:12px;color:var(--ash);margin-bottom:12px;">
+              V&aelig;lg eller tr&aelig;k <strong>flere PDF'er p&aring; &eacute;n gang</strong> &mdash; Claude l&aelig;ser tallene fra hver faktura automatisk.
+            </p>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <label id="bager-upload-dz"
+                style="display:flex;align-items:center;justify-content:center;gap:8px;
+                       border:2px dashed rgba(30,58,30,.25);border-radius:8px;padding:16px 24px;
+                       cursor:pointer;font-size:13px;color:var(--ash);min-width:280px;transition:all .2s;">
+                <span style="font-size:20px;">&#128196;</span>
+                <span id="bager-upload-fname">V&aelig;lg PDF'er eller slip dem her</span>
+                <input type="file" id="bager-upload-fil" accept=".pdf" multiple style="display:none;"
+                  onchange="bagerUploadValgt(this)">
+              </label>
+              <button id="bager-upload-btn" onclick="bagerUploadKor()"
+                style="background:var(--forest);color:#fff;border:none;border-radius:6px;
+                       padding:10px 18px;font-size:13px;cursor:pointer;display:none;">
+                &#129302; Importer alle
+              </button>
+            </div>
+            <!-- Progress -->
+            <div id="bager-upload-progress" style="display:none;margin-top:14px;">
+              <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);margin-bottom:6px;" id="bager-upload-prog-txt">0 / 0</div>
+              <div style="height:4px;background:rgba(30,58,30,.1);border-radius:2px;">
+                <div id="bager-upload-prog-bar" style="height:4px;background:var(--moss);border-radius:2px;width:0%;transition:width .3s;"></div>
+              </div>
+              <div id="bager-upload-log" style="margin-top:10px;font-size:11px;font-family:'DM Mono',monospace;max-height:160px;overflow-y:auto;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Alle uger tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Uge for uge &mdash; alle &aring;r</span>
+            <span class="aar2-tbl-hdr-r" id="bager-tbl-lbl"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="min-width:900px;">
+              <thead>
+                <tr style="background:rgba(30,58,30,.04);">
+                  <th style="width:6%;"></th>
+                  <th class="num" colspan="3" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">FAKTURA &amp; RETUR</th>
+                  <th class="num" colspan="3" style="border-bottom:2px solid rgba(155,52,32,.3);font-size:8px;letter-spacing:.07em;color:#9b3420;padding-bottom:2px;">RETUR STK</th>
+                  <th class="num" colspan="3" style="border-bottom:2px solid rgba(74,124,74,.4);font-size:8px;letter-spacing:.07em;color:var(--moss);padding-bottom:2px;">SVIND</th>
+                </tr>
+                <tr>
+                  <th>Uge</th>
+                  <th class="num">Faktura kr</th>
+                  <th class="num">Retur kr</th>
+                  <th class="num">Netto kr</th>
+                  <th class="num">Wiener stk</th>
+                  <th class="num">Boller stk</th>
+                  <th class="num">TGTG stk</th>
+                  <th class="num">Bestilt stk</th>
+                  <th class="num">Svind stk</th>
+                  <th class="num">Svind %</th>
+                </tr>
+              </thead>
+              <tbody id="bager-tbody">
+                <tr><td colspan="10" class="empty">Indl&aelig;ser&hellip;</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <!-- /BAGER REGNSKAB PANEL -->
+
       <div class="panel" id="p-svind">
         <div class="page-hdr">
           <h2>Svind &amp; bageriøkonomi</h2>
@@ -1915,6 +2026,7 @@ const NAV_SVG = {
   kaffe:        '<path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/>',
   trend:        '<path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/>',
   bestilling:   '<path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/>',
+  bager:        '<path d="M2 10c0-3.3 2.7-6 6-6s6 2.7 6 6v2H2v-2zm1.5 0c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5H3.5zM1 13h14v1H1z"/>',
   svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
   spild:        '<path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 2v4l3 1.5-.7 1.3L7 9V4h1zm-5 6.5l1.4-1.4 1 1-1.4 1.4-1-1zm9-1.4l1.4 1.4-1 1-1.4-1.4 1-1z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
@@ -1936,6 +2048,7 @@ const NAV_DEFAULT = [
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',  hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',  hidden:false},
   {id:'tgtg',        label:'Too Good To Go',        group:'Bageri & indkøb',  hidden:false},
+  {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',  hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',  hidden:false},
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Rapporter',        hidden:false},
@@ -4577,6 +4690,162 @@ async function loadTgtg() {
 
 
 // ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
+// ── BAGER REGNSKAB ───────────────────────────────────────────────────────────
+let _bagerLoaded = false;
+
+function bagerUploadToggle(hdr) {
+  const wrap = document.getElementById('bager-upload-wrap');
+  const lbl  = document.getElementById('bager-upload-lbl');
+  const open = wrap.style.display === 'none';
+  wrap.style.display = open ? '' : 'none';
+  lbl.textContent = open ? 'skjul ▴' : 'klik for at \xe5bne ▾';
+}
+
+function bagerUploadValgt(input) {
+  const fname = document.getElementById('bager-upload-fname');
+  const btn   = document.getElementById('bager-upload-btn');
+  if (input.files && input.files.length > 0) {
+    fname.textContent = input.files.length === 1
+      ? input.files[0].name
+      : input.files.length + ' PDF-filer valgt';
+    btn.style.display = '';
+  }
+}
+
+// Drag-and-drop for bager multi-upload
+(function() {
+  const dz = document.getElementById('bager-upload-dz');
+  if (!dz) return;
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.borderColor = 'var(--moss)'; });
+  dz.addEventListener('dragleave', () => { dz.style.borderColor = ''; });
+  dz.addEventListener('drop', e => {
+    e.preventDefault();
+    dz.style.borderColor = '';
+    const files = [...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    if (files.length) {
+      const input = document.getElementById('bager-upload-fil');
+      const dt = new DataTransfer();
+      files.forEach(f => dt.items.add(f));
+      input.files = dt.files;
+      bagerUploadValgt(input);
+    }
+  });
+})();
+
+async function bagerUploadKor() {
+  const input  = document.getElementById('bager-upload-fil');
+  const files  = [...input.files];
+  if (!files.length) return;
+  const btn    = document.getElementById('bager-upload-btn');
+  const prog   = document.getElementById('bager-upload-progress');
+  const bar    = document.getElementById('bager-upload-prog-bar');
+  const txt    = document.getElementById('bager-upload-prog-txt');
+  const log    = document.getElementById('bager-upload-log');
+  btn.disabled = true;
+  prog.style.display = '';
+  log.innerHTML = '';
+  let ok = 0, fejl = 0;
+  for (let i = 0; i < files.length; i++) {
+    const f = files[i];
+    txt.textContent = (i+1) + ' / ' + files.length + '  —  ' + f.name;
+    bar.style.width = Math.round((i / files.length) * 100) + '%';
+    try {
+      // 1. Parse PDF med Claude
+      const fd = new FormData();
+      fd.append('fil', f);
+      const r1 = await fetch('/api/bager/upload-pdf', { method:'POST', body:fd });
+      const j1 = await r1.json();
+      if (!j1.ok) throw new Error(j1.fejl || 'Parse fejl');
+      const d = j1.data;
+      // 2. Gem til database
+      const r2 = await fetch('/api/bager/retur-opdater', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ secret:'OM-Greve-2026-Hemlig', linjer:[{
+          uge:d.uge, aar:d.aar, faktura:d.faktura, retur_ialt:d.retur_ialt,
+          retur_wiener:d.retur_wiener, retur_boller:d.retur_boller,
+          tgtg:d.tgtg, b_kvali:d.b_kvali
+        }]}),
+      });
+      const j2 = await r2.json();
+      if (!j2.ok) throw new Error(j2.detail || 'Gem fejl');
+      ok++;
+      log.innerHTML += '<div style="color:var(--moss);">✓ ' + f.name
+        + '  &rarr;  uge ' + d.uge + '/' + d.aar
+        + '  faktura ' + Math.round(d.faktura).toLocaleString('da-DK') + ' kr'
+        + (d.retur_ialt ? '  retur ' + Math.round(d.retur_ialt).toLocaleString('da-DK') + ' kr' : '')
+        + '</div>';
+    } catch(e) {
+      fejl++;
+      log.innerHTML += '<div style="color:var(--crimson);">✗ ' + f.name + ': ' + e.message + '</div>';
+    }
+    log.scrollTop = log.scrollHeight;
+  }
+  bar.style.width = '100%';
+  txt.textContent = '✓ F\xe6rdig: ' + ok + ' importeret' + (fejl ? ', ' + fejl + ' fejl' : '');
+  btn.disabled = false;
+  input.value = '';
+  document.getElementById('bager-upload-fname').textContent = 'V\xe6lg PDF’er eller slip dem her';
+  btn.style.display = 'none';
+  if (ok > 0) { _bagerLoaded = false; loadBager(); }
+}
+
+async function loadBager() {
+  if (_bagerLoaded) return;
+  _bagerLoaded = true;
+  const data = await api('/api/bager/svind');  // ingen aar-filter = alle år
+  const tbody = document.getElementById('bager-tbody');
+  const lbl   = document.getElementById('bager-tbl-lbl');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">Ingen bager-fakturaer endnu &mdash; importer PDF\'er ovenfor</td></tr>';
+    return;
+  }
+  // KPI-totaler
+  const medFaktura = data.filter(r => r.faktura > 0);
+  const totFakt  = medFaktura.reduce((s,r) => s + (r.faktura||0), 0);
+  const totRetur = medFaktura.reduce((s,r) => s + (r.retur_ialt||0), 0);
+  const totNetto = totFakt - totRetur;
+  const svindPct = data.filter(r=>r.svind_pct!=null);
+  const gnsSvind = svindPct.length ? svindPct.reduce((s,r)=>s+r.svind_pct,0)/svindPct.length : null;
+  document.getElementById('bager-kpi-uger').textContent      = medFaktura.length;
+  document.getElementById('bager-kpi-uger-sub').textContent  = data.length + ' uger total';
+  document.getElementById('bager-kpi-faktura').textContent   = Math.round(totFakt).toLocaleString('da-DK') + ' kr';
+  document.getElementById('bager-kpi-retur').textContent     = Math.round(totRetur).toLocaleString('da-DK') + ' kr';
+  document.getElementById('bager-kpi-netto').textContent     = Math.round(totNetto).toLocaleString('da-DK') + ' kr';
+  document.getElementById('bager-kpi-svind').textContent     = gnsSvind != null ? gnsSvind.toFixed(1) + '%' : '—';
+  lbl.textContent = medFaktura.length + ' fakturaer · ' + data.length + ' uger';
+  const mono = "font-family:'DM Mono',monospace;";
+  // Gruppe efter år
+  let html = '', prevAar = null;
+  for (const r of data) {
+    if (r.aar !== prevAar) {
+      prevAar = r.aar;
+      const aarData = data.filter(x => x.aar === r.aar && x.faktura > 0);
+      const aarFakt = aarData.reduce((s,x)=>s+(x.faktura||0),0);
+      html += `<tr style="background:rgba(30,58,30,.06);">
+        <td colspan="10" style="${mono}font-size:10px;letter-spacing:.08em;color:var(--ash);padding:6px 14px;font-weight:600;">
+          ${r.aar} &mdash; ${aarData.length} fakturaer &middot; total ${Math.round(aarFakt).toLocaleString('da-DK')} kr
+        </td></tr>`;
+    }
+    const harFakt  = r.faktura > 0;
+    const svindCls = r.svind_pct == null ? '' : r.svind_pct < 15 ? 'style="color:var(--moss);"'
+                   : r.svind_pct < 22 ? '' : 'style="color:var(--crimson);"';
+    html += `<tr${harFakt ? '' : ' style="opacity:.55;"'}>
+      <td style="${mono}font-size:12px;font-weight:500;">U${r.uge}</td>
+      <td class="num" style="${mono}">${harFakt ? Math.round(r.faktura).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}color:var(--moss);">${r.retur_ialt > 0 ? Math.round(r.retur_ialt).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}font-weight:500;">${harFakt ? Math.round(r.faktura-(r.retur_ialt||0)).toLocaleString('da-DK') : '—'}</td>
+      <td class="num" style="${mono}color:var(--ash);">${r.retur_wiener > 0 ? r.retur_wiener : '—'}</td>
+      <td class="num" style="${mono}color:var(--ash);">${r.retur_boller > 0 ? r.retur_boller : '—'}</td>
+      <td class="num" style="${mono}color:var(--ash);">${r.tgtg > 0 ? r.tgtg : '—'}</td>
+      <td class="num" style="${mono}">${r.bestilt_stk > 0 ? Math.round(r.bestilt_stk) : '—'}</td>
+      <td class="num" style="${mono}">${r.svind_stk != null ? Math.round(r.svind_stk) : '—'}</td>
+      <td class="num" ${svindCls}>${r.svind_pct != null ? r.svind_pct.toFixed(1) + '%' : '—'}</td>
+    </tr>`;
+  }
+  tbody.innerHTML = html;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 let _svindLoaded = false;
 let _svindTs     = 0;
 
@@ -5599,6 +5868,7 @@ window.showPanel = function(id, el) {
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
+  if (id === 'bager')        loadBager();
   if (id === 'svind')        loadSvind();
   if (id === 'spild')        loadSpild();
   if (id === 'beregner')   loadBeregner();

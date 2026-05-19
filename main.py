@@ -866,6 +866,37 @@ async def api_fordelingsnoegle(request: Request):
     }
 
 
+@app.get("/api/debug/kager")
+async def api_debug_kager(request: Request, uge: int, aar: int):
+    """Debug: vis kage-varenavn fra bestillinger vs transaktioner for en uge."""
+    _kræv_login(request)
+    from datetime import date as _d, timedelta as _td
+    jan4 = _d(aar, 1, 4)
+    man  = jan4 - _td(days=jan4.weekday()) + _td(weeks=uge - 1)
+    datoer = [(man + _td(days=i)).isoformat() for i in range(7)]
+    ph = ','.join('?'*7)
+    with database._conn() as conn:
+        bestil = conn.execute("""
+            SELECT varenavn, (man+tir+ons+tor+fre+loe+son) AS total
+            FROM ugebestillinger WHERE uge=? AND aar=?
+            AND (LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%cookie%'
+              OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%'
+              OR LOWER(varenavn) LIKE '%romkugl%')
+        """, (uge, aar)).fetchall()
+        kasse = conn.execute(f"""
+            SELECT varenavn, ROUND(SUM(antal),0) AS antal
+            FROM transaktioner WHERE dato IN ({ph})
+            AND (LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%cookie%'
+              OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%'
+              OR LOWER(varenavn) LIKE '%romkugl%')
+            GROUP BY varenavn
+        """, datoer).fetchall()
+    return {
+        "bestillinger": [dict(r) for r in bestil],
+        "kassesalg":    [dict(r) for r in kasse],
+    }
+
+
 @app.get("/api/faste-omk")
 async def api_faste_omk(request: Request, aar: int):
     _kræv_login(request)

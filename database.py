@@ -1979,7 +1979,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                                  for r in kage_bestil_rows}
             kage_bestilt_total = sum(kage_varer_bestil.values())
 
-            # Kassesalg af kager for ugen — matcher direkte på varenavn i transaktioner
+            # Kassesalg af kager for ugen — normaliseret varenavn-matching
             kage_kasse_rows = conn.execute(f"""
                 SELECT COALESCE(varenavn,'') AS varenavn,
                        ROUND(SUM(antal), 0) AS antal
@@ -1988,15 +1988,16 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                   AND ({_KAGE_VN})
                 GROUP BY varenavn
             """, dato_liste).fetchall()
-            kage_kassesalg_map = {r['varenavn']: int(r['antal'] or 0)
-                                  for r in kage_kasse_rows}
-            kage_kassesalg_total = sum(kage_kassesalg_map.values())
+            # Normaliseret opslag: lowercase + trim
+            kage_kassesalg_norm = {r['varenavn'].strip().lower(): int(r['antal'] or 0)
+                                   for r in kage_kasse_rows}
+            kage_kassesalg_total = sum(kage_kassesalg_norm.values())
 
             # Byg kage-vareliste
             kage_varer = []
             for navn, bestilt_k in sorted(kage_varer_bestil.items(),
                                           key=lambda x: -x[1]):
-                solgt_k = kage_kassesalg_map.get(navn, 0)
+                solgt_k = kage_kassesalg_norm.get(navn.strip().lower(), 0)
                 svind_k = max(0, bestilt_k - solgt_k)
                 pct_k   = round(svind_k / bestilt_k * 100, 1) if bestilt_k > 0 else None
                 kage_varer.append({

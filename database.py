@@ -1592,6 +1592,7 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             WHERE 1=1 {aar_filter1}
             GROUP BY b.uge, b.aar
             ORDER BY b.aar DESC, b.uge DESC
+            LIMIT 12
         """, aar_params).fetchall()
 
     from calendar import monthrange as _monthrange

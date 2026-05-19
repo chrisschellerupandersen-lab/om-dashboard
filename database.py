@@ -207,6 +207,7 @@ def init_db():
             "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
             "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
             "ALTER TABLE tgtg_poser ADD COLUMN enheder_per_pose INTEGER DEFAULT 1",
+            "ALTER TABLE bager_regnskab ADD COLUMN faktura REAL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)

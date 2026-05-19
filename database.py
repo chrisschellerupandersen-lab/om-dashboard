@@ -474,6 +474,47 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM bager_regnskab WHERE uge = ? AND aar = ?
         """, (iso[1], iso[0])).fetchone()
 
+        # Bestillingsdata for ugen: antal og kr per kategori (wiener / boller)
+        _W = ("LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%croissant%'"
+              " OR LOWER(varenavn) LIKE '%snegl%' OR LOWER(varenavn) LIKE '%snurrer%'"
+              " OR LOWER(varenavn) LIKE '%tebirkes%' OR LOWER(varenavn) LIKE '%grovbirkes%'"
+              " OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%kanelstang%'")
+        _B = ("LOWER(varenavn) LIKE '%bolle%' OR LOWER(varenavn) LIKE '%hveder%'"
+              " OR LOWER(varenavn) LIKE '%musli%' OR LOWER(varenavn) LIKE '%teboller%'")
+        bestil_wien = conn.execute(f"""
+            SELECT SUM(man+tir+ons+tor+fre+loe+son) AS stk,
+                   SUM(total_pris) AS kr
+            FROM ugebestillinger WHERE uge=? AND aar=? AND ({_W})
+        """, (iso[1], iso[0])).fetchone()
+        bestil_boller = conn.execute(f"""
+            SELECT SUM(man+tir+ons+tor+fre+loe+son) AS stk,
+                   SUM(total_pris) AS kr
+            FROM ugebestillinger WHERE uge=? AND aar=? AND ({_B})
+        """, (iso[1], iso[0])).fetchone()
+
+        def _retur_stk(retur_kr, bestil_stk, bestil_kr):
+            """Beregn antal returneret fra kr-beløb og pris/stk."""
+            if not retur_kr or not bestil_stk or not bestil_kr or bestil_kr == 0:
+                return None
+            pris_per_stk = bestil_kr / bestil_stk
+            return round(retur_kr / pris_per_stk)
+
+        bager_retur_info = None
+        if bager_uge_row:
+            w_stk = bestil_wien["stk"] if bestil_wien else None
+            w_kr  = bestil_wien["kr"]  if bestil_wien else None
+            b_stk = bestil_boller["stk"] if bestil_boller else None
+            b_kr  = bestil_boller["kr"]  if bestil_boller else None
+            bager_retur_info = {
+                "wien_retur_stk":   _retur_stk(bager_uge_row["retur_wiener"], w_stk, w_kr),
+                "wien_bestilt_stk": int(w_stk) if w_stk else None,
+                "wien_retur_kr":    bager_uge_row["retur_wiener"],
+                "boller_retur_stk":   _retur_stk(bager_uge_row["retur_boller"], b_stk, b_kr),
+                "boller_bestilt_stk": int(b_stk) if b_stk else None,
+                "boller_retur_kr":    bager_uge_row["retur_boller"],
+                "retur_ialt":  bager_uge_row["retur_ialt"],
+            }
+
     return {
         "dag":              dict(dag)               if dag               else None,
         "uge":              dict(uge)               if uge               else None,
@@ -490,6 +531,7 @@ def hent_kpi(aar: int = None) -> Dict:
         "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
         "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
         "bager_uge":        dict(bager_uge_row)     if bager_uge_row     else None,
+        "bager_retur":      bager_retur_info,
         "bager_iso_uge":    iso[1],
     }
 

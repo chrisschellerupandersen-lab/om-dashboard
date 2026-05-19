@@ -697,12 +697,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
               <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR WIENERBRØD · UGE <span id="bager-retur-uge">—</span></div>
               <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-wien-v">—</div>
-              <div style="font-size:11px;color:var(--ash);">kr krediteret</div>
+              <div style="font-size:11px;color:var(--ash);" id="bager-retur-wien-sub">stk af — bestilt</div>
             </div>
             <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
               <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR BOLLER · UGE <span id="bager-retur-uge2">—</span></div>
               <div style="font-size:22px;font-weight:700;color:var(--forest);" id="bager-retur-boller-v">—</div>
-              <div style="font-size:11px;color:var(--ash);">kr krediteret</div>
+              <div style="font-size:11px;color:var(--ash);" id="bager-retur-boller-sub">stk af — bestilt</div>
             </div>
             <div class="card" style="flex:1;min-width:140px;padding:12px 16px;">
               <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);margin-bottom:4px;">RETUR I ALT inkl. TGTG</div>
@@ -2395,15 +2395,24 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     const prevUge  = kpi.prev_uge || {};
 
     // ── Bager retur denne uge ─────────────────────────────────────────────
-    const bagerUge = kpi.bager_uge;
+    const bagerRetur = kpi.bager_retur;
     const retStrip = document.getElementById('bager-retur-strip');
-    if (bagerUge && (bagerUge.retur_wiener > 0 || bagerUge.retur_boller > 0)) {
+    if (bagerRetur && (bagerRetur.wien_retur_kr > 0 || bagerRetur.boller_retur_kr > 0)) {
       const ugeNr = kpi.bager_iso_uge || '—';
       document.getElementById('bager-retur-uge').textContent  = ugeNr;
       document.getElementById('bager-retur-uge2').textContent = ugeNr;
-      document.getElementById('bager-retur-wien-v').textContent   = Math.round(bagerUge.retur_wiener).toLocaleString('da-DK') + ' kr';
-      document.getElementById('bager-retur-boller-v').textContent = Math.round(bagerUge.retur_boller).toLocaleString('da-DK') + ' kr';
-      document.getElementById('bager-retur-ialt-v').textContent   = Math.round(bagerUge.retur_ialt).toLocaleString('da-DK') + ' kr';
+      // Wienerbrød
+      const wStk = bagerRetur.wien_retur_stk;
+      const wBest = bagerRetur.wien_bestilt_stk;
+      document.getElementById('bager-retur-wien-v').textContent  = wStk != null ? wStk + ' stk' : Math.round(bagerRetur.wien_retur_kr).toLocaleString('da-DK') + ' kr';
+      document.getElementById('bager-retur-wien-sub').textContent = wBest ? `af ${wBest} bestilt` : 'retur denne uge';
+      // Boller
+      const bStk = bagerRetur.boller_retur_stk;
+      const bBest = bagerRetur.boller_bestilt_stk;
+      document.getElementById('bager-retur-boller-v').textContent  = bStk != null ? bStk + ' stk' : Math.round(bagerRetur.boller_retur_kr).toLocaleString('da-DK') + ' kr';
+      document.getElementById('bager-retur-boller-sub').textContent = bBest ? `af ${bBest} bestilt` : 'retur denne uge';
+      // Retur i alt
+      document.getElementById('bager-retur-ialt-v').textContent = Math.round(bagerRetur.retur_ialt).toLocaleString('da-DK') + ' kr';
       retStrip.style.display = '';
     } else {
       retStrip.style.display = 'none';

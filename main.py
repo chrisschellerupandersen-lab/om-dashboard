@@ -934,6 +934,30 @@ async def faste_omk_slet(request: Request):
     return {"ok": True}
 
 
+@app.get("/api/bestilling/anbefaling-wh")
+async def api_bestilling_anbefaling_webhook(
+    request: Request,
+    secret: str = "",
+    uge: Optional[int] = None,
+    aar: Optional[int] = None,
+):
+    """Webhook-version af bestillingsanbefaling (ingen login krævet, kun secret)."""
+    if secret != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Ugyldigt secret")
+    if uge is None:
+        from datetime import date
+        iso = date.today().isocalendar()
+        uge = iso[1] + 1
+        aar = iso[0]
+        if uge > 52:
+            uge = 1
+            aar += 1
+    if aar is None:
+        from datetime import date
+        aar = date.today().year
+    return database.hent_bestillings_uge(int(uge), int(aar))
+
+
 @app.post("/api/opdater-rapport")
 async def opdater_rapport(request: Request):
     header_secret = request.headers.get("X-Webhook-Secret", "")

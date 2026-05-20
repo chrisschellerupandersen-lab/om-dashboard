@@ -112,12 +112,6 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-stat>.kpi-v.up{color:var(--moss);}
 .ov-stat>.kpi-v.dn{color:var(--danger);}
 .ov-stat>.kpi-s{text-align:left;margin-top:5px;}
-.ov-top>.kpi{border-top:3px solid rgba(30,58,30,.12);}
-.ov-top>.kpi:first-child{border-top:3px solid var(--amber);}
-.kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child,.kpi-row-8 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
-.kpi-row-5 .kpi:first-child .kpi-l,.kpi-row-6 .kpi:first-child .kpi-l,.kpi-row-8 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
-.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
-.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s,.kpi-row-8 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 /* Dag-produkt-liste */
 .daglist{list-style:none;padding:0;margin:0;}
 .daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
@@ -540,8 +534,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
 
-  /* KPI kort: større tal på mobil */
-  .kpi{padding:14px 6px 10px;}
+  /* KPI kort mobil */
+  .kpi{padding:14px 14px 12px;}
+  .kpi-v{font-size:20px;}
+  .kpi-row .kpi:first-child .kpi-v,.kpi-row-4 .kpi:first-child .kpi-v,.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{font-size:24px;}
+  .ov-top .kpi{padding:14px 10px 12px;}
   .kpi-v{font-size:20px;}
   .kpi-row-4 > *:first-child .kpi-v{font-size:24px;}
   .kpi-ring-wrap{width:68px;height:68px;}

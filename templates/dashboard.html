@@ -104,14 +104,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 /* Overblik redesign */
 .ov-top{display:grid;grid-template-columns:200px 1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
 .ov-bot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.ov-stat{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:18px 20px 15px;display:flex;flex-direction:column;border-left:4px solid rgba(30,58,30,.12);transition:border-left-color .25s;box-shadow:0 2px 8px rgba(30,58,30,.05);}
+.ov-stat{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s;}
 .ov-stat.up{border-left-color:var(--moss);}
 .ov-stat.dn{border-left-color:var(--danger);}
-.ov-stat>.kpi-l{margin-bottom:10px;text-align:left;}
-.ov-stat>.kpi-v{font-size:26px;font-weight:300;text-align:left;margin-bottom:5px;}
-.ov-stat>.kpi-s{text-align:left;}
+.ov-stat>.kpi-l{margin-bottom:8px;text-align:left;}
+.ov-stat>.kpi-v{font-size:24px;font-weight:300;color:var(--forest);display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;line-height:1.1;margin-bottom:0;}
 .ov-stat>.kpi-v.up{color:var(--moss);}
 .ov-stat>.kpi-v.dn{color:var(--danger);}
+.ov-stat>.kpi-s{text-align:left;margin-top:5px;}
 .ov-top>.kpi{border-top:3px solid rgba(30,58,30,.12);}
 .ov-top>.kpi:first-child{border-top:3px solid var(--amber);}
 .kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child,.kpi-row-8 .kpi:first-child{background:var(--forest);border-color:var(--forest);}
@@ -135,19 +135,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .daglist .dl-prod-group{list-style:none;padding:0;margin:0;overflow:hidden;}
 .daglist .dl-prod-group li{padding-left:20px;border-bottom:1px solid rgba(30,58,30,.04);}
 .daglist .dl-prod-group li:last-child{border-bottom:none;}
-.kpi{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 8px 12px;display:flex;flex-direction:column;align-items:center;text-align:center;box-shadow:0 2px 8px rgba(30,58,30,.05);}
-.kpi-ring-wrap{position:relative;width:76px;height:76px;margin-bottom:4px;flex-shrink:0;}
+.kpi{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;text-align:left;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s,box-shadow .2s;position:relative;}
+.kpi:hover{box-shadow:0 4px 16px rgba(30,58,30,.10);}
+.kpi.up{border-left-color:var(--moss);}
+.kpi.dn{border-left-color:var(--danger);}
+.kpi.ok{border-left-color:var(--amber);}
+.kpi-ring-wrap{position:relative;width:76px;height:76px;margin:0 auto 4px;flex-shrink:0;}
 .kpi-ring-svg{width:76px;height:76px;overflow:visible;}
 .kpi-ring-inner{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;width:90px;}
-.kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;line-height:1.3;order:-1;}
-.kpi-v{font-size:18px;font-weight:300;color:var(--forest);line-height:1;margin-bottom:0;}
-.kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:3px;line-height:1.3;}
+.kpi-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;line-height:1.3;order:-1;}
+.kpi-v{font-size:24px;font-weight:300;color:var(--forest);line-height:1.1;display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;}
+.kpi-ring-inner .kpi-v{display:block;font-size:18px;}
+.kpi-delta{font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:2px 7px;border-radius:20px;white-space:nowrap;flex-shrink:0;letter-spacing:.02em;}
+.kpi-delta.up{background:rgba(45,90,45,.12);color:var(--moss);}
+.kpi-delta.dn{background:rgba(192,57,43,.09);color:var(--danger);}
+.kpi-delta.ok{background:rgba(200,168,75,.18);color:#7a5c00;}
+.kpi-delta.neu{background:rgba(30,58,30,.07);color:var(--ash);}
+.kpi-s{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:5px;line-height:1.5;}
 .kpi-s.up{color:var(--moss);}
 .kpi-s.dn{color:var(--danger);}
-.kpi-row .kpi:first-child{background:var(--forest);border-color:var(--forest);}
-.kpi-row .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
-.kpi-row .kpi:first-child .kpi-v{color:var(--amber);font-size:30px;}
-.kpi-row .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
+.ov-top .kpi{align-items:center;text-align:center;}
+.kpi-row .kpi:first-child,.kpi-row-4 .kpi:first-child,.kpi-row-5 .kpi:first-child,.kpi-row-6 .kpi:first-child,.kpi-row-8 .kpi:first-child{background:var(--forest);border-color:var(--forest);border-left-color:var(--amber);}
+.kpi-row .kpi:first-child .kpi-l,.kpi-row-4 .kpi:first-child .kpi-l,.kpi-row-5 .kpi:first-child .kpi-l,.kpi-row-6 .kpi:first-child .kpi-l,.kpi-row-8 .kpi:first-child .kpi-l{color:rgba(200,168,75,.7);}
+.kpi-row .kpi:first-child .kpi-v,.kpi-row-4 .kpi:first-child .kpi-v,.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{color:var(--amber);font-size:28px;}
+.kpi-row .kpi:first-child .kpi-s,.kpi-row-4 .kpi:first-child .kpi-s,.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s,.kpi-row-8 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 
 /* CARD */
 .card{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:20px 22px;margin-bottom:14px;box-shadow:0 2px 8px rgba(30,58,30,.05);}
@@ -531,7 +542,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* KPI kort: større tal på mobil */
   .kpi{padding:14px 6px 10px;}
-  .kpi-v{font-size:22px;}
+  .kpi-v{font-size:20px;}
+  .kpi-row-4 > *:first-child .kpi-v{font-size:24px;}
   .kpi-ring-wrap{width:68px;height:68px;}
   .kpi-ring-svg{width:68px;height:68px;}
   .kpi-ring-inner{width:80px;}
@@ -2361,6 +2373,23 @@ function mk(id, type, labels, datasets, extra={}) {
   });
 }
 
+function _kpiDelta(valueId, valText, pct, storyText, storyId) {
+  const vEl = document.getElementById(valueId);
+  if (!vEl) return;
+  const inRing = vEl.closest('.kpi-ring-inner');
+  let chipHtml = '';
+  let cls = 'neu';
+  if (!inRing && pct != null && !isNaN(pct)) {
+    cls = pct > 1.5 ? 'up' : pct < -1.5 ? 'dn' : 'neu';
+    const arrow = pct > 0 ? '↑' : pct < 0 ? '↓' : '→';
+    chipHtml = ` <span class="kpi-delta ${cls}">${arrow}&nbsp;${Math.abs(pct).toFixed(0)}%</span>`;
+  }
+  vEl.innerHTML = valText + chipHtml;
+  const card = vEl.closest('.kpi,.ov-stat');
+  if (card && cls !== 'neu') { card.classList.remove('up','dn','ok'); card.classList.add(cls === 'up' ? 'up' : 'dn'); }
+  if (storyId) { const sEl = document.getElementById(storyId); if (sEl && storyText != null) sEl.textContent = storyText; }
+}
+
 async function loadAll() {
   const a = VALGT_AAR;
   const [kpi, dage, uger, idag, timer, timerForrige, timerSnit, kategorier, top, katUge] = await Promise.all([
@@ -2436,17 +2465,14 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     const senesteTime = kpi.seneste_time;
     const timeLabel = senesteTime != null ? ' kl. ' + senesteTime + ':00' : '';
     if (dag.omsaetning != null) {
-      document.getElementById('kpi-dag-omsat').textContent = kr(dag.omsaetning);
-      // Ring: snit 40 kunder × 65 kr/kurv = 2.600 kr/dag normalt → 8.000 kr = fuld ring
       setRing('ring-dag-omsat-ov', Math.min(100, dag.omsaetning / 8000 * 100), 'var(--amber)');
-      // Subtext: vs. samme dag + samme time sidste uge
       const prevOmsat = (kpi.prev_dag || {}).omsaetning;
-      if (prevOmsat > 0) {
-        const pct = ((dag.omsaetning / prevOmsat) - 1) * 100;
-        document.getElementById('kpi-dag-omsat-sub').textContent =
-          (pct >= 0 ? '+' : '') + pct.toFixed(0) + '% vs. sidste uge' + timeLabel;
-        document.getElementById('kpi-dag-omsat-sub').style.color =
-          pct >= 0 ? 'rgba(200,168,75,.85)' : 'rgba(220,100,80,.85)';
+      const dagPct = prevOmsat > 0 ? ((dag.omsaetning / prevOmsat) - 1) * 100 : null;
+      document.getElementById('kpi-dag-omsat').textContent = kr(dag.omsaetning);
+      const subEl = document.getElementById('kpi-dag-omsat-sub');
+      if (subEl) {
+        subEl.textContent = dagPct != null ? (dagPct >= 0 ? '+' : '') + dagPct.toFixed(0) + '% vs. forrige uge' + timeLabel : 'ekskl. moms';
+        subEl.style.color = dagPct == null ? '' : dagPct >= 0 ? 'rgba(200,168,75,.85)' : 'rgba(220,100,80,.85)';
       }
     }
 
@@ -2457,6 +2483,8 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     if (dag.db_pct != null) {
       dbDagSub.textContent = dag.db_pct.toFixed(1) + '% bruttoavance';
       dbDagSub.className = 'kpi-s ' + (dag.db_pct >= 35 ? 'up' : dag.db_pct >= 30 ? '' : 'dn');
+      const dbCard = dbDagEl.closest('.kpi,.ov-stat');
+      if (dbCard) { dbCard.classList.remove('up','dn'); if (dag.db_pct >= 35) dbCard.classList.add('up'); else if (dag.db_pct < 30) dbCard.classList.add('dn'); }
     }
 
     // ── Uge-kasser ────────────────────────────────────────────────────────
@@ -2477,6 +2505,8 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     if (uge.db_pct != null) {
       dbUgeSub.textContent = uge.db_pct.toFixed(1) + '% bruttoavance';
       dbUgeSub.className = 'kpi-s ' + (uge.db_pct >= 35 ? 'up' : uge.db_pct >= 30 ? '' : 'dn');
+      const dbUgeCard = dbUgeEl.closest('.kpi,.ov-stat');
+      if (dbUgeCard) { dbUgeCard.classList.remove('up','dn'); if (uge.db_pct >= 35) dbUgeCard.classList.add('up'); else if (uge.db_pct < 30) dbUgeCard.classList.add('dn'); }
     }
 
     // ── Sammenlignings-KPI'er ─────────────────────────────────────────────

@@ -104,7 +104,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 /* Overblik redesign */
 .ov-top{display:grid;grid-template-columns:200px 1fr 1fr 1fr;gap:10px;margin-bottom:10px;}
 .ov-bot{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
-.ov-stat{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s;}
+.ov-stat{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s,box-shadow .2s,transform .2s;cursor:default;}
+.ov-stat:hover{box-shadow:0 8px 28px rgba(30,58,30,.14);transform:translateY(-3px);}
 .ov-stat.up{border-left-color:var(--moss);}
 .ov-stat.dn{border-left-color:var(--danger);}
 .ov-stat>.kpi-l{margin-bottom:8px;text-align:left;}
@@ -129,8 +130,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .daglist .dl-prod-group{list-style:none;padding:0;margin:0;overflow:hidden;}
 .daglist .dl-prod-group li{padding-left:20px;border-bottom:1px solid rgba(30,58,30,.04);}
 .daglist .dl-prod-group li:last-child{border-bottom:none;}
-.kpi{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;text-align:left;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s,box-shadow .2s;position:relative;}
-.kpi:hover{box-shadow:0 4px 16px rgba(30,58,30,.10);}
+.kpi{background:var(--white);border:1px solid rgba(30,58,30,.07);border-left:3px solid rgba(30,58,30,.13);border-radius:12px;padding:16px 18px 14px;display:flex;flex-direction:column;align-items:flex-start;text-align:left;box-shadow:0 1px 6px rgba(30,58,30,.06);transition:border-left-color .25s,box-shadow .2s,transform .2s;position:relative;cursor:default;}
+.kpi:hover{box-shadow:0 8px 28px rgba(30,58,30,.14);transform:translateY(-3px);}
 .kpi.up{border-left-color:var(--moss);}
 .kpi.dn{border-left-color:var(--danger);}
 .kpi.ok{border-left-color:var(--amber);}

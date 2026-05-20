@@ -100,7 +100,11 @@ async def logout():
 async def dashboard(request: Request):
     if not get_session(request):
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+    from fastapi.responses import HTMLResponse as _HR
+    resp = templates.TemplateResponse("dashboard.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 # ── API ───────────────────────────────────────────────────────────────────────

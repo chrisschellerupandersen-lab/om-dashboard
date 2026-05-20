@@ -536,22 +536,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
 
   /* KPI kort mobil */
-  .kpi{padding:14px 14px 12px;}
+  .kpi{padding:14px 12px 12px;}
   .kpi-v{font-size:20px;}
   .kpi-row .kpi:first-child .kpi-v,.kpi-row-4 .kpi:first-child .kpi-v,.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{font-size:24px;}
-  .ov-top .kpi{padding:14px 10px 12px;}
-  .kpi-v{font-size:20px;}
+  .ov-top .kpi{padding:14px 10px 12px;align-items:center;text-align:center;}
   .kpi-row-4 > *:first-child .kpi-v{font-size:24px;}
-  .kpi-ring-wrap{width:68px;height:68px;}
-  .kpi-ring-svg{width:68px;height:68px;}
-  .kpi-ring-inner{width:80px;}
+
+  /* Ring-kort: skaler ned til 60px */
+  .kpi-ring-wrap{width:60px;height:60px;}
+  .kpi-ring-svg{width:60px;height:60px;}
+  .kpi-ring-inner{width:60px;}
+  /* Ring-indre tekst: hold 16px uanset hero-kortets større kpi-v */
+  .kpi-ring-inner .kpi-v{font-size:16px !important;}
 
   /* Hero KPI (1. kort i ov-top) */
-  .ov-top>.kpi:first-child .kpi-v{font-size:30px;}
+  .ov-top>.kpi:first-child .kpi-v{font-size:28px;}
 
   /* ov-stat sammenligning kort */
-  .ov-stat{padding:14px 14px 12px;}
-  .ov-stat>.kpi-v{font-size:22px;}
+  .ov-stat{padding:12px 12px 10px;}
+  .ov-stat>.kpi-v{font-size:20px;}
 
   /* 2-kolonner → 1 kolonne */
   .two-col{grid-template-columns:1fr;}
@@ -583,21 +586,48 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .page-hdr h2{font-size:18px;}
 
   /* Card padding */
-  .card{padding:16px 14px;border-radius:12px;}
+  .card{padding:14px 12px;border-radius:12px;}
+
+  /* Fjern max-width begrænsning på kort i MobilePay-panel */
+  #p-mobilepay .card[style*="max-width"]{max-width:none !important;width:100% !important;}
+
+  /* Spild-panel: KPI-chips 3 kolonner (i stedet for 6) */
+  #spild-kpi-row{grid-template-columns:repeat(3,1fr) !important;gap:8px !important;}
+
+  /* Spild-panel: kat + anbefalinger → 1 kolonne */
+  #spild-kat-anb-grid{grid-template-columns:1fr !important;}
 
   /* Kaffe drill */
   #kaffe-drill .aar2-tbl-wrap{overflow-x:auto;}
+
+  /* Periodevalg-flex i p-dagsoverblik og p-bestilling: wrap på mobil */
+  #p-dagsoverblik > div:first-of-type > div:last-child{flex-wrap:wrap;gap:4px;}
+
+  /* Scorecard: behold 3 kolonner (compact nok) */
+  .scorecard{gap:6px;}
+  .sc-card{padding:12px 10px 10px;}
 }
 
 @media (max-width: 480px) {
-  .kpi-v{font-size:20px;}
-  .ov-top>.kpi:first-child .kpi-v{font-size:26px;}
+  .kpi-v{font-size:18px;}
+  .ov-top>.kpi:first-child .kpi-v{font-size:24px;}
+  .kpi-row .kpi:first-child .kpi-v,.kpi-row-4 .kpi:first-child .kpi-v,.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{font-size:22px;}
+  .ov-stat>.kpi-v{font-size:18px;}
   .aar2-top{grid-template-columns:1fr;}
   .aar-kpi-row{grid-template-columns:1fr 1fr;}
   .aar2-mnd-stats{grid-template-columns:1fr 1fr 1fr;}
   .aar2-forecast{grid-template-columns:1fr 1fr 1fr;}
-  .aar2-tbl th,.aar2-tbl td{padding:8px 10px;font-size:12px;}
+  .aar2-tbl th,.aar2-tbl td{padding:8px 8px;font-size:11px;}
   .panel{padding:12px 10px calc(80px + env(safe-area-inset-bottom));}
+
+  /* Spild KPI-chips: 2 kolonner på meget små skærme */
+  #spild-kpi-row{grid-template-columns:repeat(2,1fr) !important;}
+
+  /* Bestillingsberegner: uge-label skalér */
+  #bern-uge-label{font-size:16px;}
+
+  /* MobilePay inputfelter: fuld bredde */
+  #p-mobilepay input[type="number"],#p-mobilepay select{width:100%;}
 }
 </style>
 </head>
@@ -1731,7 +1761,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- Kategori + Anbefalinger side om side -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+        <div id="spild-kat-anb-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
           <!-- Kategori-fordeling (ekskl. kager) -->
           <div class="card">
             <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Kassesalg per kategori · bagværk</span></div>

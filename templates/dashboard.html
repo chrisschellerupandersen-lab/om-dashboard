@@ -2474,8 +2474,8 @@ function _buildNav() {
       if (!groups[grp] || groups[grp].length === 0) return;
       const collapsed = _navGrpCollapsed(grp);
       const ikon = NAV_GRP_IKON[grp] || '•';
-      html += `<div class="nav-grp${collapsed ? ' collapsed' : ''}" id="nav-grp-${grp.replace(/\s+/g,'_')}">
-        <div class="nav-grp-hdr" onclick="_navToggleGrp('${grp.replace(/'/g,"\\'")}')">
+      html += `<div class="nav-grp${collapsed ? ' collapsed' : ''}" id="nav-grp-${grp.replace(/\s+/g,'_')}" data-grp="${grp.replace(/"/g,'&quot;')}">
+        <div class="nav-grp-hdr" onclick="_navToggleGrp(this.closest('.nav-grp').dataset.grp)">
           <span class="nav-grp-hdr-ikon">${ikon}</span>
           <span class="nav-grp-hdr-lbl">${grp}</span>
           <span class="nav-grp-chevron">▼</span>

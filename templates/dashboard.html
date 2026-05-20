@@ -2320,6 +2320,7 @@ const NAV_SVG = {
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
   stamdata:     '<path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/>',
+  hjaelp:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm.25-3.2c0 .4-.3.7-.7.7H7.7a.7.7 0 01-.7-.7v-.3c0-1 .6-1.7 1.3-2.1.4-.2.7-.6.7-1 0-.6-.4-1-1-1s-1 .4-1 1H5.5C5.5 4 6.6 3 8 3s2.5 1 2.5 2.3c0 .9-.5 1.7-1.3 2.1-.3.2-.5.5-.5.9h.3v.02z"/>',
 };
 const NAV_DEFAULT = [
   {id:'forside',     label:'Overblik',              group:'Daglig drift',     hidden:false},
@@ -2342,7 +2343,7 @@ const NAV_DEFAULT = [
   {id:'trend',       label:'Trend & bestilling',    group:'Rapporter',        hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',   hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',   hidden:false},
-  {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Administration',   hidden:false},
+  {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Daglig drift',     hidden:false},
 ];
 
 let _navItems = null, _navEditMode = false, _navDragIdx = null;

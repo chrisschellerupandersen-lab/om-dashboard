@@ -5917,8 +5917,17 @@ async function loadBernUge(uge, aar) {
 
   // Retur-beregning: 10% boller, 13,5% wienerbrød
   const RETUR_BOLLER = 0.10, RETUR_WIENER = 0.135;
-  const bollerProds  = d.produkter.filter(p => (p.kategori||'').toLowerCase() === 'boller');
-  const wienerProds  = d.produkter.filter(p => (p.kategori||'').toLowerCase() === 'wiener');
+  const _isBolle = p => {
+    const k = (p.kategori||'').toLowerCase(), n = (p.varenavn||'').toLowerCase();
+    return k === 'boller' || (!['wiener','brød','rugbrød','flute','kage','brод'].includes(k) && n.includes('bolle'));
+  };
+  const _isWiener = p => {
+    const k = (p.kategori||'').toLowerCase(), n = (p.varenavn||'').toLowerCase();
+    return k === 'wiener' || (!['boller','brød','rugbrød','flute','kage'].includes(k) &&
+      ['croissant','snegl','snurrer','tebirkes','grovbirkes','frøsnapper','spandauer','romsnegl','kanelstang','wienerstang'].some(w => n.includes(w)));
+  };
+  const bollerProds  = d.produkter.filter(_isBolle);
+  const wienerProds  = d.produkter.filter(_isWiener);
   const bollerStk    = bollerProds.reduce((s,p) => s + p.total_anbefalet, 0);
   const wienerStk    = wienerProds.reduce((s,p) => s + p.total_anbefalet, 0);
   const returBoller  = Math.round(bollerStk  * RETUR_BOLLER);

@@ -155,6 +155,34 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .kpi-row .kpi:first-child .kpi-v,.kpi-row-4 .kpi:first-child .kpi-v,.kpi-row-5 .kpi:first-child .kpi-v,.kpi-row-6 .kpi:first-child .kpi-v,.kpi-row-8 .kpi:first-child .kpi-v{color:var(--amber);font-size:28px;}
 .kpi-row .kpi:first-child .kpi-s,.kpi-row-4 .kpi:first-child .kpi-s,.kpi-row-5 .kpi:first-child .kpi-s,.kpi-row-6 .kpi:first-child .kpi-s,.kpi-row-8 .kpi:first-child .kpi-s{color:rgba(255,255,255,.45);}
 
+/* HJÆLP-SIDE */
+.hjaelp-sektion{margin-bottom:32px;}
+.hjaelp-sektion-hdr{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--forest);font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid rgba(30,58,30,.1);}
+.hjaelp-sektion-ikon{font-size:16px;}
+.hjaelp-flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.hjaelp-flow-kort{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:18px 20px;box-shadow:0 1px 6px rgba(30,58,30,.05);border-left:3px solid rgba(30,58,30,.15);}
+.hjaelp-flow-kort.auto{border-left-color:var(--moss);}
+.hjaelp-flow-kort.manuel{border-left-color:var(--amber);}
+.hjaelp-flow-badge{font-family:'DM Mono',monospace;font-size:8px;font-weight:700;letter-spacing:.1em;padding:2px 8px;border-radius:20px;display:inline-block;margin-bottom:10px;}
+.hjaelp-flow-kort.auto .hjaelp-flow-badge{background:rgba(45,90,45,.12);color:var(--moss);}
+.hjaelp-flow-kort.manuel .hjaelp-flow-badge{background:rgba(200,168,75,.18);color:#7a5c00;}
+.hjaelp-flow-titel{font-size:14px;font-weight:500;color:var(--forest);margin-bottom:8px;}
+.hjaelp-flow-desc{font-size:12px;color:var(--ash);line-height:1.6;margin-bottom:10px;}
+.hjaelp-flow-freq{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);}
+.hjaelp-panel-liste{display:flex;flex-direction:column;gap:0;}
+.hjaelp-panel-item{display:grid;grid-template-columns:200px 1fr;gap:20px;padding:14px 0;border-bottom:1px solid rgba(30,58,30,.07);}
+.hjaelp-panel-item:last-child{border-bottom:none;}
+.hjaelp-panel-navn{font-size:13px;font-weight:500;color:var(--forest);padding-top:1px;}
+.hjaelp-panel-tekst{font-size:13px;color:var(--charcoal);line-height:1.65;}
+.hjaelp-begreber-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.hjaelp-begreb{background:var(--parchment);border-radius:10px;padding:16px 18px;}
+.hjaelp-begreb-term{font-size:12px;font-weight:500;color:var(--forest);margin-bottom:6px;}
+.hjaelp-begreb-def{font-size:12px;color:var(--ash);line-height:1.6;}
+.hjaelp-tech-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+.hjaelp-tech-item{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:14px 18px;display:flex;gap:16px;align-items:baseline;}
+.hjaelp-tech-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);white-space:nowrap;min-width:90px;}
+.hjaelp-tech-val{font-size:12px;color:var(--forest);}
+
 /* CARD */
 .card{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:20px 22px;margin-bottom:14px;box-shadow:0 2px 8px rgba(30,58,30,.05);}
 .card-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:16px;}
@@ -605,6 +633,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* Scorecard: behold 3 kolonner (compact nok) */
   .scorecard{gap:6px;}
+
+  /* Hjælp-side mobil */
+  .hjaelp-flow-grid{grid-template-columns:1fr;}
+  .hjaelp-panel-item{grid-template-columns:1fr;gap:4px;}
+  .hjaelp-panel-navn{font-weight:600;font-size:13px;}
+  .hjaelp-begreber-grid{grid-template-columns:1fr 1fr;}
+  .hjaelp-tech-grid{grid-template-columns:1fr;}
+  .hjaelp-tech-item{flex-direction:column;gap:4px;}
   .sc-card{padding:12px 10px 10px;}
 }
 
@@ -2049,6 +2085,192 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       </div>
 
+      <!-- HJÆLP & DOKUMENTATION -->
+      <div class="panel" id="p-hjaelp">
+        <div class="page-hdr">
+          <h2>Hjælp & dokumentation</h2>
+          <p>Forklaring af dashboardets paneler, datakilder og processer</p>
+        </div>
+
+        <!-- DATAKILDE-OVERSIGT -->
+        <div class="hjaelp-sektion">
+          <div class="hjaelp-sektion-hdr">
+            <span class="hjaelp-sektion-ikon">⚡</span>
+            <span>Dataflow — hvad opdateres hvornår</span>
+          </div>
+          <div class="hjaelp-flow-grid">
+            <div class="hjaelp-flow-kort auto">
+              <div class="hjaelp-flow-badge">AUTOMATISK</div>
+              <div class="hjaelp-flow-titel">Kassesalg (Shopbox)</div>
+              <div class="hjaelp-flow-desc">Google Apps Script henter dagligt salgsdata fra Shopbox POS og sender til dashboardet. Al omsætning, DB og produktsalg kommer herfra.</div>
+              <div class="hjaelp-flow-freq">📅 Dagligt · automatisk</div>
+            </div>
+            <div class="hjaelp-flow-kort auto">
+              <div class="hjaelp-flow-badge">AUTOMATISK</div>
+              <div class="hjaelp-flow-titel">Too Good To Go</div>
+              <div class="hjaelp-flow-desc">Script logger automatisk ind på TGTG Store Portal og henter antal solgte poser pr. dag. Bruges i spild-beregning og bager-regnskab.</div>
+              <div class="hjaelp-flow-freq">📅 Dagligt kl. 08:00 & 10:00</div>
+            </div>
+            <div class="hjaelp-flow-kort auto">
+              <div class="hjaelp-flow-badge">AUTOMATISK</div>
+              <div class="hjaelp-flow-titel">Ugebestillinger</div>
+              <div class="hjaelp-flow-desc">Sync-script overvåger bestillings-xlsx på Google Drive og uploader automatisk når filen ændres. Bruges i bestillingsberegner og spild-rapport.</div>
+              <div class="hjaelp-flow-freq">📅 Dagligt kl. 07:30</div>
+            </div>
+            <div class="hjaelp-flow-kort auto">
+              <div class="hjaelp-flow-badge">AUTOMATISK</div>
+              <div class="hjaelp-flow-titel">Bagerfakturaer (Gmail)</div>
+              <div class="hjaelp-flow-desc">Script søger i Gmail efter nye fakturaer fra bageren, parser PDF automatisk og uploader faktura-beløb, retur wienerbrød og retur boller.</div>
+              <div class="hjaelp-flow-freq">📅 Dagligt kl. 09:00</div>
+            </div>
+            <div class="hjaelp-flow-kort manuel">
+              <div class="hjaelp-flow-badge">MANUELT</div>
+              <div class="hjaelp-flow-titel">MobilePay</div>
+              <div class="hjaelp-flow-desc">MobilePay-omsætning uploades månedligt som CSV-rapport via siden <strong>MobilePay</strong> i dashboardet. Bruges til korrekt spildberegning for bagværk.</div>
+              <div class="hjaelp-flow-freq">📅 Månedligt · Rapport-siden</div>
+            </div>
+            <div class="hjaelp-flow-kort manuel">
+              <div class="hjaelp-flow-badge">MANUELT</div>
+              <div class="hjaelp-flow-titel">Varestamdata</div>
+              <div class="hjaelp-flow-desc">Produkttyper og kostpriser opdateres via <strong>Varestamdata</strong>-siden eller ved at køre stamdata_sync.py. Skal opdateres ved sortimentsændringer.</div>
+              <div class="hjaelp-flow-freq">📅 Ved behov</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL-FORKLARINGER -->
+        <div class="hjaelp-sektion">
+          <div class="hjaelp-sektion-hdr">
+            <span class="hjaelp-sektion-ikon">📊</span>
+            <span>Panelforklaringer</span>
+          </div>
+          <div class="hjaelp-panel-liste">
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Overblik</div>
+              <div class="hjaelp-panel-tekst">Forsiden med dagens og ugens nøgletal. Omsætning og dækningsbidrag sammenlignes automatisk med samme dag/uge sidste år. Retur-kortene øverst viser forventet retur boller og wienerbrød for den aktuelle uge baseret på bestillingen.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Seneste dag</div>
+              <div class="hjaelp-panel-tekst">Detaljeret gennemgang af den seneste dag med salg fordelt på timer, kategorier og enkeltprodukter. Sammenligner med samme dag forrige uge.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Ugeoversigt</div>
+              <div class="hjaelp-panel-tekst">Omsætning og DB pr. uge de seneste 30 uger vist som graf. God til at spotte sæsonmønstre og trendændringer over tid.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Timeprofil</div>
+              <div class="hjaelp-panel-tekst">Gennemsnitligt salg pr. time på tværs af ugedage. Bruges til personaleplanlægning og til at forstå hvornår kunderne handler.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Årsplan</div>
+              <div class="hjaelp-panel-tekst">Månedsoversigt med omsætning, DB, bagerfaktura (netto) og vareforbrug (VF). Bagerfaktura fordeles over måneder baseret på faktisk dagssalg for uger der spænder over to måneder.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Bestillingsberegner</div>
+              <div class="hjaelp-panel-tekst">Beregner anbefalet ugebestilling baseret på historisk salg, sæsonindeks og væksttrend. Tager højde for Too Good To Go-salg. Viser forventet retur boller og wienerbrød (10% / 13,5% af bestilt).</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Bager regnskab</div>
+              <div class="hjaelp-panel-tekst">Ugeregnskab for bageri med fakturabeløb, retur (wienerbrød/boller), Too Good To Go og netto vareforbrug. Data kommer fra Gmail-fakturaer parseret automatisk. Netto VF = Faktura − Retur i alt.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Svind & økonomi</div>
+              <div class="hjaelp-panel-tekst">Kombinerer kassesalg, MobilePay og bagerregnskab til en ugentlig svind-beregning. Viser hvor meget bagværk der ikke blev solgt og hvad det kostede.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Spild-rapport</div>
+              <div class="hjaelp-panel-tekst">Detaljeret dag-for-dag sammenligning af bestilt vs. solgt for boller, wienerbrød og kager. Identificerer hvilke dage og varer der har størst spild. Kager matches på SKU-nummer.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Too Good To Go</div>
+              <div class="hjaelp-panel-tekst">Oversigt over TGTG-salg pr. pose-type og uge. Viser antal solgte poser, omsætning og kostpris. Sammenligner med månedligt mål (under 800 kr/uge).</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">MobilePay</div>
+              <div class="hjaelp-panel-tekst">Omsætning via MobilePay der ikke fremgår af Shopbox — primært bagværk betalt direkte. Upload månedlig rapport fra Vipps MobilePay portalen som CSV-fil.</div>
+            </div>
+
+            <div class="hjaelp-panel-item">
+              <div class="hjaelp-panel-navn">Varestamdata</div>
+              <div class="hjaelp-panel-tekst">Administration af produkttyper (bolle, wienerbrød, kage osv.) og kostpriser. Bruges af bestillingsberegneren til korrekt kategorisering og af spild-rapporten til SKU-matching.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- NØGLEBEGREBER -->
+        <div class="hjaelp-sektion">
+          <div class="hjaelp-sektion-hdr">
+            <span class="hjaelp-sektion-ikon">📖</span>
+            <span>Nøglebegreber</span>
+          </div>
+          <div class="hjaelp-begreber-grid">
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">DB (Dækningsbidrag)</div>
+              <div class="hjaelp-begreb-def">Omsætning minus kostpris for solgte varer. Vises både i kr og som procent af omsætningen. Mål: over 35%.</div>
+            </div>
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">VF (Vareforbrug)</div>
+              <div class="hjaelp-begreb-def">Netto bagerfaktura = Fakturabeløb − Retur i alt (inkl. TGTG). Det reelle beløb betalt for bagervarer i perioden.</div>
+            </div>
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">Sæsonindeks</div>
+              <div class="hjaelp-begreb-def">Forhold mellem den aktuelle uges historiske snit og årets samlede snit. Over 1.0 = travl uge, under 1.0 = stille uge.</div>
+            </div>
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">Retur (bager)</div>
+              <div class="hjaelp-begreb-def">Bagervarer der returneres og krediteres på fakturaen. Inkluderer retur wienerbrød, retur boller og TGTG-kredit.</div>
+            </div>
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">ISO-uge</div>
+              <div class="hjaelp-begreb-def">Uger starter mandag. En uge tilhører den måned hvor mandagen falder — bruges for at undgå at uger tælles dobbelt i månedsoversigten.</div>
+            </div>
+            <div class="hjaelp-begreb">
+              <div class="hjaelp-begreb-term">MTD (Month-to-date)</div>
+              <div class="hjaelp-begreb-def">Akkumuleret omsætning/DB fra den 1. i måneden til og med i dag. Sammenlignes med samme periode forrige måned.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TEKNISK INFO -->
+        <div class="hjaelp-sektion" style="margin-bottom:0;">
+          <div class="hjaelp-sektion-hdr">
+            <span class="hjaelp-sektion-ikon">⚙️</span>
+            <span>Teknisk information</span>
+          </div>
+          <div class="hjaelp-tech-grid">
+            <div class="hjaelp-tech-item">
+              <div class="hjaelp-tech-label">Platform</div>
+              <div class="hjaelp-tech-val">Railway · FastAPI · SQLite</div>
+            </div>
+            <div class="hjaelp-tech-item">
+              <div class="hjaelp-tech-label">Deployment</div>
+              <div class="hjaelp-tech-val">Automatisk ved GitHub push (~2 min)</div>
+            </div>
+            <div class="hjaelp-tech-item">
+              <div class="hjaelp-tech-label">Adresse</div>
+              <div class="hjaelp-tech-val">om-dashboard-production-0f3a.up.railway.app</div>
+            </div>
+            <div class="hjaelp-tech-item">
+              <div class="hjaelp-tech-label">Moms-visning</div>
+              <div class="hjaelp-tech-val">Skift inkl./excl. moms med knappen øverst til højre</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
     </div>
   </div>
 </div>
@@ -2120,6 +2342,7 @@ const NAV_DEFAULT = [
   {id:'trend',       label:'Trend & bestilling',    group:'Rapporter',        hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',   hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',   hidden:false},
+  {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Administration',   hidden:false},
 ];
 
 let _navItems = null, _navEditMode = false, _navDragIdx = null;

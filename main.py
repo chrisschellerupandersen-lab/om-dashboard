@@ -934,6 +934,26 @@ async def faste_omk_slet(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/bestilling/gem-manuel-wh")
+async def bestilling_gem_manuel_webhook(request: Request):
+    """Webhook-version: gem manuelle overrides uden login (kræver secret)."""
+    body = await request.json()
+    if body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=403, detail="Ugyldigt secret")
+    uge  = body.get("uge")
+    aar  = body.get("aar")
+    overrides = body.get("overrides", [])  # [{varenummer, dag, antal}, ...]
+    count = 0
+    for o in overrides:
+        vn   = o.get("varenummer")
+        dag  = o.get("dag")
+        antal = o.get("antal")
+        if vn and dag and antal is not None:
+            database.gem_bestilling_manuel(int(uge), int(aar), str(vn), str(dag), int(antal))
+            count += 1
+    return {"ok": True, "opdateret": count}
+
+
 @app.get("/api/bestilling/anbefaling-wh")
 async def api_bestilling_anbefaling_webhook(
     request: Request,

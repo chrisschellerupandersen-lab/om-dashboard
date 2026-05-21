@@ -3768,12 +3768,25 @@ def _tabel_findes(conn, navn: str) -> bool:
 
 def _format_management_prompt(d: dict) -> str:
     """Formaterer data til et læsbart prompt til Claude."""
+    from datetime import date as _date
+    _DAGE = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+    def _dagsnavn(dato_str):
+        if not dato_str: return ''
+        try:
+            d_ = _date.fromisoformat(str(dato_str)[:10])
+            return _DAGE[d_.weekday()]
+        except Exception:
+            return ''
+
+    idag_navn    = _dagsnavn(d.get('dato_idag'))
+    seneste_navn = _dagsnavn(d.get('seneste_salgsdag'))
+
     lines = [
         "Du er et erfarent management team for Organic Market Greve — en dansk økobutik der sælger bagværk, råvarer, mejeriprodukter og specialprodukter.",
         "Butikken bestiller bagværk fra en bagerleverandør ugentligt (boller, wienerbrød, brød) og registrerer spild/retur.",
         "",
-        f"DATO I DAG: {d['dato_idag']}",
-        f"SENESTE SALGSDAG: {d['seneste_salgsdag']}",
+        f"DATO I DAG: {d['dato_idag']} ({idag_navn})",
+        f"SENESTE SALGSDAG: {d['seneste_salgsdag']} ({seneste_navn})",
         "",
     ]
 

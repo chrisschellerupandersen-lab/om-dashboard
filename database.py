@@ -466,15 +466,14 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato = ?
         """, (prev_prev_dag_dato,)).fetchone()
 
-        # 4-ugers snit — samme ugedag, samme time-cutoff, seneste 4 forekomster
-        # Bruges som primær reference i "Hvad sker der i dag"-kortet
-        _wday = str(_sd.weekday() + 1) if _sd.weekday() < 6 else '0'  # SQLite: 0=søndag
-        # SQLite strftime('%w') = 0 (sun) … 6 (sat); Python weekday() = 0 (mon) … 6 (sun)
-        _sqlite_wday = str((_sd.weekday() + 1) % 7)  # 0=sun, 1=mon, …, 6=sat
+        # 4-ugers snit — de 4 seneste samme ugedage, samme time-cutoff
+        # Beregnes direkte som datoer (undgår ORDER BY LIMIT i subquery)
+        prev_4_dage = [(_sd - _kpi_td(days=7*(i+1))).isoformat() for i in range(4)]
+        _ph4 = ','.join(['?' for _ in prev_4_dage])
         snit_4u_time_filter = "AND time_start <= ?" if seneste_time is not None else ""
         snit_4u_time_params = (seneste_time,) if seneste_time is not None else ()
         snit_4u_row = conn.execute(f"""
-            SELECT AVG(dag_omsat)  AS snit_omsaetning,
+            SELECT AVG(dag_omsat)   AS snit_omsaetning,
                    AVG(dag_transak) AS snit_transak
             FROM (
                 SELECT SUM(omsætning) AS dag_omsat,
@@ -482,15 +481,11 @@ def hent_kpi(aar: int = None) -> Dict:
                             THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
                             ELSE COUNT(*) END AS dag_transak
                 FROM v_transaktioner
-                WHERE strftime('%w', dato) = ?
-                  AND dato < ?
-                  AND dato >= date(?, '-10 weeks')
+                WHERE dato IN ({_ph4})
                   {snit_4u_time_filter}
                 GROUP BY dato
-                ORDER BY dato DESC
-                LIMIT 4
             )
-        """, (_sqlite_wday, seneste_dato, seneste_dato) + snit_4u_time_params).fetchone()
+        """, tuple(prev_4_dage) + snit_4u_time_params).fetchone()
 
         # MTD: fra 1. i indeværende måned til seneste dag
         mtd_start = seneste_dato[:8] + '01'  # YYYY-MM-01

@@ -277,6 +277,15 @@ def init_db():
                OR LOWER(varenavn) LIKE '%honninghjerter%'
         """)
 
+        # Oprydning: slet dubletter i retur_detaljer — samme registreret_dato med forskellig uge
+        # Beholder poster med korrekt ISO-uge (beregnet fra dato), sletter forkerte
+        conn.execute("""
+            DELETE FROM retur_detaljer
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM retur_detaljer GROUP BY registreret_dato, produkt, kategori
+            )
+        """)
+
         # Seed: sæt korrekte værdier på kendte TGTG-pose-typer
         # Kører altid så eksisterende rækker opdateres uden at vente på næste sync
         _TGTG_SEED = [
@@ -3450,13 +3459,20 @@ def faste_omk_maaned_sum(aar: int) -> Dict[int, float]:
 # ── RETUR DETALJER ────────────────────────────────────────────────────────────
 
 def gem_retur_detaljer(uge: int, aar: int, items: list, dato: str) -> int:
-    """Gemmer bekræftede retur-detaljer pr. dato. Erstatter kun data for samme uge+aar+dato."""
+    """Gemmer bekræftede retur-detaljer pr. dato.
+    Sletter ALT for samme registreret_dato (uanset gemt uge/aar) så dubletter undgås.
+    Uge/aar beregnes fra datoen for at sikre korrekthed."""
+    from datetime import date as _d
+    _parsed = _d.fromisoformat(dato)
+    iso = _parsed.isocalendar()
+    korrekt_uge = iso[1]
+    korrekt_aar = iso[0]
     with _conn() as conn:
-        conn.execute("DELETE FROM retur_detaljer WHERE uge=? AND aar=? AND registreret_dato=?", (uge, aar, dato))
+        conn.execute("DELETE FROM retur_detaljer WHERE registreret_dato=?", (dato,))
         for it in items:
             conn.execute(
                 "INSERT INTO retur_detaljer (registreret_dato, uge, aar, produkt, antal, kategori) VALUES (?,?,?,?,?,?)",
-                (dato, uge, aar, it['produkt'], max(0, int(it['antal'])), it.get('kategori', 'wienerbroed'))
+                (dato, korrekt_uge, korrekt_aar, it['produkt'], max(0, int(it['antal'])), it.get('kategori', 'wienerbroed'))
             )
     return len(items)
 
@@ -3623,19 +3639,43 @@ def hent_retur_kpi() -> dict:
 
 
 def hent_retur_historik(n: int = 16) -> list:
-    """Seneste n uger med retur-data."""
+    """Seneste n uger med retur-data.
+    Beregner uge/aar fra registreret_dato (ikke gemt uge-felt) for at undgå
+    fejl fra tidligere forkert ISO-uge beregning i frontend."""
+    from datetime import date as _d
     with _conn() as conn:
+        # Hent pr. dato — ignorer gemt uge/aar felt
         rows = conn.execute("""
-            SELECT uge, aar, MAX(registreret_dato) AS dato,
-                   SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS sendt_boller,
+            SELECT registreret_dato AS dato,
+                   SUM(CASE WHEN kategori='boller'     THEN antal ELSE 0 END) AS sendt_boller,
                    SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS sendt_wiener,
                    COUNT(*) AS produkter
             FROM retur_detaljer
-            GROUP BY uge, aar
-            ORDER BY aar DESC, uge DESC
-            LIMIT ?
-        """, (n,)).fetchall()
-        return [dict(r) for r in rows]
+            GROUP BY registreret_dato
+            ORDER BY registreret_dato DESC
+        """).fetchall()
+
+    # Gruppér på korrekt ISO-uge beregnet fra datoen
+    uge_data: dict = {}
+    for r in rows:
+        try:
+            iso = _d.fromisoformat(r['dato']).isocalendar()
+        except Exception:
+            continue
+        key = (iso[0], iso[1])  # (aar, uge)
+        if key not in uge_data:
+            uge_data[key] = {
+                'uge': iso[1], 'aar': iso[0], 'dato': r['dato'],
+                'sendt_boller': 0, 'sendt_wiener': 0, 'produkter': 0,
+            }
+        uge_data[key]['sendt_boller']  += r['sendt_boller']
+        uge_data[key]['sendt_wiener']  += r['sendt_wiener']
+        uge_data[key]['produkter']     += r['produkter']
+        if r['dato'] > uge_data[key]['dato']:
+            uge_data[key]['dato'] = r['dato']
+
+    result = sorted(uge_data.values(), key=lambda x: (x['aar'], x['uge']), reverse=True)
+    return result[:n]
 
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────

@@ -2982,6 +2982,40 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     TGTG_PR_POSE = 38.0
 
     with _conn() as conn:
+        # ── Salgdata til vækst + TGTG (altid beregnet) ──────────────────────
+        salg_rows = conn.execute("""
+            WITH kasse AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
+                )
+                GROUP BY uw, uy
+            ),
+            kw AS (
+                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
+                       strftime('%Y',dato) AS uy,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
+                   OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
+                GROUP BY uw, uy
+            )
+            SELECT CAST(k.uw AS INTEGER) AS uge,
+                   CAST(k.uy AS INTEGER) AS aar,
+                   k.stk + COALESCE(kw.stk,0) AS kasse_stk,
+                   br.tgtg AS tgtg_kr
+            FROM kasse k
+            LEFT JOIN kw ON kw.uw=k.uw AND kw.uy=k.uy
+            LEFT JOIN bager_regnskab br
+                ON br.uge=CAST(k.uw AS INTEGER) AND br.aar=CAST(k.uy AS INTEGER)
+            ORDER BY aar DESC, uge DESC
+            LIMIT 8
+        """).fetchall()
+
         # ── Har vi en faktisk indlæst bestilling for mål-ugen? ──────────────
         faktisk_rows = conn.execute("""
             SELECT varenummer, varenavn, pris_ex_moms,
@@ -3014,6 +3048,16 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 })
             total_stk = sum(p["total_anbefalet"] for p in produkter)
             total_kr  = sum(p["total_pris"]      for p in produkter)
+            # Beregn kontekstværdier (vises som info, påvirker ikke faktisk bestilling)
+            eff_f   = [(r["kasse_stk"] or 0) + round((r["tgtg_kr"] or 0) / TGTG_PR_POSE) for r in salg_rows]
+            b3_f    = [v for v in eff_f[:3] if v > 0]
+            p3_f    = [v for v in eff_f[3:6] if v > 0]
+            bavg_f  = sum(b3_f) / len(b3_f) if b3_f else 1.0
+            pavg_f  = sum(p3_f) / len(p3_f) if p3_f else bavg_f
+            vaekst_f = max(-0.15, min(0.15, bavg_f / pavg_f - 1)) if pavg_f > 0 else 0.0
+            tgtg_kr_f = next((r["tgtg_kr"] for r in salg_rows if (r["tgtg_kr"] or 0) > 0), 0) or 0
+            si_f    = _SI_MAANED.get(mon_dato.month, 1.0)
+            evt_f   = _get_event(maal_uge, maal_aar)
             return {
                 "maal_uge":        maal_uge,
                 "maal_aar":        maal_aar,
@@ -3021,13 +3065,13 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 "basis_uge":       maal_uge,
                 "basis_aar":       maal_aar,
                 "maaned":          mon_dato.month,
-                "si":              1.0,
-                "event":           None,
-                "tgtg_kr":         0,
-                "tgtg_ok":         True,
-                "tgtg_advarsel":   False,
-                "tgtg_korrektion": 1.0,
-                "vaekst_pct":      0.0,
+                "si":              round(si_f, 3),
+                "event":           evt_f["navn"] if evt_f else None,
+                "tgtg_kr":         round(tgtg_kr_f),
+                "tgtg_ok":         tgtg_kr_f < 800,
+                "tgtg_advarsel":   tgtg_kr_f > 1200,
+                "tgtg_korrektion": 0.95 if tgtg_kr_f > 1000 else 1.0,
+                "vaekst_pct":      round(vaekst_f * 100, 1),
                 "total_faktor":    1.0,
                 "produkter":       produkter,
                 "total_stk":       total_stk,
@@ -3077,39 +3121,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 manuel[mr["varenummer"]] = {}
             manuel[mr["varenummer"]][mr["dag"]] = mr["antal"]
 
-        # Effektivt solgt seneste 8 uger til vækst+TGTG
-        salg_rows = conn.execute("""
-            WITH kasse AS (
-                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
-                       strftime('%Y',dato) AS uy,
-                       ROUND(SUM(antal),0) AS stk
-                FROM transaktioner
-                WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
-                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
-                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
-                )
-                GROUP BY uw, uy
-            ),
-            kw AS (
-                SELECT CAST(CAST(strftime('%W',dato) AS INTEGER) AS TEXT) AS uw,
-                       strftime('%Y',dato) AS uy,
-                       ROUND(SUM(antal),0) AS stk
-                FROM transaktioner
-                WHERE (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%wiener%')
-                   OR (LOWER(varenavn) LIKE '%kaffe%' AND LOWER(varenavn) LIKE '%bmo%')
-                GROUP BY uw, uy
-            )
-            SELECT CAST(k.uw AS INTEGER) AS uge,
-                   CAST(k.uy AS INTEGER) AS aar,
-                   k.stk + COALESCE(kw.stk,0) AS kasse_stk,
-                   br.tgtg AS tgtg_kr
-            FROM kasse k
-            LEFT JOIN kw ON kw.uw=k.uw AND kw.uy=k.uy
-            LEFT JOIN bager_regnskab br
-                ON br.uge=CAST(k.uw AS INTEGER) AND br.aar=CAST(k.uy AS INTEGER)
-            ORDER BY aar DESC, uge DESC
-            LIMIT 8
-        """).fetchall()
+        # salg_rows er allerede hentet ovenfor (delt mellem faktisk og beregnet sti)
 
     # Vækst: seneste 3 vs forrige 3 uger, cap ±15%
     eff = [(r["kasse_stk"] or 0) + round((r["tgtg_kr"] or 0) / TGTG_PR_POSE)

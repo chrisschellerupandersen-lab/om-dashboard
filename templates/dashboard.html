@@ -5793,24 +5793,29 @@ async function loadBernUge(uge, aar) {
   document.getElementById('bern-total-sub').textContent = Math.round(d.total_kr).toLocaleString('da-DK') + ' kr ex moms';
 
   const siEl = document.getElementById('bern-si');
-  siEl.textContent = d.faktisk ? '—' : 'x' + d.si.toFixed(2);
-  siEl.style.color = d.faktisk ? 'var(--ash)' : d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'inherit';
-  document.getElementById('bern-si-sub').textContent = d.faktisk ? '' :
-    MND[d.maaned] + (d.si >= 1 ? ' (+' : ' (') + Math.round((d.si - 1) * 100) + '%)';
+  siEl.textContent = 'x' + d.si.toFixed(2);
+  siEl.style.color = d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'inherit';
+  siEl.style.opacity = d.faktisk ? '0.5' : '1';
+  document.getElementById('bern-si-sub').textContent =
+    MND[d.maaned] + (d.si >= 1 ? ' (+' : ' (') + Math.round((d.si - 1) * 100) + '%)' +
+    (d.faktisk ? ' · info' : '');
 
   const tEl = document.getElementById('bern-tgtg');
-  tEl.textContent = d.faktisk ? '—' : d.tgtg_kr.toLocaleString('da-DK') + ' kr';
-  tEl.style.color = d.faktisk ? 'var(--ash)' : d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
-  document.getElementById('bern-tgtg-sub').textContent = d.faktisk ? '' :
-    d.tgtg_advarsel ? '⚠ For høj — -5% auto' :
-    d.tgtg_ok       ? '✓ Sundt (under 800 kr)' : 'Hold øje';
+  tEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
+  tEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
+  tEl.style.opacity = d.faktisk ? '0.5' : '1';
+  document.getElementById('bern-tgtg-sub').textContent = d.faktisk
+    ? (d.tgtg_advarsel ? '⚠ For høj' : d.tgtg_ok ? '✓ Under 800 kr' : 'Hold øje') + ' · info'
+    : d.tgtg_advarsel ? '⚠ For høj — -5% auto' : d.tgtg_ok ? '✓ Sundt (under 800 kr)' : 'Hold øje';
 
   const vp = d.vaekst_pct;
   const vEl = document.getElementById('bern-vaekst');
-  vEl.textContent = d.faktisk ? '—' : (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
-  vEl.style.color = d.faktisk ? 'var(--ash)' : vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
-  document.getElementById('bern-vaekst-sub').textContent = d.faktisk ? '' :
-    vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt';
+  vEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
+  vEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
+  vEl.style.opacity = d.faktisk ? '0.5' : '1';
+  document.getElementById('bern-vaekst-sub').textContent =
+    (vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt') +
+    (d.faktisk ? ' · info' : '');
 
   // ── Rings (top 4) ────────────────────────────────────────────────────
   setRing('ring-bern-total', Math.min(100, d.total_stk / 1000 * 100), 'var(--amber)');

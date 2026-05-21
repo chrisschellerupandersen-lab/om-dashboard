@@ -7409,24 +7409,19 @@ async function loadReturStatus() {
     } else {
       card.style.background  = 'var(--card)';
       card.style.borderColor = 'var(--border)';
-      if (d.seneste_uge) {
-        ttl.textContent = 'SENESTE RETUR · UGE ' + d.seneste_uge;
-        ttl.style.color = ash;
-        dato.textContent = '';
-        bVal.textContent = d.seneste_boller; bVal.style.color = 'var(--charcoal)';
-        wVal.textContent = d.seneste_wiener; wVal.style.color = 'var(--charcoal)';
-        bSub.textContent = ''; wSub.textContent = '';
-        footer.textContent = 'Næste registrering: mandag for uge ' + d.aktuel_uge;
-        footer.style.color = ash;
-      } else {
-        ttl.textContent = 'RETUR REGISTRERING'; ttl.style.color = ash;
-        dato.textContent = '';
-        bVal.textContent = '—'; bVal.style.color = ash;
-        wVal.textContent = '—'; wVal.style.color = ash;
-        bSub.textContent = ''; wSub.textContent = '';
-        footer.textContent = 'Upload første retur-seddel →';
-        footer.style.color = ash;
-      }
+      ttl.textContent = 'KAN SENDE RETUR · UGE ' + d.aktuel_uge;
+      ttl.style.color = ash;
+      dato.textContent = '';
+      bVal.textContent = d.max_boller > 0 ? d.max_boller : '—';
+      bVal.style.color = d.max_boller > 0 ? green : ash;
+      bSub.textContent = d.max_boller > 0 ? '10% af ' + d.bestilt_boller + ' bestilt' : '';
+      bSub.style.color = 'var(--moss)';
+      wVal.textContent = d.max_wiener > 0 ? d.max_wiener : '—';
+      wVal.style.color = d.max_wiener > 0 ? green : ash;
+      wSub.textContent = d.max_wiener > 0 ? '13,5% af ' + d.bestilt_wiener + ' bestilt' : '';
+      wSub.style.color = 'var(--moss)';
+      footer.textContent = 'Registrer mandag for uge ' + d.aktuel_uge + ' →';
+      footer.style.color = ash;
     }
   } catch(e) { console.error('loadReturStatus:', e); }
 }

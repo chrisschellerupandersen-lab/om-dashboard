@@ -7272,9 +7272,10 @@ function retNulstil() {
   document.getElementById('ret-gem-status').style.display = 'none';
 }
 
-// ── Historik: pr. dag med fold/unfold ─────────────────────────────────────────
-let _retHistItems = {};   // {dato: [items]}  — cache pr. dag
-let _retHistOpen  = null; // dato for åben gruppe
+// ── Historik: uge (niveau 1) → dag (niveau 2) → linjer ───────────────────────
+let _retHistItems  = {};   // {dato: [items]}  — cache pr. dag
+let _retHistUgeAbn = null; // uge-key for åben uge
+let _retHistDagAbn = null; // dag-key for åben dag
 
 async function retIndlaesHistorik() {
   const el = document.getElementById('ret-historik-indhold');
@@ -7286,58 +7287,87 @@ async function retIndlaesHistorik() {
       el.innerHTML = '<div style="color:var(--ash);font-size:12px;padding:8px 0;">Ingen registreringer endnu</div>';
       return;
     }
-    el.innerHTML = rows.map(r => _retHistDagRaekke(r)).join('');
+    // Gruppér dage i uger
+    const uger = {};
+    rows.forEach(r => {
+      const uk = r.aar + '_' + String(r.uge).padStart(2,'0');
+      if (!uger[uk]) uger[uk] = { uge: r.uge, aar: r.aar, dage: [], boller: 0, wiener: 0 };
+      uger[uk].dage.push(r);
+      uger[uk].boller += r.sendt_boller;
+      uger[uk].wiener += r.sendt_wiener;
+    });
+    const sortedUger = Object.entries(uger).sort((a,b) => b[0].localeCompare(a[0]));
+    el.innerHTML = sortedUger.map(([uk, u]) => _retHistUgeBlok(uk, u)).join('');
   } catch(e) {
     el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Fejl ved indlæsning</div>';
   }
+}
+
+function _retHistUgeBlok(uk, u) {
+  const dagHtml = u.dage.map(r => _retHistDagRaekke(r)).join('');
+  return `
+  <div style="border-bottom:2px solid rgba(30,58,30,.1);margin-bottom:2px;">
+    <div onclick="retHistUgeToggle('${uk}')"
+      style="display:flex;align-items:center;gap:10px;padding:12px 8px;cursor:pointer;user-select:none;background:rgba(30,58,30,.04);">
+      <div style="font-family:'DM Mono',monospace;font-weight:700;font-size:13px;color:var(--forest);min-width:56px;">Uge ${u.uge}</div>
+      <div style="font-size:11px;color:var(--ash);flex:1;">${u.dage.length} dag${u.dage.length!==1?'e':''} · ${u.aar}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--forest);white-space:nowrap;">${u.boller}b · ${u.wiener}w</div>
+      <div id="rh-uchev-${uk}" style="font-size:10px;color:var(--ash);transition:transform .15s;margin-left:4px;">▶</div>
+    </div>
+    <div id="rh-udet-${uk}" style="display:none;">${dagHtml}</div>
+  </div>`;
+}
+
+function retHistUgeToggle(uk) {
+  // Luk anden uge
+  if (_retHistUgeAbn && _retHistUgeAbn !== uk) {
+    const pd = document.getElementById('rh-udet-' + _retHistUgeAbn);
+    const pc = document.getElementById('rh-uchev-' + _retHistUgeAbn);
+    if (pd) pd.style.display = 'none';
+    if (pc) pc.style.transform = '';
+  }
+  const det  = document.getElementById('rh-udet-'  + uk);
+  const chev = document.getElementById('rh-uchev-' + uk);
+  const isOpen = det.style.display !== 'none';
+  det.style.display  = isOpen ? 'none' : '';
+  chev.style.transform = isOpen ? '' : 'rotate(90deg)';
+  _retHistUgeAbn = isOpen ? null : uk;
 }
 
 function _retHistDagRaekke(r) {
   const dato    = r.dato;
   const key     = dato.replace(/-/g,'');
   const dagNavn = r.ugedag.charAt(0).toUpperCase() + r.ugedag.slice(1);
-  // Format: "Ons 21. maj" fra dato
-  const d = new Date(dato + 'T12:00:00');
-  const maaned = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()];
-  const datoLbl = d.getDate() + '. ' + maaned;
+  const d       = new Date(dato + 'T12:00:00');
+  const maaned  = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()];
   return `
-  <div id="rh-dag-${key}" style="border-bottom:1px solid rgba(30,58,30,.07);">
+  <div id="rh-dag-${key}" style="border-bottom:1px solid rgba(30,58,30,.06);">
     <div onclick="retHistDagToggle('${key}','${dato}')"
-      style="display:flex;align-items:center;gap:10px;padding:12px 6px;cursor:pointer;user-select:none;">
-      <div style="min-width:36px;font-size:11px;font-weight:600;color:var(--forest);">${dagNavn.slice(0,3)}</div>
-      <div style="flex:1;">
-        <div style="font-size:13px;color:var(--charcoal);">${datoLbl} <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">uge ${r.uge}</span></div>
-      </div>
-      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--forest);white-space:nowrap;">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
-      <div id="rh-chev-${key}" style="font-size:10px;color:var(--ash);transition:transform .15s;margin-left:4px;">▼</div>
+      style="display:flex;align-items:center;gap:10px;padding:10px 8px 10px 20px;cursor:pointer;user-select:none;">
+      <div style="font-size:12px;font-weight:500;color:var(--charcoal);min-width:32px;">${dagNavn.slice(0,3)}</div>
+      <div style="flex:1;font-size:12px;color:var(--charcoal);">${d.getDate()}. ${maaned}</div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--moss);white-space:nowrap;">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
+      <div id="rh-chev-${key}" style="font-size:9px;color:var(--ash);transition:transform .15s;margin-left:6px;">▶</div>
     </div>
-    <div id="rh-det-${key}" style="display:none;padding:0 8px 14px;">
+    <div id="rh-det-${key}" style="display:none;padding:0 12px 12px 20px;">
       <div style="font-size:11px;color:var(--ash);">Indlæser…</div>
     </div>
   </div>`;
 }
 
 async function retHistDagToggle(key, dato) {
-  const det  = document.getElementById('rh-det-' + key);
-  const chev = document.getElementById('rh-chev-' + key);
-  // Luk forrige åbne
-  if (_retHistOpen && _retHistOpen !== key) {
-    const pd = document.getElementById('rh-det-'  + _retHistOpen);
-    const pc = document.getElementById('rh-chev-' + _retHistOpen);
+  // Luk anden dag
+  if (_retHistDagAbn && _retHistDagAbn !== key) {
+    const pd = document.getElementById('rh-det-'  + _retHistDagAbn);
+    const pc = document.getElementById('rh-chev-' + _retHistDagAbn);
     if (pd) pd.style.display = 'none';
     if (pc) pc.style.transform = '';
   }
+  const det  = document.getElementById('rh-det-'  + key);
+  const chev = document.getElementById('rh-chev-' + key);
   const isOpen = det.style.display !== 'none';
-  if (isOpen) {
-    det.style.display = 'none';
-    chev.style.transform = '';
-    _retHistOpen = null;
-    return;
-  }
-  det.style.display = '';
-  chev.style.transform = 'rotate(180deg)';
-  _retHistOpen = key;
-  // Hent linjer hvis ikke cachet
+  if (isOpen) { det.style.display = 'none'; chev.style.transform = ''; _retHistDagAbn = null; return; }
+  det.style.display = ''; chev.style.transform = 'rotate(90deg)'; _retHistDagAbn = key;
   if (!_retHistItems[dato]) {
     const d = await fetch('/api/retur/dag/' + dato).then(r => r.json());
     _retHistItems[dato] = (d.items || []).map(it => ({...it}));

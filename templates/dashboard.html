@@ -7047,52 +7047,194 @@ function retNulstil() {
   document.getElementById('ret-gem-status').style.display = 'none';
 }
 
+// ── Historik: inline expand + redigering ──────────────────────────────────────
+let _retHistItems = {};   // {uge_aar: [items]}  — cache for inline editing
+let _retHistOpen  = null; // currently expanded key
+
 async function retIndlaesHistorik() {
   const el = document.getElementById('ret-historik-indhold');
   if (!el) return;
   try {
-    const res = await fetch('/api/retur/historik');
+    const res  = await fetch('/api/retur/historik');
     const rows = await res.json();
     if (!rows.length) {
-      el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Ingen registreringer endnu</div>';
+      el.innerHTML = '<div style="color:var(--ash);font-size:12px;padding:8px 0;">Ingen registreringer endnu</div>';
       return;
     }
-    const mono = "font-family:'DM Mono',monospace;";
-    el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:360px;">
-        <thead><tr style="border-bottom:1px solid var(--border);">
-          <th style="text-align:left;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">UGE</th>
-          <th style="text-align:left;padding:5px 6px;font-size:9px;color:var(--ash);">DATO</th>
-          <th style="text-align:right;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">BOLLER</th>
-          <th style="text-align:right;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">WIENER</th>
-          <th style="text-align:right;padding:5px 6px;font-size:9px;color:var(--ash);">PROD.</th>
-          <th style="width:32px;"></th>
-        </tr></thead>
-        <tbody>
-          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(30,58,30,.06);" onclick="retVisUge(${r.uge},${r.aar})" style="cursor:pointer;">
-            <td style="padding:7px 6px;${mono}font-weight:600;">Uge ${r.uge}</td>
-            <td style="padding:7px 6px;font-size:11px;color:var(--ash);">${(r.dato||'').slice(0,10)}</td>
-            <td style="padding:7px 6px;text-align:right;${mono}color:var(--forest);">${r.sendt_boller}</td>
-            <td style="padding:7px 6px;text-align:right;${mono}color:var(--forest);">${r.sendt_wiener}</td>
-            <td style="padding:7px 6px;text-align:right;${mono}color:var(--ash);">${r.produkter}</td>
-            <td style="padding:7px 4px;text-align:center;">
-              <button onclick="event.stopPropagation();retVisUge(${r.uge},${r.aar})"
-                style="background:none;border:1px solid var(--border);color:var(--ash);border-radius:3px;font-size:10px;padding:2px 6px;cursor:pointer;">Vis</button>
-            </td>
-          </tr>`).join('')}
-        </tbody>
-      </table></div>`;
+    el.innerHTML = rows.map(r => _retHistRaekke(r)).join('');
   } catch(e) {
     el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Fejl ved indlæsning</div>';
   }
 }
 
+function _retHistRaekke(r) {
+  const key  = r.uge + '_' + r.aar;
+  const mono = "font-family:'DM Mono',monospace;";
+  const dato = (r.dato || '').slice(0,10);
+  return `
+  <div id="rh-row-${key}" style="border-bottom:1px solid rgba(30,58,30,.07);">
+    <div onclick="retHistToggle('${key}',${r.uge},${r.aar})"
+      style="display:flex;align-items:center;gap:8px;padding:10px 6px;cursor:pointer;user-select:none;">
+      <div style="${mono}font-weight:700;font-size:13px;min-width:52px;">Uge ${r.uge}</div>
+      <div style="font-size:11px;color:var(--ash);flex:1;">${dato}</div>
+      <div style="${mono}font-size:12px;color:var(--forest);">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
+      <div id="rh-chevron-${key}" style="font-size:10px;color:var(--ash);transition:transform .15s;">▼</div>
+    </div>
+    <div id="rh-detalje-${key}" style="display:none;padding:0 6px 12px;">
+      <div style="font-size:10px;color:var(--ash);margin-bottom:6px;">Indlæser…</div>
+    </div>
+  </div>`;
+}
+
+async function retHistToggle(key, uge, aar) {
+  const det  = document.getElementById('rh-detalje-' + key);
+  const chev = document.getElementById('rh-chevron-' + key);
+  // Luk anden åben
+  if (_retHistOpen && _retHistOpen !== key) {
+    const prev = document.getElementById('rh-detalje-' + _retHistOpen);
+    const pc   = document.getElementById('rh-chevron-' + _retHistOpen);
+    if (prev) prev.style.display = 'none';
+    if (pc)   pc.style.transform = '';
+  }
+  // Toggle
+  const isOpen = det.style.display !== 'none';
+  if (isOpen) {
+    det.style.display = 'none';
+    chev.style.transform = '';
+    _retHistOpen = null;
+    return;
+  }
+  det.style.display = '';
+  chev.style.transform = 'rotate(180deg)';
+  _retHistOpen = key;
+
+  // Hent data hvis ikke cachet
+  if (!_retHistItems[key]) {
+    const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
+    const d   = await res.json();
+    _retHistItems[key] = d.items ? d.items.map(it => ({...it})) : [];
+  }
+  _retHistVisDetalje(key, uge, aar);
+}
+
+function _retHistVisDetalje(key, uge, aar) {
+  const el    = document.getElementById('rh-detalje-' + key);
+  const items = _retHistItems[key] || [];
+  const mono  = "font-family:'DM Mono',monospace;";
+  if (!items.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--ash);">Ingen data</div>';
+    return;
+  }
+  el.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr style="border-bottom:1px solid var(--border);">
+        <th style="text-align:left;padding:4px 4px;font-size:9px;color:var(--ash);">PRODUKT</th>
+        <th style="text-align:center;padding:4px 4px;font-size:9px;color:var(--ash);width:56px;">STK</th>
+        <th style="text-align:center;padding:4px 4px;font-size:9px;color:var(--ash);width:80px;">KAT.</th>
+        <th style="width:28px;"></th>
+      </tr></thead>
+      <tbody>
+        ${items.map((it, i) => `
+          <tr style="border-bottom:1px solid rgba(30,58,30,.05);">
+            <td style="padding:6px 4px;">
+              <input value="${it.produkt}"
+                onchange="_retHistItems['${key}'][${i}].produkt=this.value"
+                style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);
+                       color:var(--charcoal);font-size:12px;padding:1px 0;outline:none;">
+            </td>
+            <td style="padding:6px 4px;text-align:center;">
+              <input type="number" min="0" value="${it.antal}"
+                onchange="_retHistItems['${key}'][${i}].antal=parseInt(this.value)||0;_retHistOpdaterSum('${key}')"
+                style="width:48px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);
+                       color:var(--charcoal);${mono}font-size:12px;padding:1px 0;outline:none;">
+            </td>
+            <td style="padding:6px 4px;text-align:center;">
+              <select onchange="_retHistItems['${key}'][${i}].kategori=this.value;_retHistOpdaterSum('${key}')"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);
+                       border-radius:3px;font-size:10px;padding:1px 3px;">
+                <option value="boller"${it.kategori==='boller'?' selected':''}>Boller</option>
+                <option value="wienerbroed"${it.kategori==='wienerbroed'?' selected':''}>Wiener</option>
+              </select>
+            </td>
+            <td style="padding:6px 2px;text-align:center;">
+              <button onclick="_retHistItems['${key}'].splice(${i},1);_retHistVisDetalje('${key}',${uge},${aar})"
+                style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:14px;padding:0 3px;">×</button>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <div id="rh-sum-${key}" style="font-size:11px;color:var(--ash);flex:1;"></div>
+      <button onclick="_retHistTilfoej('${key}',${uge},${aar})"
+        style="font-size:10px;background:none;border:1px dashed var(--border);color:var(--ash);
+               border-radius:3px;padding:3px 8px;cursor:pointer;">+ Tilføj</button>
+      <button onclick="retHistGem('${key}',${uge},${aar})"
+        style="font-size:11px;background:var(--forest);color:var(--amber);border:none;
+               border-radius:4px;padding:5px 14px;font-weight:600;cursor:pointer;">Gem rettelser</button>
+    </div>
+    <div id="rh-st-${key}" style="display:none;margin-top:6px;padding:5px 8px;border-radius:3px;font-size:11px;"></div>`;
+  _retHistOpdaterSum(key);
+}
+
+function _retHistOpdaterSum(key) {
+  const el = document.getElementById('rh-sum-' + key);
+  if (!el) return;
+  const items = _retHistItems[key] || [];
+  const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
+  const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
+  el.textContent = b + ' boller · ' + w + ' wienerbrød';
+}
+
+function _retHistTilfoej(key, uge, aar) {
+  if (!_retHistItems[key]) _retHistItems[key] = [];
+  _retHistItems[key].push({produkt:'', antal:1, kategori:'wienerbroed'});
+  _retHistVisDetalje(key, uge, aar);
+}
+
+async function retHistGem(key, uge, aar) {
+  const items = _retHistItems[key] || [];
+  const stEl  = document.getElementById('rh-st-' + key);
+  if (!items.length) return;
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const res  = await fetch('/api/retur/gem', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({uge, aar, dato: today, items})
+    });
+    const data = await res.json();
+    if (data.ok) {
+      stEl.textContent = '✓ Gemt — ' + data.antal + ' produkter';
+      stEl.style.background = '#f0f7f0';
+      stEl.style.color = 'var(--forest)';
+      stEl.style.display = '';
+      // Opdater summary-rækken
+      const rowEl = document.getElementById('rh-row-' + key);
+      if (rowEl) {
+        const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
+        const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
+        const sumEl = rowEl.querySelector('div[style*="color:var(--forest)"]');
+        if (sumEl) sumEl.textContent = b + 'b · ' + w + 'w';
+      }
+      if (typeof loadReturStatus === 'function') loadReturStatus();
+      setTimeout(() => { if (stEl) stEl.style.display = 'none'; }, 3000);
+    } else {
+      stEl.textContent = '✗ ' + (data.fejl || data.detail || 'Fejl');
+      stEl.style.background = '#fff5f5';
+      stEl.style.color = 'var(--danger)';
+      stEl.style.display = '';
+    }
+  } catch(e) {
+    if (stEl) { stEl.textContent = '✗ ' + e; stEl.style.display = ''; }
+  }
+}
+
 async function retVisUge(uge, aar) {
+  // Bruges stadig fra uge-vælgerens "Indlæs"-knap
   document.getElementById('ret-uge-input').value = uge;
   document.getElementById('ret-aar-input').value = aar;
   document.getElementById('ret-bekr-uge').textContent = uge;
   const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
-  const d = await res.json();
+  const d   = await res.json();
   if (d.items && d.items.length) {
     _retItems = d.items.map(it => ({...it}));
     retVisItems();

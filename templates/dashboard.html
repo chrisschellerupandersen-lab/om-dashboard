@@ -6845,6 +6845,13 @@ document.getElementById('sidebar-backdrop').addEventListener('click', function()
 let _retItems = [];      // current item list being confirmed
 let _retFotoFile = null; // selected file
 
+// Retur-dato er altid dagen FØR upload (sedlen udfyldes dagen inden)
+function _retIGaar() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 // Helper: beregn "retur-uge" ud fra dato (mandag → forrige uge)
 function _retBeregUge(dato) {
   const d = dato || new Date();
@@ -6865,7 +6872,9 @@ function _retBeregUge(dato) {
 }
 
 function retInit() {
-  const {uge, aar} = _retBeregUge(new Date());
+  // Beregn uge ud fra i-går (sedlen er fra dagen før upload)
+  const igaar = new Date(); igaar.setDate(igaar.getDate() - 1);
+  const {uge, aar} = _retBeregUge(igaar);
   document.getElementById('ret-uge-input').value = uge;
   document.getElementById('ret-aar-input').value = aar;
   document.getElementById('ret-bekr-uge').textContent = uge;
@@ -6966,9 +6975,8 @@ async function retScanFoto() {
     }
     _retItems = data.items || [];
     retVisItems();
-    const today = new Date().toISOString().slice(0,10);
     const di = document.getElementById('ret-dato-input');
-    if (di && !di.value) { di.value = today; }
+    if (di && !di.value) { di.value = _retIGaar(); }
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-upload-kort').style.display = 'none';
   } catch(e) {
@@ -7026,7 +7034,7 @@ async function retGem() {
   const st   = document.getElementById('ret-gem-status');
   btn.disabled = true;
   const datoInput = document.getElementById('ret-dato-input');
-  const dato = (datoInput && datoInput.value) ? datoInput.value : new Date().toISOString().slice(0,10);
+  const dato = (datoInput && datoInput.value) ? datoInput.value : _retIGaar();
   try {
     const res = await fetch('/api/retur/gem', {
       method:'POST',
@@ -7136,7 +7144,7 @@ async function retHistToggle(key, uge, aar) {
     const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
     const d   = await res.json();
     _retHistItems[key] = d.items ? d.items.map(it => ({...it})) : [];
-    _retHistDato[key]  = (d.registreret || '').slice(0,10) || new Date().toISOString().slice(0,10);
+    _retHistDato[key]  = (d.registreret || '').slice(0,10) || _retIGaar();
   }
   _retHistVisDetalje(key, uge, aar);
 }
@@ -7273,7 +7281,7 @@ async function retVisUge(uge, aar) {
     _retItems = d.items.map(it => ({...it}));
     retVisItems();
     const di = document.getElementById('ret-dato-input');
-    if (di) di.value = (d.registreret || '').slice(0,10) || new Date().toISOString().slice(0,10);
+    if (di) di.value = (d.registreret || '').slice(0,10) || _retIGaar();
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-upload-kort').style.display = 'none';
     const st = document.getElementById('ret-uge-status');

@@ -764,9 +764,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning · dag</div>
             <div class="kpi-s" id="kpi-dag-omsat-sub" style="color:rgba(255,255,255,.45);">ekskl. moms</div>
           </div>
-          <div class="kpi">
+          <div class="kpi" style="cursor:pointer;" onclick="dagDbDetaljeToggle()" title="Klik for at se DB-detaljer per produkt">
             <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-db">—</div></div></div>
-            <div class="kpi-l">DB · dag</div>
+            <div class="kpi-l">DB · dag <span style="font-size:9px;opacity:.5;">▼</span></div>
             <div class="kpi-s" id="kpi-dag-db-sub">—</div>
           </div>
           <div class="kpi">
@@ -802,6 +802,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-l">Kunder · dag</div>
             <div class="kpi-v" id="kpi-kunder">—</div>
             <div class="kpi-s" id="kpi-kurv">—</div>
+          </div>
+        </div>
+        <!-- DB DAG DETALJE PANEL -->
+        <div id="dag-db-detalje-panel" class="card" style="display:none;margin-bottom:12px;padding:10px 12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ash);">DB DETALJER · <span id="dag-db-det-dato"></span></div>
+            <div onclick="dagDbDetaljeToggle()" style="cursor:pointer;font-size:11px;color:var(--ash);padding:2px 6px;border:1px solid var(--border);border-radius:4px;">✕ luk</div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table style="width:100%;border-collapse:collapse;font-size:11px;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <th style="text-align:left;padding:3px 6px;color:var(--ash);font-weight:500;">Produkt</th>
+                  <th style="text-align:right;padding:3px 6px;color:var(--ash);font-weight:500;">Antal</th>
+                  <th style="text-align:right;padding:3px 6px;color:var(--ash);font-weight:500;">Omsat inkl.</th>
+                  <th style="text-align:right;padding:3px 6px;color:var(--ash);font-weight:500;">VF</th>
+                  <th style="text-align:right;padding:3px 6px;color:var(--ash);font-weight:500;">DB kr</th>
+                  <th style="text-align:right;padding:3px 6px;color:var(--ash);font-weight:500;">DB%</th>
+                  <th style="text-align:center;padding:3px 6px;color:var(--ash);font-weight:500;" title="Har kostpris i varestamdata">Stamdata</th>
+                </tr>
+              </thead>
+              <tbody id="dag-db-det-tbody"></tbody>
+              <tfoot id="dag-db-det-tfoot"></tfoot>
+            </table>
           </div>
         </div>
         <!-- RETUR STATUS KORT -->
@@ -7379,6 +7403,63 @@ async function loadReturStatus() {
       }
     }
   } catch(e) { console.error('loadReturStatus:', e); }
+}
+
+// ── DB DAG DETALJE ────────────────────────────────────────────────────────────
+let _dagDbDetAaben = false;
+function dagDbDetaljeToggle() {
+  const panel = document.getElementById('dag-db-detalje-panel');
+  _dagDbDetAaben = !_dagDbDetAaben;
+  if (_dagDbDetAaben) {
+    panel.style.display = 'block';
+    dagDbDetaljeLoad();
+  } else {
+    panel.style.display = 'none';
+  }
+}
+
+async function dagDbDetaljeLoad() {
+  try {
+    const d = await fetch('/api/salg/dag-db-detalje').then(r => r.json());
+    document.getElementById('dag-db-det-dato').textContent = d.dato || '';
+
+    const tbody = document.getElementById('dag-db-det-tbody');
+    const tfoot = document.getElementById('dag-db-det-tfoot');
+    if (!d.produkter || d.produkter.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:8px;color:var(--ash);text-align:center;">Ingen data</td></tr>';
+      return;
+    }
+
+    const mono = "font-family:'DM Mono',monospace;";
+    const numStyle = `style="text-align:right;padding:3px 6px;${mono}"`;
+    const rows = d.produkter.map(p => {
+      const dbCls = p.db_pct == null ? '' : p.db_pct >= 35 ? 'color:var(--forest)' : p.db_pct < 20 ? 'color:var(--red,#c0392b)' : 'color:var(--amber)';
+      const stamp = p.har_stamdata ? '✓' : '<span style="color:var(--red,#c0392b);" title="Bruger Shopbox kostpris — tilføj i varestamdata">✗</span>';
+      return `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:3px 6px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.varenavn}">${p.varenavn}</td>
+        <td ${numStyle}>${p.antal}</td>
+        <td ${numStyle}>${Math.round(p.omsat_inkl).toLocaleString('da-DK')}</td>
+        <td ${numStyle}>${Math.round(p.vf).toLocaleString('da-DK')}</td>
+        <td ${numStyle} style="text-align:right;padding:3px 6px;${mono}${dbCls}">${Math.round(p.db_kr).toLocaleString('da-DK')}</td>
+        <td ${numStyle} style="text-align:right;padding:3px 6px;${mono}${dbCls}">${p.db_pct != null ? p.db_pct.toFixed(1)+'%' : '—'}</td>
+        <td style="text-align:center;padding:3px 6px;">${stamp}</td>
+      </tr>`;
+    }).join('');
+    tbody.innerHTML = rows;
+
+    const t = d.total;
+    const totPct = t.db_pct != null ? t.db_pct.toFixed(1)+'%' : '—';
+    const totCls = t.db_pct >= 35 ? 'color:var(--forest)' : t.db_pct < 20 ? 'color:var(--red,#c0392b)' : 'color:var(--amber)';
+    tfoot.innerHTML = `<tr style="border-top:2px solid var(--border);font-weight:600;">
+      <td style="padding:4px 6px;">I ALT</td>
+      <td></td>
+      <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;">${Math.round(t.omsat_inkl||0).toLocaleString('da-DK')}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;">${Math.round(t.vf||0).toLocaleString('da-DK')}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;${totCls}">${Math.round(t.db_kr||0).toLocaleString('da-DK')}</td>
+      <td style="text-align:right;padding:4px 6px;font-family:'DM Mono',monospace;${totCls}">${totPct}</td>
+      <td></td>
+    </tr>`;
+  } catch(e) { console.error('dagDbDetaljeLoad:', e); }
 }
 </script>
 </body>

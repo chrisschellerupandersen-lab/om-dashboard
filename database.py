@@ -1785,6 +1785,47 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
     return result
 
 
+def hent_dag_db_detalje() -> Dict:
+    """DB-detaljer per produkt for seneste dato med data — bruges til fejlfinding."""
+    with _conn() as conn:
+        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        if not seneste_dato:
+            return {"dato": None, "produkter": [], "total": {}}
+
+        rows = conn.execute("""
+            SELECT
+                varenavn,
+                kategori,
+                ROUND(SUM(antal), 0)                                     AS antal,
+                ROUND(SUM(omsætning), 2)                                 AS omsat_inkl,
+                ROUND(SUM(omsætning) / 1.25, 2)                         AS omsat_ex,
+                ROUND(SUM(vf_korrekt), 2)                                AS vf,
+                ROUND(SUM(db_korrekt), 2)                                AS db_kr,
+                ROUND(SUM(db_korrekt)*1.25 / NULLIF(SUM(omsætning),0) * 100, 1) AS db_pct,
+                MAX(CASE WHEN s.pris_ex_moms > 0 THEN 1 ELSE 0 END)     AS har_stamdata
+            FROM v_transaktioner vt
+            LEFT JOIN varestamdata s ON vt.varenummer != '' AND vt.varenummer = s.sku
+            WHERE vt.dato = ?
+            GROUP BY varenavn, kategori
+            ORDER BY omsat_inkl DESC
+        """, (seneste_dato,)).fetchall()
+
+        total = conn.execute("""
+            SELECT
+                ROUND(SUM(omsætning), 2)   AS omsat_inkl,
+                ROUND(SUM(vf_korrekt), 2)  AS vf,
+                ROUND(SUM(db_korrekt), 2)  AS db_kr,
+                ROUND(SUM(db_korrekt)*1.25 / NULLIF(SUM(omsætning),0) * 100, 1) AS db_pct
+            FROM v_transaktioner WHERE dato = ?
+        """, (seneste_dato,)).fetchone()
+
+    return {
+        "dato": seneste_dato,
+        "produkter": [dict(r) for r in rows],
+        "total": dict(total) if total else {}
+    }
+
+
 def hent_mangler_kostpris() -> Dict:
     """Produkter hvor total kostpris = 0 på tværs af alle transaktioner."""
     with _conn() as conn:

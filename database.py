@@ -475,9 +475,9 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato = ?
         """, (prev_prev_dag_dato,)).fetchone()
 
-        # 4-ugers snit — de 4 seneste samme ugedage, samme time-cutoff
+        # 12-ugers snit — de 12 seneste samme ugedage, samme time-cutoff
         # Beregnes direkte som datoer (undgår ORDER BY LIMIT i subquery)
-        prev_4_dage = [(_sd - _kpi_td(days=7*(i+1))).isoformat() for i in range(4)]
+        prev_4_dage = [(_sd - _kpi_td(days=7*(i+1))).isoformat() for i in range(12)]
         _ph4 = ','.join(['?' for _ in prev_4_dage])
         snit_4u_time_filter = "AND time_start <= ?" if seneste_time is not None else ""
         snit_4u_time_params = (seneste_time,) if seneste_time is not None else ()
@@ -609,7 +609,7 @@ def hent_kpi(aar: int = None) -> Dict:
         "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,
         "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
         "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
-        "snit_4uger_dag":   dict(snit_4u_row)        if snit_4u_row       else None,
+        "snit_12uger_dag":  dict(snit_4u_row)        if snit_4u_row       else None,
         "bager_uge":        dict(bager_uge_row)     if bager_uge_row     else None,
         "bager_retur":      bager_retur_info,
         "bager_iso_uge":    iso[1],

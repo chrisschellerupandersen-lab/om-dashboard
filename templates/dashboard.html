@@ -3370,95 +3370,85 @@ function buildDagProgress(kpi) {
   const rows = document.getElementById('dag-prog-rows');
   const ref  = document.getElementById('dag-prog-ref');
   if (!card || !rows || !kpi) return;
-  const dag      = kpi.dag          || {};
-  const prevDag  = kpi.prev_dag     || {};
-  const snit4u   = kpi.snit_4uger_dag || {};
+  const dag      = kpi.dag           || {};
+  const prevDag  = kpi.prev_dag      || {};
+  const snit12u  = kpi.snit_12uger_dag || {};
 
-  // Primær reference: 4-ugers snit; fald tilbage til forrige uge
-  const harSnit  = snit4u.snit_omsaetning > 0;
-  const refOmsat = harSnit ? snit4u.snit_omsaetning : prevDag.omsaetning;
+  // Primær reference: 12-ugers snit; fald tilbage til forrige uge
+  const harSnit  = snit12u.snit_omsaetning > 0;
+  const refOmsat = harSnit ? snit12u.snit_omsaetning : prevDag.omsaetning;
   if (!dag.omsaetning || !refOmsat) return;
 
   const DAG_NAVN = ['søn','man','tir','ons','tor','fre','lør'];
   const prevDato = kpi.prev_dag_dato ? new Date(kpi.prev_dag_dato) : null;
   const dagNavn  = prevDato ? DAG_NAVN[prevDato.getUTCDay()] : 'forrige uge';
-  if (ref) ref.textContent = harSnit ? 'vs. 4-ugers snit' : 'vs. ' + dagNavn + ' sidste uge';
+  if (ref) ref.textContent = harSnit ? 'Typisk ' + dagNavn + ' (snit 12 uger)' : 'vs. ' + dagNavn + ' sidste uge';
 
   const items = [];
 
   // ── Omsætning ──
-  const omRef   = refOmsat;
-  const omPct   = Math.min(100, Math.round(dag.omsaetning / omRef * 100));
+  const omPct   = Math.min(100, Math.round(dag.omsaetning / refOmsat * 100));
   const omColor = omPct >= 90 ? 'var(--moss)' : omPct >= 70 ? 'var(--gold)' : 'var(--danger)';
-  // Sekundær: vs. forrige uge
-  let omSek = '';
-  if (harSnit && prevDag.omsaetning > 0) {
+  const omSek   = (harSnit && prevDag.omsaetning > 0) ? (() => {
     const d = Math.round(dag.omsaetning - prevDag.omsaetning);
-    omSek = (d >= 0 ? '+' : '') + d.toLocaleString('da-DK') + ' kr vs. ' + dagNavn;
-  }
+    return 'Forrige ' + dagNavn + ': ' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr  (' + (d>=0?'+':'') + d.toLocaleString('da-DK') + ' kr)';
+  })() : '';
   items.push({
-    label: 'Omsætning',
-    val:   Math.round(oms(dag.omsaetning)).toLocaleString('da-DK') + ' kr',
-    exp:   '~' + Math.round(omRef).toLocaleString('da-DK') + ' kr ' + (harSnit ? 'snit' : 'forventet'),
-    sek:   omSek,
-    pct: omPct, color: omColor
+    label: 'Omsætning i dag', val: Math.round(oms(dag.omsaetning)).toLocaleString('da-DK') + ' kr',
+    norm: 'Typisk ' + dagNavn + ' på dette tidspunkt: ~' + Math.round(refOmsat).toLocaleString('da-DK') + ' kr',
+    pct: omPct, pctLbl: omPct + '%', color: omColor, sek: omSek
   });
 
   // ── Kunder ──
-  const refTransak = harSnit && snit4u.snit_transak > 0 ? snit4u.snit_transak : prevDag.transak;
+  const refTransak = harSnit && snit12u.snit_transak > 0 ? snit12u.snit_transak : prevDag.transak;
   if (dag.transak > 0 && refTransak > 0) {
-    const kPct   = Math.min(100, Math.round(dag.transak / refTransak * 100));
-    const kColor = kPct >= 90 ? 'var(--moss)' : kPct >= 70 ? 'var(--gold)' : 'var(--danger)';
-    let kSek = '';
-    if (harSnit && prevDag.transak > 0) {
+    const kPct  = Math.min(100, Math.round(dag.transak / refTransak * 100));
+    const kColor= kPct >= 90 ? 'var(--moss)' : kPct >= 70 ? 'var(--gold)' : 'var(--danger)';
+    const kSek  = (harSnit && prevDag.transak > 0) ? (() => {
       const d = dag.transak - Math.round(prevDag.transak);
-      kSek = (d >= 0 ? '+' : '') + d + ' vs. ' + dagNavn;
-    }
+      return 'Forrige ' + dagNavn + ': ' + Math.round(prevDag.transak) + ' kunder  (' + (d>=0?'+':'') + d + ')';
+    })() : '';
     items.push({
-      label: 'Kunder',
-      val:   dag.transak + ' kunder',
-      exp:   '~' + Math.round(refTransak) + ' ' + (harSnit ? 'snit' : 'forventet'),
-      sek:   kSek,
-      pct: kPct, color: kColor
+      label: 'Antal kunder', val: dag.transak + ' kunder',
+      norm: 'Typisk ' + dagNavn + ' på dette tidspunkt: ~' + Math.round(refTransak) + ' kunder',
+      pct: kPct, pctLbl: kPct + '%', color: kColor, sek: kSek
     });
   }
 
   // ── Gns. kurv ──
   if (dag.transak > 0 && dag.omsaetning > 0) {
-    const kurv = Math.round(dag.omsaetning / dag.transak);
-    const refKurv = (harSnit && snit4u.snit_transak > 0)
-      ? Math.round(snit4u.snit_omsaetning / snit4u.snit_transak)
+    const kurv    = Math.round(dag.omsaetning / dag.transak);
+    const refKurv = (harSnit && snit12u.snit_transak > 0)
+      ? Math.round(snit12u.snit_omsaetning / snit12u.snit_transak)
       : (prevDag.transak > 0 ? Math.round(prevDag.omsaetning / prevDag.transak) : null);
     if (refKurv) {
-      const kPct   = Math.min(100, Math.round(kurv / refKurv * 100));
-      const kColor = kPct >= 95 ? 'var(--moss)' : kPct >= 80 ? 'var(--gold)' : 'var(--danger)';
-      let kSek = '';
-      if (harSnit && prevDag.transak > 0) {
-        const prevKurv = Math.round(prevDag.omsaetning / prevDag.transak);
-        const d = kurv - prevKurv;
-        kSek = (d >= 0 ? '+' : '') + d + ' kr vs. ' + dagNavn;
-      }
+      const kPct  = Math.min(100, Math.round(kurv / refKurv * 100));
+      const kColor= kPct >= 95 ? 'var(--moss)' : kPct >= 80 ? 'var(--gold)' : 'var(--danger)';
+      const kSek  = (harSnit && prevDag.transak > 0) ? (() => {
+        const pk = Math.round(prevDag.omsaetning / prevDag.transak);
+        const d  = kurv - pk;
+        return 'Forrige ' + dagNavn + ': ' + pk.toLocaleString('da-DK') + ' kr/kurv  (' + (d>=0?'+':'') + d + ' kr)';
+      })() : '';
       items.push({
-        label: 'Gns. kurv',
-        val:   kurv.toLocaleString('da-DK') + ' kr/kurv',
-        exp:   '~' + refKurv.toLocaleString('da-DK') + ' kr ' + (harSnit ? 'snit' : 'forventet'),
-        sek:   kSek,
-        pct: kPct, color: kColor
+        label: 'Gns. kurvstørrelse', val: kurv.toLocaleString('da-DK') + ' kr/kurv',
+        norm: 'Typisk ' + dagNavn + ' på dette tidspunkt: ~' + refKurv.toLocaleString('da-DK') + ' kr/kurv',
+        pct: kPct, pctLbl: kPct + '%', color: kColor, sek: kSek
       });
     }
   }
 
   rows.innerHTML = items.map(it => `
-    <div style="margin-bottom:12px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-        <span style="font-size:13px;">${it.label}</span>
-        <div style="text-align:right;">
-          <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--forest);">${it.val}</span>
-          <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-left:8px;">${it.exp} · ${it.pct}%</span>
-          ${it.sek ? `<br><span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.75;">${it.sek}</span>` : ''}
+    <div style="margin-bottom:16px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px;">
+        <span style="font-size:12px;color:var(--ash);">${it.label}</span>
+        <div style="text-align:right;display:flex;align-items:baseline;gap:8px;">
+          <span style="font-family:'DM Mono',monospace;font-size:15px;font-weight:500;color:var(--forest);">${it.val}</span>
+          <span style="font-family:'DM Mono',monospace;font-size:11px;font-weight:500;color:${it.color};">${it.pctLbl}</span>
         </div>
       </div>
-      <div class="dag-prog-bar"><div class="dag-prog-fill" style="width:${it.pct}%;background:${it.color};"></div></div>
+      <div class="dag-prog-bar" style="margin-bottom:5px;"><div class="dag-prog-fill" style="width:${it.pct}%;background:${it.color};"></div></div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${it.norm}</div>
+      ${it.sek ? `<div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.65;margin-top:2px;">${it.sek}</div>` : ''}
     </div>`).join('');
   card.style.display = '';
 }

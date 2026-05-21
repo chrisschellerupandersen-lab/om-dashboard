@@ -208,7 +208,13 @@ def init_db():
                               ELSE tc.kostpris END AS db_korrekt
             FROM t_korr tc
             LEFT JOIN varestamdata s
-                ON tc.varenummer != '' AND tc.varenummer = s.sku;
+                ON (tc.varenummer != '' AND tc.varenummer IS NOT NULL AND tc.varenummer = s.sku)
+                OR (
+                    (COALESCE(tc.varenummer,'') = '' OR NOT EXISTS (
+                        SELECT 1 FROM varestamdata WHERE sku = tc.varenummer AND sku != ''
+                    ))
+                    AND LOWER(TRIM(tc.varenavn)) = LOWER(TRIM(s.varenavn))
+                );
         """)
         # Migrationer til eksisterende tabeller
         for sql in [

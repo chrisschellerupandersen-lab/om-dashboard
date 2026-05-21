@@ -6482,6 +6482,7 @@ async function loadStamdata() {
   const tbody = document.getElementById('sd-tbody');
   tbody.innerHTML = '<tr><td colspan="6" class="empty">Indlæser…</td></tr>';
   const rows = await api('/api/stamdata');
+  if (!rows) { tbody.innerHTML = '<tr><td colspan="6" class="empty" style="color:red;">Fejl ved hentning</td></tr>'; return; }
   document.getElementById('sd-count').textContent = rows.length + ' varer';
   buildStamdataTbl(rows);
 }
@@ -6593,13 +6594,28 @@ async function stamGemNy() {
   if (!varenavn) { document.getElementById('sd-new-navn').focus(); return; }
   const status = document.getElementById('sd-status');
   status.textContent = 'Gemmer…';
-  await api('/api/stamdata/gem', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({sku, varenavn, type: type_, pris_ex_moms: pris, portioner}),
-  });
-  status.textContent = '✓ Tilføjet';
-  setTimeout(() => { status.textContent = ''; }, 2000);
-  loadStamdata();
+  status.style.color = 'var(--ash)';
+  try {
+    const resp = await fetch('/api/stamdata/gem', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({sku, varenavn, type: type_, pris_ex_moms: pris, portioner}),
+    });
+    if (!resp.ok) {
+      let fejl = 'HTTP ' + resp.status;
+      try { const j = await resp.json(); fejl = j.detail || fejl; } catch {}
+      status.textContent = '✗ Fejl: ' + fejl;
+      status.style.color = 'var(--red, #c0392b)';
+      return;
+    }
+    status.textContent = '✓ Tilføjet';
+    status.style.color = 'var(--forest)';
+    setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 3000);
+    loadStamdata();
+  } catch(e) {
+    status.textContent = '✗ ' + e.message;
+    status.style.color = 'var(--red, #c0392b)';
+  }
 }
 
 async function loadVnrKontrol() {

@@ -135,18 +135,32 @@ async def api_dag_db_detalje(request: Request):
 @app.get("/api/debug/varenummer")
 async def api_debug_varenummer(request: Request, navn: str = ""):
     _kræv_login(request)
-    import database as db
-    with db._conn() as conn:
-        rows = conn.execute("""
+    with database._conn() as conn:
+        trans = conn.execute("""
             SELECT DISTINCT varenavn, varenummer, kategori,
-                   COUNT(*) as linjer,
-                   MAX(dato) as seneste
+                   COUNT(*) as linjer, MAX(dato) as seneste
             FROM transaktioner
             WHERE LOWER(varenavn) LIKE ?
             GROUP BY varenavn, varenummer, kategori
             ORDER BY seneste DESC LIMIT 20
         """, (f"%{navn.lower()}%",)).fetchall()
-    return [dict(r) for r in rows]
+        stamdata = conn.execute("""
+            SELECT id, sku, varenavn, type, pris_ex_moms, portioner
+            FROM varestamdata
+            WHERE LOWER(varenavn) LIKE ? OR LOWER(sku) LIKE ?
+        """, (f"%{navn.lower()}%", f"%{navn.lower()}%")).fetchall()
+        view = conn.execute("""
+            SELECT varenavn, varenummer, antal, omsætning,
+                   vf_korrekt, db_korrekt, dato
+            FROM v_transaktioner
+            WHERE LOWER(varenavn) LIKE ? AND dato = (SELECT MAX(dato) FROM transaktioner)
+            LIMIT 5
+        """, (f"%{navn.lower()}%",)).fetchall()
+    return {
+        "transaktioner": [dict(r) for r in trans],
+        "varestamdata": [dict(r) for r in stamdata],
+        "view_sample": [dict(r) for r in view]
+    }
 
 
 @app.get("/api/salg/idag")

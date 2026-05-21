@@ -466,6 +466,32 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato = ?
         """, (prev_prev_dag_dato,)).fetchone()
 
+        # 4-ugers snit — samme ugedag, samme time-cutoff, seneste 4 forekomster
+        # Bruges som primær reference i "Hvad sker der i dag"-kortet
+        _wday = str(_sd.weekday() + 1) if _sd.weekday() < 6 else '0'  # SQLite: 0=søndag
+        # SQLite strftime('%w') = 0 (sun) … 6 (sat); Python weekday() = 0 (mon) … 6 (sun)
+        _sqlite_wday = str((_sd.weekday() + 1) % 7)  # 0=sun, 1=mon, …, 6=sat
+        snit_4u_time_filter = "AND time_start <= ?" if seneste_time is not None else ""
+        snit_4u_time_params = (seneste_time,) if seneste_time is not None else ()
+        snit_4u_row = conn.execute(f"""
+            SELECT AVG(dag_omsat)  AS snit_omsaetning,
+                   AVG(dag_transak) AS snit_transak
+            FROM (
+                SELECT SUM(omsætning) AS dag_omsat,
+                       CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                            THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                            ELSE COUNT(*) END AS dag_transak
+                FROM v_transaktioner
+                WHERE strftime('%w', dato) = ?
+                  AND dato < ?
+                  AND dato >= date(?, '-10 weeks')
+                  {snit_4u_time_filter}
+                GROUP BY dato
+                ORDER BY dato DESC
+                LIMIT 4
+            )
+        """, (_sqlite_wday, seneste_dato, seneste_dato) + snit_4u_time_params).fetchone()
+
         # MTD: fra 1. i indeværende måned til seneste dag
         mtd_start = seneste_dato[:8] + '01'  # YYYY-MM-01
         mtd_row = conn.execute("""
@@ -579,6 +605,7 @@ def hent_kpi(aar: int = None) -> Dict:
         "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,
         "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
         "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
+        "snit_4uger_dag":   dict(snit_4u_row)        if snit_4u_row       else None,
         "bager_uge":        dict(bager_uge_row)     if bager_uge_row     else None,
         "bager_retur":      bager_retur_info,
         "bager_iso_uge":    iso[1],

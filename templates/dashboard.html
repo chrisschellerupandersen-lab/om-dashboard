@@ -957,7 +957,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <!-- Input-felt -->
           <div style="display:flex;gap:8px;align-items:flex-end;">
             <textarea id="mgmt-q-input" rows="2"
-              placeholder="Fx: Hvad er min bedste salgsdag? · Vis omsætning per uge · Hvilke produkter vokser?"
+              placeholder="Skriv et spørgsmål eller vælg et nedenfor — fx: Hvilke dage sælger jeg mest?"
               style="flex:1;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--charcoal);resize:vertical;font-family:inherit;line-height:1.4;"
               onkeydown="if((e=event).key==='Enter'&&!e.shiftKey){e.preventDefault();mgmtSpørg();}"></textarea>
             <button onclick="mgmtSpørg()" id="mgmt-q-btn"
@@ -965,9 +965,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               Send →
             </button>
           </div>
-          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;" id="mgmt-forslag">
-            <span style="font-size:10px;color:var(--ash);">Forslag:</span>
-          </div>
+          <!-- Forslags-kategorier -->
+          <div id="mgmt-forslag" style="margin-top:14px;"></div>
         </div>
       </div>
 
@@ -3371,40 +3370,81 @@ function buildDagProgress(kpi) {
   const rows = document.getElementById('dag-prog-rows');
   const ref  = document.getElementById('dag-prog-ref');
   if (!card || !rows || !kpi) return;
-  const dag     = kpi.dag      || {};
-  const prevDag = kpi.prev_dag || {};
-  if (!dag.omsaetning || !prevDag.omsaetning) return;
+  const dag      = kpi.dag          || {};
+  const prevDag  = kpi.prev_dag     || {};
+  const snit4u   = kpi.snit_4uger_dag || {};
+
+  // Primær reference: 4-ugers snit; fald tilbage til forrige uge
+  const harSnit  = snit4u.snit_omsaetning > 0;
+  const refOmsat = harSnit ? snit4u.snit_omsaetning : prevDag.omsaetning;
+  if (!dag.omsaetning || !refOmsat) return;
 
   const DAG_NAVN = ['søn','man','tir','ons','tor','fre','lør'];
   const prevDato = kpi.prev_dag_dato ? new Date(kpi.prev_dag_dato) : null;
   const dagNavn  = prevDato ? DAG_NAVN[prevDato.getUTCDay()] : 'forrige uge';
-  if (ref) ref.textContent = 'vs. ' + dagNavn + ' sidste uge';
+  if (ref) ref.textContent = harSnit ? 'vs. 4-ugers snit' : 'vs. ' + dagNavn + ' sidste uge';
 
   const items = [];
-  // Omsætning
-  const omPct   = Math.min(100, Math.round(dag.omsaetning / prevDag.omsaetning * 100));
+
+  // ── Omsætning ──
+  const omRef   = refOmsat;
+  const omPct   = Math.min(100, Math.round(dag.omsaetning / omRef * 100));
   const omColor = omPct >= 90 ? 'var(--moss)' : omPct >= 70 ? 'var(--gold)' : 'var(--danger)';
-  items.push({ label:'Omsætning', val: Math.round(oms(dag.omsaetning)).toLocaleString('da-DK') + ' kr',
-               exp: '~' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr forventet',
-               pct: omPct, color: omColor });
-  // Kunder
-  if (dag.transak > 0 && prevDag.transak > 0) {
-    const kPct   = Math.min(100, Math.round(dag.transak / prevDag.transak * 100));
-    const kColor = kPct >= 90 ? 'var(--moss)' : kPct >= 70 ? 'var(--gold)' : 'var(--danger)';
-    items.push({ label:'Kunder', val: dag.transak + ' kunder',
-                 exp: '~' + prevDag.transak + ' forventet',
-                 pct: kPct, color: kColor });
+  // Sekundær: vs. forrige uge
+  let omSek = '';
+  if (harSnit && prevDag.omsaetning > 0) {
+    const d = Math.round(dag.omsaetning - prevDag.omsaetning);
+    omSek = (d >= 0 ? '+' : '') + d.toLocaleString('da-DK') + ' kr vs. ' + dagNavn;
   }
-  // Kurv-størrelse
+  items.push({
+    label: 'Omsætning',
+    val:   Math.round(oms(dag.omsaetning)).toLocaleString('da-DK') + ' kr',
+    exp:   '~' + Math.round(omRef).toLocaleString('da-DK') + ' kr ' + (harSnit ? 'snit' : 'forventet'),
+    sek:   omSek,
+    pct: omPct, color: omColor
+  });
+
+  // ── Kunder ──
+  const refTransak = harSnit && snit4u.snit_transak > 0 ? snit4u.snit_transak : prevDag.transak;
+  if (dag.transak > 0 && refTransak > 0) {
+    const kPct   = Math.min(100, Math.round(dag.transak / refTransak * 100));
+    const kColor = kPct >= 90 ? 'var(--moss)' : kPct >= 70 ? 'var(--gold)' : 'var(--danger)';
+    let kSek = '';
+    if (harSnit && prevDag.transak > 0) {
+      const d = dag.transak - Math.round(prevDag.transak);
+      kSek = (d >= 0 ? '+' : '') + d + ' vs. ' + dagNavn;
+    }
+    items.push({
+      label: 'Kunder',
+      val:   dag.transak + ' kunder',
+      exp:   '~' + Math.round(refTransak) + ' ' + (harSnit ? 'snit' : 'forventet'),
+      sek:   kSek,
+      pct: kPct, color: kColor
+    });
+  }
+
+  // ── Gns. kurv ──
   if (dag.transak > 0 && dag.omsaetning > 0) {
     const kurv = Math.round(dag.omsaetning / dag.transak);
-    const exp_kurv = prevDag.transak > 0 ? Math.round(prevDag.omsaetning / prevDag.transak) : null;
-    if (exp_kurv) {
-      const kPct   = Math.min(100, Math.round(kurv / exp_kurv * 100));
+    const refKurv = (harSnit && snit4u.snit_transak > 0)
+      ? Math.round(snit4u.snit_omsaetning / snit4u.snit_transak)
+      : (prevDag.transak > 0 ? Math.round(prevDag.omsaetning / prevDag.transak) : null);
+    if (refKurv) {
+      const kPct   = Math.min(100, Math.round(kurv / refKurv * 100));
       const kColor = kPct >= 95 ? 'var(--moss)' : kPct >= 80 ? 'var(--gold)' : 'var(--danger)';
-      items.push({ label:'Gns. kurv', val: kurv.toLocaleString('da-DK') + ' kr/kurv',
-                   exp: '~' + exp_kurv.toLocaleString('da-DK') + ' kr forventet',
-                   pct: kPct, color: kColor });
+      let kSek = '';
+      if (harSnit && prevDag.transak > 0) {
+        const prevKurv = Math.round(prevDag.omsaetning / prevDag.transak);
+        const d = kurv - prevKurv;
+        kSek = (d >= 0 ? '+' : '') + d + ' kr vs. ' + dagNavn;
+      }
+      items.push({
+        label: 'Gns. kurv',
+        val:   kurv.toLocaleString('da-DK') + ' kr/kurv',
+        exp:   '~' + refKurv.toLocaleString('da-DK') + ' kr ' + (harSnit ? 'snit' : 'forventet'),
+        sek:   kSek,
+        pct: kPct, color: kColor
+      });
     }
   }
 
@@ -3412,9 +3452,10 @@ function buildDagProgress(kpi) {
     <div style="margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
         <span style="font-size:13px;">${it.label}</span>
-        <div>
+        <div style="text-align:right;">
           <span style="font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--forest);">${it.val}</span>
           <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-left:8px;">${it.exp} · ${it.pct}%</span>
+          ${it.sek ? `<br><span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.75;">${it.sek}</span>` : ''}
         </div>
       </div>
       <div class="dag-prog-bar"><div class="dag-prog-fill" style="width:${it.pct}%;background:${it.color};"></div></div>
@@ -7521,26 +7562,92 @@ let _mgmtHistorik = [];  // [{ spørgsmål, svar }]
 let _mgmtChartIdx = 0;
 
 const _MGMT_FORSLAG = [
-  'Hvad er min bedste salgsdag?',
-  'Vis omsætning per uge de seneste 3 måneder',
-  'Hvilke produkter har lavest DB%?',
-  'Sammenlign denne uge med forrige uge',
-  'Hvilken kategori tjener mest?',
-  'Vis dag-af-uge mønster',
+  {
+    kategori: '📊 Omsætning & Trends',
+    farve: '#2d5a2d',
+    spørgsmål: [
+      'Vis omsætning per uge de seneste 3 måneder som graf',
+      'Sammenlign denne uge med forrige uge — hvad er op og ned?',
+      'Hvilke ugedage tjener jeg mest på? Vis som søjlediagram',
+      'Hvad er min gennemsnitlige dagsomsætning denne måned vs. forrige?',
+    ]
+  },
+  {
+    kategori: '🥐 Produkter & Kategorier',
+    farve: '#8b4513',
+    spørgsmål: [
+      'Hvilke 10 produkter sælger jeg mest af — vis som diagram',
+      'Hvilken kategori har den højeste omsætning?',
+      'Hvilke produkter er vokset mest de seneste 4 uger?',
+      'Sammenlign brød vs. wienerbrød vs. kage i omsætning',
+    ]
+  },
+  {
+    kategori: '🎯 Bestilling & Svind',
+    farve: '#1a5276',
+    spørgsmål: [
+      'Hvilke dage har jeg typisk mest svind?',
+      'Vis retur-mønster per kategori de seneste 4 uger',
+      'Hvilke varer bør jeg bestille mere af baseret på salg?',
+      'Hvad er min gennemsnitlige svind-% per kategori?',
+    ]
+  },
+  {
+    kategori: '💡 Forretningsudvikling',
+    farve: '#6c3483',
+    spørgsmål: [
+      'Hvilke tidspunkter på dagen er travlest — hvornår skal jeg have mest personale?',
+      'Er der uger hvor salget stiger markant? Hvad skyldes det?',
+      'Hvilke produkter sælger godt fredag og lørdag vs. mandag?',
+      'Giv mig 3 konkrete anbefalinger baseret på mit salgsmønster',
+    ]
+  },
 ];
 
 function mgmtInitForslag() {
   const el = document.getElementById('mgmt-forslag');
   if (!el) return;
-  _MGMT_FORSLAG.forEach(t => {
-    const b = document.createElement('button');
-    b.textContent = t;
-    b.style.cssText = 'padding:3px 8px;font-size:10px;background:var(--bg);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--ash);';
-    b.onclick = () => {
-      document.getElementById('mgmt-q-input').value = t;
-      mgmtSpørg();
-    };
-    el.appendChild(b);
+  el.innerHTML = '';
+
+  // Label over forslagene
+  const lbl = document.createElement('div');
+  lbl.style.cssText = 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.12em;color:var(--ash);margin-bottom:10px;text-transform:uppercase;';
+  lbl.textContent = 'Inspirerende spørgsmål — klik for at sende';
+  el.appendChild(lbl);
+
+  // Grid med kategori-kort
+  const grid = document.createElement('div');
+  grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px;';
+  el.appendChild(grid);
+
+  _MGMT_FORSLAG.forEach(kat => {
+    const kort = document.createElement('div');
+    kort.style.cssText = `border:1px solid ${kat.farve}33;border-radius:6px;overflow:hidden;background:${kat.farve}08;`;
+
+    // Kategori-header
+    const hdr = document.createElement('div');
+    hdr.style.cssText = `padding:7px 12px;background:${kat.farve}18;font-size:11px;font-weight:500;color:${kat.farve};border-bottom:1px solid ${kat.farve}22;`;
+    hdr.textContent = kat.kategori;
+    kort.appendChild(hdr);
+
+    // Spørgsmål-liste
+    const liste = document.createElement('div');
+    liste.style.cssText = 'padding:4px 0;';
+    kat.spørgsmål.forEach(q => {
+      const btn = document.createElement('button');
+      btn.style.cssText = 'width:100%;text-align:left;padding:7px 12px;background:none;border:none;cursor:pointer;font-size:12px;color:var(--charcoal);line-height:1.4;transition:background .12s;';
+      btn.textContent = q;
+      btn.onmouseenter = () => btn.style.background = `${kat.farve}12`;
+      btn.onmouseleave = () => btn.style.background = 'none';
+      btn.onclick = () => {
+        document.getElementById('mgmt-q-input').value = q;
+        document.getElementById('mgmt-q-input').focus();
+        mgmtSpørg();
+      };
+      liste.appendChild(btn);
+    });
+    kort.appendChild(liste);
+    grid.appendChild(kort);
   });
 }
 

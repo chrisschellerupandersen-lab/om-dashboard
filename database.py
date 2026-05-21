@@ -138,6 +138,17 @@ def init_db():
                 indlæst         TEXT    DEFAULT (datetime('now','localtime'))
             );
 
+            CREATE TABLE IF NOT EXISTS retur_detaljer (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                registreret_dato TEXT    NOT NULL,
+                uge              INTEGER NOT NULL,
+                aar              INTEGER NOT NULL,
+                produkt          TEXT    NOT NULL,
+                antal            INTEGER NOT NULL DEFAULT 0,
+                kategori         TEXT    NOT NULL DEFAULT 'wienerbroed'
+            );
+            CREATE INDEX IF NOT EXISTS idx_retur_uge ON retur_detaljer(uge, aar);
+
             CREATE TABLE IF NOT EXISTS varestamdata (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 sku          TEXT    DEFAULT '',
@@ -3354,3 +3365,112 @@ def faste_omk_maaned_sum(aar: int) -> Dict[int, float]:
             GROUP BY maaned
         """, (aar,)).fetchall()
         return {r["maaned"]: r["total"] for r in rows}
+
+
+# ── RETUR DETALJER ────────────────────────────────────────────────────────────
+
+def gem_retur_detaljer(uge: int, aar: int, items: list, dato: str) -> int:
+    """Gemmer bekræftede retur-detaljer. Erstatter eksisterende data for samme uge+aar."""
+    with _conn() as conn:
+        conn.execute("DELETE FROM retur_detaljer WHERE uge=? AND aar=?", (uge, aar))
+        for it in items:
+            conn.execute(
+                "INSERT INTO retur_detaljer (registreret_dato, uge, aar, produkt, antal, kategori) VALUES (?,?,?,?,?,?)",
+                (dato, uge, aar, it['produkt'], max(0, int(it['antal'])), it.get('kategori', 'wienerbroed'))
+            )
+    return len(items)
+
+
+def hent_retur_uge(uge: int, aar: int) -> dict:
+    """Alle retur-detaljer for en uge + kvote-beregning."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT produkt, antal, kategori, registreret_dato FROM retur_detaljer WHERE uge=? AND aar=? ORDER BY kategori, produkt",
+            (uge, aar)
+        ).fetchall()
+        items = [dict(r) for r in rows]
+        sendt_boller = sum(r['antal'] for r in items if r['kategori'] == 'boller')
+        sendt_wiener = sum(r['antal'] for r in items if r['kategori'] == 'wienerbroed')
+        registreret = rows[0]['registreret_dato'] if rows else None
+
+        # Kvote fra ugebestillinger (10% boller, 13,5% wienerbrød)
+        b = conn.execute(
+            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'",
+            (uge, aar)
+        ).fetchone()
+        w = conn.execute(
+            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) NOT LIKE '%bolle%' AND LOWER(varenavn) NOT LIKE '%br_d%'",
+            (uge, aar)
+        ).fetchone()
+        bestilt_boller = round(b['t'] or 0)
+        bestilt_wiener = round(w['t'] or 0)
+
+        return {
+            'uge': uge, 'aar': aar,
+            'registreret': registreret,
+            'items': items,
+            'sendt_boller': sendt_boller,
+            'sendt_wiener': sendt_wiener,
+            'bestilt_boller': bestilt_boller,
+            'bestilt_wiener': bestilt_wiener,
+            'max_boller': round(bestilt_boller * 0.10),
+            'max_wiener': round(bestilt_wiener * 0.135),
+        }
+
+
+def hent_retur_kpi() -> dict:
+    """KPI data til forside: seneste registrering + om aktuel uge er registreret."""
+    from datetime import date, timedelta
+    today = date.today()
+    weekday = today.weekday()  # 0=Man, 6=Søn
+    this_monday = today - timedelta(days=weekday)
+    prev_sunday = this_monday - timedelta(days=1)
+    prev_iso = prev_sunday.isocalendar()
+    aktuel_uge = int(prev_iso[1])
+    aktuel_aar = int(prev_iso[0])
+
+    with _conn() as conn:
+        aktuel = conn.execute("""
+            SELECT SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
+                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener,
+                   MAX(registreret_dato) AS dato
+            FROM retur_detaljer WHERE uge=? AND aar=?
+        """, (aktuel_uge, aktuel_aar)).fetchone()
+
+        seneste = conn.execute("""
+            SELECT uge, aar, MAX(registreret_dato) AS dato,
+                   SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
+                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener
+            FROM retur_detaljer GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 1
+        """).fetchone()
+
+    er_registreret = bool(aktuel and aktuel['dato'])
+    return {
+        'aktuel_uge': aktuel_uge,
+        'aktuel_aar': aktuel_aar,
+        'er_mandag': weekday == 0,
+        'er_registreret': er_registreret,
+        'sendt_boller': int(aktuel['boller'] or 0) if aktuel else 0,
+        'sendt_wiener': int(aktuel['wiener'] or 0) if aktuel else 0,
+        'registreret_dato': aktuel['dato'] if aktuel else None,
+        'seneste_uge': int(seneste['uge']) if seneste else None,
+        'seneste_aar': int(seneste['aar']) if seneste else None,
+        'seneste_boller': int(seneste['boller'] or 0) if seneste else 0,
+        'seneste_wiener': int(seneste['wiener'] or 0) if seneste else 0,
+    }
+
+
+def hent_retur_historik(n: int = 16) -> list:
+    """Seneste n uger med retur-data."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT uge, aar, MAX(registreret_dato) AS dato,
+                   SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS sendt_boller,
+                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS sendt_wiener,
+                   COUNT(*) AS produkter
+            FROM retur_detaljer
+            GROUP BY uge, aar
+            ORDER BY aar DESC, uge DESC
+            LIMIT ?
+        """, (n,)).fetchall()
+        return [dict(r) for r in rows]

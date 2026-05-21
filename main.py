@@ -580,6 +580,90 @@ async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
         return {"ok": False, "fejl": str(exc)}
 
 
+@app.post("/api/retur/scan")
+async def retur_scan(request: Request, fil: UploadFile = File(...)):
+    """Upload retur-seddel foto → Claude Vision udtrækker produkter + antal."""
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+    img_bytes = await fil.read()
+    img_b64 = base64.b64encode(img_bytes).decode()
+    media_type = fil.content_type or "image/jpeg"
+    if media_type not in ("image/jpeg", "image/png", "image/gif", "image/webp"):
+        media_type = "image/jpeg"
+    try:
+        import anthropic as _ant
+        import json as _json
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},
+                {"type": "text", "text": (
+                    "Dette er en retur-seddel fra et dansk bageri (Organic Market Greve).\n"
+                    "Find alle produkter hvor der er skrevet et håndskrevet tal i kolonnen 'Retur antal'.\n"
+                    "Ignorer produkter markeret 'krediteres ikke' eller 'tages ikke retur'.\n"
+                    "Ignorer produkter med tom eller ingen retur-antal.\n\n"
+                    "Kategoriser hvert produkt:\n"
+                    "- 'boller': Hvedeboller, Müslibolle, Kernebolle, bolle-produkter\n"
+                    "- 'wienerbroed': Croissant, Tebirkes, Kanel snegl, Wiener, Spandauer, Romsnegle, Kanelsnurre, Kardemomme, og alt andet wienerbrød\n\n"
+                    "Returner KUN valid JSON uden forklaring:\n"
+                    '{\"items\":[{\"produkt\":\"navn\",\"antal\":N,\"kategori\":\"boller|wienerbroed\"}]}'
+                )},
+            ]}],
+        )
+        raw = msg.content[0].text.strip().strip("`")
+        if raw.lower().startswith("json"):
+            raw = raw[4:].strip()
+        data = _json.loads(raw)
+        validated = [
+            {"produkt": str(it["produkt"]), "antal": max(1, int(it["antal"])),
+             "kategori": it.get("kategori", "wienerbroed") if it.get("kategori") in ("boller", "wienerbroed") else "wienerbroed"}
+            for it in data.get("items", []) if it.get("produkt") and int(it.get("antal", 0)) > 0
+        ]
+        return {"ok": True, "items": validated}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
+@app.post("/api/retur/gem")
+async def retur_gem(request: Request):
+    """Gem bekræftede retur-detaljer for en uge."""
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    uge  = body.get("uge")
+    aar  = body.get("aar")
+    items = body.get("items", [])
+    dato  = body.get("dato") or datetime.now().strftime("%Y-%m-%d")
+    if not uge or not aar or not items:
+        raise HTTPException(status_code=400, detail="Mangler uge, aar eller items")
+    antal = database.gem_retur_detaljer(int(uge), int(aar), items, dato)
+    return {"ok": True, "antal": antal}
+
+
+@app.get("/api/retur/status")
+async def retur_status(request: Request):
+    _kræv_login(request)
+    return database.hent_retur_kpi()
+
+
+@app.get("/api/retur/uge/{uge}/{aar}")
+async def retur_uge_data(request: Request, uge: int, aar: int):
+    _kræv_login(request)
+    return database.hent_retur_uge(uge, aar)
+
+
+@app.get("/api/retur/historik")
+async def retur_historik(request: Request, n: int = 16):
+    _kræv_login(request)
+    return database.hent_retur_historik(n)
+
+
 @app.post("/api/bager/retur-opdater")
 async def bager_retur_opdater(request: Request):
     try:

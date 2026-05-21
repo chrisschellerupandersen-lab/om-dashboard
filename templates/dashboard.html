@@ -804,6 +804,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
+        <!-- RETUR STATUS KPI -->
+        <div id="ret-status-card" onclick="showPanel('retur',document.querySelector('#nav-list .nav-item[onclick*=\"retur\"]'))" class="kpi" style="margin-bottom:12px;cursor:pointer;display:none;">
+          <div class="kpi-l ret-st-ttl" style="letter-spacing:.08em;">RETUR STATUS</div>
+          <div class="kpi-v ret-st-val" style="font-size:24px;">—</div>
+          <div class="kpi-s ret-st-sub">—</div>
+        </div>
+
         <!-- BAGER RETUR DENNE UGE -->
         <div id="bager-retur-strip" style="display:none;margin-bottom:12px;">
           <div class="kpi-row-2">
@@ -1450,6 +1457,112 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="tgtg-pose-def-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;padding:4px 0 8px;">
             <div class="empty" style="grid-column:1/-1;">Indlæser…</div>
           </div>
+        </div>
+      </div>
+
+      <!-- RETUR REGISTRERING PANEL -->
+      <div class="panel" id="p-retur">
+        <div class="page-hdr">
+          <h2>Retur registrering</h2>
+          <p>Upload foto af retur-seddel &mdash; AI aflæser automatisk</p>
+        </div>
+
+        <!-- Uge-vælger -->
+        <div class="card" style="margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div style="font-size:11px;color:var(--ash);letter-spacing:.06em;flex-shrink:0;">RETUR FOR UGE</div>
+            <input id="ret-uge-input" type="number" min="1" max="53"
+              style="width:56px;padding:6px 8px;background:var(--card);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-family:'DM Mono',monospace;font-size:14px;text-align:center;">
+            <div style="font-size:11px;color:var(--ash);">ÅR</div>
+            <input id="ret-aar-input" type="number" min="2024" max="2030"
+              style="width:72px;padding:6px 8px;background:var(--card);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-family:'DM Mono',monospace;font-size:14px;text-align:center;">
+            <button onclick="retIndlaesUge()" style="padding:6px 14px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;font-size:12px;cursor:pointer;">Indlæs</button>
+            <div id="ret-uge-status" style="font-size:11px;color:var(--moss);"></div>
+          </div>
+          <div style="margin-top:8px;font-size:10px;color:var(--ash);">
+            💡 Mandag-seddel hører til ugen <em>før</em> &mdash; uge sættes automatisk korrekt
+          </div>
+        </div>
+
+        <!-- Upload zone -->
+        <div class="card" id="ret-upload-kort" style="margin-bottom:12px;">
+          <div style="font-size:12px;color:var(--ash);letter-spacing:.06em;margin-bottom:10px;">📷 UPLOAD RETUR-SEDDEL FOTO</div>
+          <label id="ret-drop-zone"
+            style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+                   border:2px dashed var(--border);border-radius:8px;padding:32px 16px;cursor:pointer;
+                   background:var(--bg);transition:border-color .15s;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:40px;height:40px;color:var(--ash);">
+              <path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+              <path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+            <div style="font-size:14px;color:var(--charcoal);">Klik for at vælge foto</div>
+            <div style="font-size:11px;color:var(--ash);">eller tag billede direkte fra telefon</div>
+            <input id="ret-fil-input" type="file" accept="image/*" capture="environment" style="display:none;" onchange="retFotoValgt(this)">
+          </label>
+          <div id="ret-preview-wrap" style="display:none;margin-top:10px;text-align:center;">
+            <img id="ret-preview-img" style="max-width:100%;max-height:220px;border-radius:6px;border:1px solid var(--border);">
+            <div style="margin-top:8px;">
+              <button id="ret-scan-btn" onclick="retScanFoto()"
+                style="padding:10px 28px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.04em;">
+                🔍 Scan seddel
+              </button>
+            </div>
+          </div>
+          <div id="ret-scan-status" style="display:none;padding:12px;text-align:center;font-size:13px;color:var(--ash);">
+            <div style="margin-bottom:6px;">⏳ AI aflæser seddel…</div>
+            <div style="font-size:11px;">Tager typisk 5-10 sekunder</div>
+          </div>
+        </div>
+
+        <!-- Bekræftelse / redigering -->
+        <div id="ret-bekraeft-kort" class="card" style="display:none;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div style="font-size:12px;color:var(--ash);letter-spacing:.06em;">✅ BEKRÆFT RETUR — UGE <span id="ret-bekr-uge">—</span></div>
+            <button onclick="retNulstil()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:4px;padding:4px 10px;cursor:pointer;">← Ny seddel</button>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:13px;" id="ret-items-tbl">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border);">
+                <th style="text-align:left;padding:6px 4px;color:var(--ash);font-weight:500;">Produkt</th>
+                <th style="text-align:center;padding:6px 4px;color:var(--ash);font-weight:500;width:60px;">Stk</th>
+                <th style="text-align:center;padding:6px 4px;color:var(--ash);font-weight:500;width:90px;">Kategori</th>
+                <th style="width:32px;"></th>
+              </tr>
+            </thead>
+            <tbody id="ret-items-body"></tbody>
+          </table>
+          <div style="margin-top:10px;">
+            <button onclick="retTilfoejLinje()"
+              style="font-size:11px;background:none;border:1px dashed var(--border);color:var(--ash);border-radius:4px;padding:5px 12px;cursor:pointer;width:100%;">
+              + Tilføj linje
+            </button>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:14px;">
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ash);">Boller</div>
+              <div id="ret-sum-boller" style="font-size:20px;font-weight:700;color:var(--forest);">0 stk</div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:11px;color:var(--ash);">Wienerbrød</div>
+              <div id="ret-sum-wiener" style="font-size:20px;font-weight:700;color:var(--forest);">0 stk</div>
+            </div>
+            <div style="align-self:flex-end;">
+              <button id="ret-gem-btn" onclick="retGem()"
+                style="padding:10px 24px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;">
+                Gem retur
+              </button>
+            </div>
+          </div>
+          <div id="ret-gem-status" style="display:none;margin-top:8px;padding:8px;border-radius:4px;font-size:12px;text-align:center;"></div>
+        </div>
+
+        <!-- Historik -->
+        <div class="card" id="ret-historik-kort">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:12px;color:var(--ash);letter-spacing:.06em;">📋 HISTORIK</div>
+            <button onclick="retIndlaesHistorik()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:4px;padding:3px 8px;cursor:pointer;">↻ Opdater</button>
+          </div>
+          <div id="ret-historik-indhold"><div style="color:var(--ash);font-size:12px;">Indlæser…</div></div>
         </div>
       </div>
 
@@ -2357,6 +2470,7 @@ const NAV_SVG = {
   trend:        '<path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/>',
   bestilling:   '<path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/>',
   bager:        '<path d="M2 10c0-3.3 2.7-6 6-6s6 2.7 6 6v2H2v-2zm1.5 0c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5H3.5zM1 13h14v1H1z"/>',
+  retur:        '<path d="M3 8h8a4 4 0 010 8H6m-3-8l3-3m-3 3l3 3M11 4a4 4 0 014 4"/>',
   svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
   spild:        '<path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 2v4l3 1.5-.7 1.3L7 9V4h1zm-5 6.5l1.4-1.4 1 1-1.4 1.4-1-1zm9-1.4l1.4 1.4-1 1-1.4-1.4 1-1z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
@@ -2378,6 +2492,7 @@ const NAV_DEFAULT = [
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
+  {id:'retur',       label:'Retur registrering',    group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',     hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',     hidden:false},
@@ -2750,6 +2865,7 @@ async function loadAll() {
   buildTop(top);
 
   if (kpi) setSyncNow();
+  loadReturStatus();
 }
 
 function setSyncNow() {
@@ -6304,6 +6420,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        loadBager();
+  if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();
   if (id === 'spild')        loadSpild();
   if (id === 'beregner')   loadBeregner();
@@ -6713,6 +6830,334 @@ document.getElementById('sidebar-backdrop').addEventListener('click', function()
   document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
   if (curBn) curBn.classList.add('active');
 });
+</script>
+
+<script>
+// ── RETUR REGISTRERING ────────────────────────────────────────────────────────
+
+let _retItems = [];      // current item list being confirmed
+let _retFotoFile = null; // selected file
+
+// Helper: beregn "retur-uge" ud fra dato (mandag → forrige uge)
+function _retBeregUge(dato) {
+  const d = dato || new Date();
+  const day = d.getDay(); // 0=søn, 1=man
+  // Mandag af denne uge
+  const manOffset = day === 0 ? -6 : 1 - day;
+  const mandag = new Date(d);
+  mandag.setDate(d.getDate() + manOffset);
+  // Søndag INDEN denne mandag = slutning af ugen vi returnerer for
+  const soend = new Date(mandag);
+  soend.setDate(mandag.getDate() - 1);
+  // ISO uge af den søndag
+  const tmp = new Date(soend.valueOf());
+  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
+  const aarStart = new Date(tmp.getFullYear(), 0, 1);
+  const uge = Math.ceil(((tmp - aarStart) / 86400000 + 1) / 7);
+  return { uge, aar: soend.getFullYear() };
+}
+
+function retInit() {
+  const {uge, aar} = _retBeregUge(new Date());
+  document.getElementById('ret-uge-input').value = uge;
+  document.getElementById('ret-aar-input').value = aar;
+  document.getElementById('ret-bekr-uge').textContent = uge;
+  // Tjek om allerede registreret
+  fetch('/api/retur/uge/' + uge + '/' + aar)
+    .then(r => r.json())
+    .then(d => {
+      const st = document.getElementById('ret-uge-status');
+      if (d.registreret) {
+        st.textContent = '✓ Registreret ' + d.registreret;
+        st.style.color = 'var(--moss)';
+      } else {
+        st.textContent = 'Ikke registreret endnu';
+        st.style.color = 'var(--ash)';
+      }
+    });
+  retIndlaesHistorik();
+}
+
+function retIndlaesUge() {
+  const uge = parseInt(document.getElementById('ret-uge-input').value);
+  const aar = parseInt(document.getElementById('ret-aar-input').value);
+  const st = document.getElementById('ret-uge-status');
+  if (!uge || !aar) return;
+  document.getElementById('ret-bekr-uge').textContent = uge;
+  fetch('/api/retur/uge/' + uge + '/' + aar)
+    .then(r => r.json())
+    .then(d => {
+      if (d.registreret) {
+        st.textContent = '✓ Registreret ' + d.registreret;
+        st.style.color = 'var(--moss)';
+        // Vis eksisterende data i bekræftelse
+        _retItems = d.items.map(it => ({...it}));
+        retVisItems();
+        document.getElementById('ret-bekraeft-kort').style.display = '';
+      } else {
+        st.textContent = 'Ikke registreret endnu';
+        st.style.color = 'var(--ash)';
+      }
+    });
+}
+
+// Foto valgt fra fil-input
+function retFotoValgt(input) {
+  if (!input.files || !input.files[0]) return;
+  _retFotoFile = input.files[0];
+  const url = URL.createObjectURL(_retFotoFile);
+  document.getElementById('ret-preview-img').src = url;
+  document.getElementById('ret-preview-wrap').style.display = '';
+  document.getElementById('ret-scan-status').style.display = 'none';
+}
+
+// Sæt drag-drop op
+document.addEventListener('DOMContentLoaded', function() {
+  const zone = document.getElementById('ret-drop-zone');
+  if (!zone) return;
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--moss)'; });
+  zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.style.borderColor = '';
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) {
+      _retFotoFile = f;
+      document.getElementById('ret-preview-img').src = URL.createObjectURL(f);
+      document.getElementById('ret-preview-wrap').style.display = '';
+    }
+  });
+});
+
+async function retScanFoto() {
+  if (!_retFotoFile) return;
+  const scan = document.getElementById('ret-scan-status');
+  const btn  = document.getElementById('ret-scan-btn');
+  scan.style.display = '';
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('fil', _retFotoFile, _retFotoFile.name || 'foto.jpg');
+    const res = await fetch('/api/retur/scan', {method:'POST', body: fd});
+    const data = await res.json();
+    scan.style.display = 'none';
+    btn.disabled = false;
+    if (!data.ok) {
+      alert('Scan fejlede: ' + (data.fejl || 'Ukendt fejl'));
+      return;
+    }
+    _retItems = data.items || [];
+    retVisItems();
+    document.getElementById('ret-bekraeft-kort').style.display = '';
+    document.getElementById('ret-upload-kort').style.display = 'none';
+  } catch(e) {
+    scan.style.display = 'none';
+    btn.disabled = false;
+    alert('Netværksfejl: ' + e);
+  }
+}
+
+function retVisItems() {
+  const tbody = document.getElementById('ret-items-body');
+  const mono = "font-family:'DM Mono',monospace;";
+  tbody.innerHTML = _retItems.map((it, i) => `
+    <tr style="border-bottom:1px solid var(--border);" id="ret-row-${i}">
+      <td style="padding:7px 4px;">
+        <input value="${it.produkt}" onchange="_retItems[${i}].produkt=this.value"
+          style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);font-size:13px;padding:2px 0;outline:none;">
+      </td>
+      <td style="padding:7px 4px;text-align:center;">
+        <input type="number" min="0" value="${it.antal}" onchange="_retItems[${i}].antal=parseInt(this.value)||0;retOpdaterSummer()"
+          style="width:50px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:13px;padding:2px 0;outline:none;">
+      </td>
+      <td style="padding:7px 4px;text-align:center;">
+        <select onchange="_retItems[${i}].kategori=this.value;retOpdaterSummer()"
+          style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:3px;font-size:11px;padding:2px 4px;">
+          <option value="boller"${it.kategori==='boller'?' selected':''}>🥐 Boller</option>
+          <option value="wienerbroed"${it.kategori==='wienerbroed'?' selected':''}>🥐 Wiener</option>
+        </select>
+      </td>
+      <td style="padding:7px 4px;text-align:center;">
+        <button onclick="_retItems.splice(${i},1);retVisItems()"
+          style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+      </td>
+    </tr>`).join('');
+  retOpdaterSummer();
+}
+
+function retOpdaterSummer() {
+  const b = _retItems.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
+  const w = _retItems.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
+  document.getElementById('ret-sum-boller').textContent = b + ' stk';
+  document.getElementById('ret-sum-wiener').textContent = w + ' stk';
+}
+
+function retTilfoejLinje() {
+  _retItems.push({produkt:'', antal:1, kategori:'wienerbroed'});
+  retVisItems();
+}
+
+async function retGem() {
+  if (!_retItems.length) { alert('Ingen varer at gemme'); return; }
+  const uge = parseInt(document.getElementById('ret-uge-input').value);
+  const aar = parseInt(document.getElementById('ret-aar-input').value);
+  const btn = document.getElementById('ret-gem-btn');
+  const st  = document.getElementById('ret-gem-status');
+  btn.disabled = true;
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const res = await fetch('/api/retur/gem', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({uge, aar, dato: today, items: _retItems})
+    });
+    const data = await res.json();
+    btn.disabled = false;
+    if (data.ok) {
+      st.textContent = '✓ Gemt! ' + data.antal + ' produkter registreret for uge ' + uge;
+      st.style.background = '#f0f7f0';
+      st.style.color = 'var(--forest)';
+      st.style.display = '';
+      document.getElementById('ret-uge-status').textContent = '✓ Registreret ' + today;
+      document.getElementById('ret-uge-status').style.color = 'var(--moss)';
+      retIndlaesHistorik();
+      // Opdater forside KPI
+      if (typeof loadReturStatus === 'function') loadReturStatus();
+    } else {
+      st.textContent = '✗ Fejl: ' + (data.fejl || data.detail || 'Ukendt');
+      st.style.background = '#fff5f5';
+      st.style.color = 'var(--danger)';
+      st.style.display = '';
+    }
+  } catch(e) {
+    btn.disabled = false;
+    st.textContent = '✗ Netværksfejl: ' + e;
+    st.style.display = '';
+  }
+}
+
+function retNulstil() {
+  _retItems = [];
+  _retFotoFile = null;
+  document.getElementById('ret-fil-input').value = '';
+  document.getElementById('ret-preview-wrap').style.display = 'none';
+  document.getElementById('ret-scan-status').style.display = 'none';
+  document.getElementById('ret-bekraeft-kort').style.display = 'none';
+  document.getElementById('ret-upload-kort').style.display = '';
+  document.getElementById('ret-gem-status').style.display = 'none';
+}
+
+async function retIndlaesHistorik() {
+  const el = document.getElementById('ret-historik-indhold');
+  if (!el) return;
+  try {
+    const res = await fetch('/api/retur/historik');
+    const rows = await res.json();
+    if (!rows.length) {
+      el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Ingen registreringer endnu</div>';
+      return;
+    }
+    const mono = "font-family:'DM Mono',monospace;";
+    el.innerHTML = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:360px;">
+        <thead><tr style="border-bottom:1px solid var(--border);">
+          <th style="text-align:left;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">UGE</th>
+          <th style="text-align:left;padding:5px 6px;font-size:9px;color:var(--ash);">DATO</th>
+          <th style="text-align:right;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">BOLLER</th>
+          <th style="text-align:right;padding:5px 6px;${mono}font-size:9px;color:var(--ash);">WIENER</th>
+          <th style="text-align:right;padding:5px 6px;font-size:9px;color:var(--ash);">PROD.</th>
+          <th style="width:32px;"></th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(30,58,30,.06);" onclick="retVisUge(${r.uge},${r.aar})" style="cursor:pointer;">
+            <td style="padding:7px 6px;${mono}font-weight:600;">Uge ${r.uge}</td>
+            <td style="padding:7px 6px;font-size:11px;color:var(--ash);">${(r.dato||'').slice(0,10)}</td>
+            <td style="padding:7px 6px;text-align:right;${mono}color:var(--forest);">${r.sendt_boller}</td>
+            <td style="padding:7px 6px;text-align:right;${mono}color:var(--forest);">${r.sendt_wiener}</td>
+            <td style="padding:7px 6px;text-align:right;${mono}color:var(--ash);">${r.produkter}</td>
+            <td style="padding:7px 4px;text-align:center;">
+              <button onclick="event.stopPropagation();retVisUge(${r.uge},${r.aar})"
+                style="background:none;border:1px solid var(--border);color:var(--ash);border-radius:3px;font-size:10px;padding:2px 6px;cursor:pointer;">Vis</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>`;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Fejl ved indlæsning</div>';
+  }
+}
+
+async function retVisUge(uge, aar) {
+  document.getElementById('ret-uge-input').value = uge;
+  document.getElementById('ret-aar-input').value = aar;
+  document.getElementById('ret-bekr-uge').textContent = uge;
+  const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
+  const d = await res.json();
+  if (d.items && d.items.length) {
+    _retItems = d.items.map(it => ({...it}));
+    retVisItems();
+    document.getElementById('ret-bekraeft-kort').style.display = '';
+    document.getElementById('ret-upload-kort').style.display = 'none';
+    const st = document.getElementById('ret-uge-status');
+    st.textContent = '✓ Registreret ' + d.registreret;
+    st.style.color = 'var(--moss)';
+  }
+}
+
+// retInit() kaldes via den centrale showPanel-kæde
+
+// ── FORSIDE: RETUR STATUS KPI ─────────────────────────────────────────────────
+async function loadReturStatus() {
+  try {
+    const d = await fetch('/api/retur/status').then(r => r.json());
+    const el = document.getElementById('ret-status-card');
+    if (!el) return;
+    el.style.display = '';
+
+    const uge = d.aktuel_uge;
+    const reg = d.er_registreret;
+    const mandag = d.er_mandag;
+
+    if (reg) {
+      el.style.background = '#f0f7f0';
+      el.style.borderColor = 'var(--moss)';
+      el.querySelector('.ret-st-ikon').textContent = '✓';
+      el.querySelector('.ret-st-ttl').textContent  = 'RETUR REGISTRERET';
+      el.querySelector('.ret-st-ttl').style.color  = 'var(--forest)';
+      el.querySelector('.ret-st-val').textContent  = d.sendt_boller + ' boller · ' + d.sendt_wiener + ' wiener';
+      el.querySelector('.ret-st-val').style.color  = 'var(--forest)';
+      el.querySelector('.ret-st-sub').textContent  = 'Uge ' + uge + ' · ' + (d.registreret_dato || '');
+      el.querySelector('.ret-st-sub').style.color  = 'var(--moss)';
+    } else if (mandag) {
+      el.style.background = '#fffbe6';
+      el.style.borderColor = 'var(--gold)';
+      el.querySelector('.ret-st-ikon').textContent = '⚠';
+      el.querySelector('.ret-st-ttl').textContent  = 'HUSK RETUR I DAG!';
+      el.querySelector('.ret-st-ttl').style.color  = '#8a6800';
+      el.querySelector('.ret-st-val').textContent  = 'Mandag — send retur for uge ' + uge;
+      el.querySelector('.ret-st-val').style.color  = '#8a6800';
+      el.querySelector('.ret-st-sub').textContent  = 'Tryk for at registrere';
+      el.querySelector('.ret-st-sub').style.color  = '#a07800';
+    } else {
+      el.style.background = 'var(--card)';
+      el.style.borderColor = 'var(--border)';
+      el.querySelector('.ret-st-ikon').textContent = '📋';
+      el.querySelector('.ret-st-ttl').textContent  = 'SENESTE RETUR';
+      el.querySelector('.ret-st-ttl').style.color  = 'var(--ash)';
+      if (d.seneste_uge) {
+        el.querySelector('.ret-st-val').textContent = d.seneste_boller + ' boller · ' + d.seneste_wiener + ' wiener';
+        el.querySelector('.ret-st-val').style.color = 'var(--charcoal)';
+        el.querySelector('.ret-st-sub').textContent = 'Uge ' + d.seneste_uge;
+      } else {
+        el.querySelector('.ret-st-val').textContent = 'Ingen data endnu';
+        el.querySelector('.ret-st-val').style.color = 'var(--ash)';
+        el.querySelector('.ret-st-sub').textContent = 'Upload første seddel';
+      }
+      el.querySelector('.ret-st-sub').style.color = 'var(--ash)';
+    }
+    el.style.display = '';
+  } catch(e) {}
+}
 </script>
 </body>
 </html>

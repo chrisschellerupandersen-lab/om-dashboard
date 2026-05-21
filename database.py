@@ -3638,44 +3638,51 @@ def hent_retur_kpi() -> dict:
     }
 
 
-def hent_retur_historik(n: int = 16) -> list:
-    """Seneste n uger med retur-data.
-    Beregner uge/aar fra registreret_dato (ikke gemt uge-felt) for at undgå
-    fejl fra tidligere forkert ISO-uge beregning i frontend."""
+def hent_retur_historik(n: int = 60) -> list:
+    """Seneste n dage med retur-data — én post pr. registreret_dato."""
     from datetime import date as _d
+    DAGE = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
     with _conn() as conn:
-        # Hent pr. dato — ignorer gemt uge/aar felt
         rows = conn.execute("""
             SELECT registreret_dato AS dato,
-                   SUM(CASE WHEN kategori='boller'     THEN antal ELSE 0 END) AS sendt_boller,
+                   SUM(CASE WHEN kategori='boller'      THEN antal ELSE 0 END) AS sendt_boller,
                    SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS sendt_wiener,
                    COUNT(*) AS produkter
             FROM retur_detaljer
             GROUP BY registreret_dato
             ORDER BY registreret_dato DESC
-        """).fetchall()
+            LIMIT ?
+        """, (n,)).fetchall()
 
-    # Gruppér på korrekt ISO-uge beregnet fra datoen
-    uge_data: dict = {}
+    result = []
     for r in rows:
         try:
-            iso = _d.fromisoformat(r['dato']).isocalendar()
+            d   = _d.fromisoformat(r['dato'])
+            iso = d.isocalendar()
         except Exception:
             continue
-        key = (iso[0], iso[1])  # (aar, uge)
-        if key not in uge_data:
-            uge_data[key] = {
-                'uge': iso[1], 'aar': iso[0], 'dato': r['dato'],
-                'sendt_boller': 0, 'sendt_wiener': 0, 'produkter': 0,
-            }
-        uge_data[key]['sendt_boller']  += r['sendt_boller']
-        uge_data[key]['sendt_wiener']  += r['sendt_wiener']
-        uge_data[key]['produkter']     += r['produkter']
-        if r['dato'] > uge_data[key]['dato']:
-            uge_data[key]['dato'] = r['dato']
+        result.append({
+            'dato':         r['dato'],
+            'ugedag':       DAGE[d.weekday()],
+            'uge':          iso[1],
+            'aar':          iso[0],
+            'sendt_boller': r['sendt_boller'],
+            'sendt_wiener': r['sendt_wiener'],
+            'produkter':    r['produkter'],
+        })
+    return result
 
-    result = sorted(uge_data.values(), key=lambda x: (x['aar'], x['uge']), reverse=True)
-    return result[:n]
+
+def hent_retur_dag(dato: str) -> dict:
+    """Henter alle retur-linjer for én specifik dato."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT id, produkt, antal, kategori
+            FROM retur_detaljer
+            WHERE registreret_dato = ?
+            ORDER BY kategori, produkt
+        """, (dato,)).fetchall()
+    return {'dato': dato, 'items': [dict(r) for r in rows]}
 
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────

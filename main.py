@@ -770,9 +770,15 @@ async def retur_uge_data(request: Request, uge: int, aar: int):
 
 
 @app.get("/api/retur/historik")
-async def retur_historik(request: Request, n: int = 16):
+async def retur_historik(request: Request, n: int = 60):
     _kræv_login(request)
     return database.hent_retur_historik(n)
+
+
+@app.get("/api/retur/dag/{dato}")
+async def retur_dag(request: Request, dato: str):
+    _kræv_login(request)
+    return database.hent_retur_dag(dato)
 
 
 @app.post("/api/bager/retur-opdater")

@@ -7272,57 +7272,61 @@ function retNulstil() {
   document.getElementById('ret-gem-status').style.display = 'none';
 }
 
-// ── Historik: inline expand + redigering ──────────────────────────────────────
-let _retHistItems = {};   // {uge_aar: [items]}  — cache for inline editing
-let _retHistDato  = {};   // {uge_aar: 'YYYY-MM-DD'} — cache for dato editing
-let _retHistOpen  = null; // currently expanded key
+// ── Historik: pr. dag med fold/unfold ─────────────────────────────────────────
+let _retHistItems = {};   // {dato: [items]}  — cache pr. dag
+let _retHistOpen  = null; // dato for åben gruppe
 
 async function retIndlaesHistorik() {
   const el = document.getElementById('ret-historik-indhold');
   if (!el) return;
+  el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Indlæser…</div>';
   try {
-    const res  = await fetch('/api/retur/historik');
-    const rows = await res.json();
+    const rows = await fetch('/api/retur/historik').then(r => r.json());
     if (!rows.length) {
       el.innerHTML = '<div style="color:var(--ash);font-size:12px;padding:8px 0;">Ingen registreringer endnu</div>';
       return;
     }
-    el.innerHTML = rows.map(r => _retHistRaekke(r)).join('');
+    el.innerHTML = rows.map(r => _retHistDagRaekke(r)).join('');
   } catch(e) {
     el.innerHTML = '<div style="color:var(--ash);font-size:12px;">Fejl ved indlæsning</div>';
   }
 }
 
-function _retHistRaekke(r) {
-  const key  = r.uge + '_' + r.aar;
-  const mono = "font-family:'DM Mono',monospace;";
-  const dato = (r.dato || '').slice(0,10);
+function _retHistDagRaekke(r) {
+  const dato    = r.dato;
+  const key     = dato.replace(/-/g,'');
+  const dagNavn = r.ugedag.charAt(0).toUpperCase() + r.ugedag.slice(1);
+  // Format: "Ons 21. maj" fra dato
+  const d = new Date(dato + 'T12:00:00');
+  const maaned = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'][d.getMonth()];
+  const datoLbl = d.getDate() + '. ' + maaned;
   return `
-  <div id="rh-row-${key}" style="border-bottom:1px solid rgba(30,58,30,.07);">
-    <div onclick="retHistToggle('${key}',${r.uge},${r.aar})"
-      style="display:flex;align-items:center;gap:8px;padding:10px 6px;cursor:pointer;user-select:none;">
-      <div style="${mono}font-weight:700;font-size:13px;min-width:52px;">Uge ${r.uge}</div>
-      <div style="font-size:11px;color:var(--ash);flex:1;">${dato}</div>
-      <div style="${mono}font-size:12px;color:var(--forest);">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
-      <div id="rh-chevron-${key}" style="font-size:10px;color:var(--ash);transition:transform .15s;">▼</div>
+  <div id="rh-dag-${key}" style="border-bottom:1px solid rgba(30,58,30,.07);">
+    <div onclick="retHistDagToggle('${key}','${dato}')"
+      style="display:flex;align-items:center;gap:10px;padding:12px 6px;cursor:pointer;user-select:none;">
+      <div style="min-width:36px;font-size:11px;font-weight:600;color:var(--forest);">${dagNavn.slice(0,3)}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;color:var(--charcoal);">${datoLbl} <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">uge ${r.uge}</span></div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--forest);white-space:nowrap;">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
+      <div id="rh-chev-${key}" style="font-size:10px;color:var(--ash);transition:transform .15s;margin-left:4px;">▼</div>
     </div>
-    <div id="rh-detalje-${key}" style="display:none;padding:0 6px 12px;">
-      <div style="font-size:10px;color:var(--ash);margin-bottom:6px;">Indlæser…</div>
+    <div id="rh-det-${key}" style="display:none;padding:0 8px 14px;">
+      <div style="font-size:11px;color:var(--ash);">Indlæser…</div>
     </div>
   </div>`;
 }
 
-async function retHistToggle(key, uge, aar) {
-  const det  = document.getElementById('rh-detalje-' + key);
-  const chev = document.getElementById('rh-chevron-' + key);
-  // Luk anden åben
+async function retHistDagToggle(key, dato) {
+  const det  = document.getElementById('rh-det-' + key);
+  const chev = document.getElementById('rh-chev-' + key);
+  // Luk forrige åbne
   if (_retHistOpen && _retHistOpen !== key) {
-    const prev = document.getElementById('rh-detalje-' + _retHistOpen);
-    const pc   = document.getElementById('rh-chevron-' + _retHistOpen);
-    if (prev) prev.style.display = 'none';
-    if (pc)   pc.style.transform = '';
+    const pd = document.getElementById('rh-det-'  + _retHistOpen);
+    const pc = document.getElementById('rh-chev-' + _retHistOpen);
+    if (pd) pd.style.display = 'none';
+    if (pc) pc.style.transform = '';
   }
-  // Toggle
   const isOpen = det.style.display !== 'none';
   if (isOpen) {
     det.style.display = 'none';
@@ -7333,117 +7337,104 @@ async function retHistToggle(key, uge, aar) {
   det.style.display = '';
   chev.style.transform = 'rotate(180deg)';
   _retHistOpen = key;
-
-  // Hent data hvis ikke cachet
-  if (!_retHistItems[key]) {
-    const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
-    const d   = await res.json();
-    _retHistItems[key] = d.items ? d.items.map(it => ({...it})) : [];
-    _retHistDato[key]  = (d.registreret || '').slice(0,10) || _retIGaar();
+  // Hent linjer hvis ikke cachet
+  if (!_retHistItems[dato]) {
+    const d = await fetch('/api/retur/dag/' + dato).then(r => r.json());
+    _retHistItems[dato] = (d.items || []).map(it => ({...it}));
   }
-  _retHistVisDetalje(key, uge, aar);
+  _retHistVisDag(key, dato);
 }
 
-function _retHistVisDetalje(key, uge, aar) {
-  const el    = document.getElementById('rh-detalje-' + key);
-  const items = _retHistItems[key] || [];
+function _retHistVisDag(key, dato) {
+  const el    = document.getElementById('rh-det-' + key);
+  const items = _retHistItems[dato] || [];
   const mono  = "font-family:'DM Mono',monospace;";
   if (!items.length) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--ash);">Ingen data</div>';
+    el.innerHTML = `
+      <div style="font-size:11px;color:var(--ash);margin-bottom:8px;">Ingen linjer</div>
+      <button onclick="_retHistTilfoejDag('${key}','${dato}')"
+        style="font-size:11px;background:none;border:1px dashed var(--border);color:var(--ash);border-radius:4px;padding:5px 12px;cursor:pointer;">+ Tilføj linje</button>`;
     return;
   }
-  const dato = _retHistDato[key] || '';
   el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);">
-      <div style="font-size:10px;color:var(--ash);white-space:nowrap;">Dato registreret:</div>
-      <input type="date" value="${dato}" id="rh-dato-${key}"
-        onchange="_retHistDato['${key}']=this.value"
-        style="flex:1;padding:4px 6px;background:var(--bg);border:1px solid var(--border);
-               color:var(--charcoal);border-radius:4px;font-size:12px;font-family:'DM Mono',monospace;">
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px;">
       <thead><tr style="border-bottom:1px solid var(--border);">
-        <th style="text-align:left;padding:4px 4px;font-size:9px;color:var(--ash);">PRODUKT</th>
-        <th style="text-align:center;padding:4px 4px;font-size:9px;color:var(--ash);width:56px;">STK</th>
-        <th style="text-align:center;padding:4px 4px;font-size:9px;color:var(--ash);width:80px;">KAT.</th>
-        <th style="width:28px;"></th>
+        <th style="text-align:left;padding:4px;font-size:9px;color:var(--ash);">PRODUKT</th>
+        <th style="text-align:center;padding:4px;font-size:9px;color:var(--ash);width:52px;">STK</th>
+        <th style="text-align:center;padding:4px;font-size:9px;color:var(--ash);width:76px;">KAT.</th>
+        <th style="width:38px;"></th>
       </tr></thead>
       <tbody>
         ${items.map((it, i) => `
-          <tr style="border-bottom:1px solid rgba(30,58,30,.05);">
-            <td style="padding:6px 4px;">
-              <input value="${it.produkt}"
-                onchange="_retHistItems['${key}'][${i}].produkt=this.value"
-                style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);
-                       color:var(--charcoal);font-size:12px;padding:1px 0;outline:none;">
+          <tr style="border-bottom:1px solid rgba(30,58,30,.05);background:${i%2===0?'transparent':'rgba(30,58,30,.02)'};">
+            <td style="padding:7px 4px;">
+              <input value="${(it.produkt||'').replace(/"/g,'&quot;')}"
+                onchange="_retHistItems['${dato}'][${i}].produkt=this.value"
+                style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);font-size:12px;padding:2px 0;outline:none;">
             </td>
-            <td style="padding:6px 4px;text-align:center;">
+            <td style="padding:7px 4px;text-align:center;">
               <input type="number" min="0" value="${it.antal}"
-                onchange="_retHistItems['${key}'][${i}].antal=parseInt(this.value)||0;_retHistOpdaterSum('${key}')"
-                style="width:48px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);
-                       color:var(--charcoal);${mono}font-size:12px;padding:1px 0;outline:none;">
+                onchange="_retHistItems['${dato}'][${i}].antal=parseInt(this.value)||0;_retHistSumDag('${key}','${dato}')"
+                style="width:46px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:12px;padding:2px 0;outline:none;">
             </td>
-            <td style="padding:6px 4px;text-align:center;">
-              <select onchange="_retHistItems['${key}'][${i}].kategori=this.value;_retHistOpdaterSum('${key}')"
-                style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);
-                       border-radius:3px;font-size:10px;padding:1px 3px;">
+            <td style="padding:7px 4px;text-align:center;">
+              <select onchange="_retHistItems['${dato}'][${i}].kategori=this.value;_retHistSumDag('${key}','${dato}')"
+                style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:3px;font-size:10px;padding:3px 4px;width:100%;">
                 <option value="boller"${it.kategori==='boller'?' selected':''}>Boller</option>
                 <option value="wienerbroed"${it.kategori==='wienerbroed'?' selected':''}>Wiener</option>
               </select>
             </td>
-            <td style="padding:6px 2px;text-align:center;">
-              <button onclick="_retHistItems['${key}'].splice(${i},1);_retHistVisDetalje('${key}',${uge},${aar})"
-                style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:14px;padding:0 3px;">×</button>
+            <td style="padding:7px 2px;text-align:center;">
+              <button onclick="_retHistItems['${dato}'].splice(${i},1);_retHistVisDag('${key}','${dato}')"
+                style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.25);color:var(--danger);cursor:pointer;font-size:16px;line-height:1;padding:3px 7px;border-radius:4px;">×</button>
             </td>
           </tr>`).join('')}
       </tbody>
     </table>
-    <div style="margin-top:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
       <div id="rh-sum-${key}" style="font-size:11px;color:var(--ash);flex:1;"></div>
-      <button onclick="_retHistTilfoej('${key}',${uge},${aar})"
-        style="font-size:10px;background:none;border:1px dashed var(--border);color:var(--ash);
-               border-radius:3px;padding:3px 8px;cursor:pointer;">+ Tilføj</button>
-      <button onclick="retHistGem('${key}',${uge},${aar})"
-        style="font-size:11px;background:var(--forest);color:var(--amber);border:none;
-               border-radius:4px;padding:5px 14px;font-weight:600;cursor:pointer;">Gem rettelser</button>
+      <button onclick="_retHistTilfoejDag('${key}','${dato}')"
+        style="font-size:10px;background:none;border:1px dashed var(--border);color:var(--ash);border-radius:3px;padding:4px 10px;cursor:pointer;">+ Tilføj</button>
+      <button onclick="retHistGemDag('${key}','${dato}')"
+        style="font-size:12px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;padding:7px 16px;font-weight:600;cursor:pointer;">Gem rettelser</button>
     </div>
     <div id="rh-st-${key}" style="display:none;margin-top:6px;padding:5px 8px;border-radius:3px;font-size:11px;"></div>`;
-  _retHistOpdaterSum(key);
+  _retHistSumDag(key, dato);
 }
 
-function _retHistOpdaterSum(key) {
+function _retHistSumDag(key, dato) {
   const el = document.getElementById('rh-sum-' + key);
   if (!el) return;
-  const items = _retHistItems[key] || [];
+  const items = _retHistItems[dato] || [];
   const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
   const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
   el.textContent = b + ' boller · ' + w + ' wienerbrød';
 }
 
-function _retHistTilfoej(key, uge, aar) {
-  if (!_retHistItems[key]) _retHistItems[key] = [];
-  _retHistItems[key].push({produkt:'', antal:1, kategori:'wienerbroed'});
-  _retHistVisDetalje(key, uge, aar);
+function _retHistTilfoejDag(key, dato) {
+  if (!_retHistItems[dato]) _retHistItems[dato] = [];
+  _retHistItems[dato].push({produkt:'', antal:1, kategori:'wienerbroed'});
+  _retHistVisDag(key, dato);
 }
 
-async function retHistGem(key, uge, aar) {
-  const items = _retHistItems[key] || [];
+async function retHistGemDag(key, dato) {
+  const items = _retHistItems[dato] || [];
   const stEl  = document.getElementById('rh-st-' + key);
   if (!items.length) return;
-  const dato = _retHistDato[key] || new Date().toISOString().slice(0,10);
   try {
     const res  = await fetch('/api/retur/gem', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({uge, aar, dato, items})
+      body: JSON.stringify({dato, items})
     });
     const data = await res.json();
     if (data.ok) {
-      stEl.textContent = '✓ Gemt — ' + data.antal + ' produkter';
+      stEl.textContent = '✓ Gemt — ' + data.antal + ' linjer';
       stEl.style.background = '#f0f7f0';
       stEl.style.color = 'var(--forest)';
       stEl.style.display = '';
-      // Opdater summary-rækken
-      const rowEl = document.getElementById('rh-row-' + key);
+      setTimeout(() => { stEl.style.display='none'; }, 3000);
+      // Opdater summary i dag-rækken
+      const rowEl = document.getElementById('rh-dag-' + key);
       if (rowEl) {
         const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
         const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);

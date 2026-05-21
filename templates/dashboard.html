@@ -7377,7 +7377,7 @@ async function loadReturStatus() {
     if (d.er_registreret) {
       card.style.background  = '#f0f7f0';
       card.style.borderColor = 'var(--moss)';
-      ttl.textContent  = 'RETUR UGE ' + d.aktuel_uge + ' ✓';
+      ttl.textContent  = 'RETURNERET DENNE UGE (' + (d.display_uge || d.aktuel_uge) + ') ✓';
       ttl.style.color  = green;
       dato.textContent = (d.registreret_dato || '').slice(0, 10);
 

@@ -3532,9 +3532,14 @@ def hent_retur_kpi() -> dict:
     sendt_w = int(aktuel['wiener'] or 0) if aktuel else 0
 
     er_registreret = bool(aktuel and aktuel['dato'])
+    today_iso = today.isocalendar()
+    display_uge = int(today_iso[1])
+    display_aar = int(today_iso[0])
     return {
         'aktuel_uge': aktuel_uge,
         'aktuel_aar': aktuel_aar,
+        'display_uge': display_uge,
+        'display_aar': display_aar,
         'er_mandag': weekday == 0,
         'er_registreret': er_registreret,
         'sendt_boller': sendt_b,

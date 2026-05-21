@@ -1516,9 +1516,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <!-- Bekræftelse / redigering -->
         <div id="ret-bekraeft-kort" class="card" style="display:none;margin-bottom:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:12px;color:var(--ash);letter-spacing:.06em;">✅ BEKRÆFT RETUR — UGE <span id="ret-bekr-uge">—</span></div>
             <button onclick="retNulstil()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:4px;padding:4px 10px;cursor:pointer;">← Ny seddel</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
+            <div style="font-size:10px;color:var(--ash);white-space:nowrap;">Foto taget:</div>
+            <input type="date" id="ret-dato-input" onchange="retDatoAendret(this.value)"
+              style="flex:1;padding:5px 8px;background:var(--bg);border:1px solid var(--border);
+                     color:var(--charcoal);border-radius:4px;font-size:13px;font-family:'DM Mono',monospace;">
+            <div id="ret-dato-uge-info" style="font-size:10px;color:var(--moss);white-space:nowrap;"></div>
           </div>
           <table style="width:100%;border-collapse:collapse;font-size:13px;" id="ret-items-tbl">
             <thead>
@@ -6929,6 +6936,17 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+function retDatoAendret(val) {
+  if (!val) return;
+  const d = new Date(val + 'T12:00:00');
+  const {uge, aar} = _retBeregUge(d);
+  document.getElementById('ret-uge-input').value = uge;
+  document.getElementById('ret-aar-input').value = aar;
+  document.getElementById('ret-bekr-uge').textContent = uge;
+  const info = document.getElementById('ret-dato-uge-info');
+  if (info) info.textContent = '→ uge ' + uge;
+}
+
 async function retScanFoto() {
   if (!_retFotoFile) return;
   const scan = document.getElementById('ret-scan-status');
@@ -6948,6 +6966,9 @@ async function retScanFoto() {
     }
     _retItems = data.items || [];
     retVisItems();
+    const today = new Date().toISOString().slice(0,10);
+    const di = document.getElementById('ret-dato-input');
+    if (di && !di.value) { di.value = today; }
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-upload-kort').style.display = 'none';
   } catch(e) {
@@ -6999,17 +7020,18 @@ function retTilfoejLinje() {
 
 async function retGem() {
   if (!_retItems.length) { alert('Ingen varer at gemme'); return; }
-  const uge = parseInt(document.getElementById('ret-uge-input').value);
-  const aar = parseInt(document.getElementById('ret-aar-input').value);
-  const btn = document.getElementById('ret-gem-btn');
-  const st  = document.getElementById('ret-gem-status');
+  const uge  = parseInt(document.getElementById('ret-uge-input').value);
+  const aar  = parseInt(document.getElementById('ret-aar-input').value);
+  const btn  = document.getElementById('ret-gem-btn');
+  const st   = document.getElementById('ret-gem-status');
   btn.disabled = true;
-  const today = new Date().toISOString().slice(0,10);
+  const datoInput = document.getElementById('ret-dato-input');
+  const dato = (datoInput && datoInput.value) ? datoInput.value : new Date().toISOString().slice(0,10);
   try {
     const res = await fetch('/api/retur/gem', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({uge, aar, dato: today, items: _retItems})
+      body: JSON.stringify({uge, aar, dato, items: _retItems})
     });
     const data = await res.json();
     btn.disabled = false;
@@ -7250,6 +7272,8 @@ async function retVisUge(uge, aar) {
   if (d.items && d.items.length) {
     _retItems = d.items.map(it => ({...it}));
     retVisItems();
+    const di = document.getElementById('ret-dato-input');
+    if (di) di.value = (d.registreret || '').slice(0,10) || new Date().toISOString().slice(0,10);
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-upload-kort').style.display = 'none';
     const st = document.getElementById('ret-uge-status');

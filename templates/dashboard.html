@@ -946,6 +946,29 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <!-- Review sektioner -->
         <div id="mgmt-sektioner" style="display:none;"></div>
+
+        <!-- ── SPØRG DINE DATA ─────────────────────────────────────────── -->
+        <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:20px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--ash);margin-bottom:14px;">SPØRG DINE DATA</div>
+
+          <!-- Samtale-historik -->
+          <div id="mgmt-chat" style="display:flex;flex-direction:column;gap:12px;margin-bottom:14px;max-height:600px;overflow-y:auto;"></div>
+
+          <!-- Input-felt -->
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <textarea id="mgmt-q-input" rows="2"
+              placeholder="Fx: Hvad er min bedste salgsdag? · Vis omsætning per uge · Hvilke produkter vokser?"
+              style="flex:1;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--charcoal);resize:vertical;font-family:inherit;line-height:1.4;"
+              onkeydown="if((e=event).key==='Enter'&&!e.shiftKey){e.preventDefault();mgmtSpørg();}"></textarea>
+            <button onclick="mgmtSpørg()" id="mgmt-q-btn"
+              style="padding:10px 18px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;cursor:pointer;font-size:13px;white-space:nowrap;align-self:stretch;">
+              Send →
+            </button>
+          </div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;" id="mgmt-forslag">
+            <span style="font-size:10px;color:var(--ash);">Forslag:</span>
+          </div>
+        </div>
       </div>
 
       <!-- SENESTE DAG -->
@@ -6512,7 +6535,7 @@ window.showPanel = function(id, el) {
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
   if (id === 'stamdata')   loadStamdata();
-  if (id === 'management') mgmtIndlaes();
+  if (id === 'management') { mgmtIndlaes(); mgmtInitForslag(); }
 };
 
 // ── VARESTAMDATA ─────────────────────────────────────────────────────────────
@@ -7485,6 +7508,151 @@ async function mgmtOpdater() {
   } finally {
     btn.disabled = false;
     btn.textContent = '↻ Opdater analyse';
+  }
+}
+
+// ── DATA Q&A CHAT ────────────────────────────────────────────────────────────
+
+const _MGMT_FARVER = {
+  forest:  '#1e3a1e', moss: '#4a7c59', amber: '#b8860b',
+  danger:  '#c0392b', ash:  '#888',    blue:  '#2980b9',
+};
+let _mgmtHistorik = [];  // [{ spørgsmål, svar }]
+let _mgmtChartIdx = 0;
+
+const _MGMT_FORSLAG = [
+  'Hvad er min bedste salgsdag?',
+  'Vis omsætning per uge de seneste 3 måneder',
+  'Hvilke produkter har lavest DB%?',
+  'Sammenlign denne uge med forrige uge',
+  'Hvilken kategori tjener mest?',
+  'Vis dag-af-uge mønster',
+];
+
+function mgmtInitForslag() {
+  const el = document.getElementById('mgmt-forslag');
+  if (!el) return;
+  _MGMT_FORSLAG.forEach(t => {
+    const b = document.createElement('button');
+    b.textContent = t;
+    b.style.cssText = 'padding:3px 8px;font-size:10px;background:var(--bg);border:1px solid var(--border);border-radius:12px;cursor:pointer;color:var(--ash);';
+    b.onclick = () => {
+      document.getElementById('mgmt-q-input').value = t;
+      mgmtSpørg();
+    };
+    el.appendChild(b);
+  });
+}
+
+function _mgmtGrafHtml(graf, idx) {
+  if (!graf) return '';
+  return `<div style="margin-top:12px;position:relative;height:220px;"><canvas id="mgmt-chart-${idx}"></canvas></div>`;
+}
+
+function _mgmtTegnGraf(graf, idx) {
+  if (!graf) return;
+  const canvas = document.getElementById('mgmt-chart-' + idx);
+  if (!canvas) return;
+  const farver = (graf.datasets || []).map((ds, i) => {
+    const c = _MGMT_FARVER[ds.farve] || Object.values(_MGMT_FARVER)[i % 6];
+    return c;
+  });
+  new Chart(canvas, {
+    type: graf.type || 'bar',
+    data: {
+      labels: graf.labels || [],
+      datasets: (graf.datasets || []).map((ds, i) => ({
+        label: ds.label || '',
+        data: ds.data || [],
+        backgroundColor: graf.type === 'line' ? 'transparent' : farver[i] + (graf.type === 'pie' || graf.type === 'doughnut' ? '' : 'cc'),
+        borderColor: farver[i],
+        borderWidth: graf.type === 'line' ? 2 : 1,
+        tension: 0.3,
+        fill: false,
+        pointRadius: graf.type === 'line' ? 3 : 0,
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: (graf.datasets||[]).length > 1 || graf.type === 'pie' || graf.type === 'doughnut' },
+        title:  { display: !!graf.titel, text: graf.titel || '', font: { size: 12 }, color: '#333' },
+      },
+      scales: (graf.type === 'pie' || graf.type === 'doughnut') ? {} : {
+        x: { ticks: { font: { size: 10 }, maxRotation: 45 }, grid: { display: false } },
+        y: { ticks: { font: { size: 10 } }, title: { display: !!graf.y_label, text: graf.y_label||'' } },
+      },
+    },
+  });
+}
+
+function _mgmtTilfoejBesked(spørgsmål, svar, loading) {
+  const chat = document.getElementById('mgmt-chat');
+  const id   = 'mgmt-msg-' + Date.now();
+
+  // Bruger-boble
+  const qDiv = document.createElement('div');
+  qDiv.style.cssText = 'display:flex;justify-content:flex-end;';
+  qDiv.innerHTML = `<div style="max-width:80%;background:var(--forest);color:#fff;padding:10px 14px;border-radius:12px 12px 2px 12px;font-size:13px;line-height:1.5;">${spørgsmål}</div>`;
+  chat.appendChild(qDiv);
+
+  // AI-svar boble
+  const aDiv = document.createElement('div');
+  aDiv.id = id;
+  aDiv.style.cssText = 'display:flex;justify-content:flex-start;';
+
+  if (loading) {
+    aDiv.innerHTML = `<div style="max-width:90%;background:var(--card);border:1px solid var(--border);padding:12px 14px;border-radius:12px 12px 12px 2px;font-size:13px;color:var(--ash);">⏳ Analyserer…</div>`;
+  } else {
+    const grafIdx = _mgmtChartIdx++;
+    const tekst = (svar.svar || '').replace(/\n/g, '<br>');
+    aDiv.innerHTML = `<div style="max-width:90%;background:var(--card);border:1px solid var(--border);padding:14px 16px;border-radius:12px 12px 12px 2px;font-size:13px;line-height:1.6;color:var(--charcoal);">${tekst}${_mgmtGrafHtml(svar.graf, grafIdx)}</div>`;
+    chat.appendChild(aDiv);
+    chat.scrollTop = chat.scrollHeight;
+    if (svar.graf) requestAnimationFrame(() => _mgmtTegnGraf(svar.graf, grafIdx));
+    return;
+  }
+  chat.appendChild(aDiv);
+  chat.scrollTop = chat.scrollHeight;
+  return id;
+}
+
+async function mgmtSpørg() {
+  const input = document.getElementById('mgmt-q-input');
+  const btn   = document.getElementById('mgmt-q-btn');
+  const spørgsmål = (input.value || '').trim();
+  if (!spørgsmål) return;
+
+  input.value  = '';
+  btn.disabled = true;
+
+  const loadingId = _mgmtTilfoejBesked(spørgsmål, null, true);
+
+  try {
+    const res  = await fetch('/api/management/spørg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ spørgsmål, historik: _mgmtHistorik.slice(-4) }),
+    });
+    const data = await res.json();
+
+    // Erstat loading-boble med svar
+    const old = document.getElementById(loadingId);
+    if (old) old.remove();
+
+    if (data.ok && data.svar) {
+      _mgmtTilfoejBesked(spørgsmål, data.svar, false);
+      _mgmtHistorik.push({ spørgsmål, svar: data.svar });
+    } else {
+      _mgmtTilfoejBesked(spørgsmål, { svar: '⚠ Fejl: ' + (data.detail || 'Ukendt fejl'), graf: null }, false);
+    }
+  } catch(e) {
+    const old = document.getElementById(loadingId);
+    if (old) old.remove();
+    _mgmtTilfoejBesked(spørgsmål, { svar: '⚠ Netværksfejl: ' + e.message, graf: null }, false);
+  } finally {
+    btn.disabled = false;
   }
 }
 

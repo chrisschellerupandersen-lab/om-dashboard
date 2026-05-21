@@ -3916,3 +3916,200 @@ def hent_seneste_management_review() -> dict | None:
     parsed = json.loads(row["indhold_json"])
     parsed["_db_genereret"] = row["genereret_dato"]
     return parsed
+
+
+def hent_data_til_spørgsmål() -> dict:
+    """Henter detaljeret data-kontekst til Q&A — mere granulat end management review."""
+    from datetime import date, timedelta
+    _DAGE = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+    today = date.today()
+
+    with _conn() as conn:
+        # Daglig omsætning seneste 60 dage
+        dage_60 = conn.execute("""
+            SELECT dato,
+                   ROUND(SUM(omsætning),0) AS oms,
+                   ROUND(SUM(avance),0)    AS db_kr,
+                   SUM(antal)              AS antal
+            FROM transaktioner
+            WHERE dato >= date('now','-60 days')
+            GROUP BY dato ORDER BY dato
+        """).fetchall()
+
+        # Ugentlig seneste 16 uger
+        uger_16 = conn.execute("""
+            SELECT strftime('%Y-%W', dato) AS uge_key,
+                   MIN(dato) AS fra, MAX(dato) AS til,
+                   ROUND(SUM(omsætning),0) AS oms,
+                   ROUND(SUM(avance),0)    AS db_kr,
+                   COUNT(DISTINCT dato)    AS dage
+            FROM transaktioner
+            WHERE dato >= date('now','-112 days')
+            GROUP BY uge_key ORDER BY uge_key
+        """).fetchall()
+
+        # Top 30 produkter seneste 30 dage
+        top30 = conn.execute("""
+            SELECT varenavn, kategori,
+                   ROUND(SUM(omsætning),0)  AS oms,
+                   SUM(antal)               AS antal,
+                   ROUND(AVG(omsætning/NULLIF(antal,0)),2) AS pris,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
+            FROM transaktioner
+            WHERE dato >= date('now','-30 days') AND varenavn != ''
+            GROUP BY varenavn ORDER BY oms DESC LIMIT 30
+        """).fetchall()
+
+        # Kategorier seneste 30 dage
+        kats = conn.execute("""
+            SELECT kategori,
+                   ROUND(SUM(omsætning),0)  AS oms,
+                   ROUND(SUM(avance),0)      AS db_kr,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
+                   SUM(antal)               AS antal
+            FROM transaktioner
+            WHERE dato >= date('now','-30 days') AND kategori != ''
+            GROUP BY kategori ORDER BY oms DESC
+        """).fetchall()
+
+        # Dag-af-uge snit seneste 12 uger
+        dag_snit = conn.execute("""
+            SELECT CAST(strftime('%w',dato) AS INTEGER) AS dag_nr,
+                   ROUND(AVG(dag_oms),0) AS snit_oms,
+                   ROUND(AVG(dag_db),0)  AS snit_db,
+                   COUNT(*)              AS uger
+            FROM (
+                SELECT dato,
+                       SUM(omsætning) AS dag_oms,
+                       SUM(avance)    AS dag_db
+                FROM transaktioner
+                WHERE dato >= date('now','-84 days')
+                GROUP BY dato
+            )
+            GROUP BY dag_nr ORDER BY dag_nr
+        """).fetchall()
+
+        # Månedlig seneste 12 måneder
+        maaned = conn.execute("""
+            SELECT strftime('%Y-%m', dato) AS mnd,
+                   ROUND(SUM(omsætning),0) AS oms,
+                   ROUND(SUM(avance),0)    AS db_kr
+            FROM transaktioner
+            WHERE dato >= date('now','-365 days')
+            GROUP BY mnd ORDER BY mnd
+        """).fetchall()
+
+    dag_navne = {0:'søndag',1:'mandag',2:'tirsdag',3:'onsdag',4:'torsdag',5:'fredag',6:'lørdag'}
+
+    return {
+        "dato_idag": str(today),
+        "dag_idag": _DAGE[today.weekday()],
+        "dage_60": [dict(r) for r in dage_60],
+        "uger_16": [dict(r) for r in uger_16],
+        "top30": [dict(r) for r in top30],
+        "kategorier": [dict(r) for r in kats],
+        "dag_snit": [{**dict(r), "dag": dag_navne.get(r["dag_nr"], "?")} for r in dag_snit],
+        "maaneder": [dict(r) for r in maaned],
+    }
+
+
+def besvar_data_spørgsmål(spørgsmål: str, historik: list, api_key: str) -> dict:
+    """Besvarer et naturligt spørgsmål om butiksdata med tal og evt. graf."""
+    import anthropic, json
+    from datetime import date
+    _DAGE = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+    today = date.today()
+    dag_navn = _DAGE[today.weekday()]
+
+    d = hent_data_til_spørgsmål()
+
+    # Byg data-kontekst som kompakt tekst
+    ctx = [
+        f"DATO I DAG: {today} ({dag_navn})",
+        "",
+        "DAGLIG OMSÆTNING seneste 60 dage:",
+    ]
+    for r in d["dage_60"]:
+        db_pct = round(r['db_kr']*100/r['oms'],1) if r.get('oms') and r['oms']>0 else 0
+        ctx.append(f"  {r['dato']}: {r['oms']:,.0f} kr  DB {db_pct}%  {r['antal']} solgte enheder")
+
+    ctx += ["", "UGENTLIG OMSÆTNING seneste 16 uger:"]
+    for r in d["uger_16"]:
+        db_pct = round(r['db_kr']*100/r['oms'],1) if r.get('oms') and r['oms']>0 else 0
+        ctx.append(f"  {r['fra']} til {r['til']}: {r['oms']:,.0f} kr  DB {db_pct}%  ({r['dage']} dage)")
+
+    ctx += ["", "MÅNEDLIG OMSÆTNING:"]
+    for r in d["maaneder"]:
+        db_pct = round(r['db_kr']*100/r['oms'],1) if r.get('oms') and r['oms']>0 else 0
+        ctx.append(f"  {r['mnd']}: {r['oms']:,.0f} kr  DB {db_pct}%")
+
+    ctx += ["", "DAG-AF-UGE SNIT (seneste 12 uger):"]
+    for r in sorted(d["dag_snit"], key=lambda x: (x['dag_nr']+6)%7):
+        ctx.append(f"  {r['dag']}: {r['snit_oms']:,.0f} kr snit  DB {r['snit_db']:,.0f} kr")
+
+    ctx += ["", "TOP 30 PRODUKTER (seneste 30 dage):"]
+    for r in d["top30"]:
+        ctx.append(f"  {r['varenavn']} ({r['kategori']}): {r['oms']:,.0f} kr  {r['antal']} stk  {r['db_pct']}% DB")
+
+    ctx += ["", "KATEGORIER (seneste 30 dage):"]
+    for r in d["kategorier"]:
+        ctx.append(f"  {r['kategori']}: {r['oms']:,.0f} kr  {r['db_pct']}% DB  {r['antal']} enheder")
+
+    data_tekst = "\n".join(ctx)
+
+    # Byg samtalehistorik
+    messages = []
+    for h in historik[-4:]:  # maks 4 tidligere udvekslinger
+        messages.append({"role": "user",      "content": h["spørgsmål"]})
+        messages.append({"role": "assistant", "content": json.dumps(h["svar"], ensure_ascii=False)})
+
+    system = f"""Du er dataanalytiker for Organic Market Greve. Du har adgang til butikkens salgsdata.
+
+{data_tekst}
+
+Besvar brugerens spørgsmål på DANSK. Returner KUN valid JSON — ingen markdown, ingen tekst udenfor JSON:
+
+{{
+  "svar": "Tekst-svar med konkrete tal fra data. Brug linjeskift (\\n) til at strukturere svaret.",
+  "graf": null
+}}
+
+ELLER hvis en graf er relevant:
+{{
+  "svar": "Tekst-svar med konkrete tal.",
+  "graf": {{
+    "type": "bar",
+    "titel": "Grafens titel",
+    "x_label": "X-akse label (valgfri)",
+    "y_label": "Y-akse label (valgfri)",
+    "labels": ["Label1", "Label2", ...],
+    "datasets": [
+      {{"label": "Serie navn", "data": [tal1, tal2, ...], "farve": "forest"}}
+    ]
+  }}
+}}
+
+Graf-regler:
+- type: "bar", "line", "pie" eller "doughnut"
+- farver: "forest" (mørkegrøn), "moss" (lysgrøn), "amber" (guld), "danger" (rød), "ash" (grå)
+- Brug kun graf når det giver reel visuel værdi (trends, sammenligninger, fordelinger)
+- Maks 2 datasets i samme graf
+- labels: maks 16 punkter (aggreger hvis nødvendigt)
+- Alle tal skal være numeriske (ikke strenge)"""
+
+    messages.append({"role": "user", "content": spørgsmål})
+
+    client = anthropic.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=1200,
+        system=system,
+        messages=messages,
+    )
+    raw = msg.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"): raw = raw[4:]
+    raw = raw.strip()
+
+    return json.loads(raw)

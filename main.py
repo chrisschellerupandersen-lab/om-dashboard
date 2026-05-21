@@ -1230,3 +1230,21 @@ async def management_review_opdater(request: Request):
         return {"ok": True, "review": review}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fejl ved generering: {str(e)}")
+
+
+@app.post("/api/management/spørg")
+async def management_spørg(request: Request):
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY ikke sat")
+    body = await request.json()
+    spørgsmål = (body.get("spørgsmål") or "").strip()
+    historik   = body.get("historik", [])
+    if not spørgsmål:
+        raise HTTPException(status_code=400, detail="Mangler spørgsmål")
+    try:
+        svar = database.besvar_data_spørgsmål(spørgsmål, historik, api_key)
+        return {"ok": True, "svar": svar}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

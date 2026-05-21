@@ -149,6 +149,14 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_retur_uge ON retur_detaljer(uge, aar);
 
+            CREATE TABLE IF NOT EXISTS management_review (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                genereret_dato  TEXT    NOT NULL DEFAULT (datetime('now','localtime')),
+                model           TEXT    DEFAULT 'claude',
+                data_snapshot   TEXT,
+                indhold_json    TEXT    NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS varestamdata (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 sku          TEXT    DEFAULT '',
@@ -3606,3 +3614,292 @@ def hent_retur_historik(n: int = 16) -> list:
             LIMIT ?
         """, (n,)).fetchall()
         return [dict(r) for r in rows]
+
+
+# ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
+
+def hent_management_data() -> dict:
+    """Samler alle relevante KPI-data til management review."""
+    from datetime import date, timedelta
+    today = date.today()
+    aar = today.year
+
+    with _conn() as conn:
+        # Seneste 8 uger omsætning + transaktioner
+        uger_8 = conn.execute("""
+            SELECT strftime('%Y', dato) AS aar,
+                   CAST(strftime('%W', dato) AS INTEGER) + 1 AS uge_approx,
+                   MIN(dato) AS uge_start, MAX(dato) AS uge_slut,
+                   SUM(omsætning) AS oms, COUNT(DISTINCT dato) AS dage,
+                   SUM(antal) AS antal_solgt
+            FROM transaktioner
+            WHERE dato >= date('now','-56 days')
+            GROUP BY strftime('%Y-%W', dato)
+            ORDER BY dato DESC
+            LIMIT 8
+        """).fetchall()
+
+        # Ugentlig omsætning i ISO-uger, seneste 10
+        uger_iso = conn.execute("""
+            SELECT
+                CAST(strftime('%Y', dato) AS INTEGER) AS aar,
+                CAST(strftime('%W', dato) AS INTEGER)+1 AS uge,
+                MIN(dato) AS fra, MAX(dato) AS til,
+                ROUND(SUM(omsætning),0) AS oms,
+                ROUND(SUM(avance),0) AS db_kr,
+                COUNT(DISTINCT dato) AS dage
+            FROM transaktioner
+            WHERE dato >= date('now','-70 days')
+            GROUP BY strftime('%Y-%W', dato)
+            ORDER BY dato DESC
+            LIMIT 10
+        """).fetchall()
+
+        # DB% per kategori, seneste 30 dage
+        kat_db = conn.execute("""
+            SELECT kategori,
+                   ROUND(SUM(omsætning),0) AS oms,
+                   ROUND(SUM(avance),0) AS db_kr,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
+            FROM transaktioner
+            WHERE dato >= date('now','-30 days') AND kategori != ''
+            GROUP BY kategori
+            ORDER BY oms DESC
+            LIMIT 12
+        """).fetchall()
+
+        # Top 10 produkter seneste 14 dage
+        top_prod = conn.execute("""
+            SELECT varenavn,
+                   ROUND(SUM(omsætning),0) AS oms,
+                   SUM(antal) AS antal,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
+            FROM transaktioner
+            WHERE dato >= date('now','-14 days') AND varenavn != ''
+            GROUP BY varenavn
+            ORDER BY oms DESC
+            LIMIT 10
+        """).fetchall()
+
+        # Dag-af-uge mønster (snit omsætning per ugedag, seneste 8 uger)
+        dag_snit = conn.execute("""
+            SELECT
+                CASE CAST(strftime('%w',dato) AS INTEGER)
+                    WHEN 1 THEN 'Mandag' WHEN 2 THEN 'Tirsdag' WHEN 3 THEN 'Onsdag'
+                    WHEN 4 THEN 'Torsdag' WHEN 5 THEN 'Fredag' WHEN 6 THEN 'Lørdag'
+                    ELSE 'Søndag'
+                END AS dag,
+                CAST(strftime('%w',dato) AS INTEGER) AS dag_nr,
+                ROUND(AVG(dag_oms),0) AS snit_oms,
+                COUNT(*) AS uger
+            FROM (
+                SELECT dato, SUM(omsætning) AS dag_oms
+                FROM transaktioner
+                WHERE dato >= date('now','-56 days')
+                GROUP BY dato
+            )
+            GROUP BY dag_nr
+            ORDER BY dag_nr
+        """).fetchall()
+
+        # Kommende events (næste 30 dage)
+        events = conn.execute("""
+            SELECT navn, dato, note, factor
+            FROM events
+            WHERE dato >= date('now') AND dato <= date('now','+30 days')
+            ORDER BY dato
+            LIMIT 10
+        """).fetchall() if _tabel_findes(conn, 'events') else []
+
+        # Retur seneste 4 uger
+        retur_hist = conn.execute("""
+            SELECT uge, aar,
+                   SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
+                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener
+            FROM retur_detaljer
+            GROUP BY uge, aar
+            ORDER BY aar DESC, uge DESC
+            LIMIT 4
+        """).fetchall()
+
+        # Seneste dag
+        seneste_dato = conn.execute(
+            "SELECT MAX(dato) FROM transaktioner"
+        ).fetchone()[0]
+        seneste_dag = conn.execute("""
+            SELECT ROUND(SUM(omsætning),0) AS oms, ROUND(SUM(avance),0) AS db_kr,
+                   COUNT(DISTINCT varenavn) AS produkter
+            FROM transaktioner WHERE dato = ?
+        """, (seneste_dato,)).fetchone() if seneste_dato else None
+
+        # Ugebestillinger aktuel + næste uge
+        iso_nu = today.isocalendar()
+        iso_naeste = (today + timedelta(weeks=1)).isocalendar()
+        best_nu = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 20
+        """, (iso_nu[1], iso_nu[0])).fetchall()
+        best_naeste = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 20
+        """, (iso_naeste[1], iso_naeste[0])).fetchall()
+
+    return {
+        "dato_idag": str(today),
+        "seneste_salgsdag": seneste_dato,
+        "seneste_dag": dict(seneste_dag) if seneste_dag else {},
+        "uger": [dict(r) for r in uger_iso],
+        "kategorier_db": [dict(r) for r in kat_db],
+        "top_produkter": [dict(r) for r in top_prod],
+        "dag_snit": [dict(r) for r in dag_snit],
+        "events": [dict(r) for r in events],
+        "retur_hist": [dict(r) for r in retur_hist],
+        "bestilling_nu": [dict(r) for r in best_nu],
+        "bestilling_naeste": [dict(r) for r in best_naeste],
+    }
+
+
+def _tabel_findes(conn, navn: str) -> bool:
+    r = conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (navn,)
+    ).fetchone()
+    return bool(r)
+
+
+def _format_management_prompt(d: dict) -> str:
+    """Formaterer data til et læsbart prompt til Claude."""
+    lines = [
+        "Du er et erfarent management team for Organic Market Greve — en dansk økobutik der sælger bagværk, råvarer, mejeriprodukter og specialprodukter.",
+        "Butikken bestiller bagværk fra en bagerleverandør ugentligt (boller, wienerbrød, brød) og registrerer spild/retur.",
+        "",
+        f"DATO I DAG: {d['dato_idag']}",
+        f"SENESTE SALGSDAG: {d['seneste_salgsdag']}",
+        "",
+    ]
+
+    if d.get('seneste_dag') and d['seneste_dag'].get('oms'):
+        sd = d['seneste_dag']
+        lines.append(f"SENESTE DAG: {sd.get('oms',0):,.0f} kr omsætning, {sd.get('db_kr',0):,.0f} kr DB, {sd.get('produkter',0)} produktlinjer")
+        lines.append("")
+
+    if d.get('uger'):
+        lines.append("UGENTLIG OMSÆTNING (nyeste først):")
+        for u in d['uger'][:8]:
+            db_pct = round(u['db_kr']*100/u['oms'], 1) if u.get('oms') and u['oms'] > 0 else 0
+            lines.append(f"  Uge {u['uge']}/{u['aar']}: {u.get('oms',0):,.0f} kr, DB {u.get('db_kr',0):,.0f} kr ({db_pct}%), {u.get('dage',0)} salgsdage")
+        lines.append("")
+
+    if d.get('kategorier_db'):
+        lines.append("DB% PER KATEGORI (seneste 30 dage):")
+        for k in d['kategorier_db']:
+            lines.append(f"  {k['kategori']}: {k.get('oms',0):,.0f} kr oms, {k.get('db_pct',0)}% DB")
+        lines.append("")
+
+    if d.get('dag_snit'):
+        lines.append("GENNEMSNIT OMS. PER UGEDAG (seneste 8 uger):")
+        for dag in sorted(d['dag_snit'], key=lambda x: x.get('dag_nr', 0)):
+            lines.append(f"  {dag['dag']}: {dag.get('snit_oms',0):,.0f} kr snit ({dag.get('uger',0)} uger data)")
+        lines.append("")
+
+    if d.get('top_produkter'):
+        lines.append("TOP 10 PRODUKTER (seneste 14 dage):")
+        for p in d['top_produkter']:
+            lines.append(f"  {p['varenavn']}: {p.get('oms',0):,.0f} kr, {p.get('antal',0)} stk, {p.get('db_pct',0)}% DB")
+        lines.append("")
+
+    if d.get('retur_hist'):
+        lines.append("RETUR BAGVÆRK (seneste 4 uger):")
+        for r in d['retur_hist']:
+            lines.append(f"  Uge {r['uge']}/{r['aar']}: {r.get('boller',0)} boller, {r.get('wiener',0)} wienerbrød returneret")
+        lines.append("")
+
+    if d.get('bestilling_nu'):
+        lines.append(f"BESTILLING AKTUEL UGE (top varer):")
+        for b in d['bestilling_nu'][:10]:
+            lines.append(f"  {b['varenavn']}: {b.get('total_antal',0)} stk")
+        lines.append("")
+
+    if d.get('events'):
+        lines.append("KOMMENDE BEGIVENHEDER (næste 30 dage):")
+        for e in d['events']:
+            lines.append(f"  {e['dato']}: {e['navn']} (faktor {e.get('factor',1.0)}) — {e.get('note','')}")
+        lines.append("")
+
+    lines += [
+        "---",
+        "Lav en management review på DANSK. Returner KUN valid JSON i dette format (ingen markdown, ingen forklaring udenfor JSON):",
+        "",
+        '{"sektioner": [',
+        '  {"id": "performance", "titel": "Ugentlig Performance", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
+        '  {"id": "bestilling", "titel": "Bestillingsanbefalinger", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
+        '  {"id": "opmærksomhed", "titel": "Opmærksomhedspunkter", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
+        '  {"id": "tiltag", "titel": "Forretningstiltag", "tone": "positiv|neutral|advarsel", "tekst": "..."}',
+        ']}',
+        "",
+        "Regler:",
+        "- Vær KONKRET — brug faktiske tal fra data",
+        "- tone: 'positiv' hvis godt, 'advarsel' hvis noget kræver handling, 'neutral' ellers",
+        "- Hvert afsnit: 3-6 sætninger. Brug \\n\\n til afsnit inden for tekst",
+        "- Skriv som et management team der kender forretningen — ikke generisk",
+        "- Bestillingsanbefalinger: giv SPECIFIKKE % eller stk-justeringer baseret på data",
+        "- Forretningstiltag: 2-3 konkrete, handlingsorienterede forslag",
+    ]
+    return "\n".join(lines)
+
+
+def generer_management_review(api_key: str) -> dict:
+    """Kalder Claude API og gemmer review i databasen. Returnerer det nye review."""
+    import anthropic, json
+    from datetime import datetime
+
+    data = hent_management_data()
+    prompt = _format_management_prompt(data)
+
+    client = anthropic.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-opus-4-5",
+        max_tokens=2000,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = msg.content[0].text.strip()
+
+    # Udtræk JSON (robusthed: fjern evt. markdown-wrapper)
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    raw = raw.strip()
+
+    parsed = json.loads(raw)
+    parsed["genereret"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    parsed["model"] = "claude-opus-4-5"
+
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO management_review (data_snapshot, indhold_json) VALUES (?,?)",
+            (json.dumps(data, ensure_ascii=False, default=str),
+             json.dumps(parsed, ensure_ascii=False))
+        )
+        # Behold kun de 10 seneste
+        conn.execute("""
+            DELETE FROM management_review
+            WHERE id NOT IN (
+                SELECT id FROM management_review ORDER BY id DESC LIMIT 10
+            )
+        """)
+
+    return parsed
+
+
+def hent_seneste_management_review() -> dict | None:
+    """Henter det seneste gemte management review."""
+    import json
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT indhold_json, genereret_dato FROM management_review ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    if not row:
+        return None
+    parsed = json.loads(row["indhold_json"])
+    parsed["_db_genereret"] = row["genereret_dato"]
+    return parsed

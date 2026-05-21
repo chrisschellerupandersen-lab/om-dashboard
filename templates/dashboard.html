@@ -911,6 +911,43 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- MANAGEMENT REVIEW -->
+      <div class="panel" id="p-management">
+        <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2>Management Review</h2>
+            <p>AI-genereret opsummering · trends · anbefalinger · tiltag</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span id="mgmt-timestamp" style="font-size:11px;color:var(--ash);font-family:'DM Mono',monospace;"></span>
+            <button id="mgmt-opdater-btn" onclick="mgmtOpdater()"
+              style="padding:7px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:3px;cursor:pointer;font-size:12px;letter-spacing:.04em;">
+              ↻ Opdater analyse
+            </button>
+          </div>
+        </div>
+
+        <!-- Spinner / fejl -->
+        <div id="mgmt-spinner" style="display:none;text-align:center;padding:40px;color:var(--ash);">
+          <div style="font-size:14px;margin-bottom:8px;">Analyserer data med AI…</div>
+          <div style="font-size:11px;color:var(--ash);">Tager typisk 5-15 sekunder</div>
+        </div>
+        <div id="mgmt-fejl" style="display:none;padding:16px;background:#fff5f5;border:1px solid #fcc;border-radius:4px;color:#c00;font-size:13px;margin-bottom:16px;"></div>
+
+        <!-- Ingen data endnu -->
+        <div id="mgmt-ingen-data" style="display:none;text-align:center;padding:48px;color:var(--ash);">
+          <div style="font-size:32px;margin-bottom:12px;">🤖</div>
+          <div style="font-size:14px;font-weight:600;color:var(--charcoal);margin-bottom:6px;">Ingen analyse endnu</div>
+          <div style="font-size:12px;color:var(--ash);margin-bottom:20px;">Tryk "Opdater analyse" for at generere din første management review</div>
+          <button onclick="mgmtOpdater()" style="padding:10px 24px;background:var(--forest);color:var(--amber);border:none;border-radius:3px;cursor:pointer;font-size:13px;">
+            ↻ Generer nu
+          </button>
+        </div>
+
+        <!-- Review sektioner -->
+        <div id="mgmt-sektioner" style="display:none;"></div>
+      </div>
+
       <!-- SENESTE DAG -->
       <div class="panel" id="p-dag">
         <div class="page-hdr">
@@ -2532,6 +2569,7 @@ const NAV_SVG = {
 };
 const NAV_DEFAULT = [
   {id:'forside',     label:'Overblik',              group:'Dagsoverblik',        hidden:false},
+  {id:'management',  label:'Management Review',     group:'Dagsoverblik',        hidden:false},
   {id:'dag',         label:'Seneste dag',           group:'Dagsoverblik',        hidden:false},
   {id:'time',        label:'Timeprofil',            group:'Dagsoverblik',        hidden:false},
   {id:'dagedetaljer',label:'Dage & produkter',      group:'Dagsoverblik',        hidden:false},
@@ -6474,6 +6512,7 @@ window.showPanel = function(id, el) {
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
   if (id === 'stamdata')   loadStamdata();
+  if (id === 'management') mgmtIndlaes();
 };
 
 // ── VARESTAMDATA ─────────────────────────────────────────────────────────────
@@ -7358,6 +7397,96 @@ async function retVisUge(uge, aar) {
 }
 
 // retInit() kaldes via den centrale showPanel-kæde
+
+// ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
+
+const MGMT_TONE = {
+  positiv:   { bg: '#f0f7f0', border: 'var(--moss)', dot: 'var(--forest)', label: '↑' },
+  neutral:   { bg: 'var(--card)', border: 'var(--border)', dot: 'var(--ash)', label: '→' },
+  advarsel:  { bg: '#fffbe6', border: '#e6c600', dot: '#8a6800', label: '⚠' },
+};
+
+function mgmtVisReview(review) {
+  const sekEl  = document.getElementById('mgmt-sektioner');
+  const tsEl   = document.getElementById('mgmt-timestamp');
+  const nEl    = document.getElementById('mgmt-ingen-data');
+  const fejlEl = document.getElementById('mgmt-fejl');
+  fejlEl.style.display = 'none';
+  nEl.style.display    = 'none';
+
+  if (review && review.sektioner && review.sektioner.length) {
+    tsEl.textContent = 'Sidst opdateret: ' + (review.genereret || review._db_genereret || '');
+    sekEl.innerHTML = review.sektioner.map(sek => {
+      const t = MGMT_TONE[sek.tone] || MGMT_TONE.neutral;
+      const afsnit = (sek.tekst || '').split('\n\n').filter(Boolean);
+      const html = afsnit.map(a =>
+        `<p style="margin:0 0 10px 0;font-size:13px;line-height:1.65;color:var(--charcoal);">${a.replace(/\n/g,'<br>')}</p>`
+      ).join('');
+      return `
+        <div style="background:${t.bg};border:1px solid ${t.border};border-radius:6px;padding:18px 20px;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+            <span style="width:8px;height:8px;border-radius:50%;background:${t.dot};flex-shrink:0;"></span>
+            <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;color:${t.dot};font-weight:600;">${sek.titel.toUpperCase()}</div>
+            <span style="margin-left:auto;font-size:11px;color:${t.dot};opacity:.7;">${t.label}</span>
+          </div>
+          <div>${html}</div>
+        </div>`;
+    }).join('');
+    sekEl.style.display = '';
+  } else {
+    nEl.style.display    = '';
+    sekEl.style.display  = 'none';
+  }
+}
+
+async function mgmtIndlaes() {
+  try {
+    const res  = await fetch('/api/management/review');
+    const data = await res.json();
+    if (data.ok && data.review) {
+      mgmtVisReview(data.review);
+    } else {
+      document.getElementById('mgmt-ingen-data').style.display = '';
+      document.getElementById('mgmt-sektioner').style.display  = 'none';
+    }
+  } catch(e) {
+    document.getElementById('mgmt-ingen-data').style.display = '';
+  }
+}
+
+async function mgmtOpdater() {
+  const btn    = document.getElementById('mgmt-opdater-btn');
+  const spin   = document.getElementById('mgmt-spinner');
+  const sekEl  = document.getElementById('mgmt-sektioner');
+  const nEl    = document.getElementById('mgmt-ingen-data');
+  const fejlEl = document.getElementById('mgmt-fejl');
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Analyserer…';
+  spin.style.display  = '';
+  sekEl.style.display = 'none';
+  nEl.style.display   = 'none';
+  fejlEl.style.display= 'none';
+
+  try {
+    const res  = await fetch('/api/management/review/opdater', { method: 'POST' });
+    const data = await res.json();
+    spin.style.display = 'none';
+    if (data.ok && data.review) {
+      mgmtVisReview(data.review);
+    } else {
+      fejlEl.textContent = 'Fejl: ' + (data.detail || 'Ukendt fejl');
+      fejlEl.style.display = '';
+    }
+  } catch(e) {
+    spin.style.display = 'none';
+    fejlEl.textContent = 'Netværksfejl: ' + e.message;
+    fejlEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Opdater analyse';
+  }
+}
 
 // ── FORSIDE: RETUR STATUS KPI ─────────────────────────────────────────────────
 async function loadReturStatus() {

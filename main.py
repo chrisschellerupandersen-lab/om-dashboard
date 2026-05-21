@@ -1206,3 +1206,27 @@ async def opdater_rapport(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fejl ved behandling: {str(e)}")
+
+
+# ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
+
+@app.get("/api/management/review")
+async def management_review_hent(request: Request):
+    _kræv_login(request)
+    data = database.hent_seneste_management_review()
+    if not data:
+        return {"ok": False, "ingen_data": True}
+    return {"ok": True, "review": data}
+
+
+@app.post("/api/management/review/opdater")
+async def management_review_opdater(request: Request):
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY ikke sat i miljøvariable")
+    try:
+        review = database.generer_management_review(api_key)
+        return {"ok": True, "review": review}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Fejl ved generering: {str(e)}")

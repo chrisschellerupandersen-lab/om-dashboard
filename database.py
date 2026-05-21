@@ -495,9 +495,11 @@ def hent_kpi(aar: int = None) -> Dict:
 
         # Bestillingsdata for ugen: antal og kr per kategori (wiener / boller)
         _W = ("LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%croissant%'"
+              " OR LOWER(varenavn) LIKE '%crossaint%'"
               " OR LOWER(varenavn) LIKE '%snegl%' OR LOWER(varenavn) LIKE '%snurrer%'"
               " OR LOWER(varenavn) LIKE '%tebirkes%' OR LOWER(varenavn) LIKE '%grovbirkes%'"
-              " OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%kanelstang%'")
+              " OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%kanelstang%'"
+              " OR LOWER(varenavn) LIKE '%frøsnapper%'")
         _B = ("LOWER(varenavn) LIKE '%bolle%' OR LOWER(varenavn) LIKE '%hveder%'"
               " OR LOWER(varenavn) LIKE '%musli%' OR LOWER(varenavn) LIKE '%teboller%'")
         bestil_wien = conn.execute(f"""

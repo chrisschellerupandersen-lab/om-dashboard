@@ -6919,21 +6919,23 @@ function _retIGaar() {
   return d.toISOString().slice(0, 10);
 }
 
-// Helper: beregn "retur-uge" ud fra en dato
-// Regel: find den søndag der afsluttede ugen → brug dens ISO-uge
-// Søndag (day=0) hører til sin EGEN uge (er ikke "forrige")
+// Helper: beregn ISO-uge (og år) for en dato
+// Bruger ISO-uge direkte (samme logik som Python isocalendar)
 function _retBeregUge(dato) {
-  const d = dato instanceof Date ? dato : new Date((dato || new Date()));
-  const day = d.getDay(); // 0=søn, 1=man … 6=lør
-  // Gå tilbage til seneste søndag (eller bliv på datoen hvis den ER søndag)
-  const soend = new Date(d);
-  soend.setDate(d.getDate() - day); // day=0 → 0 dage tilbage = same day
-  // ISO uge af den søndag
-  const tmp = new Date(soend.valueOf());
-  tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
-  const aarStart = new Date(tmp.getFullYear(), 0, 1);
-  const uge = Math.ceil(((tmp - aarStart) / 86400000 + 1) / 7);
-  return { uge, aar: soend.getFullYear() };
+  const d = dato instanceof Date ? new Date(dato) : new Date((dato || new Date()));
+  d.setHours(12, 0, 0, 0); // Undgå DST-problemer
+  // ISO: mandag=1 … søndag=7
+  const dow = d.getDay() === 0 ? 7 : d.getDay();
+  // Torsdagen i denne uge (ISO-uger defineres af deres torsdag)
+  const thu = new Date(d);
+  thu.setDate(d.getDate() - dow + 4);
+  const year = thu.getFullYear();
+  // Første torsdag i året = første januar der er en torsdag
+  const jan4 = new Date(year, 0, 4);
+  const jan4dow = jan4.getDay() === 0 ? 7 : jan4.getDay();
+  const firstThu = new Date(year, 0, 4 - jan4dow + 4);
+  const uge = Math.round((thu - firstThu) / (7 * 86400000)) + 1;
+  return { uge, aar: year };
 }
 
 function retInit() {
@@ -7376,14 +7378,15 @@ async function loadReturStatus() {
 
     const green = 'var(--forest)', ash = 'var(--ash)', gold = '#8a6800';
 
-    // Ugedag-status visual
+    // Ugedag-status visual — grøn=registreret, lys grå=ikke registreret
     if (dageEl && d.dage_status && d.dage_status.length) {
       dageEl.innerHTML = d.dage_status.map(dag => {
-        const ok   = dag.registreret;
-        const bg   = ok ? 'var(--forest)'                       : 'rgba(30,58,30,.08)';
-        const col  = ok ? '#fff'                                 : 'var(--ash)';
-        const tip  = dag.dato + (ok ? ' ✓' : '');
-        return `<div title="${tip}" style="flex:1;text-align:center;padding:3px 0;border-radius:4px;background:${bg};color:${col};font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.04em;">${dag.dag}</div>`;
+        const ok  = dag.registreret;
+        const bg  = ok ? 'var(--forest)' : 'rgba(0,0,0,.06)';
+        const col = ok ? '#fff' : 'var(--ash)';
+        const bdr = ok ? 'none' : '1px solid rgba(0,0,0,.10)';
+        const tip = dag.dato + (ok ? ' ✓' : ' –');
+        return `<div title="${tip}" style="flex:1;text-align:center;padding:4px 0;border-radius:4px;background:${bg};color:${col};border:${bdr};font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.04em;">${dag.dag}</div>`;
       }).join('');
       dageEl.style.display = 'flex';
     }

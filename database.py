@@ -3430,19 +3430,21 @@ def gem_retur_detaljer(uge: int, aar: int, items: list, dato: str) -> int:
 
 
 def hent_retur_dage_status(uge: int, aar: int) -> list:
-    """Returnerer liste over 7 dage (Man-Søn) med info om hvilke der har registrering."""
-    from datetime import date as _date
+    """Returnerer liste over 7 dage (Man-Søn) med info om hvilke der har registrering.
+    Søger på dato-interval (ikke uge-felt) så data gemt med forkert uge-nummer stadig matches."""
+    from datetime import date as _date, timedelta as _td
+    mandag = _date.fromisocalendar(aar, uge, 1)
+    sondag = mandag + _td(days=6)
     with _conn() as conn:
         rows = conn.execute(
-            "SELECT DISTINCT registreret_dato FROM retur_detaljer WHERE uge=? AND aar=? ORDER BY registreret_dato",
-            (uge, aar)
+            "SELECT DISTINCT registreret_dato FROM retur_detaljer WHERE registreret_dato >= ? AND registreret_dato <= ? ORDER BY registreret_dato",
+            (mandag.isoformat(), sondag.isoformat())
         ).fetchall()
     reg_datoer = {r['registreret_dato'] for r in rows}
     dage_navne = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
-    mandag = _date.fromisocalendar(aar, uge, 1)
     result = []
     for i in range(7):
-        dag = mandag + __import__('datetime').timedelta(days=i)
+        dag = mandag + _td(days=i)
         dato_str = dag.isoformat()
         result.append({
             'dag': dage_navne[i],
@@ -3510,13 +3512,19 @@ def hent_retur_kpi() -> dict:
     aktuel_uge = int(yesterday_iso[1])
     aktuel_aar = int(yesterday_iso[0])
 
+    # Datointerval for aktuel uge (søg på dato ikke uge-felt — JS gemte muligvis forkert uge)
+    mandag_uge = date.fromisocalendar(aktuel_aar, aktuel_uge, 1)
+    sondag_uge = mandag_uge + timedelta(days=6)
+    mandag_str = mandag_uge.isoformat()
+    sondag_str = sondag_uge.isoformat()
+
     with _conn() as conn:
         aktuel = conn.execute("""
             SELECT SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
                    SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener,
                    MAX(registreret_dato) AS dato
-            FROM retur_detaljer WHERE uge=? AND aar=?
-        """, (aktuel_uge, aktuel_aar)).fetchone()
+            FROM retur_detaljer WHERE registreret_dato >= ? AND registreret_dato <= ?
+        """, (mandag_str, sondag_str)).fetchone()
 
         seneste = conn.execute("""
             SELECT uge, aar, MAX(registreret_dato) AS dato,

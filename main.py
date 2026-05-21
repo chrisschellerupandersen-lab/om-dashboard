@@ -132,6 +132,23 @@ async def api_dag_db_detalje(request: Request):
     return database.hent_dag_db_detalje()
 
 
+@app.get("/api/debug/varenummer")
+async def api_debug_varenummer(request: Request, navn: str = ""):
+    _kræv_login(request)
+    import database as db
+    with db._conn() as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT varenavn, varenummer, kategori,
+                   COUNT(*) as linjer,
+                   MAX(dato) as seneste
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE ?
+            GROUP BY varenavn, varenummer, kategori
+            ORDER BY seneste DESC LIMIT 20
+        """, (f"%{navn.lower()}%",)).fetchall()
+    return [dict(r) for r in rows]
+
+
 @app.get("/api/salg/idag")
 async def api_idag(request: Request, aar: Optional[int] = None):
     _kræv_login(request)

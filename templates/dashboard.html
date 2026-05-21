@@ -1621,7 +1621,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div id="ret-bekraeft-kort" class="card" style="display:none;margin-bottom:12px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
             <div style="font-size:12px;color:var(--ash);letter-spacing:.06em;">✅ BEKRÆFT RETUR — UGE <span id="ret-bekr-uge">—</span></div>
-            <button onclick="retNulstil()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:4px;padding:4px 10px;cursor:pointer;">← Ny seddel</button>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button onclick="retScanEndnu()"
+                style="font-size:11px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;padding:5px 10px;cursor:pointer;">📷 Scan endnu en</button>
+              <button id="ret-ryd-alt" onclick="if(confirm('Ryd hele listen?')){_retItems=[];retVisItems();}" style="font-size:11px;background:none;border:1px solid rgba(192,57,43,.3);color:var(--danger);border-radius:4px;padding:5px 10px;cursor:pointer;display:none;">🗑 Ryd alt</button>
+              <button onclick="retNulstil()" style="font-size:11px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:4px;padding:5px 10px;cursor:pointer;">← Start forfra</button>
+            </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border);">
             <div style="font-size:10px;color:var(--ash);white-space:nowrap;">Foto taget:</div>
@@ -7133,12 +7138,22 @@ async function retScanFoto() {
       alert('Scan fejlede: ' + (data.fejl || 'Ukendt fejl'));
       return;
     }
-    _retItems = data.items || [];
+    const nyeItems = data.items || [];
+    // Akkumuler — tilføj til eksisterende liste frem for at erstatte
+    _retItems = _retItems.concat(nyeItems);
     retVisItems();
     const di = document.getElementById('ret-dato-input');
     if (di && !di.value) { di.value = _retIGaar(); }
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-upload-kort').style.display = 'none';
+    // Vis feedback
+    const st = document.getElementById('ret-gem-status');
+    if (st) {
+      st.textContent = '✓ ' + nyeItems.length + ' linjer scannet — i alt ' + _retItems.length + ' linjer. Scan endnu en seddel eller ret og gem.';
+      st.style.background = '#f0f7f0';
+      st.style.color = 'var(--forest)';
+      st.style.display = '';
+    }
   } catch(e) {
     scan.style.display = 'none';
     btn.disabled = false;
@@ -7149,26 +7164,31 @@ async function retScanFoto() {
 function retVisItems() {
   const tbody = document.getElementById('ret-items-body');
   const mono = "font-family:'DM Mono',monospace;";
+
+  // Ryd-alt knap øverst hvis der er items
+  const rydEl = document.getElementById('ret-ryd-alt');
+  if (rydEl) rydEl.style.display = _retItems.length ? '' : 'none';
+
   tbody.innerHTML = _retItems.map((it, i) => `
-    <tr style="border-bottom:1px solid var(--border);" id="ret-row-${i}">
-      <td style="padding:7px 4px;">
-        <input value="${it.produkt}" onchange="_retItems[${i}].produkt=this.value"
+    <tr style="border-bottom:1px solid var(--border);background:${i%2===0?'transparent':'rgba(30,58,30,.02)'};" id="ret-row-${i}">
+      <td style="padding:8px 4px;">
+        <input value="${it.produkt.replace(/"/g,'&quot;')}" onchange="_retItems[${i}].produkt=this.value"
           style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);font-size:13px;padding:2px 0;outline:none;">
       </td>
-      <td style="padding:7px 4px;text-align:center;">
+      <td style="padding:8px 4px;text-align:center;width:52px;">
         <input type="number" min="0" value="${it.antal}" onchange="_retItems[${i}].antal=parseInt(this.value)||0;retOpdaterSummer()"
-          style="width:50px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:13px;padding:2px 0;outline:none;">
+          style="width:48px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:13px;padding:2px 0;outline:none;">
       </td>
-      <td style="padding:7px 4px;text-align:center;">
+      <td style="padding:8px 4px;text-align:center;width:80px;">
         <select onchange="_retItems[${i}].kategori=this.value;retOpdaterSummer()"
-          style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:3px;font-size:11px;padding:2px 4px;">
-          <option value="boller"${it.kategori==='boller'?' selected':''}>🥐 Boller</option>
-          <option value="wienerbroed"${it.kategori==='wienerbroed'?' selected':''}>🥐 Wiener</option>
+          style="background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:3px;font-size:11px;padding:3px 4px;width:100%;">
+          <option value="boller"${it.kategori==='boller'?' selected':''}>Boller</option>
+          <option value="wienerbroed"${it.kategori==='wienerbroed'?' selected':''}>Wiener</option>
         </select>
       </td>
-      <td style="padding:7px 4px;text-align:center;">
+      <td style="padding:8px 4px;text-align:center;width:40px;">
         <button onclick="_retItems.splice(${i},1);retVisItems()"
-          style="background:none;border:none;color:var(--ash);cursor:pointer;font-size:16px;padding:0 4px;">×</button>
+          style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.25);color:var(--danger);cursor:pointer;font-size:18px;line-height:1;padding:4px 8px;border-radius:4px;font-weight:bold;">×</button>
       </td>
     </tr>`).join('');
   retOpdaterSummer();
@@ -7184,6 +7204,21 @@ function retOpdaterSummer() {
 function retTilfoejLinje() {
   _retItems.push({produkt:'', antal:1, kategori:'wienerbroed'});
   retVisItems();
+}
+
+function retScanEndnu() {
+  // Behold eksisterende items — vis bare upload-feltet igen så man kan scanne endnu en seddel
+  _retFotoFile = null;
+  const prev = document.getElementById('ret-preview-wrap');
+  const scan = document.getElementById('ret-scan-status');
+  const inp  = document.getElementById('ret-fil-input');
+  if (prev) prev.style.display = 'none';
+  if (scan) scan.style.display = 'none';
+  document.getElementById('ret-upload-kort').style.display = '';
+  if (inp) inp.value = '';
+  // Gem status ryd
+  const st = document.getElementById('ret-gem-status');
+  if (st) { st.textContent = 'Scan næste seddel — den tilføjes til listen herunder (' + _retItems.length + ' linjer i alt)'; st.style.background='#f0f7f0';st.style.color='var(--forest)';st.style.display=''; }
 }
 
 async function retGem() {

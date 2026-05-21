@@ -3480,7 +3480,8 @@ def hent_retur_uge(uge: int, aar: int) -> dict:
             WHERE uge=? AND aar=?
             AND (
                 LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
-                LOWER(varenavn) LIKE '%birkes%'     OR LOWER(varenavn) LIKE '%snegl%'     OR
+                (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
+                LOWER(varenavn) LIKE '%snegl%'     OR
                 LOWER(varenavn) LIKE '%snurrer%'    OR LOWER(varenavn) LIKE '%snurr%'     OR
                 LOWER(varenavn) LIKE '%spandauer%'  OR LOWER(varenavn) LIKE '%wienerstang%' OR
                 LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
@@ -3547,7 +3548,8 @@ def hent_retur_kpi() -> dict:
             WHERE uge=? AND aar=?
             AND (
                 LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
-                LOWER(varenavn) LIKE '%birkes%'     OR LOWER(varenavn) LIKE '%snegl%'     OR
+                (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
+                LOWER(varenavn) LIKE '%snegl%'     OR
                 LOWER(varenavn) LIKE '%snurrer%'    OR LOWER(varenavn) LIKE '%snurr%'     OR
                 LOWER(varenavn) LIKE '%spandauer%'  OR LOWER(varenavn) LIKE '%wienerstang%' OR
                 LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'

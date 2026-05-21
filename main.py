@@ -718,7 +718,8 @@ async def retur_debug(request: Request):
             SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger
             WHERE uge=? AND aar=? AND (
                 LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
-                LOWER(varenavn) LIKE '%birkes%' OR LOWER(varenavn) LIKE '%snegl%' OR
+                (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
+                LOWER(varenavn) LIKE '%snegl%' OR
                 LOWER(varenavn) LIKE '%snurrer%' OR LOWER(varenavn) LIKE '%snurr%' OR
                 LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%wienerstang%' OR
                 LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
@@ -732,7 +733,8 @@ async def retur_debug(request: Request):
             SELECT varenavn, total_antal FROM ugebestillinger
             WHERE uge=? AND aar=? AND (
                 LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
-                LOWER(varenavn) LIKE '%birkes%' OR LOWER(varenavn) LIKE '%snegl%' OR
+                (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
+                LOWER(varenavn) LIKE '%snegl%' OR
                 LOWER(varenavn) LIKE '%snurrer%' OR LOWER(varenavn) LIKE '%snurr%' OR
                 LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%wienerstang%' OR
                 LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'

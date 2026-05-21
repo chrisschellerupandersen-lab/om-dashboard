@@ -1357,7 +1357,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="aar2-tbl-wrap" style="margin-bottom:14px;">
           <div class="aar2-tbl-hdr">
             <span class="aar2-tbl-hdr-l">Alle importerede uger</span>
-            <span class="aar2-tbl-hdr-r" id="bestilling-uger-lbl"></span>
+            <span class="aar2-tbl-hdr-r" style="display:flex;align-items:center;gap:10px;">
+              <span id="bestilling-uger-lbl"></span>
+              <button onclick="loadBestilling(true)" class="tb-btn" style="font-size:10px;padding:4px 12px;">↺ Genindlæs</button>
+            </span>
           </div>
           <table class="aar2-tbl">
             <thead><tr>
@@ -4845,12 +4848,18 @@ function kaffeVisProduktTimer(idx) {
 // ── UGEBESTILLING ─────────────────────────────────────────────────────────────
 let _bestillingLoaded = false;
 
-async function loadBestilling() {
-  if (_bestillingLoaded) return;
+async function loadBestilling(force = false) {
+  if (_bestillingLoaded && !force) return;
+  const tbody = document.getElementById('bestilling-uger-tbody');
+  tbody.innerHTML = '<tr><td colspan="7" class="empty">Indlæser…</td></tr>';
+  _bestillingLoaded = false;
   const uger = await api(`/api/bestilling/uger?aar=${VALGT_AAR}`);
-  if (!uger || !uger.length) {
-    document.getElementById('bestilling-uger-tbody').innerHTML =
-      '<tr><td colspan="7" class="empty">Ingen bestillinger importeret endnu — kør bestilling_sync.py</td></tr>';
+  if (!uger) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty" style="color:red;">Fejl ved hentning — prøv igen</td></tr>';
+    return;
+  }
+  if (!uger.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Ingen bestillinger importeret endnu — kør bestilling_sync.py</td></tr>';
     document.getElementById('bestilling-uger-antal').textContent = '0';
     return;
   }

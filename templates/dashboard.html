@@ -6478,48 +6478,57 @@ window.showPanel = function(id, el) {
 // ── VARESTAMDATA ─────────────────────────────────────────────────────────────
 const SD_TYPER = ['Brød','Flute','Rugbrød','Boller','Wienerbrød','Kage','Jul'];
 
-async function loadStamdata() {
+async function loadStamdata(highlightId) {
   const tbody = document.getElementById('sd-tbody');
   tbody.innerHTML = '<tr><td colspan="6" class="empty">Indlæser…</td></tr>';
   const rows = await api('/api/stamdata');
   if (!rows) { tbody.innerHTML = '<tr><td colspan="6" class="empty" style="color:red;">Fejl ved hentning</td></tr>'; return; }
   document.getElementById('sd-count').textContent = rows.length + ' varer';
-  buildStamdataTbl(rows);
+  buildStamdataTbl(rows, highlightId);
 }
 
-function buildStamdataTbl(rows) {
+function buildStamdataTbl(rows, highlightId) {
   const tbody = document.getElementById('sd-tbody');
   if (!rows.length) {
     tbody.innerHTML = '<tr><td colspan="6" class="empty">Ingen varer endnu</td></tr>';
     return;
   }
-  // Gruppér efter type
+  // Gruppér efter type — kendte typer + catch-all for ukendte
   const grouped = {};
   SD_TYPER.forEach(t => grouped[t] = []);
+  grouped['_andet'] = [];
   rows.forEach(r => {
-    const g = grouped[r.type] || (grouped[r.type] = []);
-    g.push(r);
+    const key = SD_TYPER.includes(r.type) ? r.type : '_andet';
+    grouped[key].push(r);
   });
   let html = '';
-  for (const type of SD_TYPER) {
+  const alleTyper = [...SD_TYPER, '_andet'];
+  for (const type of alleTyper) {
     const grp = grouped[type] || [];
     if (!grp.length) continue;
+    const label = type === '_andet' ? 'Andet' : type;
     html += `<tr style="background:rgba(30,58,30,.04);">
-      <td colspan="6" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:6px 14px;">${type} · ${grp.length} varer</td>
+      <td colspan="6" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:6px 14px;">${label} · ${grp.length} varer</td>
     </tr>`;
     grp.forEach(r => {
-      html += stamRow(r);
+      html += stamRow(r, r.id === highlightId);
     });
   }
   tbody.innerHTML = html;
+  // Scroll til ny vare hvis highlightId
+  if (highlightId) {
+    const el = tbody.querySelector(`tr[data-id="${highlightId}"]`);
+    if (el) el.scrollIntoView({block:'center', behavior:'smooth'});
+  }
 }
 
-function stamRow(r) {
+function stamRow(r, highlight) {
   const typeOpts = SD_TYPER.map(t =>
     `<option value="${t}"${r.type===t?' selected':''}>${t}</option>`
   ).join('');
   const port = r.portioner || 1;
-  return `<tr data-id="${r.id}">
+  const hl = highlight ? 'background:rgba(200,168,75,.18);' : '';
+  return `<tr data-id="${r.id}" style="${hl}">
     <td><input class="aar-cfg-inp" style="width:90px;" value="${r.sku||''}" onblur="stamSave(${r.id},this.closest('tr'))" placeholder="—"></td>
     <td><input class="aar-cfg-inp" style="width:100%;" value="${escHtml(r.varenavn)}" onblur="stamSave(${r.id},this.closest('tr'))"></td>
     <td><select class="aar-cfg-inp" style="width:100%;" onchange="stamSave(${r.id},this.closest('tr'))">${typeOpts}</select></td>
@@ -6608,10 +6617,11 @@ async function stamGemNy() {
       status.style.color = 'var(--red, #c0392b)';
       return;
     }
+    const nyId = (await resp.json()).id;
     status.textContent = '✓ Tilføjet';
     status.style.color = 'var(--forest)';
     setTimeout(() => { status.textContent = ''; status.style.color = ''; }, 3000);
-    loadStamdata();
+    loadStamdata(nyId);
   } catch(e) {
     status.textContent = '✗ ' + e.message;
     status.style.color = 'var(--red, #c0392b)';

@@ -3125,7 +3125,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 "basis_aar":       maal_aar,
                 "maaned":          mon_dato.month,
                 "si":              round(si_f, 3),
-                "event":           evt_f["navn"] if evt_f else None,
+                "event":           evt_f if evt_f else None,
                 "tgtg_kr":         round(tgtg_kr_f),
                 "tgtg_ok":         tgtg_kr_f < 800,
                 "tgtg_advarsel":   tgtg_kr_f > 1200,

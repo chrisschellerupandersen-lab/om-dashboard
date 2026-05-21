@@ -848,7 +848,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <div id="ret-st-wiener-sub" style="font-size:10px;color:var(--moss);margin-top:3px;min-height:13px;"></div>
             </div>
           </div>
-          <div id="ret-st-footer" style="font-size:10px;color:var(--ash);text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid var(--border);"></div>
+          <div id="ret-st-dage" style="display:flex;justify-content:center;gap:5px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);"></div>
+          <div id="ret-st-footer" style="font-size:10px;color:var(--ash);text-align:center;margin-top:6px;"></div>
         </div>
 
         <!-- BAGER RETUR DENNE UGE -->
@@ -7371,8 +7372,21 @@ async function loadReturStatus() {
     const wVal   = document.getElementById('ret-st-wiener-val');
     const wSub   = document.getElementById('ret-st-wiener-sub');
     const footer = document.getElementById('ret-st-footer');
+    const dageEl = document.getElementById('ret-st-dage');
 
     const green = 'var(--forest)', ash = 'var(--ash)', gold = '#8a6800';
+
+    // Ugedag-status visual
+    if (dageEl && d.dage_status && d.dage_status.length) {
+      dageEl.innerHTML = d.dage_status.map(dag => {
+        const ok   = dag.registreret;
+        const bg   = ok ? 'var(--forest)'                       : 'rgba(30,58,30,.08)';
+        const col  = ok ? '#fff'                                 : 'var(--ash)';
+        const tip  = dag.dato + (ok ? ' ✓' : '');
+        return `<div title="${tip}" style="flex:1;text-align:center;padding:3px 0;border-radius:4px;background:${bg};color:${col};font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.04em;">${dag.dag}</div>`;
+      }).join('');
+      dageEl.style.display = 'flex';
+    }
 
     if (d.er_registreret) {
       card.style.background  = '#f0f7f0';
@@ -7420,7 +7434,8 @@ async function loadReturStatus() {
       wVal.style.color = d.max_wiener > 0 ? green : ash;
       wSub.textContent = d.max_wiener > 0 ? '13,5% af ' + d.bestilt_wiener + ' bestilt' : '';
       wSub.style.color = 'var(--moss)';
-      footer.textContent = 'Registrer mandag for uge ' + d.aktuel_uge + ' →';
+      const n = d.antal_dage_registreret || 0;
+      footer.textContent = n > 0 ? n + ' af 7 dage registreret · send mandag' : 'Registrer mandag for uge ' + d.aktuel_uge + ' →';
       footer.style.color = ash;
     }
   } catch(e) { console.error('loadReturStatus:', e); }

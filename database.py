@@ -3418,15 +3418,38 @@ def faste_omk_maaned_sum(aar: int) -> Dict[int, float]:
 # ── RETUR DETALJER ────────────────────────────────────────────────────────────
 
 def gem_retur_detaljer(uge: int, aar: int, items: list, dato: str) -> int:
-    """Gemmer bekræftede retur-detaljer. Erstatter eksisterende data for samme uge+aar."""
+    """Gemmer bekræftede retur-detaljer pr. dato. Erstatter kun data for samme uge+aar+dato."""
     with _conn() as conn:
-        conn.execute("DELETE FROM retur_detaljer WHERE uge=? AND aar=?", (uge, aar))
+        conn.execute("DELETE FROM retur_detaljer WHERE uge=? AND aar=? AND registreret_dato=?", (uge, aar, dato))
         for it in items:
             conn.execute(
                 "INSERT INTO retur_detaljer (registreret_dato, uge, aar, produkt, antal, kategori) VALUES (?,?,?,?,?,?)",
                 (dato, uge, aar, it['produkt'], max(0, int(it['antal'])), it.get('kategori', 'wienerbroed'))
             )
     return len(items)
+
+
+def hent_retur_dage_status(uge: int, aar: int) -> list:
+    """Returnerer liste over 7 dage (Man-Søn) med info om hvilke der har registrering."""
+    from datetime import date as _date
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT registreret_dato FROM retur_detaljer WHERE uge=? AND aar=? ORDER BY registreret_dato",
+            (uge, aar)
+        ).fetchall()
+    reg_datoer = {r['registreret_dato'] for r in rows}
+    dage_navne = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
+    mandag = _date.fromisocalendar(aar, uge, 1)
+    result = []
+    for i in range(7):
+        dag = mandag + __import__('datetime').timedelta(days=i)
+        dato_str = dag.isoformat()
+        result.append({
+            'dag': dage_navne[i],
+            'dato': dato_str,
+            'registreret': dato_str in reg_datoer,
+        })
+    return result
 
 
 def hent_retur_uge(uge: int, aar: int) -> dict:
@@ -3531,10 +3554,14 @@ def hent_retur_kpi() -> dict:
     sendt_w = int(aktuel['wiener'] or 0) if aktuel else 0
 
     er_registreret = bool(aktuel and aktuel['dato'])
+    dage_status = hent_retur_dage_status(aktuel_uge, aktuel_aar)
+    antal_registreret = sum(1 for d in dage_status if d['registreret'])
     return {
         'aktuel_uge': aktuel_uge,
         'aktuel_aar': aktuel_aar,
         'display_uge': aktuel_uge,
+        'dage_status': dage_status,
+        'antal_dage_registreret': antal_registreret,
         'er_mandag': weekday == 0,
         'er_registreret': er_registreret,
         'sendt_boller': sendt_b,

@@ -3444,15 +3444,36 @@ def hent_retur_kpi() -> dict:
             FROM retur_detaljer GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 1
         """).fetchone()
 
+        # Kvote fra ugebestillinger for aktuel uge
+        b_best = conn.execute(
+            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'",
+            (aktuel_uge, aktuel_aar)
+        ).fetchone()
+        w_best = conn.execute(
+            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) NOT LIKE '%bolle%' AND LOWER(varenavn) NOT LIKE '%br_d%'",
+            (aktuel_uge, aktuel_aar)
+        ).fetchone()
+
+    bestilt_boller = round(b_best['t'] or 0)
+    bestilt_wiener = round(w_best['t'] or 0)
+    max_boller = round(bestilt_boller * 0.10)
+    max_wiener = round(bestilt_wiener * 0.135)
+    sendt_b = int(aktuel['boller'] or 0) if aktuel else 0
+    sendt_w = int(aktuel['wiener'] or 0) if aktuel else 0
+
     er_registreret = bool(aktuel and aktuel['dato'])
     return {
         'aktuel_uge': aktuel_uge,
         'aktuel_aar': aktuel_aar,
         'er_mandag': weekday == 0,
         'er_registreret': er_registreret,
-        'sendt_boller': int(aktuel['boller'] or 0) if aktuel else 0,
-        'sendt_wiener': int(aktuel['wiener'] or 0) if aktuel else 0,
+        'sendt_boller': sendt_b,
+        'sendt_wiener': sendt_w,
         'registreret_dato': aktuel['dato'] if aktuel else None,
+        'max_boller': max_boller,
+        'max_wiener': max_wiener,
+        'rest_boller': max(0, max_boller - sendt_b),
+        'rest_wiener': max(0, max_wiener - sendt_w),
         'seneste_uge': int(seneste['uge']) if seneste else None,
         'seneste_aar': int(seneste['aar']) if seneste else None,
         'seneste_boller': int(seneste['boller'] or 0) if seneste else 0,

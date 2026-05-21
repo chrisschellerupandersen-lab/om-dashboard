@@ -7049,6 +7049,7 @@ function retNulstil() {
 
 // ── Historik: inline expand + redigering ──────────────────────────────────────
 let _retHistItems = {};   // {uge_aar: [items]}  — cache for inline editing
+let _retHistDato  = {};   // {uge_aar: 'YYYY-MM-DD'} — cache for dato editing
 let _retHistOpen  = null; // currently expanded key
 
 async function retIndlaesHistorik() {
@@ -7113,6 +7114,7 @@ async function retHistToggle(key, uge, aar) {
     const res = await fetch('/api/retur/uge/' + uge + '/' + aar);
     const d   = await res.json();
     _retHistItems[key] = d.items ? d.items.map(it => ({...it})) : [];
+    _retHistDato[key]  = (d.registreret || '').slice(0,10) || new Date().toISOString().slice(0,10);
   }
   _retHistVisDetalje(key, uge, aar);
 }
@@ -7125,7 +7127,15 @@ function _retHistVisDetalje(key, uge, aar) {
     el.innerHTML = '<div style="font-size:11px;color:var(--ash);">Ingen data</div>';
     return;
   }
+  const dato = _retHistDato[key] || '';
   el.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border);">
+      <div style="font-size:10px;color:var(--ash);white-space:nowrap;">Dato registreret:</div>
+      <input type="date" value="${dato}" id="rh-dato-${key}"
+        onchange="_retHistDato['${key}']=this.value"
+        style="flex:1;padding:4px 6px;background:var(--bg);border:1px solid var(--border);
+               color:var(--charcoal);border-radius:4px;font-size:12px;font-family:'DM Mono',monospace;">
+    </div>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr style="border-bottom:1px solid var(--border);">
         <th style="text-align:left;padding:4px 4px;font-size:9px;color:var(--ash);">PRODUKT</th>
@@ -7195,11 +7205,11 @@ async function retHistGem(key, uge, aar) {
   const items = _retHistItems[key] || [];
   const stEl  = document.getElementById('rh-st-' + key);
   if (!items.length) return;
-  const today = new Date().toISOString().slice(0,10);
+  const dato = _retHistDato[key] || new Date().toISOString().slice(0,10);
   try {
     const res  = await fetch('/api/retur/gem', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({uge, aar, dato: today, items})
+      body: JSON.stringify({uge, aar, dato, items})
     });
     const data = await res.json();
     if (data.ok) {
@@ -7212,8 +7222,10 @@ async function retHistGem(key, uge, aar) {
       if (rowEl) {
         const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
         const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
-        const sumEl = rowEl.querySelector('div[style*="color:var(--forest)"]');
-        if (sumEl) sumEl.textContent = b + 'b · ' + w + 'w';
+        const sumEl  = rowEl.querySelector('div[style*="color:var(--forest)"]');
+        const datoEl = rowEl.querySelector('div[style*="color:var(--ash)"][style*="flex:1"]');
+        if (sumEl)  sumEl.textContent  = b + 'b · ' + w + 'w';
+        if (datoEl) datoEl.textContent = dato;
       }
       if (typeof loadReturStatus === 'function') loadReturStatus();
       setTimeout(() => { if (stEl) stEl.style.display = 'none'; }, 3000);

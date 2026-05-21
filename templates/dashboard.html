@@ -7420,7 +7420,13 @@ function dagDbDetaljeToggle() {
 
 async function dagDbDetaljeLoad() {
   try {
-    const d = await fetch('/api/salg/dag-db-detalje').then(r => r.json());
+    const resp = await fetch('/api/salg/dag-db-detalje');
+    if (!resp.ok) {
+      document.getElementById('dag-db-det-tbody').innerHTML =
+        `<tr><td colspan="7" style="padding:8px;color:red;text-align:center;">API fejl ${resp.status}</td></tr>`;
+      return;
+    }
+    const d = await resp.json();
     document.getElementById('dag-db-det-dato').textContent = d.dato || '';
 
     const tbody = document.getElementById('dag-db-det-tbody');

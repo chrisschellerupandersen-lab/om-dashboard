@@ -155,6 +155,95 @@ function sendDashboard(filBytes, filnavn, mailDato) {
   // Kaster ikke fejl — bestillingsappen påvirkes ikke af dashboard-fejl
 }
 
+// ── LØBENDE OPDATERING (kør hvert 10. min via trigger) ────────────────────────
+/**
+ * Genbruger download-linket fra den SENESTE Shopbox-mail (inkl. allerede
+ * behandlede) og sender filen til dashboardet.
+ * Giver tæt-på-live data uden at vente på ny mail fra Shopbox.
+ *
+ * Sæt trigger: Redaktør → Triggere → opdaterLøbende → Tidsbaseret → Hvert 10. minut
+ */
+function opdaterLøbende() {
+  // Søg i ALLE mails — inkl. arkiverede/behandlede
+  var tråde = GmailApp.search(SØGEORD, 0, 5);
+
+  if (tråde.length === 0) {
+    Logger.log('opdaterLøbende: Ingen Shopbox-mails fundet');
+    return;
+  }
+
+  // Find den nyeste besked på tværs af tråde
+  var nyesteBesked = null;
+  var nyesteDato   = new Date(0);
+
+  for (var t = 0; t < tråde.length; t++) {
+    var beskeder = tråde[t].getMessages();
+    for (var b = 0; b < beskeder.length; b++) {
+      if (beskeder[b].getDate() > nyesteDato) {
+        nyesteDato   = beskeder[b].getDate();
+        nyesteBesked = beskeder[b];
+      }
+    }
+  }
+
+  if (!nyesteBesked) {
+    Logger.log('opdaterLøbende: Ingen besked fundet');
+    return;
+  }
+
+  var mailKrop    = nyesteBesked.getPlainBody() + ' ' + nyesteBesked.getBody();
+  var downloadUrl = findShopboxLink(mailKrop);
+
+  if (!downloadUrl) {
+    Logger.log('opdaterLøbende: Ingen Shopbox download-link i mailen fra ' + nyesteDato);
+    return;
+  }
+
+  Logger.log('opdaterLøbende: Henter fra Shopbox (' + nyesteDato.toLocaleString() + ')');
+
+  try {
+    var response = UrlFetchApp.fetch(downloadUrl, { muteHttpExceptions: true });
+
+    if (response.getResponseCode() !== 200) {
+      Logger.log('opdaterLøbende: Shopbox svarede ' + response.getResponseCode() + ' — link udløbet?');
+      return;
+    }
+
+    var filBytes = response.getContent();
+    Logger.log('opdaterLøbende: Fil hentet (' + filBytes.length + ' bytes), sender til dashboard...');
+
+    sendDashboard(filBytes, 'salgsdata.xlsx', new Date().toISOString());
+    Logger.log('opdaterLøbende: ✓ Dashboard opdateret');
+
+  } catch(e) {
+    Logger.log('opdaterLøbende: ✗ Fejl: ' + e.toString());
+  }
+}
+
+// ── OPSÆT AUTOMATISK TRIGGER (kør én gang manuelt) ────────────────────────────
+/**
+ * Kør denne funktion ÉN gang manuelt for at oprette den løbende trigger.
+ * Den sletter gamle triggere for opdaterLøbende og opretter en ny på 10 min.
+ */
+function opretLøbendeTrigger() {
+  // Slet eksisterende triggere for opdaterLøbende
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'opdaterLøbende') {
+      ScriptApp.deleteTrigger(triggers[i]);
+      Logger.log('Slettet gammel trigger for opdaterLøbende');
+    }
+  }
+
+  // Opret ny trigger: hvert 10. minut
+  ScriptApp.newTrigger('opdaterLøbende')
+    .timeBased()
+    .everyMinutes(10)
+    .create();
+
+  Logger.log('✓ Trigger oprettet: opdaterLøbende kører nu hvert 10. minut');
+}
+
 // ── TEST FORBINDELSE TIL RAILWAY ──────────────────────────────────────────────
 function testForbindelse() {
   var options = {

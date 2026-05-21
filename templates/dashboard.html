@@ -586,6 +586,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .aar-kpi-row{grid-template-columns:1fr 1fr;gap:8px;}
   .aar-kpi-row .kpi-card:first-child{grid-column:1/-1;}
   .tp-kpi-grid{grid-template-columns:1fr 1fr;}
+  /* Orphaned last card (3 secondary items → last alone in row) → full width */
+  .ov-top > :nth-child(even):last-child,
+  .kpi-row > :nth-child(even):last-child,
+  .kpi-row-4 > :nth-child(even):last-child,
+  .kpi-row-5 > :nth-child(even):last-child,
+  .kpi-row-6 > :nth-child(even):last-child,
+  .kpi-row-8 > :nth-child(even):last-child{grid-column:1/-1;}
 
   /* KPI kort mobil */
   .kpi{padding:14px 12px 12px;}
@@ -626,8 +633,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* Tabeller: horisontal scroll */
   .aar2-tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .aar2-tbl td{white-space:nowrap;}
   .aar2-minibar-bg{display:none;}
   .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  /* TGTG tabeller: horisontal scroll */
+  #p-tgtg .card{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  #p-tgtg table{min-width:480px;}
 
   /* Trend */
   .trend-summary{gap:6px;}

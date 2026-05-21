@@ -7180,7 +7180,7 @@ function retVisItems() {
           style="width:100%;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);font-size:13px;padding:2px 0;outline:none;">
       </td>
       <td style="padding:8px 4px;text-align:center;width:52px;">
-        <input type="number" min="0" value="${it.antal}" onchange="_retItems[${i}].antal=parseInt(this.value)||0;retOpdaterSummer()"
+        <input type="number" min="0" value="${it.antal}" oninput="_retItems[${i}].antal=parseInt(this.value)||0;retOpdaterSummer()"
           style="width:48px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:13px;padding:2px 0;outline:none;">
       </td>
       <td style="padding:8px 4px;text-align:center;width:80px;">
@@ -7352,7 +7352,7 @@ function _retHistDagRaekke(r) {
       style="display:flex;align-items:center;gap:10px;padding:10px 8px 10px 20px;cursor:pointer;user-select:none;">
       <div style="font-size:12px;font-weight:500;color:var(--charcoal);min-width:32px;">${dagNavn.slice(0,3)}</div>
       <div style="flex:1;font-size:12px;color:var(--charcoal);">${d.getDate()}. ${maaned}</div>
-      <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--moss);white-space:nowrap;">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
+      <div data-dagsum style="font-family:'DM Mono',monospace;font-size:11px;color:var(--moss);white-space:nowrap;">${r.sendt_boller}b · ${r.sendt_wiener}w</div>
       <div id="rh-chev-${key}" style="font-size:9px;color:var(--ash);transition:transform .15s;margin-left:6px;">▶</div>
     </div>
     <div id="rh-det-${key}" style="display:none;padding:0 12px 12px 20px;">
@@ -7410,7 +7410,7 @@ function _retHistVisDag(key, dato) {
             </td>
             <td style="padding:7px 4px;text-align:center;">
               <input type="number" min="0" value="${it.antal}"
-                onchange="_retHistItems['${dato}'][${i}].antal=parseInt(this.value)||0;_retHistSumDag('${key}','${dato}')"
+                oninput="_retHistItems['${dato}'][${i}].antal=parseInt(this.value)||0;_retHistSumDag('${key}','${dato}')"
                 style="width:46px;text-align:center;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--charcoal);${mono}font-size:12px;padding:2px 0;outline:none;">
             </td>
             <td style="padding:7px 4px;text-align:center;">
@@ -7439,12 +7439,18 @@ function _retHistVisDag(key, dato) {
 }
 
 function _retHistSumDag(key, dato) {
-  const el = document.getElementById('rh-sum-' + key);
-  if (!el) return;
   const items = _retHistItems[dato] || [];
   const b = items.filter(x=>x.kategori==='boller').reduce((s,x)=>s+x.antal,0);
   const w = items.filter(x=>x.kategori==='wienerbroed').reduce((s,x)=>s+x.antal,0);
-  el.textContent = b + ' boller · ' + w + ' wienerbrød';
+  // Opdater sum-linje i detalje-visningen
+  const el = document.getElementById('rh-sum-' + key);
+  if (el) el.textContent = b + ' boller · ' + w + ' wienerbrød';
+  // Opdater også dag-rækkens sammendrag (synlig i lukket tilstand)
+  const dagRow = document.getElementById('rh-dag-' + key);
+  if (dagRow) {
+    const sumSpan = dagRow.querySelector('[data-dagsum]');
+    if (sumSpan) sumSpan.textContent = b + 'b · ' + w + 'w';
+  }
 }
 
 function _retHistTilfoejDag(key, dato) {

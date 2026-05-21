@@ -225,9 +225,16 @@ def init_db():
                 conn.execute(sql)
             except Exception:
                 pass  # kolonnen eksisterer allerede
-        # Oprydning: slet alle "øko - " stamdata-rækker importeret fra bestilling
-        # (disse forstyrrer VF-beregningen — Shopbox' kostpris bruges i stedet)
-        conn.execute("DELETE FROM varestamdata WHERE LOWER(varenavn) LIKE 'øko - %'")
+        # Oprydning: slet alle "ØKO - " stamdata-rækker importeret fra bestilling
+        # LOWER() i SQLite håndterer ikke Ø → brug UPPER() i stedet
+        conn.execute("DELETE FROM varestamdata WHERE UPPER(SUBSTR(varenavn,1,6)) = 'ØKO - '")
+        # Slet SKU-duplikater: behold nyeste (højeste id) per sku når sku != ''
+        conn.execute("""
+            DELETE FROM varestamdata
+            WHERE sku != '' AND id NOT IN (
+                SELECT MAX(id) FROM varestamdata WHERE sku != '' GROUP BY sku
+            )
+        """)
 
         # Fix: ret sektion direkte fra varenavn-regler (kører ved hver opstart)
         # Wienerbrød-varer der fejlagtigt fik sektion=2 eller 4 → 3

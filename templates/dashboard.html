@@ -6104,30 +6104,21 @@ async function loadBernUge(uge, aar) {
 
   const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;
 
-  // Retur-beregning: 10% boller, 13,5% wienerbrød
-  const RETUR_BOLLER = 0.10, RETUR_WIENER = 0.135;
-  const _isBolle = p => {
-    const k = (p.kategori||'').toLowerCase(), n = (p.varenavn||'').toLowerCase();
-    return k === 'boller' || (!['wiener','brød','rugbrød','flute','kage','brод'].includes(k) && n.includes('bolle'));
-  };
-  const _isWiener = p => {
-    const k = (p.kategori||'').toLowerCase(), n = (p.varenavn||'').toLowerCase();
-    return k === 'wiener' || (!['boller','brød','rugbrød','flute','kage'].includes(k) &&
-      ['croissant','snegl','snurrer','tebirkes','grovbirkes','frøsnapper','spandauer','romsnegl','kanelstang','wienerstang'].some(w => n.includes(w)));
-  };
-  const bollerProds  = d.produkter.filter(_isBolle);
-  const wienerProds  = d.produkter.filter(_isWiener);
-  const bollerStk    = bollerProds.reduce((s,p) => s + p.total_anbefalet, 0);
-  const wienerStk    = wienerProds.reduce((s,p) => s + p.total_anbefalet, 0);
-  const returBoller  = Math.round(bollerStk  * RETUR_BOLLER);
-  const returWiener  = Math.round(wienerStk  * RETUR_WIENER);
+  // Retur-beregning: hent fra /api/retur/status (samme kilde som RETUR STATUS kortet på forsiden)
+  try {
+    const rs = await fetch('/api/retur/status').then(r => r.json());
+    const returBoller = rs.max_boller || 0;
+    const returWiener = rs.max_wiener || 0;
+    const bollerStk   = rs.bestilt_boller != null ? rs.bestilt_boller : (returBoller > 0 ? Math.round(returBoller / 0.10) : 0);
+    const wienerStk   = rs.bestilt_wiener != null ? rs.bestilt_wiener : (returWiener > 0 ? Math.round(returWiener / 0.135) : 0);
 
-  document.getElementById('bern-retur-boller').textContent     = bollerStk > 0 ? returBoller + ' stk' : '—';
-  document.getElementById('bern-retur-boller-sub').textContent = bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt';
-  document.getElementById('bern-retur-wiener').textContent     = wienerStk > 0 ? returWiener + ' stk' : '—';
-  document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
-  setRing('ring-bern-retur-b', Math.min(100, returBoller / 50 * 100), 'var(--forest)');
-  setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
+    document.getElementById('bern-retur-boller').textContent     = returBoller > 0 ? returBoller + ' stk' : '—';
+    document.getElementById('bern-retur-boller-sub').textContent = bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt';
+    document.getElementById('bern-retur-wiener').textContent     = returWiener > 0 ? returWiener + ' stk' : '—';
+    document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
+    setRing('ring-bern-retur-b', Math.min(100, returBoller / 50 * 100), 'var(--forest)');
+    setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
+  } catch(e) { console.warn('retur/status fejl:', e); }
 
   // Vis analyse-kort kun for fremtidige/aktuelle uger
   if (!d.faktisk) {

@@ -3540,6 +3540,8 @@ def hent_retur_kpi() -> dict:
         'sendt_boller': sendt_b,
         'sendt_wiener': sendt_w,
         'registreret_dato': aktuel['dato'] if aktuel else None,
+        'bestilt_boller': bestilt_boller,
+        'bestilt_wiener': bestilt_wiener,
         'max_boller': max_boller,
         'max_wiener': max_wiener,
         'rest_boller': max(0, max_boller - sendt_b),

@@ -804,11 +804,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="kpi-kurv">—</div>
           </div>
         </div>
-        <!-- RETUR STATUS KPI -->
-        <div id="ret-status-card" onclick="showPanel('retur',document.querySelector('#nav-list .nav-item[onclick*=\'retur\']'))" class="kpi" style="margin-bottom:12px;cursor:pointer;display:none;">
-          <div id="ret-st-ttl" class="kpi-l" style="letter-spacing:.08em;">RETUR STATUS</div>
-          <div id="ret-st-val" class="kpi-v" style="font-size:22px;">—</div>
-          <div id="ret-st-sub" class="kpi-s">—</div>
+        <!-- RETUR STATUS KORT -->
+        <div id="ret-status-card" onclick="showPanel('retur',document.querySelector('#nav-list .nav-item[onclick*=\'retur\']'))"
+          class="card" style="margin-bottom:12px;cursor:pointer;display:none;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div id="ret-st-ttl" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ash);">RETUR STATUS</div>
+            <div id="ret-st-dato" style="font-size:10px;color:var(--ash);"></div>
+          </div>
+          <div style="display:flex;align-items:stretch;">
+            <div style="flex:1;text-align:center;padding:4px 6px;">
+              <div id="ret-st-boller-val" style="font-family:'DM Mono',monospace;font-size:52px;font-weight:700;line-height:1;color:var(--forest);">—</div>
+              <div style="font-size:9px;letter-spacing:.08em;color:var(--ash);margin-top:3px;">BOLLER</div>
+              <div id="ret-st-boller-sub" style="font-size:10px;color:var(--moss);margin-top:3px;min-height:13px;"></div>
+            </div>
+            <div style="width:1px;background:var(--border);margin:2px 6px;"></div>
+            <div style="flex:1;text-align:center;padding:4px 6px;">
+              <div id="ret-st-wiener-val" style="font-family:'DM Mono',monospace;font-size:52px;font-weight:700;line-height:1;color:var(--forest);">—</div>
+              <div style="font-size:9px;letter-spacing:.08em;color:var(--ash);margin-top:3px;">WIENERBRØD</div>
+              <div id="ret-st-wiener-sub" style="font-size:10px;color:var(--moss);margin-top:3px;min-height:13px;"></div>
+            </div>
+          </div>
+          <div id="ret-st-footer" style="font-size:10px;color:var(--ash);text-align:center;margin-top:8px;padding-top:6px;border-top:1px solid var(--border);"></div>
         </div>
 
         <!-- BAGER RETUR DENNE UGE -->
@@ -6852,17 +6868,15 @@ function _retIGaar() {
   return d.toISOString().slice(0, 10);
 }
 
-// Helper: beregn "retur-uge" ud fra dato (mandag → forrige uge)
+// Helper: beregn "retur-uge" ud fra en dato
+// Regel: find den søndag der afsluttede ugen → brug dens ISO-uge
+// Søndag (day=0) hører til sin EGEN uge (er ikke "forrige")
 function _retBeregUge(dato) {
-  const d = dato || new Date();
-  const day = d.getDay(); // 0=søn, 1=man
-  // Mandag af denne uge
-  const manOffset = day === 0 ? -6 : 1 - day;
-  const mandag = new Date(d);
-  mandag.setDate(d.getDate() + manOffset);
-  // Søndag INDEN denne mandag = slutning af ugen vi returnerer for
-  const soend = new Date(mandag);
-  soend.setDate(mandag.getDate() - 1);
+  const d = dato instanceof Date ? dato : new Date((dato || new Date()));
+  const day = d.getDay(); // 0=søn, 1=man … 6=lør
+  // Gå tilbage til seneste søndag (eller bliv på datoen hvis den ER søndag)
+  const soend = new Date(d);
+  soend.setDate(d.getDate() - day); // day=0 → 0 dage tilbage = same day
   // ISO uge af den søndag
   const tmp = new Date(soend.valueOf());
   tmp.setDate(tmp.getDate() + 4 - (tmp.getDay() || 7));
@@ -7295,66 +7309,73 @@ async function retVisUge(uge, aar) {
 // ── FORSIDE: RETUR STATUS KPI ─────────────────────────────────────────────────
 async function loadReturStatus() {
   try {
-    const d   = await fetch('/api/retur/status').then(r => r.json());
-    const el  = document.getElementById('ret-status-card');
-    const ttl = document.getElementById('ret-st-ttl');
-    const val = document.getElementById('ret-st-val');
-    const sub = document.getElementById('ret-st-sub');
-    if (!el || !ttl || !val || !sub) return;
-    el.style.display = '';
+    const d      = await fetch('/api/retur/status').then(r => r.json());
+    const card   = document.getElementById('ret-status-card');
+    if (!card) return;
+    card.style.display = '';
 
-    const uge    = d.aktuel_uge;
-    const reg    = d.er_registreret;
-    const mandag = d.er_mandag;
+    const ttl    = document.getElementById('ret-st-ttl');
+    const dato   = document.getElementById('ret-st-dato');
+    const bVal   = document.getElementById('ret-st-boller-val');
+    const bSub   = document.getElementById('ret-st-boller-sub');
+    const wVal   = document.getElementById('ret-st-wiener-val');
+    const wSub   = document.getElementById('ret-st-wiener-sub');
+    const footer = document.getElementById('ret-st-footer');
 
-    if (reg) {
-      const restB = d.rest_boller || 0;
-      const restW = d.rest_wiener || 0;
-      el.style.background  = '#f0f7f0';
-      el.style.borderColor = 'var(--moss)';
-      ttl.textContent = 'RETUR UGE ' + uge + ' ✓';
-      ttl.style.color = 'var(--forest)';
-      val.textContent = d.sendt_boller + ' boller · ' + d.sendt_wiener + ' wiener sendt';
-      val.style.color = 'var(--forest)';
-      val.style.fontSize = '18px';
-      if (restB > 0 || restW > 0) {
-        sub.textContent = 'Kan stadig sende: ' + restB + 'b · ' + restW + 'w';
-        sub.style.color = 'var(--moss)';
-      } else if ((d.max_boller || 0) > 0 || (d.max_wiener || 0) > 0) {
-        sub.textContent = 'Fuld kvote udnyttet ✓';
-        sub.style.color = 'var(--moss)';
-      } else {
-        sub.textContent = 'Registreret ' + (d.registreret_dato || '').slice(0, 10);
-        sub.style.color = 'var(--moss)';
-      }
-    } else if (mandag) {
-      el.style.background  = '#fffbe6';
-      el.style.borderColor = 'var(--gold)';
-      ttl.textContent = 'HUSK RETUR I DAG!';
-      ttl.style.color = '#7a5c00';
-      val.textContent = 'Uge ' + uge + ' · send inden middag';
-      val.style.color = '#8a6800';
-      val.style.fontSize = '18px';
-      sub.textContent = 'Tryk for at registrere';
-      sub.style.color = '#a07800';
+    const green = 'var(--forest)', ash = 'var(--ash)', gold = '#8a6800';
+
+    if (d.er_registreret) {
+      card.style.background  = '#f0f7f0';
+      card.style.borderColor = 'var(--moss)';
+      ttl.textContent  = 'RETUR UGE ' + d.aktuel_uge + ' ✓';
+      ttl.style.color  = green;
+      dato.textContent = (d.registreret_dato || '').slice(0, 10);
+
+      bVal.textContent = d.sendt_boller;
+      bVal.style.color = green;
+      bSub.style.color = 'var(--moss)';
+      bSub.textContent = (d.rest_boller > 0) ? 'kan sende ' + d.rest_boller + ' mere' : 'kvote brugt ✓';
+
+      wVal.textContent = d.sendt_wiener;
+      wVal.style.color = green;
+      wSub.style.color = 'var(--moss)';
+      wSub.textContent = (d.rest_wiener > 0) ? 'kan sende ' + d.rest_wiener + ' mere' : 'kvote brugt ✓';
+
+      footer.textContent = '';
+    } else if (d.er_mandag) {
+      card.style.background  = '#fffbe6';
+      card.style.borderColor = 'var(--gold)';
+      ttl.textContent  = 'HUSK RETUR I DAG!';
+      ttl.style.color  = gold;
+      dato.textContent = '';
+
+      bVal.textContent = '!'; bVal.style.color = gold;
+      bSub.textContent = 'uge ' + d.aktuel_uge; bSub.style.color = gold;
+      wVal.textContent = '!'; wVal.style.color = gold;
+      wSub.textContent = 'send inden middag'; wSub.style.color = gold;
+
+      footer.textContent = 'Tryk for at registrere →';
+      footer.style.color = gold;
     } else {
-      el.style.background  = 'var(--card)';
-      el.style.borderColor = 'var(--border)';
-      val.style.fontSize = '18px';
+      card.style.background  = 'var(--card)';
+      card.style.borderColor = 'var(--border)';
       if (d.seneste_uge) {
         ttl.textContent = 'SENESTE RETUR · UGE ' + d.seneste_uge;
-        ttl.style.color = 'var(--ash)';
-        val.textContent = d.seneste_boller + ' boller · ' + d.seneste_wiener + ' wiener';
-        val.style.color = 'var(--charcoal)';
-        sub.textContent = 'Næste: mandag for uge ' + uge;
-        sub.style.color = 'var(--ash)';
+        ttl.style.color = ash;
+        dato.textContent = '';
+        bVal.textContent = d.seneste_boller; bVal.style.color = 'var(--charcoal)';
+        wVal.textContent = d.seneste_wiener; wVal.style.color = 'var(--charcoal)';
+        bSub.textContent = ''; wSub.textContent = '';
+        footer.textContent = 'Næste registrering: mandag for uge ' + d.aktuel_uge;
+        footer.style.color = ash;
       } else {
-        ttl.textContent = 'RETUR REGISTRERING';
-        ttl.style.color = 'var(--ash)';
-        val.textContent = 'Ingen data endnu';
-        val.style.color = 'var(--ash)';
-        sub.textContent = 'Upload første retur-seddel';
-        sub.style.color = 'var(--ash)';
+        ttl.textContent = 'RETUR REGISTRERING'; ttl.style.color = ash;
+        dato.textContent = '';
+        bVal.textContent = '—'; bVal.style.color = ash;
+        wVal.textContent = '—'; wVal.style.color = ash;
+        bSub.textContent = ''; wSub.textContent = '';
+        footer.textContent = 'Upload første retur-seddel →';
+        footer.style.color = ash;
       }
     }
   } catch(e) { console.error('loadReturStatus:', e); }

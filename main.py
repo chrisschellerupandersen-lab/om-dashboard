@@ -689,6 +689,67 @@ async def retur_status(request: Request):
     return database.hent_retur_kpi()
 
 
+@app.get("/api/retur/debug")
+async def retur_debug(request: Request):
+    _kræv_login(request)
+    from datetime import date, timedelta
+    today = date.today()
+    weekday = today.weekday()
+    this_monday = today - timedelta(days=weekday)
+    prev_sunday = this_monday - timedelta(days=1)
+    prev_iso = prev_sunday.isocalendar()
+    aktuel_uge = int(prev_iso[1])
+    aktuel_aar = int(prev_iso[0])
+    with database._conn() as conn:
+        # Hvad er i ugebestillinger for aktuel uge?
+        alle = conn.execute("""
+            SELECT u.varenavn, u.total_antal,
+                   COALESCE(v.type,'—') AS type
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            ORDER BY v.type, u.varenavn
+        """, (aktuel_uge, aktuel_aar)).fetchall()
+        b = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal),0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Boller' OR (v.varenavn IS NULL AND LOWER(u.varenavn) LIKE '%bolle%'))
+        """, (aktuel_uge, aktuel_aar)).fetchone()
+        w = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal),0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Wienerbrød' OR (v.varenavn IS NULL AND (
+                LOWER(u.varenavn) LIKE '%birkes%' OR LOWER(u.varenavn) LIKE '%croissant%' OR
+                LOWER(u.varenavn) LIKE '%snegl%' OR LOWER(u.varenavn) LIKE '%snurr%' OR
+                LOWER(u.varenavn) LIKE '%spandauer%' OR LOWER(u.varenavn) LIKE '%wienerstang%' OR
+                LOWER(u.varenavn) LIKE '%kanelstang%' OR LOWER(u.varenavn) LIKE '%wienerbrød%'
+            )))
+        """, (aktuel_uge, aktuel_aar)).fetchone()
+        retur = conn.execute("""
+            SELECT kategori, SUM(antal) AS antal
+            FROM retur_detaljer WHERE uge=? AND aar=?
+            GROUP BY kategori
+        """, (aktuel_uge, aktuel_aar)).fetchall()
+    bestilt_b = round(b['t'] or 0)
+    bestilt_w = round(w['t'] or 0)
+    return {
+        "dato_idag": str(today),
+        "weekday": weekday,
+        "aktuel_uge": aktuel_uge,
+        "aktuel_aar": aktuel_aar,
+        "bestilt_boller": bestilt_b,
+        "bestilt_wiener": bestilt_w,
+        "max_boller_10pct": round(bestilt_b * 0.10),
+        "max_wiener_135pct": round(bestilt_w * 0.135),
+        "retur_registreret": [dict(r) for r in retur],
+        "alle_varer_i_uge": [dict(r) for r in alle],
+    }
+
+
 @app.get("/api/retur/uge/{uge}/{aar}")
 async def retur_uge_data(request: Request, uge: int, aar: int):
     _kræv_login(request)

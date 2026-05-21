@@ -3394,14 +3394,26 @@ def hent_retur_uge(uge: int, aar: int) -> dict:
         registreret = rows[0]['registreret_dato'] if rows else None
 
         # Kvote fra ugebestillinger (10% boller, 13,5% wienerbrød)
-        b = conn.execute(
-            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'",
-            (uge, aar)
-        ).fetchone()
-        w = conn.execute(
-            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) NOT LIKE '%bolle%' AND LOWER(varenavn) NOT LIKE '%br_d%'",
-            (uge, aar)
-        ).fetchone()
+        # Bruger varestamdata.type som primær kilde — falder tilbage på LIKE hvis varen ikke er i stamdata
+        b = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal), 0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Boller' OR (v.varenavn IS NULL AND LOWER(u.varenavn) LIKE '%bolle%'))
+        """, (uge, aar)).fetchone()
+        w = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal), 0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Wienerbrød' OR (v.varenavn IS NULL AND (
+                LOWER(u.varenavn) LIKE '%birkes%' OR LOWER(u.varenavn) LIKE '%croissant%' OR
+                LOWER(u.varenavn) LIKE '%snegl%' OR LOWER(u.varenavn) LIKE '%snurr%' OR
+                LOWER(u.varenavn) LIKE '%spandauer%' OR LOWER(u.varenavn) LIKE '%wienerstang%' OR
+                LOWER(u.varenavn) LIKE '%kanelstang%' OR LOWER(u.varenavn) LIKE '%wienerbrød%'
+            )))
+        """, (uge, aar)).fetchone()
         bestilt_boller = round(b['t'] or 0)
         bestilt_wiener = round(w['t'] or 0)
 
@@ -3445,14 +3457,26 @@ def hent_retur_kpi() -> dict:
         """).fetchone()
 
         # Kvote fra ugebestillinger for aktuel uge
-        b_best = conn.execute(
-            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'",
-            (aktuel_uge, aktuel_aar)
-        ).fetchone()
-        w_best = conn.execute(
-            "SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(varenavn) NOT LIKE '%bolle%' AND LOWER(varenavn) NOT LIKE '%br_d%'",
-            (aktuel_uge, aktuel_aar)
-        ).fetchone()
+        # Bruger varestamdata.type som primær kilde — falder tilbage på LIKE hvis varen ikke er i stamdata
+        b_best = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal), 0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Boller' OR (v.varenavn IS NULL AND LOWER(u.varenavn) LIKE '%bolle%'))
+        """, (aktuel_uge, aktuel_aar)).fetchone()
+        w_best = conn.execute("""
+            SELECT COALESCE(SUM(u.total_antal), 0) AS t
+            FROM ugebestillinger u
+            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
+            WHERE u.uge=? AND u.aar=?
+            AND (v.type='Wienerbrød' OR (v.varenavn IS NULL AND (
+                LOWER(u.varenavn) LIKE '%birkes%' OR LOWER(u.varenavn) LIKE '%croissant%' OR
+                LOWER(u.varenavn) LIKE '%snegl%' OR LOWER(u.varenavn) LIKE '%snurr%' OR
+                LOWER(u.varenavn) LIKE '%spandauer%' OR LOWER(u.varenavn) LIKE '%wienerstang%' OR
+                LOWER(u.varenavn) LIKE '%kanelstang%' OR LOWER(u.varenavn) LIKE '%wienerbrød%'
+            )))
+        """, (aktuel_uge, aktuel_aar)).fetchone()
 
     bestilt_boller = round(b_best['t'] or 0)
     bestilt_wiener = round(w_best['t'] or 0)

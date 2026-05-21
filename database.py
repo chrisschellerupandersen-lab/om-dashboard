@@ -3482,11 +3482,10 @@ def hent_retur_kpi() -> dict:
     from datetime import date, timedelta
     today = date.today()
     weekday = today.weekday()  # 0=Man, 6=Søn
-    this_monday = today - timedelta(days=weekday)
-    prev_sunday = this_monday - timedelta(days=1)
-    prev_iso = prev_sunday.isocalendar()
-    aktuel_uge = int(prev_iso[1])
-    aktuel_aar = int(prev_iso[0])
+    yesterday = today - timedelta(days=1)
+    yesterday_iso = yesterday.isocalendar()
+    aktuel_uge = int(yesterday_iso[1])
+    aktuel_aar = int(yesterday_iso[0])
 
     with _conn() as conn:
         aktuel = conn.execute("""
@@ -3532,14 +3531,10 @@ def hent_retur_kpi() -> dict:
     sendt_w = int(aktuel['wiener'] or 0) if aktuel else 0
 
     er_registreret = bool(aktuel and aktuel['dato'])
-    today_iso = today.isocalendar()
-    display_uge = int(today_iso[1])
-    display_aar = int(today_iso[0])
     return {
         'aktuel_uge': aktuel_uge,
         'aktuel_aar': aktuel_aar,
-        'display_uge': display_uge,
-        'display_aar': display_aar,
+        'display_uge': aktuel_uge,
         'er_mandag': weekday == 0,
         'er_registreret': er_registreret,
         'sendt_boller': sendt_b,

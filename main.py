@@ -711,24 +711,33 @@ async def retur_debug(request: Request):
             ORDER BY v.type, u.varenavn
         """, (aktuel_uge, aktuel_aar)).fetchall()
         b = conn.execute("""
-            SELECT COALESCE(SUM(u.total_antal),0) AS t
-            FROM ugebestillinger u
-            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
-            WHERE u.uge=? AND u.aar=?
-            AND (v.type='Boller' OR (v.varenavn IS NULL AND LOWER(u.varenavn) LIKE '%bolle%'))
+            SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger
+            WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'
         """, (aktuel_uge, aktuel_aar)).fetchone()
         w = conn.execute("""
-            SELECT COALESCE(SUM(u.total_antal),0) AS t
-            FROM ugebestillinger u
-            LEFT JOIN varestamdata v ON LOWER(TRIM(u.varenavn)) = LOWER(TRIM(v.varenavn))
-            WHERE u.uge=? AND u.aar=?
-            AND (v.type='Wienerbrød' OR (v.varenavn IS NULL AND (
-                LOWER(u.varenavn) LIKE '%birkes%' OR LOWER(u.varenavn) LIKE '%croissant%' OR
-                LOWER(u.varenavn) LIKE '%snegl%' OR LOWER(u.varenavn) LIKE '%snurr%' OR
-                LOWER(u.varenavn) LIKE '%spandauer%' OR LOWER(u.varenavn) LIKE '%wienerstang%' OR
-                LOWER(u.varenavn) LIKE '%kanelstang%' OR LOWER(u.varenavn) LIKE '%wienerbrød%'
-            )))
+            SELECT COALESCE(SUM(total_antal),0) AS t FROM ugebestillinger
+            WHERE uge=? AND aar=? AND (
+                LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
+                LOWER(varenavn) LIKE '%birkes%' OR LOWER(varenavn) LIKE '%snegl%' OR
+                LOWER(varenavn) LIKE '%snurrer%' OR LOWER(varenavn) LIKE '%snurr%' OR
+                LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%wienerstang%' OR
+                LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
+            )
         """, (aktuel_uge, aktuel_aar)).fetchone()
+        boller_varer = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'
+        """, (aktuel_uge, aktuel_aar)).fetchall()
+        wiener_varer = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? AND (
+                LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
+                LOWER(varenavn) LIKE '%birkes%' OR LOWER(varenavn) LIKE '%snegl%' OR
+                LOWER(varenavn) LIKE '%snurrer%' OR LOWER(varenavn) LIKE '%snurr%' OR
+                LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%wienerstang%' OR
+                LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
+            )
+        """, (aktuel_uge, aktuel_aar)).fetchall()
         retur = conn.execute("""
             SELECT kategori, SUM(antal) AS antal
             FROM retur_detaljer WHERE uge=? AND aar=?
@@ -746,6 +755,8 @@ async def retur_debug(request: Request):
         "max_boller_10pct": round(bestilt_b * 0.10),
         "max_wiener_135pct": round(bestilt_w * 0.135),
         "retur_registreret": [dict(r) for r in retur],
+        "boller_tæller_med": [dict(r) for r in boller_varer],
+        "wiener_tæller_med": [dict(r) for r in wiener_varer],
         "alle_varer_i_uge": [dict(r) for r in alle],
     }
 

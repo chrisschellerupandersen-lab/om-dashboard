@@ -636,9 +636,6 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .aar2-tbl td{white-space:nowrap;}
   .aar2-minibar-bg{display:none;}
   .heatmap-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  /* TGTG tabeller: horisontal scroll */
-  #p-tgtg .card{overflow-x:auto;-webkit-overflow-scrolling:touch;}
-  #p-tgtg table{min-width:480px;}
 
   /* Trend */
   .trend-summary{gap:6px;}
@@ -1402,7 +1399,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <!-- Tabel: per pose-type -->
         <div class="card" style="margin-bottom:14px;">
           <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Per pose-type · år til dato</span></div>
-          <table style="width:100%;border-collapse:collapse;" id="tgtg-pose-tbl">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="min-width:550px;border-collapse:collapse;" id="tgtg-pose-tbl">
             <thead>
               <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
                 <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">POSETYPE</th>
@@ -1418,6 +1416,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <tr><td colspan="7" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
 
         <!-- Tabel: per uge vs. bager-faktura -->
@@ -1426,7 +1425,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <span class="aar2-chart-ttl">Per uge — beregnet vs. bager-faktura</span>
             <span class="aar2-chart-sub">difference = beregnet − faktura · løbende sum afslører systematisk offset</span>
           </div>
-          <table style="width:100%;border-collapse:collapse;">
+          <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+          <table style="min-width:480px;border-collapse:collapse;">
             <thead>
               <tr style="border-bottom:1px solid rgba(30,58,30,.12);">
                 <th style="text-align:left;padding:6px 8px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">UGE</th>
@@ -1441,6 +1441,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <tr><td colspan="6" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
 
         <!-- Pose-definitioner -->

@@ -1622,6 +1622,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <!-- ── TRIN 2: BEKRÆFT & GEM ──────────────────────────────────────── -->
         <div id="ret-bekraeft-kort" style="display:none;margin-bottom:16px;">
 
+          <!-- Dato (altid synlig i bekræft-trin) -->
+          <div class="card" style="margin-bottom:10px;padding:12px 14px;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <div style="font-size:11px;color:var(--ash);letter-spacing:.06em;white-space:nowrap;">DATO FOR RETUR</div>
+              <input type="date" id="ret-dato-input2"
+                onchange="retDatoAendret(this.value); document.getElementById('ret-dato-input').value=this.value;"
+                style="flex:1;min-width:150px;padding:10px 12px;background:var(--bg);border:1px solid var(--border);
+                       color:var(--charcoal);border-radius:6px;font-size:16px;font-family:'DM Mono',monospace;">
+              <div id="ret-dato-uge-info2" style="font-family:'DM Mono',monospace;font-size:12px;color:var(--moss);white-space:nowrap;"></div>
+            </div>
+          </div>
+
           <!-- Handlingsbar -->
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
             <button onclick="retScanEndnu()"
@@ -7510,8 +7522,17 @@ function retDatoAendret(val) {
   document.getElementById('ret-uge-input').value = uge;
   document.getElementById('ret-aar-input').value = aar;
   document.getElementById('ret-bekr-uge').textContent = uge;
-  const info = document.getElementById('ret-dato-uge-info');
-  if (info) info.textContent = '→ uge ' + uge;
+  // Opdater uge-info begge steder
+  const info  = document.getElementById('ret-dato-uge-info');
+  const info2 = document.getElementById('ret-dato-uge-info2');
+  const ugeTxt = '→ uge ' + uge;
+  if (info)  info.textContent  = ugeTxt;
+  if (info2) info2.textContent = ugeTxt;
+  // Hold begge dato-felter synkroniseret
+  const d1 = document.getElementById('ret-dato-input');
+  const d2 = document.getElementById('ret-dato-input2');
+  if (d1 && d1.value !== val) d1.value = val;
+  if (d2 && d2.value !== val) d2.value = val;
 }
 
 async function retScanFoto() {
@@ -7537,6 +7558,11 @@ async function retScanFoto() {
     retVisItems();
     const di = document.getElementById('ret-dato-input');
     if (di && !di.value) { di.value = _retIGaar(); }
+    // Synkroniser det sekundære dato-felt i bekræft-kortet
+    const di2 = document.getElementById('ret-dato-input2');
+    if (di2) { di2.value = di ? di.value : _retIGaar(); }
+    // Opdater uge-info under det nye felt
+    if (di2 && di2.value) retDatoAendret(di2.value);
     document.getElementById('ret-bekraeft-kort').style.display = '';
     document.getElementById('ret-step-scan').style.display = 'none';
     // Vis feedback

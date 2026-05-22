@@ -4443,7 +4443,8 @@ def _format_management_prompt(d: dict) -> str:
         "- Skriv altid varenavn naar du taler om et produkt",
         "- tone 'advarsel' naar noget er over/under normalniveau og kraever handling",
         "- Brug \\n\\n til nye afsnit inden for tekst",
-        "- Maks 120 ord pr sektion",
+        "- Maks 80 ord pr sektion — vær præcis og kortfattet",
+        "- Hele JSON-svaret SKAL afsluttes korrekt med ]} — afskær aldrig midt i en sætning",
     ]
     return "\n".join(lines)
 
@@ -4459,9 +4460,12 @@ def generer_management_review(api_key: str) -> dict:
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model="claude-opus-4-5",
-        max_tokens=2000,
+        max_tokens=4000,
         messages=[{"role": "user", "content": prompt}],
     )
+
+    # Tjek om svaret blev trunkeret
+    stop_reason = msg.stop_reason
     raw = msg.content[0].text.strip()
 
     # Udtræk JSON (robusthed: fjern evt. markdown-wrapper)
@@ -4471,9 +4475,28 @@ def generer_management_review(api_key: str) -> dict:
             raw = raw[4:]
     raw = raw.strip()
 
-    parsed = json.loads(raw)
+    # Håndter trunkeret JSON — forsøg at reparere afskåret tekst
+    if stop_reason == 'max_tokens':
+        # Prøv at lukke JSON manuelt hvis den er trunkeret
+        if not raw.endswith('}'):
+            # Afslut den åbne sektion og luk JSON
+            raw = raw.rstrip(',').rstrip()
+            if '"tekst"' in raw and not raw.endswith('"'):
+                raw += '... [trunkeret]"}'
+            raw += ']}'
+
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        # Fallback: byg minimal parsed struktur
+        parsed = {"sektioner": [{"id": "fejl", "titel": "Trunkeret svar",
+                   "tone": "advarsel",
+                   "tekst": "Svaret blev afskåret. Tryk 'Generer ny' igen."}]}
+
     parsed["genereret"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     parsed["model"] = "claude-opus-4-5"
+    if stop_reason == 'max_tokens':
+        parsed["advarsel"] = "Svaret blev trunkeret — tryk Generer ny for komplet review"
 
     with _conn() as conn:
         conn.execute(

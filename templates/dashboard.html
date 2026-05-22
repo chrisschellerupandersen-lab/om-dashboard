@@ -7926,7 +7926,10 @@ function mgmtVisReview(review) {
   nEl.style.display    = 'none';
 
   if (review && review.sektioner && review.sektioner.length) {
-    tsEl.textContent = 'Sidst opdateret: ' + (review.genereret || review._db_genereret || '');
+    const trunkAdv = review.advarsel
+      ? `<div style="background:#fffbe6;border:1px solid #e6c600;border-radius:4px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#8a6800;">⚠ ${review.advarsel}</div>`
+      : '';
+    tsEl.innerHTML = (trunkAdv || '') + 'Sidst opdateret: ' + (review.genereret || review._db_genereret || '');
     sekEl.innerHTML = review.sektioner.map(sek => {
       const t = MGMT_TONE[sek.tone] || MGMT_TONE.neutral;
       const afsnit = (sek.tekst || '').split('\n\n').filter(Boolean);

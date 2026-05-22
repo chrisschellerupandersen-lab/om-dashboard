@@ -3926,6 +3926,20 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
         prev_mon = _d.fromisocalendar(prev_aar, prev_uge, 1)
         prev_sun = prev_mon + _td(days=6)
 
+        # Er "forrige uge" den igangværende uge? (bestiller vi til næste uge mens indeværende ikke er slut)
+        today_local = _d.today()
+        prev_er_igangvaerende = prev_mon <= today_local <= prev_sun
+        # Hvor mange dage er der data for i "forrige uge"?
+        prev_dage_med_data = conn.execute("""
+            SELECT COUNT(DISTINCT dato) AS dage, MAX(dato) AS seneste_dag
+            FROM transaktioner WHERE dato>=? AND dato<=?
+        """, (prev_mon.isoformat(), min(prev_sun, today_local).isoformat())).fetchone()
+        prev_dage = int(prev_dage_med_data['dage'] or 0) if prev_dage_med_data else 0
+        prev_seneste_dag = prev_dage_med_data['seneste_dag'] if prev_dage_med_data else None
+        # Ugedagsnavn for seneste dag
+        _DAGE_DA = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+        prev_seneste_dagsnavn = _DAGE_DA[_d.fromisoformat(prev_seneste_dag).weekday()] if prev_seneste_dag else None
+
         # Salg forrige uge (inkl. TGTG)
         prev_salg = conn.execute("""
             SELECT SUM(omsætning) AS oms,
@@ -3986,12 +4000,13 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
             ORDER BY dato DESC LIMIT 8
         """, (mon.isoformat(),)).fetchall()
 
-        # Salg samme periode 4 uger siden
+        # Salg samme periode 4 uger siden — kun samme antal dage for fair sammenligning
         prev4_mon = mon - _td(weeks=4)
-        prev4_sun = prev4_mon + _td(days=6)
+        # Hvis forrige uge er igangværende: sammenlign kun de dage vi har data for
+        prev4_slut = prev4_mon + _td(days=max(prev_dage - 1, 0)) if prev_er_igangvaerende and prev_dage > 0 else prev4_mon + _td(days=6)
         prev4_oms = conn.execute("""
             SELECT SUM(omsætning) AS oms FROM transaktioner WHERE dato>=? AND dato<=?
-        """, (prev4_mon.isoformat(), prev4_sun.isoformat())).fetchone()
+        """, (prev4_mon.isoformat(), prev4_slut.isoformat())).fetchone()
 
     # Events
     evt      = _get_event(maal_uge, maal_aar)
@@ -4048,8 +4063,10 @@ Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
 
-FORRIGE UGE ({prev_uge}/{prev_aar}){evt_prev_info}:
-  Omsætning: {prev_oms:,} kr ({prev_kunder} kunder) — samme uge for 4 uger siden: {oms_4u_ago:,} kr
+FORRIGE UGE ({prev_uge}/{prev_aar}, {prev_mon.strftime('%-d. %b')}–{prev_sun.strftime('%-d. %b')}){evt_prev_info}:
+{'⚠ IGANGVÆRENDE UGE — kun ' + str(prev_dage) + ' dage med data (til og med ' + (prev_seneste_dagsnavn or '?') + '). Ugen er IKKE AFSLUTTET. Sammenlign KUN dag-for-dag, IKKE mod fuld uge fra andre perioder.' if prev_er_igangvaerende else f'Afsluttet uge — {prev_dage} dage med salgsdata.'}
+  Omsætning så langt: {prev_oms:,} kr ({prev_kunder} kunder){' — ⚠ DELVIS UGE, ikke sammenlignelig med fuld uge' if prev_er_igangvaerende else ''}
+  Samme periode 4 uger siden ({prev4_mon.strftime('%-d. %b')}–{(_d.fromisoformat(prev_salg['dato']) if prev_salg and prev_salg.get('dato') else prev_sun).strftime('%-d. %b') if not prev_er_igangvaerende else (prev4_mon + _td(days=prev_dage-1)).strftime('%-d. %b')}): {oms_4u_ago:,} kr
   Bestilling: {best_str}
 
 RETUR FORRIGE UGE:
@@ -4066,8 +4083,8 @@ BEGIVENHED UGE {maal_uge}: {evt_info}
 
 1. UGE — hvilken uge, datoer, overordnet situation
 
-2. FORRIGE UGE — konkrete tal, var det godt/dårligt?{' Begivenhed påvirkede.' if evt_prev else ''}
-   Peg på om vi misede salg (for lidt) eller havde spild (for meget) på specifikke dage.
+2. FORRIGE UGE — {'⚠ IKKE AFSLUTTET (' + str(prev_dage) + ' dage til og med ' + (prev_seneste_dagsnavn or '?') + '). Skriv KUN om de dage der er data for. Ingen konklusioner om hele ugen. Sammenlign KUN mod tilsvarende dage fra 4 uger siden — ikke mod en fuld uge.' if prev_er_igangvaerende else 'Afsluttet uge — hvad viser tallene?'}{' Begivenhed kan have påvirket.' if evt_prev else ''}
+   Peg på om vi mistede salg (for lidt) eller havde spild (for meget) på specifikke dage.
 
 3. BEGIVENHED & DAG-FORDELING — hvilke dage bliver stærke/svage næste uge?
    Beregn risiko begge veje: hvilke dage risikerer vi tomme hylder vs. spild?

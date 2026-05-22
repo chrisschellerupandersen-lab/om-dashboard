@@ -6349,46 +6349,169 @@ async function bernVurderBestilling() {
   const dagTotaler = {};
   DAGE.forEach((dag, i) => { dagTotaler[DAGE_DA[i]] = 0; });
 
-  // Aggreger fra produkter i _bernData (anbefalet + manuelle overrides)
-  const produktOversigt = (d.produkter || []).map(p => {
+  // Byg produkt-oversigt med varenavn til AI-matching
+  const produktListe = (d.produkter || []).map(p => {
     const anb = p.anbefalet || {};
-    const total = DAGE.reduce((s,dag) => s + (anb[dag] || 0), 0);
-    DAGE.forEach((dag,i) => { dagTotaler[DAGE_DA[i]] += (anb[dag] || 0); });
-    return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => DAGE_DA[i]+':'+(anb[dag]||0)).join(' ')} = ${total} stk`;
+    const total = DAGE.reduce((s,dag) => s + (anb[dag]||0), 0);
+    DAGE.forEach((dag,i) => { dagTotaler[DAGE_DA[i]] += (anb[dag]||0); });
+    return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => dag+':' + (anb[dag]||0)).join(' ')} = ${total} stk`;
   }).join('\n');
 
-  const dagStr = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
-  const totalStk = Object.values(dagTotaler).reduce((s,v) => s+v, 0);
-  const evt = d.event ? d.event.navn + ' — ' + (d.event.note||'') : 'ingen';
-  const si  = d.si || 1;
+  const dagStr   = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
+  const totalStk = Object.values(dagTotaler).reduce((s,v)=>s+v,0);
+  const evt    = d.event ? d.event.navn + ' — ' + (d.event.note||'') : 'ingen';
   const vaekst = d.vaekst_pct != null ? d.vaekst_pct + '%' : 'ukendt';
-  const tgtg = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
+  const tgtg   = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
 
   const payload = {
     uge: _bernUge, aar: _bernAar,
     dag_totaler: dagStr, total_stk: totalStk,
-    produkter: produktOversigt,
-    event: evt, si: si, vaekst: vaekst, tgtg: tgtg,
+    produkter: produktListe,
+    event: evt, si: d.si||1, vaekst, tgtg,
     dato_range: d.dato_range || '',
   };
 
   try {
-    const res = await fetch('/api/bestilling/vurder', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+    const res  = await fetch('/api/bestilling/vurder', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)});
     const data = await res.json();
     spinner.style.display = 'none';
     btn.disabled = false; btn.textContent = '↻ Vurder igen';
+
+    if (!data.ok) {
+      tekst.style.display = '';
+      tekst.textContent = '⚠ ' + (data.fejl || 'Fejl');
+      return;
+    }
+
+    // Vis vurderingstekst
     tekst.style.display = '';
-    tekst.textContent = data.ok ? data.vurdering : '⚠ ' + (data.fejl || 'Fejl');
+    const klarIkon = data.klar ? '✅' : '⚠️';
+    tekst.innerHTML = `<div style="margin-bottom:10px;">${klarIkon} ${data.vurdering}</div>`;
+
+    // Vis justeringer hvis der er nogle
+    const justeringer = data.justeringer || [];
+    if (justeringer.length > 0) {
+      const jDiv = document.createElement('div');
+      jDiv.style.cssText = 'border-top:1px solid var(--border);padding-top:10px;margin-top:4px;';
+      jDiv.innerHTML = `
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ash);margin-bottom:8px;">
+          FORESLÅEDE JUSTERINGER (${justeringer.length})
+        </div>
+        <div id="bern-just-liste" style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="bernAnvendAlle()" id="bern-anvend-alle-btn"
+            style="padding:8px 18px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+            ✓ Anvend alle justeringer
+          </button>
+          <button onclick="document.getElementById('bern-vurder-kort').querySelector('#bern-just-liste').closest('div[style*=border-top]').style.display='none'"
+            style="padding:8px 12px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:6px;font-size:12px;cursor:pointer;">
+            Behold originale tal
+          </button>
+        </div>`;
+      tekst.appendChild(jDiv);
+
+      // Gem justeringer globalt til brug i bernAnvendAlle
+      window._bernJusteringer = justeringer;
+      window._bernProduktMap  = {};
+      (d.produkter || []).forEach(p => { window._bernProduktMap[p.varenavn] = p; });
+
+      const liste = jDiv.querySelector('#bern-just-liste');
+      justeringer.forEach((j, idx) => {
+        const pil    = j.til > j.fra ? '↑' : '↓';
+        const farve  = j.til > j.fra ? 'var(--moss)' : 'var(--danger)';
+        const pct    = j.fra > 0 ? Math.round((j.til - j.fra) / j.fra * 100) : 0;
+        const row    = document.createElement('div');
+        row.id       = `bj-${idx}`;
+        row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border:1px solid var(--border);border-radius:4px;';
+        row.innerHTML = `
+          <input type="checkbox" id="bjc-${idx}" checked style="width:16px;height:16px;cursor:pointer;accent-color:var(--forest);">
+          <label for="bjc-${idx}" style="flex:1;font-size:12px;cursor:pointer;">
+            <strong>${j.varenavn}</strong>
+            <span style="font-family:'DM Mono',monospace;color:var(--ash);margin-left:6px;">${_dagLabel(j.dag)}</span>
+            <span style="font-family:'DM Mono',monospace;margin-left:8px;">${j.fra}</span>
+            <span style="color:${farve};margin:0 4px;font-weight:600;">${pil} ${j.til}</span>
+            <span style="font-family:'DM Mono',monospace;font-size:10px;color:${farve};">(${pct>0?'+':''}${pct}%)</span>
+          </label>
+          <span style="font-size:11px;color:var(--ash);font-style:italic;">${j.grund}</span>`;
+        liste.appendChild(row);
+      });
+    } else {
+      tekst.innerHTML += `<div style="font-size:11px;color:var(--moss);margin-top:6px;">✓ Ingen justeringer nødvendige — bestillingen ser fornuftig ud.</div>`;
+    }
   } catch(e) {
     spinner.style.display = 'none';
     btn.disabled = false; btn.textContent = '↻ Vurder igen';
     tekst.style.display = '';
     tekst.textContent = '⚠ Netværksfejl: ' + e;
   }
+}
+
+function _dagLabel(dag) {
+  return {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'}[dag] || dag;
+}
+
+async function bernAnvendAlle() {
+  const justeringer = window._bernJusteringer || [];
+  const produktMap  = window._bernProduktMap  || {};
+  const d = window._bernData;
+  if (!justeringer.length || !d) return;
+
+  const btn = document.getElementById('bern-anvend-alle-btn');
+  btn.disabled = true; btn.textContent = 'Anvender…';
+
+  let antalAnvendt = 0;
+
+  for (let idx = 0; idx < justeringer.length; idx++) {
+    const chk = document.getElementById('bjc-' + idx);
+    if (chk && !chk.checked) continue;  // spring over ikke-valgte
+
+    const j = justeringer[idx];
+    // Find varenummer via produktmap (fuzzy: prøv eksakt match først)
+    let prod = produktMap[j.varenavn];
+    if (!prod) {
+      // Fuzzy: find produkt hvis varenavn indeholder søgeord
+      const lower = j.varenavn.toLowerCase();
+      prod = Object.values(produktMap).find(p => p.varenavn.toLowerCase().includes(lower) || lower.includes(p.varenavn.toLowerCase()));
+    }
+    if (!prod) { console.warn('Kan ikke finde produkt:', j.varenavn); continue; }
+
+    const vn  = prod.varenummer || '';
+    const dag = j.dag;
+    const til = j.til;
+
+    // Opdater DOM-celle
+    const celle = document.querySelector(`.bern-cell[data-vn="${CSS.escape(vn)}"][data-dag="${dag}"]`);
+    if (celle) {
+      celle.textContent = til;
+      celle.style.borderBottom = '2px solid var(--gold)';  // markér som ændret
+      // Gem via API
+      if (vn) {
+        fetch('/api/bestilling/manuel', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({uge: _bernUge, aar: _bernAar, varenummer: vn, dag, antal: til})
+        }).catch(()=>{});
+      }
+      // Opdater _bernData
+      if (prod && d.produkter) {
+        const p = d.produkter.find(p => p.varenummer === vn);
+        if (p && p.anbefalet) p.anbefalet[dag] = til;
+      }
+      antalAnvendt++;
+    }
+  }
+
+  // Opdater rækketotaler
+  document.querySelectorAll('#beregner-tabel tr[data-vn]').forEach(row => {
+    const cells = row.querySelectorAll('.bern-cell');
+    const tot   = Array.from(cells).reduce((s,c) => s + (parseInt(c.textContent)||0), 0);
+    const totEl = row.querySelector('.bern-row-tot');
+    if (totEl) totEl.textContent = tot;
+  });
+
+  btn.textContent = `✓ ${antalAnvendt} justeringer anvendt`;
+  btn.style.background = 'var(--moss)';
+  setTimeout(() => { btn.disabled = false; btn.textContent = '✓ Anvend alle'; }, 2000);
 }
 
 async function bernGenererAnalyse() {

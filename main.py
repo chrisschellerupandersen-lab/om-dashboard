@@ -370,46 +370,65 @@ async def bestilling_gem_manuel(request: Request):
 
 @app.post("/api/bestilling/vurder")
 async def api_beregner_vurder(request: Request):
-    """AI vurderer den aktuelle bestilling og peger på dage der skal justeres."""
+    """AI vurderer bestillingen og returnerer tekst + strukturerede justeringer."""
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
     try:
         body = await request.json()
-        import anthropic as _ant
-        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
+        import anthropic as _ant, json as _json
 
-Ejeren er ved at sende sin ugebestilling til bageren og beder dig vurdere om tallene ser rigtige ud.
+        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
 
 BESTILLINGSUGE {body.get('uge')}/{body.get('aar')} ({body.get('dato_range','')}):
 Begivenhed: {body.get('event','ingen')}
-Sæsonindeks: {body.get('si', 1.0)}
-Væksttrend: {body.get('vaekst','?')}
-TGTG seneste uge: {body.get('tgtg','ingen data')}
+Sæsonindeks: {body.get('si',1.0)} · Vækst: {body.get('vaekst','?')} · TGTG: {body.get('tgtg','ingen data')}
 
-DAGSTOTALER (alle produkter summeret):
-{body.get('dag_totaler', '')}
-TOTAL: {body.get('total_stk', 0)} stk
+DAGSTOTALER: {body.get('dag_totaler','')}
 
-PRODUKTER PR. DAG:
-{body.get('produkter', '')}
+PRODUKTER PR. DAG (format: Varenavn (kat): Man:X Tir:X ...):
+{body.get('produkter','')}
 
-Giv en KORT vurdering (max 200 ord) struktureret sådan:
-1. OVERORDNET: Er bestillingen OK eller er der noget der springer i øjnene?
-2. DAGE DER SKAL JUSTERES: Peg på specifikke dage og produkter der virker for høje eller for lave — vær konkret ("tirsdag wienerbrød 24 stk ser højt ud — reducer til ~18")
-3. TGTG: Ser TGTG-niveauet fornuftigt ud i forhold til bestillingen?
-4. KLAR TIL AT SENDE? Ja/Nej — og hvad du evt. vil ændre først.
+Returner KUN valid JSON — ingen forklaring udenfor JSON:
+{{
+  "vurdering": "2-4 sætninger om den samlede bestilling. Konkret, med tal.",
+  "klar": true/false,
+  "justeringer": [
+    {{
+      "varenavn": "eksakt varenavn fra listen ovenfor",
+      "dag": "man|tir|ons|tor|fre|loe|son",
+      "fra": <nuværende antal>,
+      "til": <anbefalet antal>,
+      "grund": "kort begrundelse max 8 ord"
+    }}
+  ]
+}}
 
-Skriv direkte og konkret. Ingen lange forklaringer."""
+Regler for justeringer:
+- Inkluder KUN justeringer hvor ændringen er meningsfuld (mindst ±20% eller ±2 stk)
+- Brug eksakt varenavn som det står i produktlisten
+- Max 8 justeringer — prioriter de vigtigste
+- Hvis bestillingen er fin: returner tom justeringer-liste []
+- dag skal være én af: man, tir, ons, tor, fre, loe, son"""
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-haiku-4-5",
-            max_tokens=500,
+            max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )
-        return {"ok": True, "vurdering": msg.content[0].text.strip()}
+        raw = msg.content[0].text.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.lower().startswith("json"): raw = raw[4:]
+        parsed = _json.loads(raw.strip())
+        return {
+            "ok": True,
+            "vurdering":   parsed.get("vurdering", ""),
+            "klar":        parsed.get("klar", True),
+            "justeringer": parsed.get("justeringer", []),
+        }
     except Exception as e:
         return {"ok": False, "fejl": str(e)}
 

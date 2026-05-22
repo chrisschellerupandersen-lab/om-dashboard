@@ -390,6 +390,12 @@ Begge er tabsbringende. Det handler om DAG-PRÆCISION — ikke bare ugetotal.
 TGTG-mål: under 800 kr/uge. Over 1.200 kr = vi overbestiller på svage dage.
 Lørdage og fredage er typisk stærke. Mandage og tirsdage typisk svage.
 Begivenheder kan VENDE dette mønster helt.
+
+⚠ DATAKVALITET — disse forbehold gælder ALTID:
+• Shopbox er manuelt tastet → varenavn/antal kan have fejl → sell-through undervurderer reelt salg
+• MobilePay-salg er ikke varekoblet → en del af bagværkssalget mangler i produkt-tallene
+• Brug derfor TGTG-kr og retur-stk som primære signaler — de er mere præcise end Shopbox-antal
+• Vær forsigtig med store reduktioner baseret på lav sell-through alene
 ═══════════════════════════════════════════════════════
 
 BESTILLINGSUGE {body.get('uge')}/{body.get('aar')} ({body.get('dato_range','')}):
@@ -400,7 +406,9 @@ Dag-snit fra historik: {body.get('dag_snit','')}
 
 HISTORISK SELL-THROUGH (solgt/bestilt % pr. kategori pr. dag — seneste 10 uger):
 {body.get('sellthrough', 'ingen data')}
-[>95% = sandsynligvis udsolgt på den dag · <75% = spild/TGTG-risiko]
+[>95% = sandsynligvis udsolgt · <75% = spild/TGTG-risiko]
+DATAKVALITET: {body.get('mobilepay_andel', 'MobilePay-andel ukendt')}
+(Shopbox er manuelt tastet — sell-through % undervurderer reelt salg)
 
 DAGSTOTALER DENNE BESTILLING:
 {body.get('dag_totaler','')}

@@ -6374,9 +6374,9 @@ function bernVisSellthrough(data) {
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
-    <div style="padding:6px 14px;font-size:10px;color:var(--ash);">
-      🔴 = sidst salg tidligt = sandsynligvis udsolgt &nbsp;·&nbsp;
-      Hover for bestilt/solgt snit
+    <div style="padding:6px 14px;font-size:10px;color:var(--ash);line-height:1.6;border-top:1px solid var(--border);margin-top:2px;">
+      🔴 = sidst salg tidligt = sandsynligvis udsolgt &nbsp;·&nbsp; Hover for snit-tal<br>
+      <span style="color:var(--ash);opacity:.85;">⚠ Shopbox er manuelt tastet — stk-tal er estimater.${data.mp_andel_pct > 0 ? ` MobilePay ~${data.mp_andel_pct}% af omsætningen er ikke varekoblet — reelt salg er tilsvarende højere.` : ''}</span>
     </div>`;
 }
 
@@ -6468,8 +6468,9 @@ async function bernVurderBestilling() {
     .map(ds => `${ds.dag}: ~${Math.round(ds.snit_oms||0).toLocaleString('da-DK')} kr snit`)
     .join(', ');
 
-  // Sell-through historik til AI — guldstandarden for over/underbestilling
+  // Sell-through historik til AI
   const stTekst = _bernST ? _bernStTilTekst(_bernST) : '';
+  const mpAndel = _bernST?.mp_andel_pct || 0;
 
   const payload = {
     uge: _bernUge, aar: _bernAar,
@@ -6478,6 +6479,7 @@ async function bernVurderBestilling() {
     event: evt, si: d.si||1, vaekst, tgtg,
     dag_snit: dagSnitStr,
     sellthrough: stTekst,
+    mobilepay_andel: mpAndel > 0 ? `${mpAndel}% af omsætningen er MobilePay (ikke varekoblet) — reelt bagværkssalg kan være ${mpAndel}% højere end Shopbox viser` : '',
     dato_range: d.dato_range || '',
   };
 

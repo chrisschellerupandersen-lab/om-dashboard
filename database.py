@@ -3770,6 +3770,24 @@ def hent_sellthrough_analyse(uger: int = 10) -> dict:
             GROUP BY dato, varenavn
         """, (start_dato, slut_dato)).fetchall()
 
+        # ── MobilePay pr. dato (uvarekoblet bagværkssalg) ─────────────────
+        # Bruges til at estimere hvor stor en andel af salget mangler i Shopbox
+        mp_rows = conn.execute("""
+            SELECT dato, omsaetning_inkl / 1.25 AS oms_ex
+            FROM mobilepay_dag
+            WHERE dato >= ? AND dato <= ?
+            ORDER BY dato
+        """, (start_dato, slut_dato)).fetchall()
+        mp_map = {r['dato']: float(r['oms_ex'] or 0) for r in mp_rows}
+
+        # Total Shopbox omsætning pr. dato (til beregning af MP-andel)
+        shopbox_dag = conn.execute("""
+            SELECT dato, SUM(omsætning) AS oms
+            FROM transaktioner WHERE dato >= ? AND dato <= ?
+            GROUP BY dato
+        """, (start_dato, slut_dato)).fetchall()
+        shopbox_map = {r['dato']: float(r['oms'] or 0) for r in shopbox_dag}
+
     # ── Byg bestilt-snit pr. ISO-uge pr. kat pr. dag ──────────────────────
     # bestilt[uge_key][kat][dag] = stk
     bestilt: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
@@ -3869,13 +3887,26 @@ def hent_sellthrough_analyse(uger: int = 10) -> dict:
                                  'spild' if pct >= 50 else 'stort_spild',
             }
 
+    # Beregn MobilePay-andel (snit over perioden) — viser hvor meget salg mangler i Shopbox
+    mp_total      = sum(mp_map.values())
+    shopbox_total = sum(shopbox_map.values())
+    mp_andel_pct  = round(mp_total / (shopbox_total + mp_total) * 100, 1) if (shopbox_total + mp_total) > 0 else 0
+
     return {
-        'sellthrough':  result,
-        'dage':         DAGE,
-        'dage_da':      DAGE_DA,
-        'kategorier':   KATS,
+        'sellthrough':    result,
+        'dage':           DAGE,
+        'dage_da':        DAGE_DA,
+        'kategorier':     KATS,
         'uger_analyseret': uger,
-        'periode':      f"{start_dato} – {slut_dato}",
+        'periode':        f"{start_dato} – {slut_dato}",
+        'mp_andel_pct':   mp_andel_pct,   # % af total omsætning der er MobilePay (uvarekoblet)
+        'datakvalitet': {
+            'shopbox_manuelt_tastet': True,
+            'mobilepay_ikke_varekoblet': True,
+            'mp_andel_pct': mp_andel_pct,
+            'note': f"MobilePay udgør ~{mp_andel_pct}% af omsætningen og er ikke koblet til specifikke varer. "
+                    f"Reelt bagværkssalg kan være {mp_andel_pct}% højere end Shopbox-data viser."
+        },
     }
 
 
@@ -4005,6 +4036,14 @@ To LIGE STORE risici — begge er direkte tab:
 
 Fokus er DAG-PRÆCISION. Lørdage/fredage er typisk stærke. Mandage/tirsdage svage.
 Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
+
+⚠ DATAKVALITET — husk disse forbehold:
+• Shopbox-data er manuelt tastet af personale — varenavn og antal kan indeholde fejl.
+  Sell-through kan UNDERVURDERE reelt salg pga. forkert registrering.
+• MobilePay-omsætning er IKKE varekoblet — en del af bagværkssalget (typisk kontant/MobilePay
+  ved bagerbordet) fremgår ikke i produkt-tallene. Reelt salg er højere end Shopbox viser.
+• Konsekvens: vær forsigtig med at anbefale store reduktioner baseret på lav sell-through alene.
+  Kombiner altid med TGTG-data og retur-data som er mere præcise.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
@@ -4261,6 +4300,11 @@ def _format_management_prompt(d: dict) -> str:
         "② FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder",
         "TGTG-mål: under 800 kr/uge. Over 1.200 kr = vi overbestiller på svage dage.",
         "Lørdage/fredage typisk stærke. Mandage/tirsdage typisk svage. Begivenheder kan vende mønstret.",
+        "",
+        "⚠ DATAKVALITET:",
+        "• Shopbox er manuelt tastet — varenavn/antal kan indeholde fejl. Solgte stk er estimat, ikke præcist.",
+        "• MobilePay-omsætning er ikke varekoblet — reelt bagværkssalg er højere end produktdata viser.",
+        "• Brug TGTG-kr og retur-stk som primære indikatorer — de er mere pålidelige end stk-tal fra Shopbox.",
         "",
         f"DATO I DAG: {d['dato_idag']} ({_dn(d['dato_idag'])})",
         f"SENESTE SALGSDAG: {d['seneste_salgsdag']} ({_dn(d['seneste_salgsdag'])})",

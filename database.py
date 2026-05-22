@@ -3830,44 +3830,52 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
 
     evt_prev_info = f" (BEMÆRK: forrige uge havde {evt_prev['navn']} — tallene kan være atypiske)" if evt_prev else ''
 
-    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med eget bageri i Greve, Danmark.
+    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med eget bageri i Greve, Danmark.
+
+═══ FORRETNINGSLOGIK ═══
+To LIGE STORE risici — begge er direkte tab:
+① FOR MEGET på svage dage → TGTG/retur → tab af kostpris + arbejdstid
+② FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder
+
+Fokus er DAG-PRÆCISION. Lørdage/fredage er typisk stærke. Mandage/tirsdage svage.
+Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
+═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
 
 FORRIGE UGE ({prev_uge}/{prev_aar}){evt_prev_info}:
-  Omsætning: {prev_oms:,} kr ({prev_kunder} kunder)
-  Samme uge for 4 uger siden: {oms_4u_ago:,} kr
-  Bestilling forrige uge: {best_str}
+  Omsætning: {prev_oms:,} kr ({prev_kunder} kunder) — samme uge for 4 uger siden: {oms_4u_ago:,} kr
+  Bestilling: {best_str}
 
 RETUR FORRIGE UGE:
-  Boller: {retur_b} stk · Wienerbrød: {retur_w} stk
-  Pr. vare: {retur_varer_str}
+  Boller: {retur_b} stk · Wienerbrød: {retur_w} stk (pr. vare: {retur_varer_str})
   Snit seneste 4 uger: {snit_b} boller + {snit_w} wienerbrød
 
-TOO GOOD TO GO (TGTG) FORRIGE UGE:
-  Solgte poser: {tgtg_poser} · Omsætning: {tgtg_kr:,} kr
-  Snit seneste 4 uger: {tgtg_snit:,} kr/uge
-  (Mål: under 800 kr/uge = minimalt spild. Over 1.200 kr = for meget spild)
+TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (snit 4 uger: {tgtg_snit:,} kr · mål: <800 kr)
 
-OMSÆTNINGSTREND (seneste 6 uger): {trend_str}
+TREND: {trend_str}
 
 BEGIVENHED UGE {maal_uge}: {evt_info}
 
-─── DIN OPGAVE ───
-Skriv en KORT, praktisk bestillingsvejledning til butiksejeren. Brug disse 5 afsnit:
+─── VEJLEDNING (5 afsnit, ren tekst) ───
 
-1. UGE & PERIODE — én sætning om hvilken uge og datoer
+1. UGE — hvilken uge, datoer, overordnet situation
 
-2. FORRIGE UGE — hvad gik godt/skidt? Var omsætningen som forventet vs. for 4 uger siden?{' Var der begivenhed der påvirkede?' if evt_prev else ''}
+2. FORRIGE UGE — konkrete tal, var det godt/dårligt?{' Begivenhed påvirkede.' if evt_prev else ''}
+   Peg på om vi misede salg (for lidt) eller havde spild (for meget) på specifikke dage.
 
-3. BEGIVENHEDER & OBS — beskriv begivenheder i den kommende uge konkret. Hvilke dage stiger/falder? Hvad betyder det for bestillingen dag for dag?
+3. BEGIVENHED & DAG-FORDELING — hvilke dage bliver stærke/svage næste uge?
+   Beregn risiko begge veje: hvilke dage risikerer vi tomme hylder vs. spild?
 
-4. TGTG-VURDERING — er {tgtg_kr:,} kr/uge for mange poser? Er vi over eller under målet på 800 kr? Hvad bør vi justere — skære ned på bestilling, ændre pose-sammensætning, eller er det ok?
+4. TGTG-ANALYSE — {tgtg_kr:,} kr vs. 800 kr mål.
+   Er TGTG pga. for høj bestilling på svage dage, eller forkert dag-fordeling?
+   Hvad konkret skal ned? Hvad må IKKE sænkes (risiko for tabt salg)?
 
-5. RETUR & BESTILLINGSANBEFALING — forrige uges retur var {retur_b}b + {retur_w}w (varer: {retur_varer_str}). Snit er {snit_b}b + {snit_w}w. Hvad siger det om bestillingsniveauet? Bestil mere, mindre eller det samme?
+5. ANBEFALING — specifikke dag-justeringer med tal.
+   Format: "Fredag: +10% wienerbrød (stærk dag, risiko for udsolgt)"
+            "Mandag: -15% boller (svag dag, TGTG-risiko)"
 
-Vær KONKRET med tal. Sig fx "bestil 10% mere wienerbrød fredag" ikke "overvej at justere". Skriv direkte til ejeren i du-form.
-KUN ren tekst — ingen # overskrifter, ingen * bullets."""
+Skriv i du-form. Vær KONKRET — brug tal og dagenavne. Ingen generelle råd."""
 
     client = _ant.Anthropic(api_key=api_key)
     msg = client.messages.create(
@@ -4082,7 +4090,11 @@ def _format_management_prompt(d: dict) -> str:
     lines = [
         "Du er erfaren detailhandels-rådgiver for Organic Market Greve — en dansk specialbutik med eget bageri.",
         "Produktmix: bagværk (boller, wienerbrød, brød fra ekstern bagerleverandør), friske råvarer, mejeriprodukter, delikatesser.",
-        "Butikken bruger Too Good To Go (TGTG) til at sælge overskud. For meget TGTG = for høj bestilling = spild.",
+        "KERNEFORRETNINGSLOGIK — to LIGE STORE risici:",
+        "① FOR MEGET på svage dage → TGTG/retur → tab (kostpris + arbejdstid)",
+        "② FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder",
+        "TGTG-mål: under 800 kr/uge. Over 1.200 kr = vi overbestiller på svage dage.",
+        "Lørdage/fredage typisk stærke. Mandage/tirsdage typisk svage. Begivenheder kan vende mønstret.",
         "",
         f"DATO I DAG: {d['dato_idag']} ({_dn(d['dato_idag'])})",
         f"SENESTE SALGSDAG: {d['seneste_salgsdag']} ({_dn(d['seneste_salgsdag'])})",

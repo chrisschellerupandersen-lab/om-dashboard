@@ -6363,11 +6363,18 @@ async function bernVurderBestilling() {
   const vaekst = d.vaekst_pct != null ? d.vaekst_pct + '%' : 'ukendt';
   const tgtg   = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
 
+  // Dag-snit fra historik til AI — så den ved hvilke dage der er stærke/svage
+  const dagSnitStr = (d.dag_snit || [])
+    .sort((a,b) => (a.dag_nr||0) - (b.dag_nr||0))
+    .map(ds => `${ds.dag}: ~${Math.round(ds.snit_oms||0).toLocaleString('da-DK')} kr snit`)
+    .join(', ');
+
   const payload = {
     uge: _bernUge, aar: _bernAar,
     dag_totaler: dagStr, total_stk: totalStk,
     produkter: produktListe,
     event: evt, si: d.si||1, vaekst, tgtg,
+    dag_snit: dagSnitStr,
     dato_range: d.dato_range || '',
   };
 

@@ -379,38 +379,56 @@ async def api_beregner_vurder(request: Request):
         body = await request.json()
         import anthropic as _ant, json as _json
 
-        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
+        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med bageri.
+
+═══ FORRETNINGSLOGIK — FORSTÅ DETTE FØR ALT ANDET ═══
+Vores to LIGE STORE risici er:
+1. FOR MEGET på svage dage → retur/TGTG → direkte tab (kostpris + arbejdstid)
+2. FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder
+
+Begge er tabsbringende. Det handler om DAG-PRÆCISION — ikke bare ugetotal.
+TGTG-mål: under 800 kr/uge. Over 1.200 kr = vi overbestiller på svage dage.
+Lørdage og fredage er typisk stærke. Mandage og tirsdage typisk svage.
+Begivenheder kan VENDE dette mønster helt.
+═══════════════════════════════════════════════════════
 
 BESTILLINGSUGE {body.get('uge')}/{body.get('aar')} ({body.get('dato_range','')}):
 Begivenhed: {body.get('event','ingen')}
-Sæsonindeks: {body.get('si',1.0)} · Vækst: {body.get('vaekst','?')} · TGTG: {body.get('tgtg','ingen data')}
+Sæsonindeks: {body.get('si',1.0)} · Vækst: {body.get('vaekst','?')}
+TGTG seneste uge: {body.get('tgtg','ingen data')}
+Dag-snit fra historik: {body.get('dag_snit','')}
 
-DAGSTOTALER: {body.get('dag_totaler','')}
+DAGSTOTALER DENNE BESTILLING:
+{body.get('dag_totaler','')}
 
-PRODUKTER PR. DAG (format: Varenavn (kat): Man:X Tir:X ...):
+PRODUKTER PR. DAG:
 {body.get('produkter','')}
 
-Returner KUN valid JSON — ingen forklaring udenfor JSON:
+Vurder BEGGE risici for HVER dag:
+- Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
+- Er svage dage bestilt for højt? Overskud = TGTG-tab.
+
+Returner KUN valid JSON:
 {{
-  "vurdering": "2-4 sætninger om den samlede bestilling. Konkret, med tal.",
+  "vurdering": "2-4 sætninger. Nævn specifikt hvilke dage der er under/overbestilt og hvad det koster.",
   "klar": true/false,
   "justeringer": [
     {{
-      "varenavn": "eksakt varenavn fra listen ovenfor",
+      "varenavn": "eksakt varenavn fra produktlisten",
       "dag": "man|tir|ons|tor|fre|loe|son",
       "fra": <nuværende antal>,
       "til": <anbefalet antal>,
-      "grund": "kort begrundelse max 8 ord"
+      "grund": "salg-tab/TGTG-tab + max 5 ord"
     }}
   ]
 }}
 
-Regler for justeringer:
-- Inkluder KUN justeringer hvor ændringen er meningsfuld (mindst ±20% eller ±2 stk)
-- Brug eksakt varenavn som det står i produktlisten
-- Max 8 justeringer — prioriter de vigtigste
-- Hvis bestillingen er fin: returner tom justeringer-liste []
-- dag skal være én af: man, tir, ons, tor, fre, loe, son"""
+Regler:
+- justeringer: både OP (for lidt → tabt salg) og NED (for meget → TGTG)
+- Angiv om grunden er "tabt salg" eller "TGTG-risiko" som første ord i grund
+- Min ±2 stk eller ±20% for at inkludere
+- Max 10 justeringer — prioriter størst økonomisk effekt
+- Tomme justeringer [] hvis alt ser fornuftigt ud"""
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(

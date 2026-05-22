@@ -3895,145 +3895,174 @@ KUN ren tekst — ingen # overskrifter, ingen * bullets."""
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
 
 def hent_management_data() -> dict:
-    """Samler alle relevante KPI-data til management review."""
+    """Samler detaljerede KPI-data til management review."""
     from datetime import date, timedelta
+    from collections import defaultdict
     today = date.today()
-    aar = today.year
 
     with _conn() as conn:
-        # Seneste 8 uger omsætning + transaktioner
-        uger_8 = conn.execute("""
-            SELECT strftime('%Y', dato) AS aar,
-                   CAST(strftime('%W', dato) AS INTEGER) + 1 AS uge_approx,
-                   MIN(dato) AS uge_start, MAX(dato) AS uge_slut,
-                   SUM(omsætning) AS oms, COUNT(DISTINCT dato) AS dage,
-                   SUM(antal) AS antal_solgt
-            FROM transaktioner
-            WHERE dato >= date('now','-56 days')
-            GROUP BY strftime('%Y-%W', dato)
-            ORDER BY dato DESC
-            LIMIT 8
-        """).fetchall()
-
-        # Ugentlig omsætning i ISO-uger, seneste 10
+        # Ugentlig omsaetning + DB + kunder, seneste 10 ISO-uger
         uger_iso = conn.execute("""
             SELECT
                 CAST(strftime('%Y', dato) AS INTEGER) AS aar,
                 CAST(strftime('%W', dato) AS INTEGER)+1 AS uge,
                 MIN(dato) AS fra, MAX(dato) AS til,
-                ROUND(SUM(omsætning),0) AS oms,
+                ROUND(SUM(omsaetning),0) AS oms,
                 ROUND(SUM(avance),0) AS db_kr,
-                COUNT(DISTINCT dato) AS dage
+                ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct,
+                COUNT(DISTINCT dato) AS dage,
+                COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
             FROM transaktioner
             WHERE dato >= date('now','-70 days')
             GROUP BY strftime('%Y-%W', dato)
-            ORDER BY dato DESC
-            LIMIT 10
+            ORDER BY dato DESC LIMIT 10
         """).fetchall()
 
-        # DB% per kategori, seneste 30 dage
-        kat_db = conn.execute("""
-            SELECT kategori,
-                   ROUND(SUM(omsætning),0) AS oms,
-                   ROUND(SUM(avance),0) AS db_kr,
-                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
+        # Seneste salgsdag + samme dag forrige uge
+        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        seneste_dag = None
+        prev_dag_oms = None
+        if seneste_dato:
+            seneste_dag = conn.execute("""
+                SELECT ROUND(SUM(omsaetning),0) AS oms,
+                       ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct,
+                       COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
+                FROM transaktioner WHERE dato=?
+            """, (seneste_dato,)).fetchone()
+            prev_dag = conn.execute("SELECT date(?,'-7 days')", (seneste_dato,)).fetchone()[0]
+            prev_dag_oms = conn.execute(
+                "SELECT ROUND(SUM(omsaetning),0) AS oms FROM transaktioner WHERE dato=?",
+                (prev_dag,)
+            ).fetchone()
+
+        # Kategorier seneste 30 dage med vaekst vs forrige 30 dage
+        kat_nu = conn.execute("""
+            SELECT kategori, ROUND(SUM(omsaetning),0) AS oms,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct
             FROM transaktioner
             WHERE dato >= date('now','-30 days') AND kategori != ''
+            GROUP BY kategori ORDER BY oms DESC LIMIT 10
+        """).fetchall()
+        kat_prev = {r['kategori']: r['oms'] for r in conn.execute("""
+            SELECT kategori, ROUND(SUM(omsaetning),0) AS oms FROM transaktioner
+            WHERE dato >= date('now','-60 days') AND dato < date('now','-30 days') AND kategori != ''
             GROUP BY kategori
-            ORDER BY oms DESC
-            LIMIT 12
-        """).fetchall()
+        """).fetchall()}
 
-        # Top 10 produkter seneste 14 dage
-        top_prod = conn.execute("""
-            SELECT varenavn,
-                   ROUND(SUM(omsætning),0) AS oms,
-                   SUM(antal) AS antal,
-                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
-            FROM transaktioner
-            WHERE dato >= date('now','-14 days') AND varenavn != ''
-            GROUP BY varenavn
-            ORDER BY oms DESC
-            LIMIT 10
-        """).fetchall()
-
-        # Dag-af-uge mønster (snit omsætning per ugedag, seneste 8 uger)
+        # Dag-af-uge snit, seneste 12 uger
         dag_snit = conn.execute("""
             SELECT
                 CASE CAST(strftime('%w',dato) AS INTEGER)
                     WHEN 1 THEN 'Mandag' WHEN 2 THEN 'Tirsdag' WHEN 3 THEN 'Onsdag'
-                    WHEN 4 THEN 'Torsdag' WHEN 5 THEN 'Fredag' WHEN 6 THEN 'Lørdag'
-                    ELSE 'Søndag'
-                END AS dag,
+                    WHEN 4 THEN 'Torsdag' WHEN 5 THEN 'Fredag' WHEN 6 THEN 'Lordag'
+                    ELSE 'Sondag' END AS dag,
                 CAST(strftime('%w',dato) AS INTEGER) AS dag_nr,
                 ROUND(AVG(dag_oms),0) AS snit_oms,
+                ROUND(AVG(dag_kunder),0) AS snit_kunder,
                 COUNT(*) AS uger
             FROM (
-                SELECT dato, SUM(omsætning) AS dag_oms
-                FROM transaktioner
-                WHERE dato >= date('now','-56 days')
+                SELECT dato, SUM(omsaetning) AS dag_oms,
+                       COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS dag_kunder
+                FROM transaktioner WHERE dato >= date('now','-84 days')
                 GROUP BY dato
-            )
-            GROUP BY dag_nr
-            ORDER BY dag_nr
+            ) GROUP BY dag_nr ORDER BY dag_nr
         """).fetchall()
 
-        # Kommende events (næste 30 dage)
-        events = conn.execute("""
-            SELECT navn, dato, note, factor
-            FROM events
-            WHERE dato >= date('now') AND dato <= date('now','+30 days')
-            ORDER BY dato
-            LIMIT 10
-        """).fetchall() if _tabel_findes(conn, 'events') else []
+        # Top 15 produkter seneste 14 dage + vaekst
+        top_nu = conn.execute("""
+            SELECT varenavn, ROUND(SUM(omsaetning),0) AS oms, SUM(antal) AS antal,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct
+            FROM transaktioner
+            WHERE dato >= date('now','-14 days') AND varenavn != ''
+            GROUP BY varenavn ORDER BY oms DESC LIMIT 15
+        """).fetchall()
+        top_prev_map = {r['varenavn']: r['oms'] for r in conn.execute("""
+            SELECT varenavn, ROUND(SUM(omsaetning),0) AS oms FROM transaktioner
+            WHERE dato >= date('now','-28 days') AND dato < date('now','-14 days') AND varenavn != ''
+            GROUP BY varenavn
+        """).fetchall()}
 
-        # Retur seneste 4 uger
-        retur_hist = conn.execute("""
-            SELECT uge, aar,
-                   SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
-                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener
-            FROM retur_detaljer
-            GROUP BY uge, aar
-            ORDER BY aar DESC, uge DESC
-            LIMIT 4
+        # TGTG seneste 8 uger
+        tgtg_uger = conn.execute("""
+            SELECT strftime('%Y-%W', dato) AS yw, MIN(dato) AS fra,
+                   SUM(antal_solgt) AS poser, ROUND(SUM(omsaetning),0) AS kr
+            FROM tgtg_dagssalg
+            WHERE dato >= date('now','-56 days')
+            GROUP BY yw ORDER BY yw DESC LIMIT 8
         """).fetchall()
 
-        # Seneste dag
-        seneste_dato = conn.execute(
-            "SELECT MAX(dato) FROM transaktioner"
-        ).fetchone()[0]
-        seneste_dag = conn.execute("""
-            SELECT ROUND(SUM(omsætning),0) AS oms, ROUND(SUM(avance),0) AS db_kr,
-                   COUNT(DISTINCT varenavn) AS produkter
-            FROM transaktioner WHERE dato = ?
-        """, (seneste_dato,)).fetchone() if seneste_dato else None
+        # Retur pr uge og pr vare (seneste 6 uger)
+        retur_uger = conn.execute("""
+            SELECT registreret_dato, kategori, SUM(antal) AS antal
+            FROM retur_detaljer WHERE registreret_dato >= date('now','-42 days')
+            GROUP BY registreret_dato, kategori ORDER BY registreret_dato DESC
+        """).fetchall()
+        retur_varer = conn.execute("""
+            SELECT produkt, kategori, SUM(antal) AS antal
+            FROM retur_detaljer WHERE registreret_dato >= date('now','-28 days')
+            GROUP BY produkt, kategori ORDER BY antal DESC LIMIT 12
+        """).fetchall()
 
-        # Ugebestillinger aktuel + næste uge
-        iso_nu = today.isocalendar()
-        iso_naeste = (today + timedelta(weeks=1)).isocalendar()
-        best_nu = conn.execute("""
-            SELECT varenavn, total_antal FROM ugebestillinger
-            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 20
-        """, (iso_nu[1], iso_nu[0])).fetchall()
-        best_naeste = conn.execute("""
-            SELECT varenavn, total_antal FROM ugebestillinger
-            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 20
-        """, (iso_naeste[1], iso_naeste[0])).fetchall()
+        # Bestilling aktuel + naeste uge
+        iso_nu  = today.isocalendar()
+        iso_nxt = (today + timedelta(weeks=1)).isocalendar()
+        best_nu = conn.execute(
+            "SELECT varenavn, total_antal FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 15",
+            (iso_nu[1], iso_nu[0])
+        ).fetchall()
+        best_nxt = conn.execute(
+            "SELECT varenavn, total_antal FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 15",
+            (iso_nxt[1], iso_nxt[0])
+        ).fetchall()
+
+    # Berig med vaekst
+    kat_enriched = []
+    for k in kat_nu:
+        prev_oms = kat_prev.get(k['kategori'], 0)
+        vaekst = round((k['oms'] - prev_oms) / prev_oms * 100, 1) if prev_oms else None
+        kat_enriched.append({**dict(k), "oms_prev30": prev_oms, "vaekst_pct": vaekst})
+
+    top_enriched = []
+    for p in top_nu:
+        prev_oms = top_prev_map.get(p['varenavn'], 0)
+        vaekst = round((p['oms'] - prev_oms) / prev_oms * 100, 1) if prev_oms else None
+        top_enriched.append({**dict(p), "oms_prev14": prev_oms, "vaekst_pct": vaekst})
+
+    retur_pr_uge: dict = defaultdict(lambda: {'b': 0, 'w': 0})
+    for r in retur_uger:
+        yw = r['registreret_dato'][:7]
+        if r['kategori'] == 'boller':       retur_pr_uge[yw]['b'] += r['antal']
+        if r['kategori'] == 'wienerbroed':  retur_pr_uge[yw]['w'] += r['antal']
+
+    kommende_evt = []
+    for i in range(1, 4):
+        u = today + timedelta(weeks=i)
+        iso = u.isocalendar()
+        evt = _get_event(iso[1], iso[0])
+        if evt:
+            from datetime import date as _d2
+            mon = _d2.fromisocalendar(iso[0], iso[1], 1)
+            kommende_evt.append({"uge": iso[1], "aar": iso[0], "fra": mon.isoformat(),
+                                  "navn": evt["navn"], "factor": evt["factor"],
+                                  "note": evt.get("note","")})
 
     return {
-        "dato_idag": str(today),
-        "seneste_salgsdag": seneste_dato,
-        "seneste_dag": dict(seneste_dag) if seneste_dag else {},
-        "uger": [dict(r) for r in uger_iso],
-        "kategorier_db": [dict(r) for r in kat_db],
-        "top_produkter": [dict(r) for r in top_prod],
-        "dag_snit": [dict(r) for r in dag_snit],
-        "events": [dict(r) for r in events],
-        "retur_hist": [dict(r) for r in retur_hist],
-        "bestilling_nu": [dict(r) for r in best_nu],
-        "bestilling_naeste": [dict(r) for r in best_naeste],
+        "dato_idag":         str(today),
+        "seneste_salgsdag":  seneste_dato,
+        "seneste_dag":       dict(seneste_dag) if seneste_dag else {},
+        "prev_dag_oms":      int(prev_dag_oms['oms'] or 0) if prev_dag_oms else None,
+        "uger":              [dict(r) for r in uger_iso],
+        "kategorier":        kat_enriched,
+        "dag_snit":          [dict(r) for r in dag_snit],
+        "top_produkter":     top_enriched,
+        "tgtg_uger":         [dict(r) for r in tgtg_uger],
+        "retur_pr_uge":      dict(retur_pr_uge),
+        "retur_varer":       [dict(r) for r in retur_varer],
+        "bestilling_nu":     [dict(r) for r in best_nu],
+        "bestilling_naeste": [dict(r) for r in best_nxt],
+        "kommende_events":   kommende_evt,
+        "aktuel_uge":        iso_nu[1],
     }
-
 
 def _tabel_findes(conn, navn: str) -> bool:
     r = conn.execute(
@@ -4043,95 +4072,139 @@ def _tabel_findes(conn, navn: str) -> bool:
 
 
 def _format_management_prompt(d: dict) -> str:
-    """Formaterer data til et læsbart prompt til Claude."""
+    """Formaterer rig data til konkret management review prompt."""
     from datetime import date as _date
     _DAGE = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
-    def _dagsnavn(dato_str):
-        if not dato_str: return ''
-        try:
-            d_ = _date.fromisoformat(str(dato_str)[:10])
-            return _DAGE[d_.weekday()]
-        except Exception:
-            return ''
-
-    idag_navn    = _dagsnavn(d.get('dato_idag'))
-    seneste_navn = _dagsnavn(d.get('seneste_salgsdag'))
+    def _dn(ds):
+        try: return _DAGE[_date.fromisoformat(str(ds)[:10]).weekday()]
+        except: return ''
 
     lines = [
-        "Du er et erfarent management team for Organic Market Greve — en dansk økobutik der sælger bagværk, råvarer, mejeriprodukter og specialprodukter.",
-        "Butikken bestiller bagværk fra en bagerleverandør ugentligt (boller, wienerbrød, brød) og registrerer spild/retur.",
+        "Du er erfaren detailhandels-rådgiver for Organic Market Greve — en dansk specialbutik med eget bageri.",
+        "Produktmix: bagværk (boller, wienerbrød, brød fra ekstern bagerleverandør), friske råvarer, mejeriprodukter, delikatesser.",
+        "Butikken bruger Too Good To Go (TGTG) til at sælge overskud. For meget TGTG = for høj bestilling = spild.",
         "",
-        f"DATO I DAG: {d['dato_idag']} ({idag_navn})",
-        f"SENESTE SALGSDAG: {d['seneste_salgsdag']} ({seneste_navn})",
+        f"DATO I DAG: {d['dato_idag']} ({_dn(d['dato_idag'])})",
+        f"SENESTE SALGSDAG: {d['seneste_salgsdag']} ({_dn(d['seneste_salgsdag'])})",
         "",
     ]
 
-    if d.get('seneste_dag') and d['seneste_dag'].get('oms'):
-        sd = d['seneste_dag']
-        lines.append(f"SENESTE DAG: {sd.get('oms',0):,.0f} kr omsætning, {sd.get('db_kr',0):,.0f} kr DB, {sd.get('produkter',0)} produktlinjer")
-        lines.append("")
+    # Seneste dag med sammenligning
+    sd = d.get('seneste_dag', {})
+    if sd.get('oms'):
+        prev = d.get('prev_dag_oms')
+        diff = f" (samme dag forrige uge: {prev:,} kr, {'+' if sd['oms']>prev else ''}{round(sd['oms']-prev):,} kr)" if prev else ""
+        lines += [f"SENESTE DAG ({_dn(d['seneste_salgsdag'])}): {sd['oms']:,.0f} kr · {sd.get('db_pct',0):.1f}% DB · {sd.get('kunder',0)} kunder{diff}", ""]
 
+    # Ugentlig trend — vis udvikling
     if d.get('uger'):
-        lines.append("UGENTLIG OMSÆTNING (nyeste først):")
-        for u in d['uger'][:8]:
-            db_pct = round(u['db_kr']*100/u['oms'], 1) if u.get('oms') and u['oms'] > 0 else 0
-            lines.append(f"  Uge {u['uge']}/{u['aar']}: {u.get('oms',0):,.0f} kr, DB {u.get('db_kr',0):,.0f} kr ({db_pct}%), {u.get('dage',0)} salgsdage")
+        lines.append("UGENTLIG OMSAETNING OG DB (nyeste forst):")
+        uger = d['uger']
+        for i, u in enumerate(uger[:8]):
+            change = ""
+            if i+1 < len(uger) and uger[i+1].get('oms',0) > 0:
+                pct = round((u['oms'] - uger[i+1]['oms']) / uger[i+1]['oms'] * 100, 1)
+                change = f" ({'+' if pct>=0 else ''}{pct}% ift. forrige)"
+            lines.append(f"  Uge {u['uge']}/{u['aar']} ({u.get('fra','')[:10]}–{u.get('til','')[:10]}): "
+                        f"{u.get('oms',0):,.0f} kr · {u.get('db_pct',0):.1f}% DB · "
+                        f"{u.get('kunder',0)} kunder · {u.get('dage',0)} dage{change}")
         lines.append("")
 
-    if d.get('kategorier_db'):
-        lines.append("DB% PER KATEGORI (seneste 30 dage):")
-        for k in d['kategorier_db']:
-            lines.append(f"  {k['kategori']}: {k.get('oms',0):,.0f} kr oms, {k.get('db_pct',0)}% DB")
+    # Kategorier med vaekst
+    if d.get('kategorier'):
+        lines.append("KATEGORIER SENESTE 30 DAGE (vs. forrige 30 dage):")
+        for k in d['kategorier']:
+            v = k.get('vaekst_pct')
+            vaekst = f" ({'+' if v and v>=0 else ''}{v}% vaekst)" if v is not None else ""
+            lines.append(f"  {k['kategori']}: {k['oms']:,.0f} kr · {k.get('db_pct',0):.1f}% DB{vaekst}")
         lines.append("")
 
+    # Dag-af-uge
     if d.get('dag_snit'):
-        lines.append("GENNEMSNIT OMS. PER UGEDAG (seneste 8 uger):")
-        for dag in sorted(d['dag_snit'], key=lambda x: x.get('dag_nr', 0)):
-            lines.append(f"  {dag['dag']}: {dag.get('snit_oms',0):,.0f} kr snit ({dag.get('uger',0)} uger data)")
+        lines.append("SNIT PR UGEDAG (seneste 12 uger):")
+        for dag in sorted(d['dag_snit'], key=lambda x: x.get('dag_nr',0)):
+            lines.append(f"  {dag['dag']}: {dag.get('snit_oms',0):,.0f} kr · {dag.get('snit_kunder',0)} kunder snit")
         lines.append("")
 
+    # Top produkter med vaekst
     if d.get('top_produkter'):
-        lines.append("TOP 10 PRODUKTER (seneste 14 dage):")
-        for p in d['top_produkter']:
-            lines.append(f"  {p['varenavn']}: {p.get('oms',0):,.0f} kr, {p.get('antal',0)} stk, {p.get('db_pct',0)}% DB")
+        lines.append("TOP PRODUKTER SENESTE 14 DAGE (vs. forrige 14 dage):")
+        for p in d['top_produkter'][:12]:
+            v = p.get('vaekst_pct')
+            vaekst = f" ({'+' if v and v>=0 else ''}{v}%)" if v is not None else " (ny)"
+            lines.append(f"  {p['varenavn']}: {p['oms']:,.0f} kr · {p.get('antal',0)} stk · {p.get('db_pct',0):.1f}% DB{vaekst}")
         lines.append("")
 
-    if d.get('retur_hist'):
-        lines.append("RETUR BAGVÆRK (seneste 4 uger):")
-        for r in d['retur_hist']:
-            lines.append(f"  Uge {r['uge']}/{r['aar']}: {r.get('boller',0)} boller, {r.get('wiener',0)} wienerbrød returneret")
+    # TGTG analyse
+    if d.get('tgtg_uger'):
+        tgtg_snit = round(sum(r.get('kr',0) or 0 for r in d['tgtg_uger']) / max(len(d['tgtg_uger']),1))
+        lines.append(f"TOO GOOD TO GO (TGTG) — snit {tgtg_snit:,} kr/uge (maal: under 800 kr = minimalt spild, over 1200 kr = for meget):")
+        for t in d['tgtg_uger'][:6]:
+            status = "OK" if (t.get('kr') or 0) < 800 else ("HOEJ" if (t.get('kr') or 0) < 1200 else "FOR HOEJ")
+            lines.append(f"  {t.get('fra','')[:10]}: {t.get('poser',0)} poser · {t.get('kr',0):,.0f} kr [{status}]")
         lines.append("")
 
+    # Retur analyse
+    retur_uge_data = d.get('retur_pr_uge', {})
+    if retur_uge_data:
+        lines.append("RETUR BAGVAERK PR DATO (seneste 6 uger):")
+        for yw, rv in sorted(retur_uge_data.items(), reverse=True)[:6]:
+            lines.append(f"  {yw}: {rv['b']} boller + {rv['w']} wienerbroed returneret")
+        lines.append("")
+    if d.get('retur_varer'):
+        lines.append("RETUR PR VARE (seneste 4 uger):")
+        for r in d['retur_varer']:
+            lines.append(f"  {r['produkt']} ({r['kategori']}): {r['antal']} stk returneret")
+        lines.append("")
+
+    # Bestilling
     if d.get('bestilling_nu'):
-        lines.append(f"BESTILLING AKTUEL UGE (top varer):")
-        for b in d['bestilling_nu'][:10]:
+        lines.append(f"AKTUEL UGE BESTILLING (uge {d.get('aktuel_uge','?')}):")
+        for b in d['bestilling_nu'][:12]:
+            lines.append(f"  {b['varenavn']}: {b.get('total_antal',0)} stk")
+        lines.append("")
+    if d.get('bestilling_naeste'):
+        lines.append(f"NAESTE UGE BESTILLING:")
+        for b in d['bestilling_naeste'][:12]:
             lines.append(f"  {b['varenavn']}: {b.get('total_antal',0)} stk")
         lines.append("")
 
-    if d.get('events'):
-        lines.append("KOMMENDE BEGIVENHEDER (næste 30 dage):")
-        for e in d['events']:
-            lines.append(f"  {e['dato']}: {e['navn']} (faktor {e.get('factor',1.0)}) — {e.get('note','')}")
+    # Kommende begivenheder
+    if d.get('kommende_events'):
+        lines.append("KOMMENDE BEGIVENHEDER (naeste 3 uger):")
+        for e in d['kommende_events']:
+            lines.append(f"  Uge {e['uge']}/{e['aar']} ({e['fra'][:10]}): {e['navn']} — faktor {e['factor']} — {e.get('note','')}")
         lines.append("")
 
     lines += [
-        "---",
-        "Lav en management review på DANSK. Returner KUN valid JSON i dette format (ingen markdown, ingen forklaring udenfor JSON):",
+        "═══════════════════════════════════════════════════════",
+        "MANAGEMENT REVIEW OPGAVE:",
+        "Skriv en SPECIFIK og DATADREVET management review for Organic Market Greve.",
+        "Brug faktiske tal i HVERT udsagn — aldrig generiske vendinger.",
+        "Sammenlign altid med forrige periode og identificer tendenser.",
+        "",
+        "Returner KUN valid JSON (ingen markdown, ingen forklaring udenfor JSON):",
         "",
         '{"sektioner": [',
-        '  {"id": "performance", "titel": "Ugentlig Performance", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
-        '  {"id": "bestilling", "titel": "Bestillingsanbefalinger", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
-        '  {"id": "opmærksomhed", "titel": "Opmærksomhedspunkter", "tone": "positiv|neutral|advarsel", "tekst": "..."},',
-        '  {"id": "tiltag", "titel": "Forretningstiltag", "tone": "positiv|neutral|advarsel", "tekst": "..."}',
+        '  {"id": "uge_status", "titel": "Ugestatus & Omsaetning", "tone": "positiv|neutral|advarsel",',
+        '   "tekst": "Specifik analyse af seneste uges performance med konkrete tal og sammenligning"},',
+        '  {"id": "tgtg_spild", "titel": "TGTG & Spild", "tone": "positiv|neutral|advarsel",',
+        '   "tekst": "TGTG-niveau analyseret: er vi over/under 800 kr maalet? Hvilke varer fylder poserne? Konkret anbefaling"},',
+        '  {"id": "retur", "titel": "Retur & Bestillingsniveau", "tone": "positiv|neutral|advarsel",',
+        '   "tekst": "Retur-analyse pr vare og pr uge. Er returraten normal (10% boller, 13.5% wiener)? Hvad skal justeres?"},',
+        '  {"id": "begivenheder", "titel": "Kommende Begivenheder", "tone": "positiv|neutral|advarsel",',
+        '   "tekst": "Konkrete handlinger for kommende begivenheder — hvilke dage, hvilke produkter, hvilke justeringer"},',
+        '  {"id": "tiltag", "titel": "Anbefalede Handlinger", "tone": "positiv|neutral|advarsel",',
+        '   "tekst": "3 konkrete, navngivne handlinger med specifikke tal: fx Reducer Croissant med 15% mandag-onsdag"}',
         ']}',
         "",
-        "Regler:",
-        "- Vær KONKRET — brug faktiske tal fra data",
-        "- tone: 'positiv' hvis godt, 'advarsel' hvis noget kræver handling, 'neutral' ellers",
-        "- Hvert afsnit: 3-6 sætninger. Brug \\n\\n til afsnit inden for tekst",
-        "- Skriv som et management team der kender forretningen — ikke generisk",
-        "- Bestillingsanbefalinger: giv SPECIFIKKE % eller stk-justeringer baseret på data",
-        "- Forretningstiltag: 2-3 konkrete, handlingsorienterede forslag",
+        "REGLER — overtraed ikke disse:",
+        "- Hvert afsnit SKAL indeholde mindst 3 specifikke tal fra data",
+        "- Skriv altid: 'X kr' ikke 'omsaetningen'",
+        "- Skriv altid varenavn naar du taler om et produkt",
+        "- tone 'advarsel' naar noget er over/under normalniveau og kraever handling",
+        "- Brug \\n\\n til nye afsnit inden for tekst",
+        "- Maks 120 ord pr sektion",
     ]
     return "\n".join(lines)
 

@@ -3180,26 +3180,27 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             }
 
         # ── Ingen faktisk bestilling → beregn anbefaling ────────────────────
-        # Find seneste bestillingsuge der er ældre end (eller lig) mål-ugen
-        basis_row = conn.execute("""
+        # Find de 3 seneste bestillingsuger ældre end mål-ugen (snit er mere robust end kun 1)
+        basis_rows = conn.execute("""
             SELECT uge, aar FROM ugebestillinger
             WHERE (aar < ? OR (aar = ? AND uge < ?))
+            GROUP BY uge, aar
             ORDER BY aar DESC, uge DESC
-            LIMIT 1
-        """, (maal_aar, maal_aar, maal_uge)).fetchone()
+            LIMIT 3
+        """, (maal_aar, maal_aar, maal_uge)).fetchall()
 
-        if not basis_row:
-            # Fallback: seneste uge overhovedet
-            basis_row = conn.execute("""
+        if not basis_rows:
+            basis_rows = conn.execute("""
                 SELECT uge, aar FROM ugebestillinger
-                ORDER BY aar DESC, uge DESC LIMIT 1
-            """).fetchone()
+                GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 3
+            """).fetchall()
 
-        if not basis_row:
+        if not basis_rows:
             return {"fejl": "Ingen ugebestillinger indlæst endnu"}
 
-        basis_uge = basis_row["uge"]
-        basis_aar = basis_row["aar"]
+        # Primær basis: seneste uge (til produkt-liste og rækkefølge)
+        basis_uge = basis_rows[0]["uge"]
+        basis_aar = basis_rows[0]["aar"]
 
         # Hent alle produkter fra basis-ugen — bevar original rækkefølge (id)
         prod_rows = conn.execute("""
@@ -3209,6 +3210,23 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             WHERE uge=? AND aar=?
             ORDER BY id
         """, (basis_uge, basis_aar)).fetchall()
+
+        # Byg snit-map over de 3 seneste uger pr. varenummer pr. dag
+        # Bruges til at udjævne atypiske uger i selve anbefalingen
+        _dag_cols = ['man','tir','ons','tor','fre','loe','son']
+        _basis_snit: Dict = {}  # {varenummer: {dag: snit_antal}}
+        for br in basis_rows:
+            br_rows = conn.execute("""
+                SELECT varenummer, man, tir, ons, tor, fre, loe, son
+                FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY id
+            """, (br["uge"], br["aar"])).fetchall()
+            for rr in br_rows:
+                vn = rr["varenummer"] or rr.get("varenavn", "")
+                if vn not in _basis_snit:
+                    _basis_snit[vn] = {d: [] for d in _dag_cols}
+                for d in _dag_cols:
+                    if rr[d] and rr[d] > 0:
+                        _basis_snit[vn][d].append(float(rr[d]))
 
         # Manuelle overrides for mål-ugen
         manuel_rows = conn.execute("""
@@ -3249,7 +3267,16 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     sd_map = _stamdata_type_map()
     produkter = []
     for r in prod_rows:
-        basis_dag = {d: float(r[d] or 0) for d in DAGE}
+        # Brug snit af de 3 seneste uger pr. dag (mere robust end kun seneste uge)
+        vn_key = r["varenummer"] or ""
+        snit_data = _basis_snit.get(vn_key, {})
+        basis_dag = {}
+        for d in DAGE:
+            vals = snit_data.get(d, [])
+            if vals:
+                basis_dag[d] = sum(vals) / len(vals)  # snit
+            else:
+                basis_dag[d] = float(r[d] or 0)       # fallback til seneste uge
         kat = _kat(r["varenavn"], sd_map)
         vn  = r["varenummer"] or ""
 
@@ -3316,6 +3343,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         "dato_range":      _dato_range(maal_uge, maal_aar),
         "basis_uge":       basis_uge,
         "basis_aar":       basis_aar,
+        "basis_uger_snit": len(basis_rows),
         "maaned":          mon_dato.month,
         "si":              round(si, 2),
         "event":           evt,
@@ -3683,6 +3711,131 @@ def hent_retur_dag(dato: str) -> dict:
             ORDER BY kategori, produkt
         """, (dato,)).fetchall()
     return {'dato': dato, 'items': [dict(r) for r in rows]}
+
+
+# ── BESTILLINGSBEREGNER AI-KONTEKST ──────────────────────────────────────────
+
+def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dict:
+    """Genererer AI-hjælpetekst til bestillingsberegneren for den kommende uge."""
+    from datetime import date as _d, timedelta as _td
+    import anthropic as _ant, json as _json
+
+    DAGE_DA = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+
+    with _conn() as conn:
+        # Mål-ugens datointerval
+        mon = _d.fromisocalendar(maal_aar, maal_uge, 1)
+        sun = mon + _td(days=6)
+
+        # Forrige uge
+        prev_uge = maal_uge - 1 if maal_uge > 1 else 52
+        prev_aar = maal_aar if maal_uge > 1 else maal_aar - 1
+        prev_mon = _d.fromisocalendar(prev_aar, prev_uge, 1)
+        prev_sun = prev_mon + _td(days=6)
+
+        # Salg forrige uge
+        prev_salg = conn.execute("""
+            SELECT SUM(omsætning) AS oms, COUNT(DISTINCT dato) AS dage,
+                   COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
+            FROM transaktioner WHERE dato>=? AND dato<=?
+        """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
+
+        # Salg 4 uger siden (samme ugedag-mønster til sammenligning)
+        prev4_mon = mon - _td(weeks=4)
+        prev4_sun = prev4_mon + _td(days=6)
+        prev4_salg = conn.execute("""
+            SELECT SUM(omsætning) AS oms FROM transaktioner
+            WHERE dato>=? AND dato<=?
+        """, (prev4_mon.isoformat(), prev4_sun.isoformat())).fetchone()
+
+        # Trend: seneste 8 uger omsætning
+        trend_rows = conn.execute("""
+            SELECT MIN(dato) AS uge_start, SUM(omsætning) AS oms
+            FROM transaktioner WHERE dato < ?
+            GROUP BY strftime('%Y-%W', dato)
+            ORDER BY dato DESC LIMIT 8
+        """, (mon.isoformat(),)).fetchall()
+
+        # Retur denne uge (indeværende bestillingsuge)
+        retur_row = conn.execute("""
+            SELECT SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS b,
+                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS w
+            FROM retur_detaljer WHERE registreret_dato>=? AND registreret_dato<=?
+        """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
+
+        # Bestilling forrige uge (basis)
+        best_prev = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 10
+        """, (prev_uge, prev_aar)).fetchall()
+
+        # Event for mål-ugen
+        evt = _get_event(maal_uge, maal_aar)
+
+        # Top svind-produkter seneste 4 uger
+        svind_rows = conn.execute("""
+            SELECT varenavn, SUM(spild_stk) AS spild, SUM(bestilt_stk) AS bestilt
+            FROM (
+                SELECT u.varenavn,
+                       u.total_antal - COALESCE(
+                           (SELECT SUM(antal) FROM transaktioner t
+                            WHERE t.dato>=date(u.uge||' '||u.aar||' monday', 'weekday 1')
+                            AND LOWER(t.varenavn) LIKE '%'||LOWER(SUBSTR(u.varenavn,1,6))||'%'), 0
+                       ) AS spild_stk,
+                       u.total_antal AS bestilt_stk
+                FROM ugebestillinger u
+                WHERE (u.aar=? AND u.uge>=?) OR (u.aar=? AND u.uge<=?)
+            ) GROUP BY varenavn HAVING spild > 0
+            ORDER BY spild DESC LIMIT 5
+        """, (prev_aar, max(1, prev_uge-3), prev_aar, prev_uge)).fetchall()
+
+    # Byg prompt
+    prev_oms  = round(prev_salg['oms'] or 0) if prev_salg else 0
+    prev4_oms = round(prev4_salg['oms'] or 0) if prev4_salg else 0
+    trend_str = ', '.join([f"{r['uge_start'][:10]}: {round(r['oms']):,} kr" for r in trend_rows]) if trend_rows else 'ingen data'
+    best_str  = ', '.join([f"{r['varenavn']} ({r['total_antal']} stk)" for r in best_prev[:6]]) if best_prev else 'ingen data'
+    retur_b   = int(retur_row['b'] or 0) if retur_row else 0
+    retur_w   = int(retur_row['w'] or 0) if retur_row else 0
+    evt_str   = f"{evt['navn']} (faktor {evt['factor']})" if evt else 'ingen kendte begivenheder'
+
+    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
+
+BESTILLINGSUGE: {maal_uge}/{maal_aar} ({mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')})
+FORRIGE UGE ({prev_uge}/{prev_aar}): Omsætning {prev_oms:,} kr
+SAMME UGE FOR 4 UGER SIDEN: {prev4_oms:,} kr
+TREND SENESTE 8 UGER (nyeste først): {trend_str}
+RETUR FORRIGE UGE: {retur_b} boller + {retur_w} wienerbrød
+FORRIGE UGES BESTILLING (top varer): {best_str}
+BEGIVENHEDER UGE {maal_uge}: {evt_str}
+
+Skriv en KORT, praktisk hjælpetekst til butiksejeren på dansk. Max 5 korte afsnit:
+1. Hvilken uge og periode vi bestiller til
+2. Hvad forrige uge viste — var det godt/dårligt vs. 4 uger siden
+3. Hvad vi skal være opmærksomme på (begivenheder, sæson, tendens)
+4. Konkret anbefaling: bestil mere/mindre/det samme? Hvilke kategorier?
+5. Retur-forventning: typisk 10% boller og 13,5% wienerbrød retur — hvad betyder det for denne uge?
+
+Vær konkret og brug tal. Undgå sætninger som "det er vigtigt at". Skriv direkte til ejeren.
+Svar KUN med ren tekst — ingen JSON, ingen overskrifter med #, ingen bullets med *."""
+
+    client = _ant.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=600,
+        messages=[{"role": "user", "content": prompt}]
+    )
+    tekst = msg.content[0].text.strip()
+
+    return {
+        "ok": True,
+        "tekst": tekst,
+        "maal_uge": maal_uge,
+        "maal_aar": maal_aar,
+        "dato_range": f"{mon.strftime('%-d. %b')} – {sun.strftime('%-d. %b %Y')}",
+        "prev_uge": prev_uge,
+        "prev_oms": prev_oms,
+        "evt": evt['navn'] if evt else None,
+    }
 
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────

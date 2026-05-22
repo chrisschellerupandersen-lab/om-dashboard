@@ -2098,7 +2098,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-beregner">
         <div class="page-hdr">
           <h2>Bestillingsberegner</h2>
-          <p>Historiske uger viser faktisk bestilling · fremtidige uger beregnes: Excel-basis × sæsonindeks × begivenhedsfaktor × TGTG-korrektion × vækst</p>
+          <p>Snit af 3 seneste bestillingsuger som basis · skaleret med sæson, begivenheder, TGTG og væksttrend</p>
+        </div>
+
+        <!-- AI-kontekstkort -->
+        <div id="bern-kontekst-kort" class="card" style="margin-bottom:16px;display:none;border-left:3px solid var(--forest);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--forest);">🧠 BESTILLINGSRÅDGIVER</div>
+            <button onclick="bernHentKontekst()" id="bern-kontekst-btn"
+              style="font-size:10px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:3px;padding:3px 8px;cursor:pointer;">↻ Opdater</button>
+          </div>
+          <div id="bern-kontekst-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;"></div>
+          <div id="bern-kontekst-spinner" style="display:none;font-size:12px;color:var(--ash);padding:8px 0;">⏳ Analyserer data…</div>
         </div>
 
         <!-- Uge-vælger -->
@@ -6042,7 +6053,7 @@ async function loadBernUge(uge, aar) {
   document.getElementById('bern-dato-label').textContent = d.dato_range + ' · ' + d.maal_aar;
   document.getElementById('bern-basis-label').textContent = d.faktisk
     ? '✓ Faktisk bestilling — indlæst fra Excel'
-    : 'Udgangspunkt: uge ' + d.basis_uge + ' ' + d.basis_aar;
+    : 'Basis: snit af ' + (d.basis_uger_snit || 1) + ' seneste bestillingsuger (seneste: uge ' + d.basis_uge + '/' + d.basis_aar + ')';
   document.getElementById('bern-basis-label').style.color = d.faktisk ? 'var(--moss)' : '';
 
   // Event-badge (header)
@@ -6266,6 +6277,39 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
+  // Hent AI-kontekst automatisk for næste uge
+  bernHentKontekst();
+}
+
+let _bernKontekstUge = null;
+async function bernHentKontekst() {
+  if (!_bernUge || !_bernAar) return;
+  const kort    = document.getElementById('bern-kontekst-kort');
+  const tekst   = document.getElementById('bern-kontekst-tekst');
+  const spinner = document.getElementById('bern-kontekst-spinner');
+  const btn     = document.getElementById('bern-kontekst-btn');
+  if (!kort) return;
+
+  kort.style.display    = '';
+  tekst.textContent     = '';
+  spinner.style.display = '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+
+  try {
+    const res = await api('/api/bestilling/kontekst?uge=' + _bernUge + '&aar=' + _bernAar);
+    spinner.style.display = 'none';
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
+    if (!res || !res.ok) {
+      tekst.textContent = '⚠ ' + (res?.fejl || 'Fejl ved analyse');
+      return;
+    }
+    tekst.textContent = res.tekst;
+    _bernKontekstUge = _bernUge;
+  } catch(e) {
+    spinner.style.display = 'none';
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
+    tekst.textContent = '⚠ Netværksfejl';
+  }
 }
 
 async function bernGenererAnalyse() {
@@ -6330,12 +6374,12 @@ async function bernCellSave(td) {
 function bernPrev() {
   let u = _bernUge - 1, a = _bernAar;
   if (u < 1) { u = 52; a--; }
-  loadBernUge(u, a);
+  loadBernUge(u, a).then(() => bernHentKontekst());
 }
 function bernNext() {
   let u = _bernUge + 1, a = _bernAar;
   if (u > 52) { u = 1; a++; }
-  loadBernUge(u, a);
+  loadBernUge(u, a).then(() => bernHentKontekst());
 }
 
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────

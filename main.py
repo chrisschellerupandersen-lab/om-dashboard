@@ -356,6 +356,22 @@ async def bestilling_gem_manuel(request: Request):
     return {"ok": True}
 
 
+@app.get("/api/bestilling/kontekst")
+async def api_beregner_kontekst(
+    request: Request,
+    uge: int,
+    aar: int,
+):
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+    try:
+        return database.generer_beregner_kontekst(int(uge), int(aar), api_key)
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
 @app.get("/api/bestilling/anbefaling")
 async def api_bestillings_anbefaling(
     request: Request,

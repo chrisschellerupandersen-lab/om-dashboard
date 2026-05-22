@@ -3753,7 +3753,7 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
 
         # TGTG fra tgtg_dagssalg tabellen (mere præcis)
         tgtg_dag = conn.execute("""
-            SELECT SUM(antal_solgt) AS poser, SUM(omsaetning) AS kr
+            SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
             FROM tgtg_dagssalg WHERE dato>=? AND dato<=?
         """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
 
@@ -3985,7 +3985,7 @@ def hent_management_data() -> dict:
         # TGTG seneste 8 uger
         tgtg_uger = conn.execute("""
             SELECT strftime('%Y-%W', dato) AS yw, MIN(dato) AS fra,
-                   SUM(antal_solgt) AS poser, ROUND(SUM(omsaetning),0) AS kr
+                   SUM(antal) AS poser, ROUND(SUM(kreditering),0) AS kr
             FROM tgtg_dagssalg
             WHERE dato >= date('now','-56 days')
             GROUP BY yw ORDER BY yw DESC LIMIT 8

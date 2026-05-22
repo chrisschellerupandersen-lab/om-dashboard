@@ -6569,6 +6569,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        loadBager();
+  if (id === 'forside')      loadReturStatus();
   if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();
   if (id === 'spild')        loadSpild();
@@ -6825,6 +6826,7 @@ _navLoad(); _buildNav();
 _initMomsBtn();
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);
+setInterval(loadReturStatus, 60 * 1000);  // Retur-KPI opdateres hvert minut
 </script>
 
 <!-- VF DRILL-DOWN MODAL -->

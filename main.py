@@ -15,6 +15,18 @@ import database
 import parser as xlsx_parser
 
 app = FastAPI(title="Organic Market Dashboard")
+
+# Tillad upload op til 10 MB (mobilbilleder komprimeres i frontend til ~1.5 MB)
+from starlette.middleware.base import BaseHTTPMiddleware
+class _UploadLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.headers.get("content-type","").startswith("multipart"):
+            cl = int(request.headers.get("content-length", 0))
+            if cl > 10 * 1024 * 1024:
+                from starlette.responses import JSONResponse
+                return JSONResponse({"ok": False, "fejl": "Billedet er for stort (max 10 MB) — prøv at tage et nyt foto"}, status_code=400)
+        return await call_next(request)
+app.add_middleware(_UploadLimitMiddleware)
 templates = Jinja2Templates(directory="templates")
 
 # CORS: tillad kald fra TGTG Store Portal (til browser-baseret sync)

@@ -7214,11 +7214,40 @@ function retIndlaesUge() {
 // Foto valgt fra fil-input
 function retFotoValgt(input) {
   if (!input.files || !input.files[0]) return;
-  _retFotoFile = input.files[0];
-  const url = URL.createObjectURL(_retFotoFile);
-  document.getElementById('ret-preview-img').src = url;
+  const fil = input.files[0];
+  // Vis preview med original
+  document.getElementById('ret-preview-img').src = URL.createObjectURL(fil);
   document.getElementById('ret-preview-wrap').style.display = '';
   document.getElementById('ret-scan-status').style.display = 'none';
+  // Komprimer hvis over 1.5 MB
+  _retKomprimer(fil, 1500000).then(komprimeret => { _retFotoFile = komprimeret; });
+}
+
+function _retKomprimer(fil, maxBytes) {
+  return new Promise(resolve => {
+    if (fil.size <= maxBytes) { resolve(fil); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(fil);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      // Skalér ned så længste side max 1600px
+      let w = img.width, h = img.height;
+      const maxDim = 1600;
+      if (w > maxDim || h > maxDim) {
+        if (w >= h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else        { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      // JPEG kvalitet 0.82 — god balance læsbarhed/størrelse
+      canvas.toBlob(blob => {
+        resolve(blob ? new File([blob], 'foto.jpg', {type:'image/jpeg'}) : fil);
+      }, 'image/jpeg', 0.82);
+    };
+    img.onerror = () => { resolve(fil); };
+    img.src = url;
+  });
 }
 
 // Sæt drag-drop op
@@ -7232,9 +7261,9 @@ document.addEventListener('DOMContentLoaded', function() {
     zone.style.borderColor = '';
     const f = e.dataTransfer.files[0];
     if (f && f.type.startsWith('image/')) {
-      _retFotoFile = f;
       document.getElementById('ret-preview-img').src = URL.createObjectURL(f);
       document.getElementById('ret-preview-wrap').style.display = '';
+      _retKomprimer(f, 1500000).then(k => { _retFotoFile = k; });
     }
   });
 });

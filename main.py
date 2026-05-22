@@ -356,6 +356,52 @@ async def bestilling_gem_manuel(request: Request):
     return {"ok": True}
 
 
+@app.post("/api/bestilling/vurder")
+async def api_beregner_vurder(request: Request):
+    """AI vurderer den aktuelle bestilling og peger på dage der skal justeres."""
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+    try:
+        body = await request.json()
+        import anthropic as _ant
+        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
+
+Ejeren er ved at sende sin ugebestilling til bageren og beder dig vurdere om tallene ser rigtige ud.
+
+BESTILLINGSUGE {body.get('uge')}/{body.get('aar')} ({body.get('dato_range','')}):
+Begivenhed: {body.get('event','ingen')}
+Sæsonindeks: {body.get('si', 1.0)}
+Væksttrend: {body.get('vaekst','?')}
+TGTG seneste uge: {body.get('tgtg','ingen data')}
+
+DAGSTOTALER (alle produkter summeret):
+{body.get('dag_totaler', '')}
+TOTAL: {body.get('total_stk', 0)} stk
+
+PRODUKTER PR. DAG:
+{body.get('produkter', '')}
+
+Giv en KORT vurdering (max 200 ord) struktureret sådan:
+1. OVERORDNET: Er bestillingen OK eller er der noget der springer i øjnene?
+2. DAGE DER SKAL JUSTERES: Peg på specifikke dage og produkter der virker for høje eller for lave — vær konkret ("tirsdag wienerbrød 24 stk ser højt ud — reducer til ~18")
+3. TGTG: Ser TGTG-niveauet fornuftigt ud i forhold til bestillingen?
+4. KLAR TIL AT SENDE? Ja/Nej — og hvad du evt. vil ændre først.
+
+Skriv direkte og konkret. Ingen lange forklaringer."""
+
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {"ok": True, "vurdering": msg.content[0].text.strip()}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
 @app.get("/api/bestilling/kontekst")
 async def api_beregner_kontekst(
     request: Request,

@@ -2165,6 +2165,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
 
+        <!-- Bestillingsvurdering -->
+        <div id="bern-vurder-kort" class="card" style="margin-top:14px;display:none;border-left:3px solid var(--gold);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--gold);">✅ BESTILLINGSVURDERING</div>
+            <button onclick="bernVurderBestilling()" id="bern-vurder-btn"
+              style="font-size:11px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-weight:500;">
+              Vurder min bestilling →
+            </button>
+          </div>
+          <div id="bern-vurder-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;display:none;"></div>
+          <div id="bern-vurder-spinner" style="display:none;font-size:12px;color:var(--ash);padding:4px 0;">⏳ AI gennemgår bestillingen…</div>
+        </div>
+
         <!-- Management analyse -->
         <div class="card" id="bern-analyse-kort" style="margin-top:16px;display:none;">
           <div class="aar2-chart-hdr">
@@ -6237,8 +6250,13 @@ async function loadBernUge(uge, aar) {
   if (!d.faktisk) {
     document.getElementById('bern-analyse-kort').style.display = '';
     bernGenererAnalyse();
+    // Vis vurderingskortet klar til brug
+    document.getElementById('bern-vurder-kort').style.display = '';
+    document.getElementById('bern-vurder-tekst').style.display = 'none';
+    document.getElementById('bern-vurder-tekst').textContent = '';
   } else {
     document.getElementById('bern-analyse-kort').style.display = 'none';
+    document.getElementById('bern-vurder-kort').style.display = 'none';
   }
 
   document.getElementById('beregner-tabel').innerHTML = `
@@ -6309,6 +6327,67 @@ async function bernHentKontekst() {
     spinner.style.display = 'none';
     if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
     tekst.textContent = '⚠ Netværksfejl';
+  }
+}
+
+async function bernVurderBestilling() {
+  if (!_bernUge || !_bernAar || !window._bernData) return;
+  const btn     = document.getElementById('bern-vurder-btn');
+  const tekst   = document.getElementById('bern-vurder-tekst');
+  const spinner = document.getElementById('bern-vurder-spinner');
+
+  btn.disabled = true; btn.textContent = '…';
+  tekst.style.display   = 'none';
+  spinner.style.display = '';
+
+  // Saml de aktuelle tal fra tabellen (inkl. manuelle rettelser)
+  const d = window._bernData;
+  const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+  const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+
+  // Læs aktuelle værdier direkte fra DOM-cellerne
+  const dagTotaler = {};
+  DAGE.forEach((dag, i) => { dagTotaler[DAGE_DA[i]] = 0; });
+
+  // Aggreger fra produkter i _bernData (anbefalet + manuelle overrides)
+  const produktOversigt = (d.produkter || []).map(p => {
+    const anb = p.anbefalet || {};
+    const total = DAGE.reduce((s,dag) => s + (anb[dag] || 0), 0);
+    DAGE.forEach((dag,i) => { dagTotaler[DAGE_DA[i]] += (anb[dag] || 0); });
+    return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => DAGE_DA[i]+':'+(anb[dag]||0)).join(' ')} = ${total} stk`;
+  }).join('\n');
+
+  const dagStr = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
+  const totalStk = Object.values(dagTotaler).reduce((s,v) => s+v, 0);
+  const evt = d.event ? d.event.navn + ' — ' + (d.event.note||'') : 'ingen';
+  const si  = d.si || 1;
+  const vaekst = d.vaekst_pct != null ? d.vaekst_pct + '%' : 'ukendt';
+  const tgtg = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
+
+  const payload = {
+    uge: _bernUge, aar: _bernAar,
+    dag_totaler: dagStr, total_stk: totalStk,
+    produkter: produktOversigt,
+    event: evt, si: si, vaekst: vaekst, tgtg: tgtg,
+    dato_range: d.dato_range || '',
+  };
+
+  try {
+    const res = await fetch('/api/bestilling/vurder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    spinner.style.display = 'none';
+    btn.disabled = false; btn.textContent = '↻ Vurder igen';
+    tekst.style.display = '';
+    tekst.textContent = data.ok ? data.vurdering : '⚠ ' + (data.fejl || 'Fejl');
+  } catch(e) {
+    spinner.style.display = 'none';
+    btn.disabled = false; btn.textContent = '↻ Vurder igen';
+    tekst.style.display = '';
+    tekst.textContent = '⚠ Netværksfejl: ' + e;
   }
 }
 

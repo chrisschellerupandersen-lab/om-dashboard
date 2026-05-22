@@ -3718,37 +3718,70 @@ def hent_retur_dag(dato: str) -> dict:
 def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dict:
     """Genererer AI-hjælpetekst til bestillingsberegneren for den kommende uge."""
     from datetime import date as _d, timedelta as _td
-    import anthropic as _ant, json as _json
-
-    DAGE_DA = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+    import anthropic as _ant
 
     with _conn() as conn:
-        # Mål-ugens datointerval
         mon = _d.fromisocalendar(maal_aar, maal_uge, 1)
         sun = mon + _td(days=6)
 
-        # Forrige uge
         prev_uge = maal_uge - 1 if maal_uge > 1 else 52
         prev_aar = maal_aar if maal_uge > 1 else maal_aar - 1
         prev_mon = _d.fromisocalendar(prev_aar, prev_uge, 1)
         prev_sun = prev_mon + _td(days=6)
 
-        # Salg forrige uge
+        # Salg forrige uge (inkl. TGTG)
         prev_salg = conn.execute("""
-            SELECT SUM(omsætning) AS oms, COUNT(DISTINCT dato) AS dage,
+            SELECT SUM(omsætning) AS oms,
                    COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
             FROM transaktioner WHERE dato>=? AND dato<=?
         """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
 
-        # Salg 4 uger siden (samme ugedag-mønster til sammenligning)
-        prev4_mon = mon - _td(weeks=4)
-        prev4_sun = prev4_mon + _td(days=6)
-        prev4_salg = conn.execute("""
-            SELECT SUM(omsætning) AS oms FROM transaktioner
-            WHERE dato>=? AND dato<=?
-        """, (prev4_mon.isoformat(), prev4_sun.isoformat())).fetchone()
+        # TGTG seneste 4 uger — kr og estimeret stk
+        tgtg_rows = conn.execute("""
+            SELECT strftime('%Y-%W', dato) AS yw,
+                   SUM(tgtg_kr) AS kr, SUM(tgtg_stk) AS stk
+            FROM (
+                SELECT dato,
+                       SUM(CASE WHEN LOWER(varenavn) LIKE '%tgtg%' OR LOWER(varenavn) LIKE '%too good%'
+                                THEN omsætning ELSE 0 END) AS tgtg_kr,
+                       COUNT(CASE WHEN LOWER(varenavn) LIKE '%tgtg%' OR LOWER(varenavn) LIKE '%too good%'
+                                  THEN 1 END) AS tgtg_stk
+                FROM transaktioner WHERE dato >= date(?,'-28 days') AND dato <= ?
+                GROUP BY dato
+            ) GROUP BY yw ORDER BY yw DESC LIMIT 4
+        """, (mon.isoformat(), prev_sun.isoformat())).fetchall()
 
-        # Trend: seneste 8 uger omsætning
+        # TGTG fra tgtg_dagssalg tabellen (mere præcis)
+        tgtg_dag = conn.execute("""
+            SELECT SUM(antal_solgt) AS poser, SUM(omsaetning) AS kr
+            FROM tgtg_dagssalg WHERE dato>=? AND dato<=?
+        """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
+
+        # Retur forrige uge pr. produkt
+        retur_varer = conn.execute("""
+            SELECT produkt, SUM(antal) AS antal, kategori
+            FROM retur_detaljer WHERE registreret_dato>=? AND registreret_dato<=?
+            GROUP BY produkt, kategori ORDER BY antal DESC
+        """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchall()
+
+        # Retur seneste 4 uger snit
+        retur_snit = conn.execute("""
+            SELECT AVG(b) AS snit_b, AVG(w) AS snit_w FROM (
+                SELECT strftime('%Y-%W', registreret_dato) AS yw,
+                       SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS b,
+                       SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS w
+                FROM retur_detaljer WHERE registreret_dato >= date(?,'-28 days')
+                GROUP BY yw ORDER BY yw DESC LIMIT 4
+            )
+        """, (mon.isoformat(),)).fetchone()
+
+        # Bestilling forrige uge
+        best_prev = conn.execute("""
+            SELECT varenavn, total_antal FROM ugebestillinger
+            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 12
+        """, (prev_uge, prev_aar)).fetchall()
+
+        # Trend 8 uger
         trend_rows = conn.execute("""
             SELECT MIN(dato) AS uge_start, SUM(omsætning) AS oms
             FROM transaktioner WHERE dato < ?
@@ -3756,85 +3789,106 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
             ORDER BY dato DESC LIMIT 8
         """, (mon.isoformat(),)).fetchall()
 
-        # Retur denne uge (indeværende bestillingsuge)
-        retur_row = conn.execute("""
-            SELECT SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS b,
-                   SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS w
-            FROM retur_detaljer WHERE registreret_dato>=? AND registreret_dato<=?
-        """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
+        # Salg samme periode 4 uger siden
+        prev4_mon = mon - _td(weeks=4)
+        prev4_sun = prev4_mon + _td(days=6)
+        prev4_oms = conn.execute("""
+            SELECT SUM(omsætning) AS oms FROM transaktioner WHERE dato>=? AND dato<=?
+        """, (prev4_mon.isoformat(), prev4_sun.isoformat())).fetchone()
 
-        # Bestilling forrige uge (basis)
-        best_prev = conn.execute("""
-            SELECT varenavn, total_antal FROM ugebestillinger
-            WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 10
-        """, (prev_uge, prev_aar)).fetchall()
+    # Events
+    evt      = _get_event(maal_uge, maal_aar)
+    evt_prev = _get_event(prev_uge, prev_aar)
 
-        # Event for mål-ugen
-        evt = _get_event(maal_uge, maal_aar)
+    # Beregn tal
+    prev_oms   = round(prev_salg['oms'] or 0) if prev_salg else 0
+    prev_kunder= int(prev_salg['kunder'] or 0) if prev_salg else 0
+    oms_4u_ago = round(prev4_oms['oms'] or 0) if prev4_oms else 0
+    trend_str  = ' → '.join([f"U{r['uge_start'][5:7]}/{r['uge_start'][:4]}: {round(r['oms']):,}kr" for r in trend_rows[:6]]) if trend_rows else 'ingen data'
 
-        # Top svind-produkter seneste 4 uger
-        svind_rows = conn.execute("""
-            SELECT varenavn, SUM(spild_stk) AS spild, SUM(bestilt_stk) AS bestilt
-            FROM (
-                SELECT u.varenavn,
-                       u.total_antal - COALESCE(
-                           (SELECT SUM(antal) FROM transaktioner t
-                            WHERE t.dato>=date(u.uge||' '||u.aar||' monday', 'weekday 1')
-                            AND LOWER(t.varenavn) LIKE '%'||LOWER(SUBSTR(u.varenavn,1,6))||'%'), 0
-                       ) AS spild_stk,
-                       u.total_antal AS bestilt_stk
-                FROM ugebestillinger u
-                WHERE (u.aar=? AND u.uge>=?) OR (u.aar=? AND u.uge<=?)
-            ) GROUP BY varenavn HAVING spild > 0
-            ORDER BY spild DESC LIMIT 5
-        """, (prev_aar, max(1, prev_uge-3), prev_aar, prev_uge)).fetchall()
+    # TGTG forrige uge
+    tgtg_poser = int(tgtg_dag['poser'] or 0) if tgtg_dag else 0
+    tgtg_kr    = round(tgtg_dag['kr'] or 0) if tgtg_dag else 0
+    tgtg_snit  = round(sum(r['kr'] or 0 for r in tgtg_rows) / max(len(tgtg_rows),1)) if tgtg_rows else 0
 
-    # Byg prompt
-    prev_oms  = round(prev_salg['oms'] or 0) if prev_salg else 0
-    prev4_oms = round(prev4_salg['oms'] or 0) if prev4_salg else 0
-    trend_str = ', '.join([f"{r['uge_start'][:10]}: {round(r['oms']):,} kr" for r in trend_rows]) if trend_rows else 'ingen data'
-    best_str  = ', '.join([f"{r['varenavn']} ({r['total_antal']} stk)" for r in best_prev[:6]]) if best_prev else 'ingen data'
-    retur_b   = int(retur_row['b'] or 0) if retur_row else 0
-    retur_w   = int(retur_row['w'] or 0) if retur_row else 0
-    evt_str   = f"{evt['navn']} (faktor {evt['factor']})" if evt else 'ingen kendte begivenheder'
+    # Retur forrige uge
+    retur_b = sum(r['antal'] for r in retur_varer if r['kategori']=='boller')
+    retur_w = sum(r['antal'] for r in retur_varer if r['kategori']=='wienerbroed')
+    retur_varer_str = ', '.join([f"{r['produkt']} {r['antal']} stk" for r in retur_varer[:8]]) or 'ingen registreret'
+    snit_b  = round(retur_snit['snit_b'] or 0) if retur_snit else 0
+    snit_w  = round(retur_snit['snit_w'] or 0) if retur_snit else 0
 
-    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med bageri.
+    best_str = ', '.join([f"{r['varenavn']} {r['total_antal']}stk" for r in best_prev[:8]]) if best_prev else 'ingen data'
 
-BESTILLINGSUGE: {maal_uge}/{maal_aar} ({mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')})
-FORRIGE UGE ({prev_uge}/{prev_aar}): Omsætning {prev_oms:,} kr
-SAMME UGE FOR 4 UGER SIDEN: {prev4_oms:,} kr
-TREND SENESTE 8 UGER (nyeste først): {trend_str}
-RETUR FORRIGE UGE: {retur_b} boller + {retur_w} wienerbrød
-FORRIGE UGES BESTILLING (top varer): {best_str}
-BEGIVENHEDER UGE {maal_uge}: {evt_str}
+    evt_info = ''
+    if evt:
+        dag_fak = evt.get('dag_fak', {})
+        dag_str = ', '.join([f"{d}: ×{v}" for d,v in dag_fak.items() if v != 1.0])
+        evt_info = f"{evt['navn']} — faktor {evt['factor']} ({evt.get('note','')}). Dag-faktorer: {dag_str}"
+    else:
+        evt_info = 'Ingen kendte begivenheder'
 
-Skriv en KORT, praktisk hjælpetekst til butiksejeren på dansk. Max 5 korte afsnit:
-1. Hvilken uge og periode vi bestiller til
-2. Hvad forrige uge viste — var det godt/dårligt vs. 4 uger siden
-3. Hvad vi skal være opmærksomme på (begivenheder, sæson, tendens)
-4. Konkret anbefaling: bestil mere/mindre/det samme? Hvilke kategorier?
-5. Retur-forventning: typisk 10% boller og 13,5% wienerbrød retur — hvad betyder det for denne uge?
+    evt_prev_info = f" (BEMÆRK: forrige uge havde {evt_prev['navn']} — tallene kan være atypiske)" if evt_prev else ''
 
-Vær konkret og brug tal. Undgå sætninger som "det er vigtigt at". Skriv direkte til ejeren.
-Svar KUN med ren tekst — ingen JSON, ingen overskrifter med #, ingen bullets med *."""
+    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — en specialbutik med eget bageri i Greve, Danmark.
+
+─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
+
+FORRIGE UGE ({prev_uge}/{prev_aar}){evt_prev_info}:
+  Omsætning: {prev_oms:,} kr ({prev_kunder} kunder)
+  Samme uge for 4 uger siden: {oms_4u_ago:,} kr
+  Bestilling forrige uge: {best_str}
+
+RETUR FORRIGE UGE:
+  Boller: {retur_b} stk · Wienerbrød: {retur_w} stk
+  Pr. vare: {retur_varer_str}
+  Snit seneste 4 uger: {snit_b} boller + {snit_w} wienerbrød
+
+TOO GOOD TO GO (TGTG) FORRIGE UGE:
+  Solgte poser: {tgtg_poser} · Omsætning: {tgtg_kr:,} kr
+  Snit seneste 4 uger: {tgtg_snit:,} kr/uge
+  (Mål: under 800 kr/uge = minimalt spild. Over 1.200 kr = for meget spild)
+
+OMSÆTNINGSTREND (seneste 6 uger): {trend_str}
+
+BEGIVENHED UGE {maal_uge}: {evt_info}
+
+─── DIN OPGAVE ───
+Skriv en KORT, praktisk bestillingsvejledning til butiksejeren. Brug disse 5 afsnit:
+
+1. UGE & PERIODE — én sætning om hvilken uge og datoer
+
+2. FORRIGE UGE — hvad gik godt/skidt? Var omsætningen som forventet vs. for 4 uger siden?{' Var der begivenhed der påvirkede?' if evt_prev else ''}
+
+3. BEGIVENHEDER & OBS — beskriv begivenheder i den kommende uge konkret. Hvilke dage stiger/falder? Hvad betyder det for bestillingen dag for dag?
+
+4. TGTG-VURDERING — er {tgtg_kr:,} kr/uge for mange poser? Er vi over eller under målet på 800 kr? Hvad bør vi justere — skære ned på bestilling, ændre pose-sammensætning, eller er det ok?
+
+5. RETUR & BESTILLINGSANBEFALING — forrige uges retur var {retur_b}b + {retur_w}w (varer: {retur_varer_str}). Snit er {snit_b}b + {snit_w}w. Hvad siger det om bestillingsniveauet? Bestil mere, mindre eller det samme?
+
+Vær KONKRET med tal. Sig fx "bestil 10% mere wienerbrød fredag" ikke "overvej at justere". Skriv direkte til ejeren i du-form.
+KUN ren tekst — ingen # overskrifter, ingen * bullets."""
 
     client = _ant.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model="claude-haiku-4-5",
-        max_tokens=600,
+        max_tokens=800,
         messages=[{"role": "user", "content": prompt}]
     )
     tekst = msg.content[0].text.strip()
 
     return {
-        "ok": True,
-        "tekst": tekst,
-        "maal_uge": maal_uge,
-        "maal_aar": maal_aar,
+        "ok":         True,
+        "tekst":      tekst,
+        "maal_uge":   maal_uge,
+        "maal_aar":   maal_aar,
         "dato_range": f"{mon.strftime('%-d. %b')} – {sun.strftime('%-d. %b %Y')}",
-        "prev_uge": prev_uge,
-        "prev_oms": prev_oms,
-        "evt": evt['navn'] if evt else None,
+        "prev_uge":   prev_uge,
+        "prev_oms":   prev_oms,
+        "evt":        evt['navn'] if evt else None,
+        "tgtg_kr":    tgtg_kr,
+        "retur_b":    retur_b,
+        "retur_w":    retur_w,
     }
 
 

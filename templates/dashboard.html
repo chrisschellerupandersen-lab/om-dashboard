@@ -7851,7 +7851,7 @@ function _retHistTilfoejDag(key, dato) {
 async function retHistGemDag(key, dato) {
   const items = _retHistItems[dato] || [];
   const stEl  = document.getElementById('rh-st-' + key);
-  if (!items.length) return;
+  // Tillad tom liste — det betyder "slet alle linjer for denne dato"
   try {
     const res  = await fetch('/api/retur/gem', {
       method:'POST', headers:{'Content-Type':'application/json'},
@@ -7859,7 +7859,9 @@ async function retHistGemDag(key, dato) {
     });
     const data = await res.json();
     if (data.ok) {
-      stEl.textContent = '✓ Gemt — ' + data.antal + ' linjer';
+      stEl.textContent = items.length === 0
+        ? '✓ Alle linjer slettet'
+        : '✓ Gemt — ' + data.antal + ' linjer';
       stEl.style.background = '#f0f7f0';
       stEl.style.color = 'var(--forest)';
       stEl.style.display = '';

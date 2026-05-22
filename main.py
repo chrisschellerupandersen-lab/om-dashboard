@@ -802,13 +802,12 @@ async def retur_gem(request: Request):
         body = await request.json()
     except Exception:
         raise HTTPException(status_code=400, detail="Ugyldig JSON")
-    uge  = body.get("uge")
-    aar  = body.get("aar")
     items = body.get("items", [])
     dato  = body.get("dato") or datetime.now().strftime("%Y-%m-%d")
-    if not uge or not aar or not items:
-        raise HTTPException(status_code=400, detail="Mangler uge, aar eller items")
-    antal = database.gem_retur_detaljer(int(uge), int(aar), items, dato)
+    if not dato:
+        raise HTTPException(status_code=400, detail="Mangler dato")
+    # uge/aar er valgfrie — gem_retur_detaljer beregner dem fra datoen
+    antal = database.gem_retur_detaljer(0, 0, items, dato)
     return {"ok": True, "antal": antal}
 
 

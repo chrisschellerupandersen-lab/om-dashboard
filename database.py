@@ -3713,6 +3713,172 @@ def hent_retur_dag(dato: str) -> dict:
     return {'dato': dato, 'items': [dict(r) for r in rows]}
 
 
+# ── SELL-THROUGH ANALYSE ─────────────────────────────────────────────────────
+
+def hent_sellthrough_analyse(uger: int = 10) -> dict:
+    """Beregner sell-through rate pr. kategori pr. ugedag over de seneste N uger.
+
+    Matcher bestilte stk (ugebestillinger) mod solgte stk (transaktioner) via
+    keyword-klassificering på varenavn — begge systemer bruger samme logik.
+
+    Returnerer:
+      sellthrough[kategori][dag] = { pct, bestilt_snit, solgt_snit, udsolgt_dage, spild_dage }
+      udsolgt_dage  = dage hvor sidst-salg-time er ≥ 1 time før median lukketid
+      spild_dage    = dage hvor sell-through < 75%
+      tab_tabt_salg = estimeret tabt omsætning fra udsolgte dage
+      tab_spild     = estimeret spild-kostpris fra overbestilte dage
+    """
+    from datetime import date as _d, timedelta as _td
+    from collections import defaultdict
+
+    DAGE   = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    # SQLite strftime('%w'): 0=søn, 1=man, ..., 6=lør
+    _WMAP  = {'0': 'son', '1': 'man', '2': 'tir', '3': 'ons',
+               '4': 'tor', '5': 'fre', '6': 'loe'}
+    KATS   = ['Boller', 'Wiener', 'Brød', 'Rugbrød', 'Kage', 'Flute']
+    today  = _d.today()
+
+    # Datointerval: de seneste N afsluttede ISO-uger
+    iso_nu     = today.isocalendar()
+    start_dato = (_d.fromisocalendar(iso_nu[0], iso_nu[1], 1) - _td(weeks=uger)).isoformat()
+    slut_dato  = (_d.fromisocalendar(iso_nu[0], iso_nu[1], 1) - _td(days=1)).isoformat()
+
+    with _conn() as conn:
+        sd_map = _stamdata_type_map()
+
+        # ── Bestilte stk pr. uge pr. vare ──────────────────────────────────
+        best_rows = conn.execute("""
+            SELECT uge, aar, varenavn, pris_ex_moms,
+                   man, tir, ons, tor, fre, loe, son
+            FROM ugebestillinger
+            WHERE (aar > ? OR (aar = ? AND uge >= ?))
+              AND (aar < ? OR (aar = ? AND uge < ?))
+        """, (
+            int(start_dato[:4]), int(start_dato[:4]), int(start_dato[5:7]),
+            iso_nu[0], iso_nu[0], iso_nu[1]
+        )).fetchall()
+
+        # ── Solgte stk pr. dato pr. varenavn ───────────────────────────────
+        salg_rows = conn.execute("""
+            SELECT dato, varenavn,
+                   strftime('%w', dato) AS dag_nr,
+                   SUM(antal) AS solgt_stk,
+                   MAX(time_start) AS sidst_time,
+                   SUM(omsætning) AS solgt_oms
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ? AND varenavn != ''
+            GROUP BY dato, varenavn
+        """, (start_dato, slut_dato)).fetchall()
+
+    # ── Byg bestilt-snit pr. ISO-uge pr. kat pr. dag ──────────────────────
+    # bestilt[uge_key][kat][dag] = stk
+    bestilt: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
+    for r in best_rows:
+        kat = _kat(r['varenavn'], sd_map)
+        if kat not in KATS:
+            continue
+        uk = (r['aar'], r['uge'])
+        for dag in DAGE:
+            v = r[dag] or 0
+            if v > 0:
+                bestilt[uk][kat][dag] += v
+
+    # ── Byg solgt pr. dato pr. kat ────────────────────────────────────────
+    # solgt[(dato, kat)] = { stk, sidst_time, oms }
+    solgt: dict = defaultdict(lambda: {'stk': 0, 'sidst_time': None, 'oms': 0.0})
+    for r in salg_rows:
+        kat = _kat(r['varenavn'], sd_map)
+        if kat not in KATS:
+            continue
+        key = (r['dato'], kat)
+        solgt[key]['stk']       += r['solgt_stk'] or 0
+        solgt[key]['oms']       += r['solgt_oms'] or 0
+        t = r['sidst_time']
+        if t is not None and (solgt[key]['sidst_time'] is None or t > solgt[key]['sidst_time']):
+            solgt[key]['sidst_time'] = t
+
+    # ── Match bestilt vs. solgt pr. (uge, kat, dag) ───────────────────────
+    # Saml pr. kat pr. dag: liste af (bestilt, solgt, sidst_time)
+    obs: dict = defaultdict(lambda: defaultdict(list))  # obs[kat][dag] = [(b, s, t), ...]
+    for (aar, uge), kat_dag in bestilt.items():
+        try:
+            man_dato = _d.fromisocalendar(aar, uge, 1)
+        except Exception:
+            continue
+        for kat, dag_dict in kat_dag.items():
+            for dag, b_stk in dag_dict.items():
+                dag_idx = DAGE.index(dag)  # 0=man, 6=son
+                dato    = (man_dato + _td(days=dag_idx)).isoformat()
+                s_data  = solgt.get((dato, kat), {})
+                s_stk   = s_data.get('stk', 0)
+                s_tid   = s_data.get('sidst_time')
+                obs[kat][dag].append({
+                    'bestilt':   b_stk,
+                    'solgt':     s_stk,
+                    'sidst_tid': s_tid,
+                    'dato':      dato,
+                })
+
+    # ── Beregn statistik pr. kat pr. dag ─────────────────────────────────
+    DAGE_DA = {'man':'Man','tir':'Tir','ons':'Ons','tor':'Tor','fre':'Fre','loe':'Lør','son':'Søn'}
+    result  = {}
+    total_tab_tabt  = 0.0
+    total_tab_spild = 0.0
+
+    for kat in KATS:
+        result[kat] = {}
+        for dag in DAGE:
+            points = obs[kat].get(dag, [])
+            if len(points) < 2:
+                result[kat][dag] = None
+                continue
+
+            b_vals = [p['bestilt'] for p in points if p['bestilt'] > 0]
+            s_vals = [p['solgt']   for p in points if p['bestilt'] > 0]
+            if not b_vals:
+                result[kat][dag] = None
+                continue
+
+            b_snit = sum(b_vals) / len(b_vals)
+            s_snit = sum(s_vals) / len(s_vals) if s_vals else 0
+            pct    = round(s_snit / b_snit * 100) if b_snit > 0 else 0
+
+            # Udsolgt-detektion: sidst-salg-time < 14 (kl. 14) på dage med fuld bestilling
+            # Butikken lukker typisk 17-18 — hvis bagværk holder op kl. 12 er det et signal
+            tider  = [p['sidst_tid'] for p in points if p['sidst_tid'] is not None and p['bestilt'] > 0]
+            median_tid = sorted(tider)[len(tider)//2] if tider else None
+            tidlig_stop_dage = sum(1 for p in points
+                                   if p['sidst_tid'] is not None
+                                   and p['sidst_tid'] < 13
+                                   and p['bestilt'] > 0) if tider else 0
+
+            udsolgt_pct  = round(tidlig_stop_dage / len(points) * 100) if points else 0
+            spild_dage   = sum(1 for p in points if p['bestilt'] > 0 and (p['solgt'] / p['bestilt']) < 0.75) if b_vals else 0
+
+            result[kat][dag] = {
+                'pct':           pct,
+                'bestilt_snit':  round(b_snit, 1),
+                'solgt_snit':    round(s_snit, 1),
+                'obs':           len(b_vals),
+                'udsolgt_pct':   udsolgt_pct,     # % af uger med tidlig stop
+                'spild_dage':    spild_dage,       # antal uger med <75% sell-through
+                'median_tid':    median_tid,
+                'signal':        'udsolgt' if pct >= 95 and udsolgt_pct >= 30 else
+                                 'risiko_udsolgt' if pct >= 90 else
+                                 'ok' if pct >= 75 else
+                                 'spild' if pct >= 50 else 'stort_spild',
+            }
+
+    return {
+        'sellthrough':  result,
+        'dage':         DAGE,
+        'dage_da':      DAGE_DA,
+        'kategorier':   KATS,
+        'uger_analyseret': uger,
+        'periode':      f"{start_dato} – {slut_dato}",
+    }
+
+
 # ── BESTILLINGSBEREGNER AI-KONTEKST ──────────────────────────────────────────
 
 def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dict:

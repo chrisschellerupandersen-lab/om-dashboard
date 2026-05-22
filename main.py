@@ -398,6 +398,10 @@ Sæsonindeks: {body.get('si',1.0)} · Vækst: {body.get('vaekst','?')}
 TGTG seneste uge: {body.get('tgtg','ingen data')}
 Dag-snit fra historik: {body.get('dag_snit','')}
 
+HISTORISK SELL-THROUGH (solgt/bestilt % pr. kategori pr. dag — seneste 10 uger):
+{body.get('sellthrough', 'ingen data')}
+[>95% = sandsynligvis udsolgt på den dag · <75% = spild/TGTG-risiko]
+
 DAGSTOTALER DENNE BESTILLING:
 {body.get('dag_totaler','')}
 
@@ -449,6 +453,12 @@ Regler:
         }
     except Exception as e:
         return {"ok": False, "fejl": str(e)}
+
+
+@app.get("/api/bestilling/sellthrough")
+async def api_sellthrough(request: Request, uger: int = 10):
+    _kræv_login(request)
+    return database.hent_sellthrough_analyse(uger)
 
 
 @app.get("/api/bestilling/kontekst")

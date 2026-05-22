@@ -2112,6 +2112,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="bern-kontekst-spinner" style="display:none;font-size:12px;color:var(--ash);padding:8px 0;">⏳ Analyserer data…</div>
         </div>
 
+        <!-- Sell-through kort -->
+        <div id="bern-st-kort" class="card" style="margin-bottom:14px;display:none;padding:0;overflow:hidden;">
+          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(30,58,30,.04);border-bottom:1px solid var(--border);">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--charcoal);">📊 SELL-THROUGH PR. DAG (snit <span id="bern-st-uger">—</span> uger)</div>
+            <div style="font-size:10px;color:var(--ash);">
+              <span style="display:inline-block;width:10px;height:10px;background:#2d5a2d;border-radius:2px;margin-right:3px;"></span>>95% udsolgt risk
+              <span style="display:inline-block;width:10px;height:10px;background:#c8a84b;border-radius:2px;margin:0 3px 0 8px;"></span>75-95% ok
+              <span style="display:inline-block;width:10px;height:10px;background:#c0392b;border-radius:2px;margin:0 3px 0 8px;"></span><75% spild
+            </div>
+          </div>
+          <div id="bern-st-tabel" style="overflow-x:auto;padding:0 0 4px;"></div>
+        </div>
+
         <!-- Uge-vælger -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
           <button onclick="bernPrev()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">←</button>
@@ -6291,12 +6304,98 @@ async function loadBernUge(uge, aar) {
 
 async function loadBeregner() {
   const iso = _isoUgeIdag();
-  // Default: næste uge (den vi skal bestille til)
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
-  // Hent AI-kontekst automatisk for næste uge
   bernHentKontekst();
+  bernHentSellthrough();  // hent sell-through data
+}
+
+// ── SELL-THROUGH ─────────────────────────────────────────────────────────────
+let _bernST = null;  // cachet sell-through data
+
+async function bernHentSellthrough() {
+  if (_bernST) { bernVisSellthrough(_bernST); return; }
+  try {
+    const data = await api('/api/bestilling/sellthrough?uger=10');
+    if (!data || !data.sellthrough) return;
+    _bernST = data;
+    bernVisSellthrough(data);
+  } catch(e) { console.warn('sellthrough fejl:', e); }
+}
+
+function bernVisSellthrough(data) {
+  const kort  = document.getElementById('bern-st-kort');
+  const tabel = document.getElementById('bern-st-tabel');
+  const ugerEl= document.getElementById('bern-st-uger');
+  if (!kort || !tabel) return;
+
+  const DAGE   = data.dage || ['man','tir','ons','tor','fre','loe','son'];
+  const DAGDA  = data.dage_da || {};
+  const KATS   = (data.kategorier || []).filter(k => {
+    // Vis kun kategorier med mindst ét datapunkt
+    return DAGE.some(d => data.sellthrough[k]?.[d] != null);
+  });
+  if (!KATS.length) return;
+
+  if (ugerEl) ugerEl.textContent = data.uger_analyseret || 10;
+  kort.style.display = '';
+
+  const mono = "font-family:'DM Mono',monospace;";
+  const hdrCells = DAGE.map(d =>
+    `<th style="${mono}font-size:10px;color:var(--ash);padding:6px 8px;text-align:center;white-space:nowrap;">${DAGDA[d]||d}</th>`
+  ).join('');
+
+  const rows = KATS.map(kat => {
+    const cells = DAGE.map(dag => {
+      const st = data.sellthrough[kat]?.[dag];
+      if (!st) return `<td style="padding:5px 8px;text-align:center;color:var(--ash);font-size:10px;">—</td>`;
+      const pct   = st.pct;
+      const bg    = pct >= 95 ? 'rgba(45,90,45,.15)' : pct >= 75 ? 'rgba(200,168,75,.12)' : 'rgba(192,57,43,.12)';
+      const color = pct >= 95 ? 'var(--forest)' : pct >= 75 ? '#8a6800' : 'var(--danger)';
+      const icon  = st.signal === 'udsolgt' ? ' 🔴' : st.signal === 'risiko_udsolgt' ? ' ⚠' : '';
+      const tip   = `Bestilt ~${st.bestilt_snit} · Solgt ~${st.solgt_snit} · ${st.obs} uger`;
+      return `<td title="${tip}" style="${mono}padding:5px 8px;text-align:center;font-size:11px;font-weight:600;
+        background:${bg};color:${color};cursor:default;">
+        ${pct}%${icon}
+      </td>`;
+    }).join('');
+    return `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
+      <td style="padding:6px 14px;font-size:12px;font-weight:500;white-space:nowrap;">${kat}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  tabel.innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="background:rgba(0,0,0,.02);">
+        <th style="padding:6px 14px;text-align:left;font-size:10px;color:var(--ash);">Kategori</th>
+        ${hdrCells}
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="padding:6px 14px;font-size:10px;color:var(--ash);">
+      🔴 = sidst salg tidligt = sandsynligvis udsolgt &nbsp;·&nbsp;
+      Hover for bestilt/solgt snit
+    </div>`;
+}
+
+function _bernStTilTekst(data) {
+  if (!data || !data.sellthrough) return '';
+  const DAGE = data.dage || [];
+  const DAGDA= data.dage_da || {};
+  const lines = [];
+  for (const kat of (data.kategorier||[])) {
+    const dagLinjer = [];
+    for (const dag of DAGE) {
+      const st = data.sellthrough[kat]?.[dag];
+      if (!st) continue;
+      const flag = st.pct >= 95 ? ' [UDSOLGT RISIKO]' : st.pct < 75 ? ' [SPILD RISIKO]' : '';
+      dagLinjer.push(`${DAGDA[dag]||dag}:${st.pct}%(best:${st.bestilt_snit}→solgt:${st.solgt_snit})${flag}`);
+    }
+    if (dagLinjer.length) lines.push(`${kat}: ${dagLinjer.join(' | ')}`);
+  }
+  return lines.join('\n');
 }
 
 let _bernKontekstUge = null;
@@ -6369,12 +6468,16 @@ async function bernVurderBestilling() {
     .map(ds => `${ds.dag}: ~${Math.round(ds.snit_oms||0).toLocaleString('da-DK')} kr snit`)
     .join(', ');
 
+  // Sell-through historik til AI — guldstandarden for over/underbestilling
+  const stTekst = _bernST ? _bernStTilTekst(_bernST) : '';
+
   const payload = {
     uge: _bernUge, aar: _bernAar,
     dag_totaler: dagStr, total_stk: totalStk,
     produkter: produktListe,
     event: evt, si: d.si||1, vaekst, tgtg,
     dag_snit: dagSnitStr,
+    sellthrough: stTekst,
     dato_range: d.dato_range || '',
   };
 

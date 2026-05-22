@@ -7538,7 +7538,7 @@ async function retScanFoto() {
     const di = document.getElementById('ret-dato-input');
     if (di && !di.value) { di.value = _retIGaar(); }
     document.getElementById('ret-bekraeft-kort').style.display = '';
-    document.getElementById('ret-upload-kort').style.display = 'none';
+    document.getElementById('ret-step-scan').style.display = 'none';
     // Vis feedback
     const st = document.getElementById('ret-gem-status');
     if (st) {
@@ -7609,7 +7609,7 @@ function retScanEndnu() {
   const inp  = document.getElementById('ret-fil-input');
   if (prev) prev.style.display = 'none';
   if (scan) scan.style.display = 'none';
-  document.getElementById('ret-upload-kort').style.display = '';
+  document.getElementById('ret-step-scan').style.display = '';
   if (inp) inp.value = '';
   // Gem status ryd
   const st = document.getElementById('ret-gem-status');
@@ -7663,7 +7663,7 @@ function retNulstil() {
   document.getElementById('ret-preview-wrap').style.display = 'none';
   document.getElementById('ret-scan-status').style.display = 'none';
   document.getElementById('ret-bekraeft-kort').style.display = 'none';
-  document.getElementById('ret-upload-kort').style.display = '';
+  document.getElementById('ret-step-scan').style.display = '';
   document.getElementById('ret-gem-status').style.display = 'none';
 }
 
@@ -7900,7 +7900,7 @@ async function retVisUge(uge, aar) {
     const di = document.getElementById('ret-dato-input');
     if (di) di.value = (d.registreret || '').slice(0,10) || _retIGaar();
     document.getElementById('ret-bekraeft-kort').style.display = '';
-    document.getElementById('ret-upload-kort').style.display = 'none';
+    document.getElementById('ret-step-scan').style.display = 'none';
     const st = document.getElementById('ret-uge-status');
     st.textContent = '✓ Registreret ' + d.registreret;
     st.style.color = 'var(--moss)';

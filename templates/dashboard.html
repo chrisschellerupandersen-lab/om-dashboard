@@ -6488,7 +6488,7 @@ async function loadBernUge(uge, aar) {
   // Vis analyse-kort kun for fremtidige/aktuelle uger
   if (!d.faktisk) {
     document.getElementById('bern-analyse-kort').style.display = '';
-    bernGenererAnalyse();
+    // BEMÆRK: bernGenererAnalyse() FJERNET - brugeren skal klikke knappen
     // Vis vurderingskortet klar til brug
     document.getElementById('bern-vurder-kort').style.display = '';
     document.getElementById('bern-vurder-tekst').style.display = 'none';
@@ -6533,7 +6533,7 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
-  bernHentKontekst();
+  // Bemærk: auto-analyse FJERNET - brugeren skal klikke "Opdater analyse"
   bernHentSellthrough();  // hent sell-through data
 }
 

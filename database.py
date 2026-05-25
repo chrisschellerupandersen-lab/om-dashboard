@@ -3195,19 +3195,19 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             }
 
         # ── Ingen faktisk bestilling → beregn anbefaling ────────────────────
-        # Find de 3 seneste bestillingsuger ældre end mål-ugen (snit er mere robust end kun 1)
+        # Find alle historiske bestillingsuger (robuste snit over 26+ uger)
         basis_rows = conn.execute("""
             SELECT uge, aar FROM ugebestillinger
             WHERE (aar < ? OR (aar = ? AND uge < ?))
             GROUP BY uge, aar
             ORDER BY aar DESC, uge DESC
-            LIMIT 3
+            LIMIT 52
         """, (maal_aar, maal_aar, maal_uge)).fetchall()
 
         if not basis_rows:
             basis_rows = conn.execute("""
                 SELECT uge, aar FROM ugebestillinger
-                GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 3
+                GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 52
             """).fetchall()
 
         if not basis_rows:
@@ -3226,7 +3226,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             ORDER BY id
         """, (basis_uge, basis_aar)).fetchall()
 
-        # Byg snit-map over de 3 seneste uger pr. varenummer pr. dag
+        # Byg snit-map over alle historiske uger pr. varenummer pr. dag (26+ ugers robust basis)
         # Bruges til at udjævne atypiske uger i selve anbefalingen
         _dag_cols = ['man','tir','ons','tor','fre','loe','son']
         _basis_snit: Dict = {}  # {varenummer: {dag: snit_antal}}

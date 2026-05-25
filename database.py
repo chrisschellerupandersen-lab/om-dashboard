@@ -851,6 +851,8 @@ def hent_uger(aar: int = None) -> List[Dict]:
         except Exception:
             mp_netto = 0.0
         row = dict(r)
+        row["uge"] = iso[1]  # Brug ISO week i stedet for %W
+        row["aar"] = iso[0]  # Brug ISO år
         row["mp_netto"] = mp_netto
         resultat.append(row)
     return resultat

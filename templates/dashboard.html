@@ -6490,14 +6490,15 @@ async function loadBernUge(uge, aar) {
     // Sum boller og wienerbrød fra denne uges bestilling
     (d.produkter || []).forEach(p => {
       const navn = (p.varenavn || '').toLowerCase();
+      const kat = (p.kategori || '').toLowerCase();
       const total = p.total_anbefalet || 0;
 
-      // Boller: "bolle" eller "smør"
-      if (navn.includes('bolle') || navn.includes('smør')) {
+      // Boller: kategori "Boller" eller navn indeholder "bolle"/"smør"
+      if (kat.includes('boller') || navn.includes('bolle') || navn.includes('smør')) {
         bollerTotal += total;
       }
-      // Wienerbrød: "wien" (wienerbr...) eller "schnitzel"
-      if (navn.includes('wien') || navn.includes('schnit')) {
+      // Wienerbrød: kategori "Wiener" eller navn indeholder "wien"/"schnitzel"
+      if (kat.includes('wiener') || navn.includes('wien') || navn.includes('schnit')) {
         wienerTotal += total;
       }
     });

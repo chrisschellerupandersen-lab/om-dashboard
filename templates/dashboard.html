@@ -3306,6 +3306,50 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       newKurvEl.textContent = kurv.toLocaleString('da-DK') + ' kr';
     }
 
+    // Sammenligninger vs. forrige uge (samme time)
+    const senesteTime = kpi.seneste_time;
+    const timeLabel = senesteTime != null ? ' KL ' + senesteTime : ' KL —';
+
+    // OMS sammenligning
+    const newOmsCmpEl = document.getElementById('new-ov-cmp-oms');
+    if (newOmsCmpEl && dag.omsaetning != null && prevDag.omsaetning > 0) {
+      const osmPct = ((dag.omsaetning / prevDag.omsaetning) - 1) * 100;
+      newOmsCmpEl.textContent = (osmPct >= 0 ? '+' : '') + osmPct.toFixed(0) + '%';
+      newOmsCmpEl.className = osmPct >= 0 ? 'up' : 'dn';
+    }
+
+    // DB sammenligning
+    const newDbCmpEl = document.getElementById('new-ov-cmp-db');
+    if (newDbCmpEl && dag.db_kr != null && prevDag.db_kr > 0) {
+      const dbPct = ((dag.db_kr / prevDag.db_kr) - 1) * 100;
+      newDbCmpEl.textContent = (dbPct >= 0 ? '+' : '') + dbPct.toFixed(0) + '%';
+      newDbCmpEl.className = dbPct >= 0 ? 'up' : 'dn';
+    }
+
+    // Kunder sammenligning
+    const newKunderCmpEl = document.getElementById('new-ov-cmp-kunder');
+    if (newKunderCmpEl && dag.transak != null && prevDag.transak > 0) {
+      const kunPct = ((dag.transak / prevDag.transak) - 1) * 100;
+      newKunderCmpEl.textContent = (kunPct >= 0 ? '+' : '') + kunPct.toFixed(0) + '%';
+      newKunderCmpEl.className = kunPct >= 0 ? 'up' : 'dn';
+    }
+
+    // Kurv sammenligning
+    const newKurvCmpEl = document.getElementById('new-ov-cmp-kurv');
+    if (newKurvCmpEl && dag.transak > 0 && prevDag.transak > 0) {
+      const dagKurv = dag.omsaetning / dag.transak;
+      const prevKurv = prevDag.omsaetning / prevDag.transak;
+      const kurvPct = ((dagKurv / prevKurv) - 1) * 100;
+      newKurvCmpEl.textContent = (kurvPct >= 0 ? '+' : '') + kurvPct.toFixed(0) + '%';
+      newKurvCmpEl.className = kurvPct >= 0 ? 'up' : 'dn';
+    }
+
+    // Opdater tekstlabel med klokkeslæt
+    const newVsForrigeEl = document.getElementById('new-ov-vs-forrige-uge');
+    if (newVsForrigeEl) {
+      newVsForrigeEl.innerHTML = `<div>vs. forrige uge${timeLabel}: OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>`;
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

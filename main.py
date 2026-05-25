@@ -419,24 +419,27 @@ Vurder BEGGE risici for HVER dag:
 - Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
 - Er svage dage bestilt for højt? Overskud = TGTG-tab.
 
-Returner KUN valid JSON:
+Returner KUN valid JSON — HELT VIGTIG:
+- Escape alle citationstegn i strenge med \\
+- Brug \\n for linjeskift, ALDRIG ægte linjeskift i streng
+- Alle tal uden citationstegn: "fra": 12 IKKE "fra": "12"
+
 {{
   "vurdering": "2-4 sætninger. Nævn specifikt hvilke dage der er under/overbestilt og hvad det koster.",
-  "klar": true/false,
+  "klar": true,
   "justeringer": [
     {{
       "varenavn": "eksakt varenavn fra produktlisten",
-      "dag": "man|tir|ons|tor|fre|loe|son",
-      "fra": <nuværende antal>,
-      "til": <anbefalet antal>,
-      "grund": "salg-tab/TGTG-tab + max 5 ord"
+      "dag": "man",
+      "fra": 12,
+      "til": 15,
+      "grund": "tabt salg — fredagsefterspørgsel"
     }}
   ]
 }}
 
 Regler:
 - justeringer: både OP (for lidt → tabt salg) og NED (for meget → TGTG)
-- Angiv om grunden er "tabt salg" eller "TGTG-risiko" som første ord i grund
 - Min ±2 stk eller ±20% for at inkludere
 - Max 10 justeringer — prioriter størst økonomisk effekt
 - Tomme justeringer [] hvis alt ser fornuftigt ud"""
@@ -451,7 +454,15 @@ Regler:
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.lower().startswith("json"): raw = raw[4:]
-        parsed = _json.loads(raw.strip())
+        raw = raw.strip()
+
+        try:
+            parsed = _json.loads(raw)
+        except _json.JSONDecodeError as je:
+            import re
+            raw_clean = re.sub(r'[\r\n]+', ' ', raw)
+            return {"ok": False, "fejl": f"JSON parse fejl: {str(je)} — svar kan have ugyldige tegn"}
+
         return {
             "ok": True,
             "vurdering":   parsed.get("vurdering", ""),
@@ -459,7 +470,8 @@ Regler:
             "justeringer": parsed.get("justeringer", []),
         }
     except Exception as e:
-        return {"ok": False, "fejl": str(e)}
+        import traceback
+        return {"ok": False, "fejl": f"Bestillingsværdier kunne ikke genereres: {type(e).__name__}"}
 
 
 @app.get("/api/bestilling/sellthrough")

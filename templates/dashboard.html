@@ -3268,6 +3268,17 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       newOmsatEl.textContent = kr(dag.omsaetning);
     }
 
+    // Vareforbrug dag
+    const newVfEl = document.getElementById('new-ov-vf');
+    const newVfPctEl = document.getElementById('new-ov-vf-pct');
+    if (newVfEl && dag.vareforbrug != null) {
+      newVfEl.textContent = kr(dag.vareforbrug);
+      if (newVfPctEl && dag.omsaetning > 0) {
+        const vfPct = (dag.vareforbrug / dag.omsaetning) * 100;
+        newVfPctEl.textContent = vfPct.toFixed(0) + '%';
+      }
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

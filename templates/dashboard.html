@@ -3279,6 +3279,33 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       }
     }
 
+    // DB dag
+    const newDbEl = document.getElementById('new-ov-db');
+    const newDbPctEl = document.getElementById('new-ov-db-pct');
+    if (newDbEl && dag.db_kr != null) {
+      newDbEl.textContent = kr(dag.db_kr);
+      if (newDbPctEl && dag.db_pct != null) {
+        newDbPctEl.textContent = dag.db_pct.toFixed(0) + '%';
+      }
+    }
+
+    // Kunder dag
+    const newKunderEl = document.getElementById('new-ov-kunder');
+    const newKunderSubEl = document.getElementById('new-ov-kunder-sub');
+    if (newKunderEl && dag.transak != null) {
+      newKunderEl.textContent = dag.transak.toLocaleString('da-DK');
+      if (newKunderSubEl) {
+        newKunderSubEl.textContent = dag.transak + ' kunder i dag';
+      }
+    }
+
+    // Kurv dag (gennemsnitlig kurv)
+    const newKurvEl = document.getElementById('new-ov-kurv');
+    if (newKurvEl && dag.omsaetning != null && dag.transak > 0) {
+      const kurv = Math.round(dag.omsaetning / dag.transak);
+      newKurvEl.textContent = kurv.toLocaleString('da-DK') + ' kr';
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

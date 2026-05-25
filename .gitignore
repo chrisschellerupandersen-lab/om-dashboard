@@ -6,3 +6,8 @@ tgtg_tokens.json
 .env
 gmail_token.json
 gmail_credentials.json
+*.db
+*.json
+_check*.js
+_check*.py
+replace_mgmt.py

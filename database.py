@@ -3286,21 +3286,32 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
     sd_map = _stamdata_type_map()
     produkter = []
     for r in prod_rows:
-        # Brug snit af de 3 seneste uger pr. dag (mere robust end kun seneste uge)
-        vn_key = r["varenummer"] or ""
-        snit_data = _basis_snit.get(vn_key, {})
-        basis_dag = {}
-        for d in DAGE:
-            vals = snit_data.get(d, [])
-            if vals:
-                basis_dag[d] = sum(vals) / len(vals)  # snit
-            else:
-                try:
-                    basis_dag[d] = float(r[d] or 0)       # fallback til seneste uge
-                except (ValueError, TypeError):
-                    basis_dag[d] = 0.0
         kat = _kat(r["varenavn"], sd_map)
         vn  = r["varenummer"] or ""
+
+        # Kager: ALTID kun seneste uge, ingen gennemsnit
+        if kat == 'Kage':
+            basis_dag = {}
+            for d in DAGE:
+                try:
+                    basis_dag[d] = float(r[d] or 0)
+                except (ValueError, TypeError):
+                    basis_dag[d] = 0.0
+            anb_dag = {d: int(basis_dag[d]) for d in DAGE}
+        else:
+            # Andre varer: brug snit af de 3 seneste uger pr. dag (mere robust)
+            vn_key = r["varenummer"] or ""
+            snit_data = _basis_snit.get(vn_key, {})
+            basis_dag = {}
+            for d in DAGE:
+                vals = snit_data.get(d, [])
+                if vals:
+                    basis_dag[d] = sum(vals) / len(vals)  # snit
+                else:
+                    try:
+                        basis_dag[d] = float(r[d] or 0)       # fallback til seneste uge
+                    except (ValueError, TypeError):
+                        basis_dag[d] = 0.0
 
         min_anb_dage: set = set()
 

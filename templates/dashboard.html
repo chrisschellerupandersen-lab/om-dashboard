@@ -877,31 +877,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
         </div>
 
-        <!-- Overblik række 1: hoved-metrics med ringe -->
-        <div class="ov-top">
-          <div class="kpi" style="background:var(--forest);border-color:var(--forest);border-top:3px solid var(--amber);">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-dag-omsat-ov" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-omsat" style="color:var(--amber);">—</div></div></div>
-            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning · dag</div>
-            <div class="kpi-s" id="kpi-dag-omsat-sub" style="color:rgba(255,255,255,.45);">ekskl. moms</div>
-          </div>
-          <div class="kpi" style="cursor:pointer;" onclick="dagDbDetaljeToggle()" title="Klik for at se DB-detaljer per produkt">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-dag-db">—</div></div></div>
-            <div class="kpi-l">DB · dag <span style="font-size:9px;opacity:.5;">▼</span></div>
-            <div class="kpi-s" id="kpi-dag-db-sub">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-uge-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-uge-omsat">—</div></div></div>
-            <div class="kpi-l">Omsætning · uge</div>
-            <div class="kpi-s" id="kpi-uge-dage">indlæser…</div>
-            <div class="kpi-s" id="kpi-uge-vf" style="color:var(--ash);"></div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-uge-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="kpi-uge-db">—</div></div></div>
-            <div class="kpi-l">DB · uge</div>
-            <div class="kpi-s" id="kpi-uge-db-sub">—</div>
-          </div>
-        </div>
-        <!-- Overblik række 2: sammenligninger uden ringe -->
+        <!-- Overblik sammenligning kort -->
         <div class="ov-bot">
           <div class="ov-stat" id="ov-cmp-dag">
             <div class="kpi-l">DB dag vs. forrige uge</div>
@@ -3200,54 +3176,6 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       document.getElementById('kpi-kunder').textContent = dag.transak;
       const kurv = dag.omsaetning && dag.transak ? Math.round(dag.omsaetning / dag.transak) : 0;
       document.getElementById('kpi-kurv').textContent = kurv > 0 ? kurv.toLocaleString('da-DK') + ' kr/kurv' : '—';
-    }
-
-    // Omsætning dag (overblik-kort)
-    const senesteTime = kpi.seneste_time;
-    const timeLabel = senesteTime != null ? ' kl. ' + senesteTime + ':00' : '';
-    if (dag.omsaetning != null) {
-      setRing('ring-dag-omsat-ov', Math.min(100, dag.omsaetning / 8000 * 100), 'var(--amber)');
-      const prevOmsat = (kpi.prev_dag || {}).omsaetning;
-      const dagPct = prevOmsat > 0 ? ((dag.omsaetning / prevOmsat) - 1) * 100 : null;
-      document.getElementById('kpi-dag-omsat').textContent = kr(dag.omsaetning);
-      const subEl = document.getElementById('kpi-dag-omsat-sub');
-      if (subEl) {
-        subEl.textContent = dagPct != null ? (dagPct >= 0 ? '+' : '') + dagPct.toFixed(0) + '% vs. forrige uge' + timeLabel : 'ekskl. moms';
-        subEl.style.color = dagPct == null ? '' : dagPct >= 0 ? 'rgba(200,168,75,.85)' : 'rgba(220,100,80,.85)';
-      }
-    }
-
-    // DB dag
-    const dbDagEl = document.getElementById('kpi-dag-db');
-    dbDagEl.textContent = dag.db_kr != null ? kr(dag.db_kr) : '—';
-    const dbDagSub = document.getElementById('kpi-dag-db-sub');
-    if (dag.db_pct != null) {
-      dbDagSub.textContent = dag.db_pct.toFixed(1) + '% bruttoavance';
-      dbDagSub.className = 'kpi-s ' + (dag.db_pct >= 35 ? 'up' : dag.db_pct >= 30 ? '' : 'dn');
-      const dbCard = dbDagEl.closest('.kpi,.ov-stat');
-      if (dbCard) { dbCard.classList.remove('up','dn'); if (dag.db_pct >= 35) dbCard.classList.add('up'); else if (dag.db_pct < 30) dbCard.classList.add('dn'); }
-    }
-
-    // ── Uge-kasser ────────────────────────────────────────────────────────
-    document.getElementById('kpi-uge-omsat').textContent = uge.omsaetning != null ? kr(uge.omsaetning) : '—';
-    const ugeDage = uge.antal_dage || 0;
-    const prevUgeDage = (kpi.prev_uge || {}).antal_dage || 0;
-    document.getElementById('kpi-uge-dage').textContent  =
-      ugeDage ? ugeDage + ' dage · vs. ' + prevUgeDage + ' dage forrige uge' : '—';
-
-    if (uge.vareforbrug > 0) {
-      document.getElementById('kpi-uge-vf').textContent = 'VF ' + kr(uge.vareforbrug);
-    }
-
-    // DB uge
-    const dbUgeEl = document.getElementById('kpi-uge-db');
-    dbUgeEl.textContent = uge.db_kr != null ? kr(uge.db_kr) : '—';
-    const dbUgeSub = document.getElementById('kpi-uge-db-sub');
-    if (uge.db_pct != null) {
-      dbUgeSub.textContent = uge.db_pct.toFixed(1) + '% bruttoavance';
-      dbUgeSub.className = 'kpi-s ' + (uge.db_pct >= 35 ? 'up' : uge.db_pct >= 30 ? '' : 'dn');
-      const dbUgeCard = dbUgeEl.closest('.kpi,.ov-stat');
-      if (dbUgeCard) { dbUgeCard.classList.remove('up','dn'); if (uge.db_pct >= 35) dbUgeCard.classList.add('up'); else if (uge.db_pct < 30) dbUgeCard.classList.add('dn'); }
     }
 
     // ── Sammenlignings-KPI'er ─────────────────────────────────────────────

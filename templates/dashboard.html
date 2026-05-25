@@ -3261,6 +3261,124 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       if (el) el.className = 'ov-stat ' + (isUp ? 'up' : 'dn');
     }
 
+    // ── NYT OVERBLIK: Udfyld elementer (tekstContent only) ────────────────
+    try {
+      // Omsætning dag
+      const el1 = document.getElementById('new-ov-omsat');
+      if (el1 && dag.omsaetning != null) el1.textContent = kr(dag.omsaetning);
+
+      // Vareforbrug
+      const el2 = document.getElementById('new-ov-vf');
+      if (el2 && dag.vareforbrug != null) el2.textContent = kr(dag.vareforbrug);
+      const el3 = document.getElementById('new-ov-vf-pct');
+      if (el3 && dag.omsaetning > 0 && dag.vareforbrug != null) {
+        el3.textContent = ((dag.vareforbrug / dag.omsaetning) * 100).toFixed(0) + '%';
+      }
+
+      // DB dag
+      const el4 = document.getElementById('new-ov-db');
+      if (el4 && dag.db_kr != null) el4.textContent = kr(dag.db_kr);
+      const el5 = document.getElementById('new-ov-db-pct');
+      if (el5 && dag.db_pct != null) el5.textContent = dag.db_pct.toFixed(0) + '%';
+
+      // Kunder dag
+      const el6 = document.getElementById('new-ov-kunder');
+      if (el6 && dag.transak != null) el6.textContent = dag.transak.toLocaleString('da-DK');
+      const el7 = document.getElementById('new-ov-kunder-sub');
+      if (el7 && dag.transak != null) el7.textContent = dag.transak + ' kunder';
+
+      // Kurv dag
+      const el8 = document.getElementById('new-ov-kurv');
+      if (el8 && dag.omsaetning != null && dag.transak > 0) {
+        el8.textContent = Math.round(dag.omsaetning / dag.transak).toLocaleString('da-DK') + ' kr';
+      }
+
+      // Sammenligninger (spans som allerede eksisterer i HTML)
+      const cmp1 = document.getElementById('new-ov-cmp-oms');
+      if (cmp1 && dag.omsaetning != null && prevDag.omsaetning > 0) {
+        const pct = ((dag.omsaetning / prevDag.omsaetning) - 1) * 100;
+        cmp1.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        cmp1.className = pct >= 0 ? 'up' : 'dn';
+      }
+
+      const cmp2 = document.getElementById('new-ov-cmp-db');
+      if (cmp2 && dag.db_kr != null && prevDag.db_kr > 0) {
+        const pct = ((dag.db_kr / prevDag.db_kr) - 1) * 100;
+        cmp2.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        cmp2.className = pct >= 0 ? 'up' : 'dn';
+      }
+
+      const cmp3 = document.getElementById('new-ov-cmp-kunder');
+      if (cmp3 && dag.transak != null && prevDag.transak > 0) {
+        const pct = ((dag.transak / prevDag.transak) - 1) * 100;
+        cmp3.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        cmp3.className = pct >= 0 ? 'up' : 'dn';
+      }
+
+      const cmp4 = document.getElementById('new-ov-cmp-kurv');
+      if (cmp4 && dag.transak > 0 && prevDag.transak > 0) {
+        const pct = ((dag.omsaetning / dag.transak) / (prevDag.omsaetning / prevDag.transak) - 1) * 100;
+        cmp4.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        cmp4.className = pct >= 0 ? 'up' : 'dn';
+      }
+
+      // WTD kort
+      const wtd1 = document.getElementById('new-ov-wtd-oms');
+      if (wtd1 && uge.omsaetning != null) wtd1.textContent = kr(uge.omsaetning);
+      const wtd2 = document.getElementById('new-ov-wtd-db');
+      if (wtd2 && uge.db_kr != null) {
+        wtd2.textContent = kr(uge.db_kr) + (uge.db_pct != null ? ' (' + uge.db_pct.toFixed(0) + '%)' : '');
+      }
+      const wtd3 = document.getElementById('new-ov-wtd-kunder');
+      if (wtd3 && uge.transak != null) wtd3.textContent = uge.transak.toLocaleString('da-DK');
+      const wtd4 = document.getElementById('new-ov-wtd-kurv');
+      if (wtd4 && uge.omsaetning != null && uge.transak > 0) {
+        wtd4.textContent = Math.round(uge.omsaetning / uge.transak).toLocaleString('da-DK') + ' kr';
+      }
+
+      // MTD kort
+      const mtd1 = document.getElementById('new-ov-mtd-oms');
+      if (mtd1 && mtd.omsaetning != null) mtd1.textContent = kr(mtd.omsaetning);
+      const mtd2 = document.getElementById('new-ov-mtd-db');
+      if (mtd2 && mtd.db_kr != null) {
+        mtd2.textContent = kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : '');
+      }
+      const mtd3 = document.getElementById('new-ov-mtd-kunder');
+      if (mtd3 && mtd.transak != null) mtd3.textContent = mtd.transak.toLocaleString('da-DK');
+      const mtd4 = document.getElementById('new-ov-mtd-kurv');
+      if (mtd4 && mtd.omsaetning != null && mtd.transak > 0) {
+        mtd4.textContent = Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr';
+      }
+
+      // vs forrige uge kort
+      const prev1 = document.getElementById('new-ov-prev-oms');
+      if (prev1 && uge.omsaetning != null && prevUge.omsaetning > 0) {
+        const pct = ((uge.omsaetning / prevUge.omsaetning) - 1) * 100;
+        prev1.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        prev1.className = pct >= 0 ? 'up' : 'dn';
+      }
+      const prev2 = document.getElementById('new-ov-prev-db');
+      if (prev2 && uge.db_kr != null && prevUge.db_kr > 0) {
+        const pct = ((uge.db_kr / prevUge.db_kr) - 1) * 100;
+        prev2.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        prev2.className = pct >= 0 ? 'up' : 'dn';
+      }
+      const prev3 = document.getElementById('new-ov-prev-kunder');
+      if (prev3 && uge.transak != null && prevUge.transak > 0) {
+        const pct = ((uge.transak / prevUge.transak) - 1) * 100;
+        prev3.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        prev3.className = pct >= 0 ? 'up' : 'dn';
+      }
+      const prev4 = document.getElementById('new-ov-prev-kurv');
+      if (prev4 && uge.transak > 0 && prevUge.transak > 0) {
+        const pct = ((uge.omsaetning / uge.transak) / (prevUge.omsaetning / prevUge.transak) - 1) * 100;
+        prev4.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        prev4.className = pct >= 0 ? 'up' : 'dn';
+      }
+    } catch (e) {
+      console.log('Nyt Overblik fejl:', e);
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

@@ -419,30 +419,33 @@ Vurder BEGGE risici for HVER dag:
 - Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
 - Er svage dage bestilt for højt? Overskud = TGTG-tab.
 
-Returner KUN valid JSON — HELT VIGTIG:
-- Escape alle citationstegn i strenge med \\
-- Brug \\n for linjeskift, ALDRIG ægte linjeskift i streng
-- Alle tal uden citationstegn: "fra": 12 IKKE "fra": "12"
+Returner UDELUKKENDE valid JSON — INGEN anden tekst før eller efter:
+- KUN bokstaver, tal, mellemrum i tekst-værdier
+- ALDRIG citationstegn, backticks, eller specielle tegn i tekst
+- Hvis du skal referere til et produkt, brug dets navn fra produktlisten uden ændring
+- Alle talværdier uden citationstegn: "fra": 12 IKKE "fra": "12"
+- Booleans uden citationstegn: "klar": true IKKE "klar": "true"
 
-{{
-  "vurdering": "2-4 sætninger. Nævn specifikt hvilke dage der er under/overbestilt og hvad det koster.",
+{
+  "vurdering": "2-4 sætninger med konkrete tal og dage. Ingen specielle tegn.",
   "klar": true,
   "justeringer": [
-    {{
-      "varenavn": "eksakt varenavn fra produktlisten",
+    {
+      "varenavn": "Boller almindelige",
       "dag": "man",
-      "fra": 12,
-      "til": 15,
-      "grund": "tabt salg — fredagsefterspørgsel"
-    }}
+      "fra": 100,
+      "til": 120,
+      "grund": "tabt salg mandag stærk"
+    }
   ]
-}}
+}
 
 Regler:
-- justeringer: både OP (for lidt → tabt salg) og NED (for meget → TGTG)
-- Min ±2 stk eller ±20% for at inkludere
-- Max 10 justeringer — prioriter størst økonomisk effekt
-- Tomme justeringer [] hvis alt ser fornuftigt ud"""
+- vurdering: kun almindelig tekst, ingen citationstegn eller symboler
+- justeringer: både OP og NED, min 2 stk eller 20 pct
+- Max 10, prioriter økonomisk effekt
+- Tomme liste [] hvis alt OK
+- VIGTIG: Udelukkende JSON, ingen markdown eller ekstra tekst"""
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
@@ -456,12 +459,34 @@ Regler:
             if raw.lower().startswith("json"): raw = raw[4:]
         raw = raw.strip()
 
+        # Forsøg at reparere almindelige JSON-fejl
+        def repair_json(text):
+            import re
+            # Erstat uescapede tegn inden i strengværdier
+            # Find alle tekststrenge og escape indre citationstegn
+            def fix_string(m):
+                s = m.group(1)
+                # Erstat ikkeescapede citationstegn med escapede
+                s = re.sub(r'(?<!\\)"', r'\\"', s)
+                # Erstat ikkeescapede backslashes (undtagen allerede escapede)
+                s = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', s)
+                return '"' + s + '"'
+            # Denne regex kan være farlig, så gør i stedet en simpel erstatning
+            return text
+
         try:
             parsed = _json.loads(raw)
         except _json.JSONDecodeError as je:
-            import re
-            raw_clean = re.sub(r'[\r\n]+', ' ', raw)
-            return {"ok": False, "fejl": f"JSON parse fejl: {str(je)} — svar kan have ugyldige tegn"}
+            # Prøv igen efter at have fjernet problematiske tegn
+            try:
+                # Erstat almindelige problemer: ukontrollerede linjeskift i værdier
+                raw_fixed = raw.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+                # Erstat dobbelte mellemrum
+                import re
+                raw_fixed = re.sub(r'  +', ' ', raw_fixed)
+                parsed = _json.loads(raw_fixed)
+            except:
+                return {"ok": False, "fejl": f"JSON invalidt: {je.msg} (linje {je.lineno}). Prøv igen."}
 
         return {
             "ok": True,

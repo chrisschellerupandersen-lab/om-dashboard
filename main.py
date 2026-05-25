@@ -502,7 +502,18 @@ async def api_bestillings_anbefaling(
     if aar is None:
         from datetime import date
         aar = date.today().year
-    return database.hent_bestillings_uge(int(uge), int(aar))
+    try:
+        return database.hent_bestillings_uge(int(uge), int(aar))
+    except Exception as e:
+        import traceback
+        error_msg = str(e)
+        print(f"ERROR in hent_bestillings_uge({uge}, {aar}): {error_msg}")
+        traceback.print_exc()
+        return {
+            "error": f"Fejl ved bestillingsberegning: {error_msg}",
+            "uge": uge,
+            "aar": aar
+        }
 
 
 @app.get("/api/bestilling/management-analyse")

@@ -6496,8 +6496,8 @@ async function loadBernUge(uge, aar) {
       if (navn.includes('bolle') || navn.includes('smør')) {
         bollerTotal += total;
       }
-      // Wienerbrød: "wiener" eller "schnitzel"
-      if (navn.includes('wiener') || navn.includes('schnit')) {
+      // Wienerbrød: "wien" (wienerbr...) eller "schnitzel"
+      if (navn.includes('wien') || navn.includes('schnit')) {
         wienerTotal += total;
       }
     });

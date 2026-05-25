@@ -443,7 +443,7 @@ Regler:
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-4-5",
+            model="claude-haiku-4-5-20251001",
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -581,7 +581,7 @@ Vær direkte og konkret. Brug tal. Maks 200 ord."""
         import anthropic as _ant
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-haiku-4-5-20251001",
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -707,7 +707,7 @@ async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
         import anthropic as _ant
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-3-5-haiku-20241022",
+            model="claude-haiku-4-5-20251001",
             max_tokens=512,
             messages=[{
                 "role": "user",
@@ -773,7 +773,7 @@ async def retur_scan(request: Request, fil: UploadFile = File(...)):
         import json as _json
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-opus-4-5",
+            model="claude-opus-4-7",
             max_tokens=1024,
             messages=[{"role": "user", "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},

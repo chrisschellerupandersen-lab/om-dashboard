@@ -2256,12 +2256,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="bern-st-tabel" style="overflow-x:auto;padding:0 0 4px;"></div>
         </div>
 
-        <!-- Uge-vælger -->
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+        <!-- Uge-vælger + Opdater analyse knap -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
           <button onclick="bernPrev()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">←</button>
           <span id="bern-uge-label" style="font-size:20px;font-weight:500;color:var(--forest);">Uge —</span>
           <span id="bern-dato-label" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);"></span>
           <button onclick="bernNext()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">→</button>
+          <button onclick="bernHentKontekst()" id="bern-main-btn" style="margin-left:auto;background:var(--forest);color:#fff;border:none;border-radius:4px;padding:8px 18px;cursor:pointer;font-weight:500;font-size:13px;">🔄 Opdater analyse</button>
           <span id="bern-event-badge" style="display:none;background:rgba(30,58,30,.10);color:var(--forest);border:1px solid rgba(30,58,30,.25);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500;letter-spacing:.02em;"></span>
         </div>
         <div style="margin-bottom:12px;">
@@ -6894,12 +6895,12 @@ async function bernCellSave(td) {
 function bernPrev() {
   let u = _bernUge - 1, a = _bernAar;
   if (u < 1) { u = 52; a--; }
-  loadBernUge(u, a).then(() => bernHentKontekst());
+  loadBernUge(u, a);  // Ikke auto-analyze - bruger skal klikke "Opdater analyse"
 }
 function bernNext() {
   let u = _bernUge + 1, a = _bernAar;
   if (u > 52) { u = 1; a++; }
-  loadBernUge(u, a).then(() => bernHentKontekst());
+  loadBernUge(u, a);  // Ikke auto-analyze - bruger skal klikke "Opdater analyse"
 }
 
 // ── MANGLER KOSTPRIS ──────────────────────────────────────────────────────────

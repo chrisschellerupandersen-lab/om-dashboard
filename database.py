@@ -3145,7 +3145,11 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             sd_map   = _stamdata_type_map()
             produkter = []
             for r in faktisk_rows:
-                dag_vals = {d: int(float(r[d] or 0)) for d in DAGE}
+                try:
+                    dag_vals = {d: int(float(r[d] or 0)) for d in DAGE}
+                except (ValueError, TypeError) as e:
+                    print(f"Fejl ved konvertering af dag-værdier for {r['varenavn']}: {e}")
+                    dag_vals = {d: 0 for d in DAGE}
                 total_p  = sum(dag_vals.values())
                 pris     = float(r["pris_ex_moms"] or 0)
                 kat      = _kat(r["varenavn"], sd_map)
@@ -3291,7 +3295,10 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             if vals:
                 basis_dag[d] = sum(vals) / len(vals)  # snit
             else:
-                basis_dag[d] = float(r[d] or 0)       # fallback til seneste uge
+                try:
+                    basis_dag[d] = float(r[d] or 0)       # fallback til seneste uge
+                except (ValueError, TypeError):
+                    basis_dag[d] = 0.0
         kat = _kat(r["varenavn"], sd_map)
         vn  = r["varenummer"] or ""
 

@@ -1663,19 +1663,34 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-retur">
         <div class="page-hdr">
           <h2>Retur</h2>
-          <p id="ret-hdr-sub">Registrer dagens retur fra bageriet</p>
+          <p id="ret-hdr-sub">Registrer returnering fra bageriet</p>
+        </div>
+
+        <!-- Viktigt: Forklaring af dag-offset -->
+        <div style="background:rgba(30,58,30,.08);border:1px solid rgba(30,58,30,.12);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.5;color:rgba(255,255,255,.85);">
+          <div style="color:var(--moss);font-weight:600;margin-bottom:6px;">💡 Vigtigt at vide:</div>
+          <div>Du registrerer i dag returneret fra <strong>i går</strong>, da pakken sendes næste dag. F.eks: Du registrerer <strong>mandag</strong> returneret fra <strong>søndag</strong>.</div>
         </div>
 
         <!-- ── TRIN 1: SCAN ──────────────────────────────────────────────── -->
         <div id="ret-step-scan" class="card" style="margin-bottom:16px;">
 
-          <!-- Dato-linje -->
+          <!-- Dato-linje (redesigned) -->
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-            <div style="font-size:11px;color:var(--ash);letter-spacing:.06em;white-space:nowrap;">DATO FOR RETUR</div>
+            <div style="font-size:11px;color:var(--ash);letter-spacing:.06em;white-space:nowrap;">RETURNERING FOR DATO</div>
             <input type="date" id="ret-dato-input" onchange="retDatoAendret(this.value)"
               style="flex:1;min-width:140px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);
                      color:var(--charcoal);border-radius:4px;font-size:14px;font-family:'DM Mono',monospace;">
-            <div id="ret-dato-uge-info" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--moss);white-space:nowrap;"></div>
+            <div style="display:flex;flex-direction:column;gap:2px;font-size:11px;">
+              <div id="ret-dato-uge-info" style="font-family:'DM Mono',monospace;color:var(--moss);white-space:nowrap;"></div>
+              <div id="ret-dato-gaar-info" style="font-family:'DM Mono',monospace;color:var(--gold);white-space:nowrap;font-size:10px;"></div>
+            </div>
+          </div>
+
+          <!-- Hurtig-valg (i går, to dage siden osv.) -->
+          <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;">
+            <button onclick="retSaetDato('yesterday')" style="padding:6px 12px;background:rgba(30,58,30,.15);border:1px solid rgba(30,58,30,.3);color:var(--moss);border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap;">← I går</button>
+            <button onclick="retSaetDato('2daysago')" style="padding:6px 12px;background:rgba(30,58,30,.1);border:1px solid rgba(30,58,30,.25);color:var(--ash);border-radius:4px;font-size:12px;cursor:pointer;white-space:nowrap;">← 2 dage siden</button>
           </div>
 
           <!-- Kamera-knap (stor, mobilvenlig) -->
@@ -1912,26 +1927,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <button onclick="_svindLoaded=false;loadSvind(true);" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
         </div>
         <!-- HJÆLP / FORKLARING -->
-        <div style="background:rgba(30,58,30,.08);border:1px solid rgba(30,58,30,.12);border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.8);">
-          <div style="font-weight:600;margin-bottom:10px;color:var(--gold);">📖 Hvad betyder disse tal?</div>
+        <div style="background:rgba(30,58,30,.15);border:1px solid rgba(30,58,30,.3);border-radius:8px;padding:14px;margin-bottom:16px;font-size:12px;line-height:1.7;color:rgba(255,255,255,.95);">
+          <div style="font-weight:600;margin-bottom:14px;color:var(--gold);font-size:13px;">📖 Hvad betyder disse tal?</div>
 
-          <div style="margin-bottom:12px;">
-            <strong>Gns. Svind:</strong> Hvor meget af dit indkøb går til spilde (kasseres, mold, dårlige varer). Beregnet som procent af indkøbt værdi.
-            <span style="color:var(--gold);">Målsætning: under 15%</span> — håndværk og nordisk klima gør 15-22% også acceptabelt.
+          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.15);">
+            <div style="font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.95);">Gns. Svind</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.9);">Hvor meget af indkøbet går til spilde (kasseres, mold, dårlige varer).</div>
+            <div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,.9);"><span style="color:#FFD700;font-weight:500;">Mål: under 15%</span> (15-22% også okay for håndværk)</div>
           </div>
 
-          <div style="margin-bottom:12px;">
-            <strong>Total Indkøb ex moms:</strong> Samlet værdi af alle varer du køber fra bageren (uden moms). Bruges som basis for alle procenter.
+          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.15);">
+            <div style="font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.95);">Total Indkøb ex moms</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.9);">Samlet værdi af alle varer fra bageren. Bruges som basis for alle procenter.</div>
           </div>
 
-          <div style="margin-bottom:12px;">
-            <strong>Total Retur inkl. TGTG:</strong> Hvad du får tilbage ved at sælge returnerede varer på TGTG og andre kanaler.
-            <span style="color:var(--moss);">Jo højere, desto bedre</span> — betyder færre kasserede varer.
+          <div style="margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.15);">
+            <div style="font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.95);">Total Retur inkl. TGTG</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.9);">Hvad du får tilbage ved at sælge returnerede varer.</div>
+            <div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,.9);"><span style="color:#7CFC00;font-weight:500;">Jo højere, jo bedre</span> — færre kasserede varer</div>
           </div>
 
           <div style="margin-bottom:0;">
-            <strong>Netto Bagerregning:</strong> Det beløb du skal betale bageren efter at have fratrukket alle dine returfindinger.
-            <span style="color:var(--moss);">Jo højere %, desto dårligere økonomi</span> (betyder meget spilde). Målsætning: over 85% betyder godt arbejde.
+            <div style="font-weight:600;margin-bottom:4px;color:rgba(255,255,255,.95);">Netto Bagerregning</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.9);">Det du skal betale efter fratræk af returvarer.</div>
+            <div style="margin-top:4px;font-size:11px;color:rgba(255,255,255,.9);"><span style="color:#7CFC00;font-weight:500;">Mål: over 85%</span> — betyder godt arbejde</div>
           </div>
         </div>
         <div class="kpi-row" id="svind-kpi-row">
@@ -6469,7 +6488,7 @@ async function loadBernUge(uge, aar) {
   // Vis analyse-kort kun for fremtidige/aktuelle uger
   if (!d.faktisk) {
     document.getElementById('bern-analyse-kort').style.display = '';
-    bernGenererAnalyse();
+    // BEMÆRK: bernGenererAnalyse() FJERNET - brugeren skal klikke knappen
     // Vis vurderingskortet klar til brug
     document.getElementById('bern-vurder-kort').style.display = '';
     document.getElementById('bern-vurder-tekst').style.display = 'none';
@@ -6514,7 +6533,7 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
-  bernHentKontekst();
+  // Bemærk: auto-analyse FJERNET - brugeren skal klikke "Opdater analyse"
   bernHentSellthrough();  // hent sell-through data
 }
 
@@ -7710,6 +7729,21 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 
+function retSaetDato(offset) {
+  const d = new Date();
+  if (offset === 'yesterday') {
+    d.setDate(d.getDate() - 1);
+  } else if (offset === '2daysago') {
+    d.setDate(d.getDate() - 2);
+  }
+  const år = d.getFullYear();
+  const mnd = String(d.getMonth() + 1).padStart(2, '0');
+  const dag = String(d.getDate()).padStart(2, '0');
+  const dateStr = `${år}-${mnd}-${dag}`;
+  document.getElementById('ret-dato-input').value = dateStr;
+  retDatoAendret(dateStr);
+}
+
 function retDatoAendret(val) {
   if (!val) return;
   const d = new Date(val + 'T12:00:00');
@@ -7723,6 +7757,17 @@ function retDatoAendret(val) {
   const ugeTxt = '→ uge ' + uge;
   if (info)  info.textContent  = ugeTxt;
   if (info2) info2.textContent = ugeTxt;
+  // Vis "gårsdags dato" info
+  const gaarInfo = document.getElementById('ret-dato-gaar-info');
+  if (gaarInfo) {
+    const idag = new Date();
+    const hørTilDato = new Date(d);
+    if (hørTilDato.toDateString() === idag.toDateString()) {
+      gaarInfo.textContent = '(I dag - returneres i morgen)';
+    } else {
+      gaarInfo.textContent = '(returneres i dag)';
+    }
+  }
   // Hold begge dato-felter synkroniseret
   const d1 = document.getElementById('ret-dato-input');
   const d2 = document.getElementById('ret-dato-input2');

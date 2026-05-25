@@ -1,8 +1,22 @@
+.tgtg_chrome_profile/
+__pycache__/
+*.pyc
+*.pyo
+tgtg_tokens.json
+.env
+gmail_token.json
+gmail_credentials.json
+*.db
+*.json
+_check*.js
+_check*.py
+replace_mgmt.py
+
 # Hemmelige filer – må IKKE uploades
-bestilling-app/email-config.js
+../bestilling-app/email-config.js
 
 # Node modules
-node_modules/
+../node_modules/
 
 # Ordre-log (valgfrit – fjern linjen hvis du vil have den med)
-# bestilling-app/orders.json
+# ../bestilling-app/orders.json

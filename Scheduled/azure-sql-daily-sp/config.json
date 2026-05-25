@@ -1,0 +1,11 @@
+{
+  "_comment": "Udfyld disse felter med dine rigtige værdier. Filen læses af den planlagte task 'azure-sql-daily-sp' hver morgen kl. 06:00 på hverdage.",
+  "server": "t365.database.windows.net",
+  "database": "TP_C252601068243",
+  "username": "C252601068243",
+  "password": "Ec!2IEg3fPGlib$o",
+  "stored_procedure": "tpdb.ProcessUserTables",
+  "parameters": {},
+  "timeout_seconds": 300,
+  "log_to_file": true
+}

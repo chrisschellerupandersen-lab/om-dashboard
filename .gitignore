@@ -1,0 +1,8 @@
+# Hemmelige filer – må IKKE uploades
+bestilling-app/email-config.js
+
+# Node modules
+node_modules/
+
+# Ordre-log (valgfrit – fjern linjen hvis du vil have den med)
+# bestilling-app/orders.json

@@ -6483,21 +6483,35 @@ async function loadBernUge(uge, aar) {
 
   const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;
 
-  // Retur-beregning: hent fra /api/retur/status (samme kilde som RETUR STATUS kortet på forsiden)
+  // Retur-beregning: baseret på produkter i denne uge (skifter når du skifter uge)
   try {
-    const rs = await fetch('/api/retur/status').then(r => r.json());
-    const returBoller = rs.max_boller || 0;
-    const returWiener = rs.max_wiener || 0;
-    const bollerStk   = rs.bestilt_boller != null ? rs.bestilt_boller : (returBoller > 0 ? Math.round(returBoller / 0.10) : 0);
-    const wienerStk   = rs.bestilt_wiener != null ? rs.bestilt_wiener : (returWiener > 0 ? Math.round(returWiener / 0.135) : 0);
+    let bollerTotal = 0, wienerTotal = 0;
+
+    // Sum boller og wienerbrød fra denne uges bestilling
+    (d.produkter || []).forEach(p => {
+      const navn = (p.varenavn || '').toLowerCase();
+      const total = p.total_anbefalet || 0;
+
+      // Boller: "bolle" eller "smør"
+      if (navn.includes('bolle') || navn.includes('smør')) {
+        bollerTotal += total;
+      }
+      // Wienerbrød: "wiener" eller "schnitzel"
+      if (navn.includes('wiener') || navn.includes('schnit')) {
+        wienerTotal += total;
+      }
+    });
+
+    const returBoller = Math.round(bollerTotal * 0.10);
+    const returWiener = Math.round(wienerTotal * 0.135);
 
     document.getElementById('bern-retur-boller').textContent     = returBoller > 0 ? returBoller + ' stk' : '—';
-    document.getElementById('bern-retur-boller-sub').textContent = bollerStk > 0 ? `10% af ${bollerStk} stk` : '10% af bestilt';
+    document.getElementById('bern-retur-boller-sub').textContent = bollerTotal > 0 ? `10% af ${bollerTotal} stk` : '10% af bestilt';
     document.getElementById('bern-retur-wiener').textContent     = returWiener > 0 ? returWiener + ' stk' : '—';
-    document.getElementById('bern-retur-wiener-sub').textContent = wienerStk > 0 ? `13,5% af ${wienerStk} stk` : '13,5% af bestilt';
+    document.getElementById('bern-retur-wiener-sub').textContent = wienerTotal > 0 ? `13,5% af ${wienerTotal} stk` : '13,5% af bestilt';
     setRing('ring-bern-retur-b', Math.min(100, returBoller / 50 * 100), 'var(--forest)');
     setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
-  } catch(e) { console.warn('retur/status fejl:', e); }
+  } catch(e) { console.warn('retur beregning fejl:', e); }
 
   // Vis analyse-kort kun for fremtidige/aktuelle uger
   if (!d.faktisk) {

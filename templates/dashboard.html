@@ -3330,9 +3330,9 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         wtd2.textContent = kr(uge.db_kr) + (uge.db_pct != null ? ' (' + uge.db_pct.toFixed(0) + '%)' : '');
       }
       const wtd3 = document.getElementById('new-ov-wtd-kunder');
-      if (wtd3 && uge.transak != null) wtd3.textContent = uge.transak.toLocaleString('da-DK');
+      if (wtd3 && typeof uge.transak === 'number') wtd3.textContent = uge.transak.toLocaleString('da-DK');
       const wtd4 = document.getElementById('new-ov-wtd-kurv');
-      if (wtd4 && uge.omsaetning != null && uge.transak > 0) {
+      if (wtd4 && typeof uge.omsaetning === 'number' && uge.transak > 0) {
         wtd4.textContent = Math.round(uge.omsaetning / uge.transak).toLocaleString('da-DK') + ' kr';
       }
 
@@ -3344,9 +3344,9 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         mtd2.textContent = kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : '');
       }
       const mtd3 = document.getElementById('new-ov-mtd-kunder');
-      if (mtd3 && mtd.transak != null) mtd3.textContent = mtd.transak.toLocaleString('da-DK');
+      if (mtd3 && typeof mtd.transak === 'number') mtd3.textContent = mtd.transak.toLocaleString('da-DK');
       const mtd4 = document.getElementById('new-ov-mtd-kurv');
-      if (mtd4 && mtd.omsaetning != null && mtd.transak > 0) {
+      if (mtd4 && typeof mtd.omsaetning === 'number' && mtd.transak > 0) {
         mtd4.textContent = Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr';
       }
 
@@ -3364,15 +3364,17 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         prev2.className = pct >= 0 ? 'up' : 'dn';
       }
       const prev3 = document.getElementById('new-ov-prev-kunder');
-      if (prev3 && uge.transak != null && prevUge.transak > 0) {
+      if (prev3 && typeof uge.transak === 'number' && prevUge.transak > 0) {
         const pct = ((uge.transak / prevUge.transak) - 1) * 100;
-        prev3.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        prev3.textContent = uge.transak.toLocaleString('da-DK') + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
         prev3.className = pct >= 0 ? 'up' : 'dn';
       }
       const prev4 = document.getElementById('new-ov-prev-kurv');
       if (prev4 && uge.transak > 0 && prevUge.transak > 0) {
-        const pct = ((uge.omsaetning / uge.transak) / (prevUge.omsaetning / prevUge.transak) - 1) * 100;
-        prev4.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+        const kurvDag = Math.round(uge.omsaetning / uge.transak);
+        const kurvPrev = Math.round(prevUge.omsaetning / prevUge.transak);
+        const pct = (kurvDag / kurvPrev - 1) * 100;
+        prev4.textContent = kurvDag.toLocaleString('da-DK') + ' kr (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
         prev4.className = pct >= 0 ? 'up' : 'dn';
       }
     } catch (e) {

@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "Bestilling App",
+      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
+      "runtimeArgs": ["bestilling-app/server.mjs"],
+      "port": 3000,
+      "env": {
+        "ADMIN_USER": "admin",
+        "ADMIN_PASS": "test"
+      }
+    },
+    {
+      "name": "Dashboard",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["dashboard/main.py"],
+      "port": 5000
+    }
+  ]
+}

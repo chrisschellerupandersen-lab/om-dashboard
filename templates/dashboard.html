@@ -7424,7 +7424,9 @@ _navLoad(); _buildNav();
 _initMomsBtn();
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);
-setInterval(loadReturStatus, 60 * 1000);  // Retur-KPI opdateres hvert minut
+if (typeof loadReturStatus === 'function') {
+  setInterval(loadReturStatus, 60 * 1000);  // Retur-KPI opdateres hvert minut
+}
 </script>
 
 <!-- VF DRILL-DOWN MODAL -->

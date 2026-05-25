@@ -3211,7 +3211,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             """).fetchall()
 
         if not basis_rows:
-            return {"fejl": "Ingen ugebestillinger indlæst endnu"}
+            return {"error": "Ingen ugebestillinger indlæst endnu"}
 
         # Primær basis: seneste uge (til produkt-liste og rækkefølge)
         basis_uge = basis_rows[0]["uge"]

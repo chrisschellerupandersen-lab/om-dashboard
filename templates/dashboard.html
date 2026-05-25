@@ -3261,6 +3261,13 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       if (el) el.className = 'ov-stat ' + (isUp ? 'up' : 'dn');
     }
 
+    // ── NYT OVERBLIK DESIGN: Udfyld top banner ────────────────────────────
+    // Omsætning dag
+    const newOmsatEl = document.getElementById('new-ov-omsat');
+    if (newOmsatEl && dag.omsaetning != null) {
+      newOmsatEl.textContent = kr(dag.omsaetning);
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

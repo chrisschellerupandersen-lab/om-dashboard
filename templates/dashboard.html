@@ -3350,6 +3350,25 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       newVsForrigeEl.innerHTML = `<div>vs. forrige uge${timeLabel}: OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>`;
     }
 
+    // ── WTD kort (Uge-til-dato) ────────────────────────────────────────────
+    const wtdOmsEl = document.getElementById('new-ov-wtd-oms');
+    if (wtdOmsEl && uge.omsaetning != null) {
+      wtdOmsEl.textContent = kr(uge.omsaetning);
+    }
+    const wtdDbEl = document.getElementById('new-ov-wtd-db');
+    if (wtdDbEl && uge.db_kr != null) {
+      wtdDbEl.textContent = kr(uge.db_kr) + (uge.db_pct != null ? ' (' + uge.db_pct.toFixed(0) + '%)' : '');
+    }
+    const wtdKunderEl = document.getElementById('new-ov-wtd-kunder');
+    if (wtdKunderEl && uge.transak != null) {
+      wtdKunderEl.textContent = uge.transak.toLocaleString('da-DK');
+    }
+    const wtdKurvEl = document.getElementById('new-ov-wtd-kurv');
+    if (wtdKurvEl && uge.omsaetning != null && uge.transak > 0) {
+      const ugeKurv = Math.round(uge.omsaetning / uge.transak);
+      wtdKurvEl.textContent = ugeKurv.toLocaleString('da-DK') + ' kr';
+    }
+
     // DB dag vs. samme dag forrige uge
     const vsDagEl  = document.getElementById('kpi-vs-dag');
     const vsDagSub = document.getElementById('kpi-vs-dag-sub');

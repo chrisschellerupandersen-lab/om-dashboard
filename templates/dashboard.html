@@ -297,6 +297,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .aar-pill{font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border-radius:2px;border:1px solid rgba(30,58,30,.15);color:var(--ash);background:var(--white);}
 .aar-pill.ok{color:#2d5a2d;background:rgba(74,124,74,.08);border-color:rgba(74,124,74,.2);}
 .aar-pill.est{color:#7a5c00;background:rgba(200,168,75,.1);border-color:rgba(200,168,75,.25);}
+
+/* NYT OVERBLIK DESIGN */
+.ov-banner{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 6px rgba(30,58,30,.06);}
+.ov-banner-top{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;margin-bottom:12px;border-bottom:1px solid rgba(30,58,30,.08);padding-bottom:12px;}
+.ov-banner-cmp{font-size:13px;color:var(--ash);margin-top:8px;display:flex;gap:16px;}
+.ov-metric{display:flex;flex-direction:column;}
+.ov-metric-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;font-weight:500;}
+.ov-metric-value{font-size:28px;font-weight:300;color:var(--forest);line-height:1.1;margin-bottom:4px;}
+.ov-metric-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);}
+.ov-comparison{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:12px;}
+.ov-cmp-card{background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:14px 16px;}
+.ov-cmp-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;font-weight:500;}
+.ov-cmp-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(30,58,30,.06);font-size:13px;}
+.ov-cmp-row:last-child{border-bottom:none;}
+.ov-cmp-label{color:var(--charcoal);}
+.ov-cmp-val{font-family:'DM Mono',monospace;font-weight:400;color:var(--forest);}
+.ov-cmp-val.up{color:var(--moss);}
+.ov-cmp-val.dn{color:var(--danger);}
+.ov-cmp-val.neutral{color:var(--ash);}
 .aar-pill.warn{color:#9b3420;background:rgba(180,60,40,.07);border-color:rgba(180,60,40,.18);}
 .aar-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
 .aar-kpi-row .kpi-card:first-child{background:var(--forest);border-color:var(--forest);}
@@ -757,6 +776,107 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Overblik</h2>
           <p id="hdr-forside-sub">Organic Market Greve</p>
         </div>
+
+        <!-- NYT OVERBLIK DESIGN -->
+        <div class="ov-banner">
+          <!-- Top rækker med nøgletal -->
+          <div class="ov-banner-top">
+            <div class="ov-metric">
+              <div class="kpi-l">Omsætning · dag</div>
+              <div class="kpi-v" id="new-ov-omsat">—</div>
+              <div class="kpi-s">ekskl. moms</div>
+            </div>
+            <div class="ov-metric">
+              <div class="kpi-l">Vareforbrug</div>
+              <div class="kpi-v" id="new-ov-vf">—</div>
+              <div class="kpi-s" id="new-ov-vf-pct">—</div>
+            </div>
+            <div class="ov-metric">
+              <div class="kpi-l">DB · dag</div>
+              <div class="kpi-v" id="new-ov-db">—</div>
+              <div class="kpi-s" id="new-ov-db-pct">—</div>
+            </div>
+            <div class="ov-metric">
+              <div class="kpi-l">Kunder · dag</div>
+              <div class="kpi-v" id="new-ov-kunder">—</div>
+              <div class="kpi-s" id="new-ov-kunder-sub">—</div>
+            </div>
+            <div class="ov-metric">
+              <div class="kpi-l">Kurv · gennemsnit</div>
+              <div class="kpi-v" id="new-ov-kurv">—</div>
+              <div class="kpi-s">per kunde</div>
+            </div>
+          </div>
+
+          <!-- Sammenligninger vs. forrige uge (samme time) -->
+          <div class="ov-banner-cmp" id="new-ov-vs-forrige-uge">
+            <div>vs. forrige uge (KL —): OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>
+          </div>
+        </div>
+
+        <!-- 3 sammenligning kort -->
+        <div class="ov-comparison">
+          <div class="ov-cmp-card">
+            <div class="ov-cmp-title">Uge til dato</div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Omsætning</span>
+              <span class="ov-cmp-val" id="new-ov-wtd-oms">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">DB</span>
+              <span class="ov-cmp-val" id="new-ov-wtd-db">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kunder</span>
+              <span class="ov-cmp-val" id="new-ov-wtd-kunder">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kurv</span>
+              <span class="ov-cmp-val" id="new-ov-wtd-kurv">—</span>
+            </div>
+          </div>
+
+          <div class="ov-cmp-card">
+            <div class="ov-cmp-title">Måned til dato</div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Omsætning</span>
+              <span class="ov-cmp-val" id="new-ov-mtd-oms">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">DB</span>
+              <span class="ov-cmp-val" id="new-ov-mtd-db">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kunder</span>
+              <span class="ov-cmp-val" id="new-ov-mtd-kunder">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kurv</span>
+              <span class="ov-cmp-val" id="new-ov-mtd-kurv">—</span>
+            </div>
+          </div>
+
+          <div class="ov-cmp-card">
+            <div class="ov-cmp-title">vs forrige uge</div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Omsætning</span>
+              <span class="ov-cmp-val" id="new-ov-prev-oms">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">DB</span>
+              <span class="ov-cmp-val" id="new-ov-prev-db">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kunder</span>
+              <span class="ov-cmp-val" id="new-ov-prev-kunder">—</span>
+            </div>
+            <div class="ov-cmp-row">
+              <span class="ov-cmp-label">Kurv</span>
+              <span class="ov-cmp-val" id="new-ov-prev-kurv">—</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Overblik række 1: hoved-metrics med ringe -->
         <div class="ov-top">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);border-top:3px solid var(--amber);">

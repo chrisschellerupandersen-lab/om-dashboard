@@ -4,6 +4,7 @@ import base64
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
@@ -14,7 +15,12 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import database
 import parser as xlsx_parser
 
-app = FastAPI(title="Organic Market Dashboard")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    database.init_db()
+    yield
+
+app = FastAPI(title="Organic Market Dashboard", lifespan=lifespan)
 
 # Tillad upload op til 10 MB (mobilbilleder komprimeres i frontend til ~1.5 MB)
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -59,13 +65,6 @@ def get_session(request: Request):
         return signer.loads(token, max_age=SESSION_MAX_AGE)
     except (BadSignature, SignatureExpired):
         return None
-
-
-# ── STARTUP ───────────────────────────────────────────────────────────────────
-
-@app.on_event("startup")
-async def startup():
-    database.init_db()
 
 
 # ── SIDER ─────────────────────────────────────────────────────────────────────

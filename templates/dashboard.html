@@ -6367,26 +6367,42 @@ async function loadBernUge(uge, aar) {
   const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
   window._bernData = d;
 
+  console.log('📊 loadBernUge - API response data:', {
+    produkter_count: d.produkter ? d.produkter.length : 0,
+    total_stk: d.total_stk,
+    produkter_sample: d.produkter ? d.produkter.slice(0, 2) : null
+  });
+
   const thDage = DAGE.map(dag =>
     `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
   ).join('');
 
   // Gruppér produkter efter kategori
   const groups = {};
-  for (const p of d.produkter) {
-    const k = p.kategori || 'Andet';
-    if (!groups[k]) groups[k] = [];
-    groups[k].push(p);
+  if (!d.produkter || !Array.isArray(d.produkter)) {
+    console.error('❌ produkter is not an array:', d.produkter);
+  } else {
+    for (const p of d.produkter) {
+      const k = p.kategori || 'Andet';
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(p);
+    }
   }
+  console.log('📊 Grouped produkter:', Object.keys(groups).map(k => `${k}: ${groups[k].length}`).join(', '))
 
   let bodyRows = '';
   const COLSPAN = 11; // varenavn + 7 dage + total + kr/stk + kr total
 
   const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+  console.log('📊 Category order to render:', katOrder);
 
   for (const kat of katOrder) {
     const prods = groups[kat];
-    if (!prods || prods.length === 0) continue;
+    if (!prods || prods.length === 0) {
+      console.log(`⊘ Skipping category "${kat}" - no products`);
+      continue;
+    }
+    console.log(`✓ Rendering category "${kat}" with ${prods.length} products`);
 
     // Kategori-header
     bodyRows += `<tr style="background:rgba(45,74,45,.07);">
@@ -6451,6 +6467,12 @@ async function loadBernUge(uge, aar) {
       ? `<br><span style="font-size:9px;opacity:.7;">${diff>0?'+':''}${diff}</span>` : '';
     return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}</td>`;
   }).join('');
+
+  console.log('📊 bodyRows generated:', {
+    length: bodyRows.length,
+    isEmpty: !bodyRows || bodyRows === '',
+    preview: bodyRows.substring(0, 200)
+  });
 
   const evtNote = d.event
     ? `<div class="bern-evt-note" style="margin-bottom:10px;">⚑ <b>${d.event.navn}</b> — ${d.event.note}</div>`

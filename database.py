@@ -596,6 +596,7 @@ def hent_kpi(aar: int = None) -> Dict:
                 boller_kr  = round(b_kr * RETUR_BOLLER, 2) if b_kr else None
                 kilde      = "prognose"
             bager_retur_info = {
+                "aktuel_uge":         iso[1],
                 "wien_retur_stk":     wien_stk,
                 "wien_bestilt_stk":   w_stk,
                 "wien_retur_kr":      wien_kr,

@@ -4146,15 +4146,15 @@ def hent_management_data() -> dict:
     today = date.today()
 
     with _conn() as conn:
-        # Ugentlig omsaetning + DB + kunder, seneste 10 ISO-uger
+        # Ugentlig omsætning + DB + kunder, seneste 10 ISO-uger
         uger_iso = conn.execute("""
             SELECT
                 CAST(strftime('%Y', dato) AS INTEGER) AS aar,
                 CAST(strftime('%W', dato) AS INTEGER)+1 AS uge,
                 MIN(dato) AS fra, MAX(dato) AS til,
-                ROUND(SUM(omsaetning),0) AS oms,
+                ROUND(SUM(omsætning),0) AS oms,
                 ROUND(SUM(avance),0) AS db_kr,
-                ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct,
+                ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
                 COUNT(DISTINCT dato) AS dage,
                 COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
             FROM transaktioner
@@ -4169,27 +4169,27 @@ def hent_management_data() -> dict:
         prev_dag_oms = None
         if seneste_dato:
             seneste_dag = conn.execute("""
-                SELECT ROUND(SUM(omsaetning),0) AS oms,
-                       ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct,
+                SELECT ROUND(SUM(omsætning),0) AS oms,
+                       ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
                        COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
                 FROM transaktioner WHERE dato=?
             """, (seneste_dato,)).fetchone()
             prev_dag = conn.execute("SELECT date(?,'-7 days')", (seneste_dato,)).fetchone()[0]
             prev_dag_oms = conn.execute(
-                "SELECT ROUND(SUM(omsaetning),0) AS oms FROM transaktioner WHERE dato=?",
+                "SELECT ROUND(SUM(omsætning),0) AS oms FROM transaktioner WHERE dato=?",
                 (prev_dag,)
             ).fetchone()
 
         # Kategorier seneste 30 dage med vaekst vs forrige 30 dage
         kat_nu = conn.execute("""
-            SELECT kategori, ROUND(SUM(omsaetning),0) AS oms,
-                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct
+            SELECT kategori, ROUND(SUM(omsætning),0) AS oms,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
             FROM transaktioner
             WHERE dato >= date('now','-30 days') AND kategori != ''
             GROUP BY kategori ORDER BY oms DESC LIMIT 10
         """).fetchall()
         kat_prev = {r['kategori']: r['oms'] for r in conn.execute("""
-            SELECT kategori, ROUND(SUM(omsaetning),0) AS oms FROM transaktioner
+            SELECT kategori, ROUND(SUM(omsætning),0) AS oms FROM transaktioner
             WHERE dato >= date('now','-60 days') AND dato < date('now','-30 days') AND kategori != ''
             GROUP BY kategori
         """).fetchall()}
@@ -4206,7 +4206,7 @@ def hent_management_data() -> dict:
                 ROUND(AVG(dag_kunder),0) AS snit_kunder,
                 COUNT(*) AS uger
             FROM (
-                SELECT dato, SUM(omsaetning) AS dag_oms,
+                SELECT dato, SUM(omsætning) AS dag_oms,
                        COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS dag_kunder
                 FROM transaktioner WHERE dato >= date('now','-84 days')
                 GROUP BY dato
@@ -4215,14 +4215,14 @@ def hent_management_data() -> dict:
 
         # Top 15 produkter seneste 14 dage + vaekst
         top_nu = conn.execute("""
-            SELECT varenavn, ROUND(SUM(omsaetning),0) AS oms, SUM(antal) AS antal,
-                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsaetning),0),1) AS db_pct
+            SELECT varenavn, ROUND(SUM(omsætning),0) AS oms, SUM(antal) AS antal,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
             FROM transaktioner
             WHERE dato >= date('now','-14 days') AND varenavn != ''
             GROUP BY varenavn ORDER BY oms DESC LIMIT 15
         """).fetchall()
         top_prev_map = {r['varenavn']: r['oms'] for r in conn.execute("""
-            SELECT varenavn, ROUND(SUM(omsaetning),0) AS oms FROM transaktioner
+            SELECT varenavn, ROUND(SUM(omsætning),0) AS oms FROM transaktioner
             WHERE dato >= date('now','-28 days') AND dato < date('now','-14 days') AND varenavn != ''
             GROUP BY varenavn
         """).fetchall()}

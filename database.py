@@ -394,6 +394,10 @@ def hent_kpi(aar: int = None) -> Dict:
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                         ELSE 0 END               AS db_pct,
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END                           AS transak,
                    COUNT(DISTINCT dato)          AS antal_dage
             FROM v_transaktioner
             WHERE dato >= ? AND dato <= ?
@@ -431,6 +435,10 @@ def hent_kpi(aar: int = None) -> Dict:
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                         ELSE 0 END             AS db_pct,
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END                         AS transak,
                    COUNT(DISTINCT dato)        AS antal_dage
             FROM v_transaktioner
             WHERE dato >= ? AND dato <= ?
@@ -504,6 +512,10 @@ def hent_kpi(aar: int = None) -> Dict:
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                         ELSE 0 END             AS db_pct,
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END                         AS transak,
                    COUNT(DISTINCT dato)        AS antal_dage
             FROM v_transaktioner WHERE dato >= ? AND dato <= ?
         """, (mtd_start, seneste_dato)).fetchone()

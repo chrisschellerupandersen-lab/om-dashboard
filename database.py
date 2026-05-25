@@ -3240,7 +3240,7 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                 FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY id
             """, (br["uge"], br["aar"])).fetchall()
             for rr in br_rows:
-                vn = rr["varenummer"] or rr.get("varenavn", "")
+                vn = rr["varenummer"] or ""
                 if vn not in _basis_snit:
                     _basis_snit[vn] = {d: [] for d in _dag_cols}
                 for d in _dag_cols:

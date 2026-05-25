@@ -1911,6 +1911,29 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p>Effektivt solgt = kassesalg + Kaffe/wiener-kombo + TGTG (à 38 kr/pose) · faktura &amp; retur per uge</p>
           <button onclick="_svindLoaded=false;loadSvind(true);" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
         </div>
+        <!-- HJÆLP / FORKLARING -->
+        <div style="background:rgba(30,58,30,.08);border:1px solid rgba(30,58,30,.12);border-radius:8px;padding:16px;margin-bottom:16px;font-size:13px;line-height:1.6;color:rgba(255,255,255,.8);">
+          <div style="font-weight:600;margin-bottom:10px;color:var(--gold);">📖 Hvad betyder disse tal?</div>
+
+          <div style="margin-bottom:12px;">
+            <strong>Gns. Svind:</strong> Hvor meget af dit indkøb går til spilde (kasseres, mold, dårlige varer). Beregnet som procent af indkøbt værdi.
+            <span style="color:var(--gold);">Målsætning: under 15%</span> — håndværk og nordisk klima gør 15-22% også acceptabelt.
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <strong>Total Indkøb ex moms:</strong> Samlet værdi af alle varer du køber fra bageren (uden moms). Bruges som basis for alle procenter.
+          </div>
+
+          <div style="margin-bottom:12px;">
+            <strong>Total Retur inkl. TGTG:</strong> Hvad du får tilbage ved at sælge returnerede varer på TGTG og andre kanaler.
+            <span style="color:var(--moss);">Jo højere, desto bedre</span> — betyder færre kasserede varer.
+          </div>
+
+          <div style="margin-bottom:0;">
+            <strong>Netto Bagerregning:</strong> Det beløb du skal betale bageren efter at have fratrukket alle dine returfindinger.
+            <span style="color:var(--moss);">Jo højere %, desto dårligere økonomi</span> (betyder meget spilde). Målsætning: over 85% betyder godt arbejde.
+          </div>
+        </div>
         <div class="kpi-row" id="svind-kpi-row">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
             <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(200,168,75,.25)" stroke-width="2.5"/><circle id="ring-svind-gns" cx="18" cy="18" r="15.9" fill="none" stroke="var(--amber)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="svind-gns-pct" style="color:var(--amber);">—</div></div></div>

@@ -180,6 +180,12 @@ async def api_idag(request: Request, aar: Optional[int] = None):
     return database.hent_dag_produkter(aar)
 
 
+@app.get("/api/salg/dag/{dato}")
+async def api_dag_specificeret(request: Request, dato: str, aar: Optional[int] = None):
+    _kræv_login(request)
+    return database.hent_dag_produkter_by_date(dato, aar)
+
+
 @app.get("/api/salg/dage")
 async def api_dage(request: Request, n: int = 14, aar: Optional[int] = None):
     _kræv_login(request)

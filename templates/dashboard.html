@@ -5442,7 +5442,9 @@ function buildBasisTable() {
   const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
   const groups = {};
   Object.entries(produkter).forEach(([vn, prod]) => {
-    const kat = prod.kategori;
+    // Use kategori from product, default to 'Øvrige' if empty
+    let kat = (prod.kategori || '').trim();
+    if (!kat) kat = 'Øvrige';
     if (!groups[kat]) groups[kat] = [];
     groups[kat].push({varenummer: vn, ...prod});
   });
@@ -5658,12 +5660,25 @@ async function basisAddProduct() {
     const varenummer = prod.varenavn;
 
     // Add default quantity of 5 to all days
+    // Map product type to standard category names for consistency
+    let kategori = prod.type || 'Øvrige';
+    // Normalize category names
+    const katMap = {
+      'Rugbrød': 'Rugbrød',
+      'Flute': 'Flute',
+      'Brød': 'Brød',
+      'Boller': 'Boller',
+      'Wiener': 'Wiener',
+      'Kage': 'Kage'
+    };
+    kategori = katMap[kategori] || kategori;
+
     const updates = DAGE_BASIS.map(dag => ({
       varenummer,
       varenavn: prod.varenavn,
       dag,
       anbefalet_antal: 5,
-      kategori: prod.type || ''
+      kategori
     }));
 
     const saveRes = await fetch('/api/basis-bestilling/bulk-gem', {
@@ -5821,6 +5836,10 @@ async function basisInitFromHistory() {
     // Beregn gennemsnit og forbered bulk-update
     const updates = [];
     for (const [vn, prod] of Object.entries(produktAggregate)) {
+      // Normaliser kategorinavn
+      let kategori = prod.kategori || 'Øvrige';
+      if (kategori.trim() === '') kategori = 'Øvrige';
+
       DAGE.forEach(dag => {
         const vals = prod.dage[dag];
         if (vals.length > 0) {
@@ -5831,7 +5850,7 @@ async function basisInitFromHistory() {
               varenavn: vn,
               dag,
               anbefalet_antal: avg,
-              kategori: prod.kategori
+              kategori
             });
           }
         }

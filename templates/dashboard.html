@@ -8338,14 +8338,22 @@ function mgmtVisReview(review) {
 }
 
 async function mgmtIndlaes() {
-  // Initialiser uge/år input-felterne med nuværende værdier
+  // Initialiser uge/år input-felterne med nuværende ISO uge og år
   const ugeInput = document.getElementById('mgmt-uge');
   const aarInput = document.getElementById('mgmt-aar');
+
   if (ugeInput && !ugeInput.value) {
-    ugeInput.value = _currentUge || 23;
+    // Beregn ISO uge nummer
+    const today = new Date();
+    const jan4 = new Date(today.getFullYear(), 0, 4);
+    const week1Mon = new Date(jan4);
+    week1Mon.setDate(jan4.getDate() - jan4.getDay() + 1);
+    const diff = today - week1Mon;
+    const isoWeek = Math.floor(diff / (7 * 24 * 60 * 60 * 1000)) + 1;
+    ugeInput.value = isoWeek;
   }
   if (aarInput && !aarInput.value) {
-    aarInput.value = VALGT_AAR || 2026;
+    aarInput.value = new Date().getFullYear();
   }
 
   try {

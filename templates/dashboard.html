@@ -7275,6 +7275,7 @@ async function loadBernUge(uge, aar) {
   // Byg Basis vs Forslag sammenligning
   let basisSammenligning = '';
   // Vis ALTID sammenligningen (hvis data findes)
+  console.log('Bygger basisSammenligning - d.produkter:', d.produkter?.length);
   if (d.produkter && d.produkter.length > 0) {
     const DAGE = ['man','tir','ons','tor','fre','loe','son'];
     const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
@@ -7355,8 +7356,12 @@ async function loadBernUge(uge, aar) {
         </tfoot>
       </table>
     </div>`;
+    console.log('basisSammenligning længde:', basisSammenligning.length);
+  } else {
+    console.log('basisSammenligning skipped - d.produkter:', d.produkter?.length);
   }
 
+  console.log('Insert innerHTML med basisSammenligning:', basisSammenligning.substring(0, 100));
   document.getElementById('beregner-tabel').innerHTML = `
     ${basisSammenligning}
     ${evtNote}

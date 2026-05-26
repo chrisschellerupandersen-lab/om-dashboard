@@ -1592,6 +1592,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             style="padding:8px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;cursor:pointer;font-weight:500;">
             + Tilføj produkt
           </button>
+          <button onclick="basisInitFromHistory()"
+            style="padding:8px 16px;background:var(--moss);color:var(--white);border:none;border-radius:4px;cursor:pointer;font-weight:500;">
+            📊 Initialiser fra historik
+          </button>
           <span id="basis-save-status" style="font-size:11px;color:var(--ash);margin-left:auto;">—</span>
         </div>
 
@@ -5635,6 +5639,123 @@ function updateBasisSaveTime() {
 }
 
 document.getElementById('basis-filter-input')?.addEventListener('input', buildBasisTable);
+
+async function basisInitFromHistory() {
+  const confirmed = confirm(
+    'Dette vil hente gennemsnit fra sidste 4 ugers bestillinger og udfylde basis-skabelonen.\n\n' +
+    'Eksisterende værdier bliver overskrevet. Fortsæt?'
+  );
+  if (!confirmed) return;
+
+  const spinner = document.createElement('div');
+  spinner.textContent = '⏳ Henter data fra historik...';
+  spinner.style.cssText = 'padding:12px;background:var(--forest);color:var(--amber);border-radius:4px;margin-bottom:16px;';
+  document.querySelector('#p-basis .page-hdr').parentElement.insertBefore(
+    spinner, document.querySelector('#p-basis .page-hdr').nextSibling
+  );
+
+  try {
+    // Hent liste over importerede uger
+    const ugerRes = await fetch('/api/bestilling/uger');
+    const ugerResp = await ugerRes.json();
+    if (!Array.isArray(ugerResp)) {
+      alert('Fejl: Kunne ikke hente ugeliste');
+      spinner.remove();
+      return;
+    }
+
+    // Sort og tag sidste 4 uger
+    const uger = ugerResp
+      .sort((a, b) => (b.aar - a.aar) || (b.uge - a.uge))
+      .slice(0, 4);
+
+    if (uger.length === 0) {
+      alert('Ingen bestillinger fundet i systemet');
+      spinner.remove();
+      return;
+    }
+
+    // Hent data fra hver uge og aggreger
+    const produktAggregate = {};
+
+    for (const u of uger) {
+      try {
+        const res = await fetch(`/api/bestilling/uge/${u.uge}?aar=${u.aar}`);
+        const data = await res.json();
+        if (!Array.isArray(data)) continue;
+
+        data.forEach(prod => {
+          const vn = prod.varenavn;
+          if (!produktAggregate[vn]) {
+            produktAggregate[vn] = {
+              varenavn: prod.varenavn,
+              kategori: prod.type || '',
+              dage: {man: [], tir: [], ons: [], tor: [], fre: [], loe: [], son: []}
+            };
+          }
+
+          ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'].forEach(dag => {
+            const val = prod[dag];
+            if (val && !isNaN(val)) {
+              produktAggregate[vn].dage[dag].push(parseFloat(val));
+            }
+          });
+        });
+      } catch (e) {
+        console.warn(`Fejl ved hentning af uge ${u.uge}/${u.aar}:`, e);
+      }
+    }
+
+    // Beregn gennemsnit og forbered bulk-update
+    const updates = [];
+    for (const [vn, prod] of Object.entries(produktAggregate)) {
+      ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'].forEach(dag => {
+        const vals = prod.dage[dag];
+        if (vals.length > 0) {
+          const avg = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+          if (avg > 0) {
+            updates.push({
+              varenummer: vn,
+              varenavn: vn,
+              dag,
+              anbefalet_antal: avg,
+              kategori: prod.kategori
+            });
+          }
+        }
+      });
+    }
+
+    if (updates.length === 0) {
+      alert('Ingen data fundet i historikken');
+      spinner.remove();
+      return;
+    }
+
+    // Gem alle på en gang
+    spinner.textContent = `⏳ Gemmer ${updates.length} værdier...`;
+
+    const saveRes = await fetch('/api/basis-bestilling/bulk-gem', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ updates })
+    });
+    const saveResp = await saveRes.json();
+
+    if (saveResp.ok) {
+      spinner.textContent = `✓ ${updates.length} værdier gemt fra gennemsnit af ${uger.length} uger`;
+      spinner.style.background = 'var(--moss)';
+      await loadBasis();
+      setTimeout(() => spinner.remove(), 3000);
+    } else {
+      alert('Fejl ved gemning: ' + (saveResp.fejl || 'ukendt'));
+      spinner.remove();
+    }
+  } catch (e) {
+    alert('Fejl: ' + e.message);
+    spinner.remove();
+  }
+}
 
 // ── DAGSOVERBLIK: BESTILT VS. SOLGT ───────────────────────────────────────────
 let _dagUge = null, _dagAar = null;

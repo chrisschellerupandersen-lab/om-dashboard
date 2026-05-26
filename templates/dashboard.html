@@ -5793,6 +5793,16 @@ async function basisInitFromHistory() {
       }
     };
 
+    // Hent varestamdata først for at få korrekte kategorier
+    const stamRes = await fetch('/api/stamdata');
+    const stamData = await stamRes.json();
+    const stamMap = {};
+    if (Array.isArray(stamData.data)) {
+      stamData.data.forEach(s => {
+        stamMap[s.varenavn?.toLowerCase()] = s.type || 'Øvrige';
+      });
+    }
+
     // Hent data fra hver uge og aggreger (ekskl. helligdage)
     const produktAggregate = {};
     const DAGE_IDX = {man: 0, tir: 1, ons: 2, tor: 3, fre: 4, loe: 5, son: 6};
@@ -5811,9 +5821,11 @@ async function basisInitFromHistory() {
         data.forEach(prod => {
           const vn = prod.varenavn;
           if (!produktAggregate[vn]) {
+            // Hent kategori fra varestamdata, fallback til prod.type
+            let kategori = stamMap[vn?.toLowerCase()] || prod.type || 'Øvrige';
             produktAggregate[vn] = {
               varenavn: prod.varenavn,
-              kategori: prod.type || '',
+              kategori,
               dage: {man: [], tir: [], ons: [], tor: [], fre: [], loe: [], son: []}
             };
           }

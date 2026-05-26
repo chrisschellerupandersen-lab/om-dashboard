@@ -1023,6 +1023,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span id="mgmt-timestamp" style="font-size:11px;color:var(--ash);font-family:'DM Mono',monospace;"></span>
+            <div style="display:flex;gap:6px;align-items:center;font-size:12px;">
+              <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">Uge</label>
+              <input id="mgmt-uge" type="number" min="1" max="52"
+                style="width:50px;padding:6px 8px;border:1px solid var(--border);border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;" />
+              <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">År</label>
+              <input id="mgmt-aar" type="number" min="2020" max="2099"
+                style="width:60px;padding:6px 8px;border:1px solid var(--border);border-radius:3px;font-family:'DM Mono',monospace;font-size:11px;" />
+            </div>
             <button id="mgmt-opdater-btn" onclick="mgmtOpdater()"
               style="padding:7px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:3px;cursor:pointer;font-size:12px;letter-spacing:.04em;">
               ↻ Opdater analyse
@@ -8328,6 +8336,16 @@ function mgmtVisReview(review) {
 }
 
 async function mgmtIndlaes() {
+  // Initialiser uge/år input-felterne med nuværende værdier
+  const ugeInput = document.getElementById('mgmt-uge');
+  const aarInput = document.getElementById('mgmt-aar');
+  if (ugeInput && !ugeInput.value) {
+    ugeInput.value = _currentUge || 23;
+  }
+  if (aarInput && !aarInput.value) {
+    aarInput.value = VALGT_AAR || 2026;
+  }
+
   try {
     const res  = await fetch('/api/management/review');
     const data = await res.json();
@@ -8349,6 +8367,10 @@ async function mgmtOpdater() {
   const nEl    = document.getElementById('mgmt-ingen-data');
   const fejlEl = document.getElementById('mgmt-fejl');
 
+  // Læs uge og år fra input-felterne
+  const uge = parseInt(document.getElementById('mgmt-uge')?.value) || _currentUge || 23;
+  const aar = parseInt(document.getElementById('mgmt-aar')?.value) || VALGT_AAR || 2026;
+
   btn.disabled = true;
   btn.textContent = '⏳ Analyserer…';
   spin.style.display  = '';
@@ -8357,7 +8379,7 @@ async function mgmtOpdater() {
   fejlEl.style.display= 'none';
 
   try {
-    const res  = await fetch('/api/management/review/opdater', { method: 'POST' });
+    const res  = await fetch(`/api/management/review/opdater?uge=${uge}&aar=${aar}`, { method: 'POST' });
     const data = await res.json();
     spin.style.display = 'none';
     if (data.ok && data.review) {

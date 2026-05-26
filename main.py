@@ -378,6 +378,12 @@ async def api_beregner_vurder(request: Request):
         body = await request.json()
         import anthropic as _ant, json as _json
 
+        # Validér at vi har de vigtigste felter
+        required_fields = ['uge', 'aar', 'dag_totaler', 'produkter']
+        for field in required_fields:
+            if field not in body or body[field] is None:
+                return {"ok": False, "fejl": f"Manglende felt: {field}"}
+
         prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med bageri.
 
 ═══ FORRETNINGSLOGIK — FORSTÅ DETTE FØR ALT ANDET ═══

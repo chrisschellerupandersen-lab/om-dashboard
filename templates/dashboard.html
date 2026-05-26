@@ -377,6 +377,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .aar2-minibar-bg{height:6px;background:rgba(30,58,30,.07);border-radius:1px;overflow:hidden;width:120px;}
 .aar2-minibar-fill{height:100%;border-radius:1px;}
 
+/* BASIS BESTILLING SPECIFIC */
+.basis-cell{cursor:text !important;}
+.basis-cell:focus{outline:2px solid var(--amber);outline-offset:-1px;background:rgba(200,168,75,.1);}
+.aar2-tbl th.basis-we{background:rgba(30,58,30,.95);}
+.aar2-tbl td.basis-we{background:rgba(45,74,45,.04);}
+
 /* TREND PANEL */
 .saeson-banner{display:flex;align-items:center;gap:12px;background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.25);border-radius:3px;padding:12px 16px;margin-bottom:20px;font-size:13px;}
 .saeson-icon{font-size:22px;line-height:1;}
@@ -1599,25 +1605,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="basis-save-status" style="font-size:11px;color:var(--ash);margin-left:auto;">—</span>
         </div>
 
-        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:16px;">
-          <table id="basis-tabel" style="width:100%;border-collapse:collapse;background:var(--white);">
-            <thead>
-              <tr style="background:var(--forest);color:var(--amber);">
-                <th style="padding:12px;text-align:left;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;">Produkt (Kategori)</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Man</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tir</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Ons</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tor</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Fre</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Lør</th>
-                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Søn</th>
-                <th style="padding:12px;text-align:center;font-weight:500;font-size:12px;width:40px;">Ret</th>
-              </tr>
-            </thead>
-            <tbody id="basis-tbody">
-              <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Indlæser…</td></tr>
-            </tbody>
-          </table>
+        <div id="basis-tabel-wrap">
+          <div style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Indlæser…</div>
         </div>
       </div>
 
@@ -5434,6 +5423,7 @@ async function loadBasis() {
 
 function buildBasisTable() {
   const filter = document.getElementById('basis-filter-input').value.toLowerCase();
+  const wrap = document.getElementById('basis-tabel-wrap');
 
   // Group by product
   const produkter = {};
@@ -5441,108 +5431,169 @@ function buildBasisTable() {
     if (!produkter[row.varenummer]) {
       produkter[row.varenummer] = {
         varenavn: row.varenavn,
-        kategori: row.kategori,
+        kategori: row.kategori || 'Øvrige',
         data: {}
       };
     }
     produkter[row.varenummer].data[row.dag] = row.anbefalet_antal;
   });
 
-  const tbody = document.getElementById('basis-tbody');
-  const rows = [];
+  // Group by category
+  const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+  const groups = {};
+  Object.entries(produkter).forEach(([vn, prod]) => {
+    const kat = prod.kategori;
+    if (!groups[kat]) groups[kat] = [];
+    groups[kat].push({varenummer: vn, ...prod});
+  });
 
-  for (const [vn, prod] of Object.entries(produkter)) {
-    const display = `${prod.varenavn} (${prod.kategori || 'ukendt'})`;
-    if (filter && !display.toLowerCase().includes(filter)) continue;
+  const mono = "font-family:'DM Mono',monospace;";
+  const DAGE_DA = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+  const WEEKEND = new Set(['loe','son']);
 
-    const dayCells = DAGE_BASIS.map(dag =>
-      `<td style="padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);cursor:pointer;"
-         onclick="basisEditCell('${vn}', '${dag}')"
-         data-vn="${vn}" data-dag="${dag}"
-         style="background:${['loe','son'].includes(dag)?'rgba(45,90,45,.03)':'var(--white)'};padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);cursor:pointer;">
-        <span class="basis-val">${prod.data[dag] || '—'}</span>
-      </td>`
-    ).join('');
+  // Build header row with days
+  const thDage = DAGE_BASIS.map(dag =>
+    `<th class="${WEEKEND.has(dag)?'num basis-we':'num'}" style="min-width:45px;">${DAGE_DA[dag]}</th>`
+  ).join('');
 
-    const weekendStyle = `background:rgba(45,90,45,.03);`;
-    rows.push(`
-      <tr style="border-bottom:1px solid rgba(30,58,30,.08);">
-        <td style="padding:8px 12px;text-align:left;border-right:1px solid rgba(30,58,30,.08);font-size:12px;font-weight:500;">${display}</td>
-        ${dayCells}
-        <td style="padding:8px;text-align:center;">
-          <button onclick="basisDeleteProduct('${vn}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;">×</button>
+  // Build body rows grouped by category
+  let bodyRows = '';
+  const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+
+  for (const kat of katOrder) {
+    const prods = groups[kat];
+    if (!prods || prods.length === 0) continue;
+
+    // Filter products by search
+    const filteredProds = prods.filter(p => {
+      if (!filter) return true;
+      return `${p.varenavn} ${p.kategori}`.toLowerCase().includes(filter);
+    });
+    if (filteredProds.length === 0) continue;
+
+    // Category header
+    bodyRows += `<tr style="background:rgba(45,74,45,.07);border-top:1px solid rgba(200,168,75,.12);">
+      <td colspan="8" style="font-weight:600;font-size:11px;color:var(--forest);padding:6px 16px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
+    </tr>`;
+
+    // Product rows
+    for (const p of filteredProds) {
+      const dagCells = DAGE_BASIS.map(dag => {
+        const v = p.data[dag] || 0;
+        const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
+        return `<td class="num basis-cell" ${mono}
+          contenteditable="true" data-vn="${p.varenummer}" data-dag="${dag}"
+          onblur="basisCellSave(this)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
+          onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
+          style="${wkBg}${v===0?'color:var(--ash);':''} cursor:text; min-width:28px; padding:8px 4px;"
+        >${v||0}</td>`;
+      }).join('');
+
+      const total = DAGE_BASIS.reduce((s,d) => s + (p.data[d]||0), 0);
+      bodyRows += `<tr data-vn="${p.varenummer}" style="border-bottom:1px solid rgba(30,58,30,.06);">
+        <td style="padding:10px 16px;font-size:12px;max-width:180px;">${p.varenavn}</td>
+        ${dagCells}
+        <td style="text-align:right;padding:8px 16px;">
+          <button onclick="basisDeleteProduct('${p.varenummer}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;opacity:.6;hover:opacity:1;">×</button>
         </td>
-      </tr>
-    `);
+      </tr>`;
+    }
+
+    // Category subtotal
+    const katDagCells = DAGE_BASIS.map(dag => {
+      const t = filteredProds.reduce((s,p) => s + (p.data[dag]||0), 0);
+      const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.08);' : '';
+      return `<td class="num" style="${mono}${wkBg}font-weight:600;color:var(--forest);">${t}</td>`;
+    }).join('');
+    const katTotal = filteredProds.reduce((s,p) => s + DAGE_BASIS.reduce((sd,d) => sd + (p.data[d]||0), 0), 0);
+    bodyRows += `<tr style="background:rgba(45,74,45,.04);border-top:1px solid rgba(45,74,45,.15);">
+      <td style="padding:6px 16px;font-size:11px;font-weight:600;color:var(--forest);">${kat} i alt</td>
+      ${katDagCells}
+      <td style="${mono}font-weight:600;color:var(--forest);padding:8px 16px;text-align:right;">${katTotal}</td>
+    </tr>`;
   }
 
-  if (rows.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Ingen produkter. Klik "+Tilføj produkt" for at begynde.</td></tr>`;
-  } else {
-    tbody.innerHTML = rows.join('');
+  if (bodyRows === '') {
+    wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Ingen produkter. Klik "+Tilføj produkt" for at begynde.</div>`;
+    return;
   }
+
+  // Calculate totals
+  const dagTotaler = {};
+  DAGE_BASIS.forEach(d => { dagTotaler[d] = 0; });
+  Object.values(produkter).forEach(p => {
+    DAGE_BASIS.forEach(d => {
+      dagTotaler[d] += p.data[d] || 0;
+    });
+  });
+  const totalAlmindeligt = Object.values(dagTotaler).reduce((s,v) => s+v, 0);
+
+  const footDage = DAGE_BASIS.map(dag => {
+    const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.2);' : '';
+    return `<td class="num" style="${wkBg}">${dagTotaler[dag]}</td>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div class="aar2-tbl-wrap">
+      <div class="aar2-tbl-hdr">
+        <span class="aar2-tbl-hdr-l">Din basis bestilling — daglig skabelon</span>
+        <span class="aar2-tbl-hdr-r">${totalAlmindeligt} stk · i alt</span>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="aar2-tbl" style="min-width:600px;">
+          <thead><tr>
+            <th style="min-width:180px;">Produkt</th>${thDage}
+            <th class="num" style="min-width:40px;">Ret</th>
+          </tr></thead>
+          <tbody>${bodyRows}</tbody>
+          <tfoot><tr>
+            <td style="font-weight:700;">I alt</td>${footDage}
+            <td class="num" style="font-weight:700;">${totalAlmindeligt}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>`;
 }
 
-function basisEditCell(varenummer, dag) {
-  const cell = event.target.closest('td');
-  const currentValue = _basisData.find(r => r.varenummer === varenummer && r.dag === dag)?.anbefalet_antal || 0;
+async function basisCellSave(cell) {
+  const varenummer = cell.dataset.vn;
+  const dag = cell.dataset.dag;
+  const newValue = parseInt(cell.textContent) || 0;
+  const prodInfo = _basisData.find(r => r.varenummer === varenummer);
 
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.min = '0';
-  input.value = currentValue;
-  input.style.cssText = 'width:100%;padding:4px;border:1px solid var(--gold);border-radius:2px;font-size:12px;';
-
-  const originalHtml = cell.innerHTML;
-  cell.innerHTML = '';
-  cell.appendChild(input);
-  input.focus();
-  input.select();
-
-  const save = async () => {
-    const newValue = parseInt(input.value) || 0;
-    const prodInfo = _basisData.find(r => r.varenummer === varenummer);
-
-    cell.innerHTML = '<span style="opacity:0.5;">…</span>';
-
-    try {
-      const res = await fetch('/api/basis-bestilling/gem', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          varenummer,
-          varenavn: prodInfo?.varenavn || '',
-          dag,
-          anbefalet_antal: newValue,
-          kategori: prodInfo?.kategori || ''
-        })
-      });
-      const resp = await res.json();
-      if (resp.ok) {
-        // Update local data
-        let found = _basisData.find(r => r.varenummer === varenummer && r.dag === dag);
-        if (!found) {
-          found = {varenummer, varenavn: prodInfo?.varenavn || '', dag, kategori: prodInfo?.kategori || ''};
-          _basisData.push(found);
-        }
-        found.anbefalet_antal = newValue;
-        cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
-        updateBasisSaveTime();
-      } else {
-        cell.innerHTML = originalHtml;
-        alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
+  try {
+    const res = await fetch('/api/basis-bestilling/gem', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        varenummer,
+        varenavn: prodInfo?.varenavn || '',
+        dag,
+        anbefalet_antal: newValue,
+        kategori: prodInfo?.kategori || ''
+      })
+    });
+    const resp = await res.json();
+    if (resp.ok) {
+      // Update local data
+      let found = _basisData.find(r => r.varenummer === varenummer && r.dag === dag);
+      if (!found) {
+        found = {varenummer, varenavn: prodInfo?.varenavn || '', dag, kategori: prodInfo?.kategori || ''};
+        _basisData.push(found);
       }
-    } catch (e) {
-      cell.innerHTML = originalHtml;
-      alert('Fejl: ' + e.message);
+      found.anbefalet_antal = newValue;
+      cell.textContent = newValue || 0;
+      updateBasisSaveTime();
+      buildBasisTable();  // Rebuild to update subtotals
+    } else {
+      alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
+      buildBasisTable();  // Rebuild to reset
     }
-  };
-
-  input.onblur = save;
-  input.onkeydown = (e) => {
-    if (e.key === 'Enter') save();
-    if (e.key === 'Escape') cell.innerHTML = originalHtml;
-  };
+  } catch (e) {
+    alert('Fejl: ' + e.message);
+    buildBasisTable();  // Rebuild to reset
+  }
 }
 
 async function basisDeleteProduct(varenummer) {
@@ -5583,9 +5634,9 @@ async function basisAddProduct() {
     const resp = await res.json();
     const allProducts = resp.data || [];
 
-    // Get products already in basis
-    const inBasis = new Set(_basisData.map(r => r.varenummer));
-    const available = allProducts.filter(p => !inBasis.has(p.varenavn));
+    // Get products already in basis (check by varenavn for simplicity)
+    const inBasis = new Set(_basisData.map(r => r.varenavn?.toLowerCase()));
+    const available = allProducts.filter(p => !inBasis.has((p.varenavn || '').toLowerCase()));
 
     if (available.length === 0) {
       alert('Alle produkter er allerede i basis-bestillingen.');
@@ -5603,9 +5654,12 @@ async function basisAddProduct() {
       return;
     }
 
+    // Use varenavn as varenummer (product identifier in basis_bestilling)
+    const varenummer = prod.varenavn;
+
     // Add default quantity of 5 to all days
     const updates = DAGE_BASIS.map(dag => ({
-      varenummer: prod.varenavn,
+      varenummer,
       varenavn: prod.varenavn,
       dag,
       anbefalet_antal: 5,

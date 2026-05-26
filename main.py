@@ -384,7 +384,8 @@ async def api_beregner_vurder(request: Request):
             if field not in body or body[field] is None:
                 return {"ok": False, "fejl": f"Manglende felt: {field}"}
 
-        prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med bageri.
+        # Brug .format() i stedet for f-string for at undgå curly-brace fortolkning
+        prompt = """Du er bestillingsrådgiver for Organic Market Greve — specialbutik med bageri.
 
 ═══ FORRETNINGSLOGIK — FORSTÅ DETTE FØR ALT ANDET ═══
 Vores to LIGE STORE risici er:
@@ -403,23 +404,33 @@ Begivenheder kan VENDE dette mønster helt.
 • Vær forsigtig med store reduktioner baseret på lav sell-through alene
 ═══════════════════════════════════════════════════════
 
-BESTILLINGSUGE {body.get('uge')}/{body.get('aar')} ({body.get('dato_range','')}):
-Begivenhed: {body.get('event','ingen')}
-Sæsonindeks: {body.get('si',1.0)} · Vækst: {body.get('vaekst','?')}
-TGTG seneste uge: {body.get('tgtg','ingen data')}
-Dag-snit fra historik: {body.get('dag_snit','')}
+BESTILLINGSUGE {}/{} ({}):
+Begivenhed: {}
+Sæsonindeks: {} · Vækst: {}
+TGTG seneste uge: {}
+Dag-snit fra historik: {}
 
 HISTORISK SELL-THROUGH (solgt/bestilt % pr. kategori pr. dag — seneste 10 uger):
-{body.get('sellthrough', 'ingen data')}
+{}
 [>95% = sandsynligvis udsolgt · <75% = spild/TGTG-risiko]
-DATAKVALITET: {body.get('mobilepay_andel', 'MobilePay-andel ukendt')}
+DATAKVALITET: {}
 (Shopbox er manuelt tastet — sell-through % undervurderer reelt salg)
 
 DAGSTOTALER DENNE BESTILLING:
-{body.get('dag_totaler','')}
+{}
 
 PRODUKTER PR. DAG:
-{body.get('produkter','')}
+{}""".format(
+            body.get('uge'), body.get('aar'), body.get('dato_range',''),
+            body.get('event','ingen'),
+            body.get('si',1.0), body.get('vaekst','?'),
+            body.get('tgtg','ingen data'),
+            body.get('dag_snit',''),
+            body.get('sellthrough', 'ingen data'),
+            body.get('mobilepay_andel', 'MobilePay-andel ukendt'),
+            body.get('dag_totaler',''),
+            body.get('produkter','')
+        )
 
 Vurder BEGGE risici for HVER dag:
 - Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.

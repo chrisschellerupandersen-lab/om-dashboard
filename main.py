@@ -426,7 +426,39 @@ DAGSTOTALER DENNE BESTILLING:
 {}
 
 PRODUKTER PR. DAG:
-{}""".format(
+{}
+
+Vurder BEGGE risici for HVER dag:
+- Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
+- Er svage dage bestilt for højt? Overskud = TGTG-tab.
+
+Returner UDELUKKENDE valid JSON - INGEN anden tekst før eller efter:
+- KUN bokstaver, tal, mellemrum i tekst-værdier
+- ALDRIG citationstegn, backticks, eller specielle tegn i tekst
+- Hvis du skal referere til et produkt, brug dets navn fra produktlisten uden ændring
+- Alle talværdier uden citationstegn: "fra": 12 IKKE "fra": "12"
+- Booleans uden citationstegn: "klar": true IKKE "klar": "true"
+
+{{
+  "vurdering": "2-4 sætninger med konkrete tal og dage. Ingen specielle tegn.",
+  "klar": true,
+  "justeringer": [
+    {{
+      "varenavn": "Boller almindelige",
+      "dag": "man",
+      "fra": 100,
+      "til": 120,
+      "grund": "tabt salg mandag stærk"
+    }}
+  ]
+}}
+
+Regler:
+- vurdering: kun almindelig tekst, ingen citationstegn eller symboler
+- justeringer: både OP og NED, min 2 stk eller 20 pct
+- Max 10, prioriter økonomisk effekt
+- Tomme liste [] hvis alt OK
+- VIGTIG: Udelukkende JSON, ingen markdown eller ekstra tekst""".format(
             body.get('uge'), body.get('aar'), body.get('dato_range',''),
             body.get('event','ingen'),
             body.get('si',1.0), body.get('vaekst','?'),
@@ -437,38 +469,6 @@ PRODUKTER PR. DAG:
             body.get('dag_totaler',''),
             body.get('produkter','')
         )
-
-Vurder BEGGE risici for HVER dag:
-- Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
-- Er svage dage bestilt for højt? Overskud = TGTG-tab.
-
-Returner UDELUKKENDE valid JSON — INGEN anden tekst før eller efter:
-- KUN bokstaver, tal, mellemrum i tekst-værdier
-- ALDRIG citationstegn, backticks, eller specielle tegn i tekst
-- Hvis du skal referere til et produkt, brug dets navn fra produktlisten uden ændring
-- Alle talværdier uden citationstegn: "fra": 12 IKKE "fra": "12"
-- Booleans uden citationstegn: "klar": true IKKE "klar": "true"
-
-{
-  "vurdering": "2-4 sætninger med konkrete tal og dage. Ingen specielle tegn.",
-  "klar": true,
-  "justeringer": [
-    {
-      "varenavn": "Boller almindelige",
-      "dag": "man",
-      "fra": 100,
-      "til": 120,
-      "grund": "tabt salg mandag stærk"
-    }
-  ]
-}
-
-Regler:
-- vurdering: kun almindelig tekst, ingen citationstegn eller symboler
-- justeringer: både OP og NED, min 2 stk eller 20 pct
-- Max 10, prioriter økonomisk effekt
-- Tomme liste [] hvis alt OK
-- VIGTIG: Udelukkende JSON, ingen markdown eller ekstra tekst"""
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(

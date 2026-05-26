@@ -5428,6 +5428,9 @@ function buildBasisTable() {
   const filter = document.getElementById('basis-filter-input').value.toLowerCase();
   const wrap = document.getElementById('basis-tabel-wrap');
 
+  // Debug: log constants
+  console.log('buildBasisTable START - DAGE:', DAGE, 'DAG_LBL:', DAG_LBL, 'WEEKEND:', WEEKEND, '_basisData:', _basisData);
+
   // Group by product
   const produkter = {};
   _basisData.forEach(row => {
@@ -5458,6 +5461,7 @@ function buildBasisTable() {
   const thDage = DAGE.map(dag =>
     `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
   ).join('');
+  console.log('thDage HTML:', thDage, 'thDage length:', thDage.length);
 
   // Build body rows grouped by category
   let bodyRows = '';

@@ -5642,19 +5642,33 @@ document.getElementById('basis-filter-input')?.addEventListener('input', buildBa
 
 async function basisInitFromHistory() {
   const confirmed = confirm(
-    'Dette vil hente gennemsnit fra sidste 4 ugers bestillinger og udfylde basis-skabelonen.\n\n' +
+    'Dette vil hente gennemsnit fra sidste 26 ugers bestillinger (ekskl. helligdage) og udfylde basis-skabelonen.\n\n' +
     'Eksisterende værdier bliver overskrevet. Fortsæt?'
   );
   if (!confirmed) return;
 
   const spinner = document.createElement('div');
-  spinner.textContent = '⏳ Henter data fra historik...';
+  spinner.textContent = '⏳ Henter 26 ugers data og ekskluderer helligdage...';
   spinner.style.cssText = 'padding:12px;background:var(--forest);color:var(--amber);border-radius:4px;margin-bottom:16px;';
   document.querySelector('#p-basis .page-hdr').parentElement.insertBefore(
     spinner, document.querySelector('#p-basis .page-hdr').nextSibling
   );
 
   try {
+    // Hent helligdage fra 2024-2026
+    let helligdageSet = new Set();
+    try {
+      for (const yr of [2024, 2025, 2026]) {
+        const res = await fetch(`/api/helligdage?aar=${yr}`);
+        const resp = await res.json();
+        if (resp.ok && Array.isArray(resp.data)) {
+          resp.data.forEach(h => helligdageSet.add(h.dato));
+        }
+      }
+    } catch (e) {
+      console.warn('Kunne ikke hente helligdage:', e);
+    }
+
     // Hent liste over importerede uger
     const ugerRes = await fetch('/api/bestilling/uger');
     const ugerResp = await ugerRes.json();
@@ -5664,10 +5678,10 @@ async function basisInitFromHistory() {
       return;
     }
 
-    // Sort og tag sidste 4 uger
+    // Sort og tag sidste 26 uger
     const uger = ugerResp
       .sort((a, b) => (b.aar - a.aar) || (b.uge - a.uge))
-      .slice(0, 4);
+      .slice(0, 26);
 
     if (uger.length === 0) {
       alert('Ingen bestillinger fundet i systemet');
@@ -5675,14 +5689,51 @@ async function basisInitFromHistory() {
       return;
     }
 
-    // Hent data fra hver uge og aggreger
+    // Helper: få mandag for en ISO-uge
+    const getMondayOfWeek = (uge, aar) => {
+      try {
+        const simple = new Date(aar, 0, 4);
+        const firstThurs = simple.getTime() - simple.getDay() * 86400000 + 3 * 86400000;
+        const weekOne = new Date(firstThurs);
+        const dayOffset = (uge - 1) * 7 * 86400000;
+        const monday = new Date(weekOne.getTime() + dayOffset);
+        const year = monday.getFullYear();
+        const month = String(monday.getMonth() + 1).padStart(2, '0');
+        const day = String(monday.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // Helper: få dato for en bestemt dag i ugen
+    const getDayDate = (mondayStr, dayIndex) => {
+      try {
+        const [yr, mo, da] = mondayStr.split('-').map(Number);
+        const date = new Date(yr, mo - 1, da + dayIndex);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    // Hent data fra hver uge og aggreger (ekskl. helligdage)
     const produktAggregate = {};
+    const DAGE_IDX = {man: 0, tir: 1, ons: 2, tor: 3, fre: 4, loe: 5, son: 6};
+    const DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'];
 
     for (const u of uger) {
       try {
         const res = await fetch(`/api/bestilling/uge/${u.uge}?aar=${u.aar}`);
         const data = await res.json();
         if (!Array.isArray(data)) continue;
+
+        // Få mandagen for denne uge
+        const monday = getMondayOfWeek(u.uge, u.aar);
+        if (!monday) continue;
 
         data.forEach(prod => {
           const vn = prod.varenavn;
@@ -5694,9 +5745,13 @@ async function basisInitFromHistory() {
             };
           }
 
-          ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'].forEach(dag => {
+          DAGE.forEach(dag => {
             const val = prod[dag];
-            if (val && !isNaN(val)) {
+            const dayIdx = DAGE_IDX[dag];
+            const dagDato = getDayDate(monday, dayIdx);
+
+            // Ekskludér helligdage
+            if (val && !isNaN(val) && !helligdageSet.has(dagDato)) {
               produktAggregate[vn].dage[dag].push(parseFloat(val));
             }
           });
@@ -5709,7 +5764,7 @@ async function basisInitFromHistory() {
     // Beregn gennemsnit og forbered bulk-update
     const updates = [];
     for (const [vn, prod] of Object.entries(produktAggregate)) {
-      ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'].forEach(dag => {
+      DAGE.forEach(dag => {
         const vals = prod.dage[dag];
         if (vals.length > 0) {
           const avg = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
@@ -5727,13 +5782,13 @@ async function basisInitFromHistory() {
     }
 
     if (updates.length === 0) {
-      alert('Ingen data fundet i historikken');
+      alert('Ingen data fundet i historikken (eller alle dage var helligdage)');
       spinner.remove();
       return;
     }
 
     // Gem alle på en gang
-    spinner.textContent = `⏳ Gemmer ${updates.length} værdier...`;
+    spinner.textContent = `⏳ Gemmer ${updates.length} værdier (26 uger, helligdage udelukket)...`;
 
     const saveRes = await fetch('/api/basis-bestilling/bulk-gem', {
       method: 'POST',
@@ -5743,10 +5798,10 @@ async function basisInitFromHistory() {
     const saveResp = await saveRes.json();
 
     if (saveResp.ok) {
-      spinner.textContent = `✓ ${updates.length} værdier gemt fra gennemsnit af ${uger.length} uger`;
+      spinner.textContent = `✓ ${updates.length} værdier gemt fra gennemsnit af 26 uger (helligdage udelukket)`;
       spinner.style.background = 'var(--moss)';
       await loadBasis();
-      setTimeout(() => spinner.remove(), 3000);
+      setTimeout(() => spinner.remove(), 4000);
     } else {
       alert('Fejl ved gemning: ' + (saveResp.fejl || 'ukendt'));
       spinner.remove();

@@ -188,6 +188,13 @@ def init_db():
                 UNIQUE(aar, maaned, kategori) ON CONFLICT REPLACE
             );
 
+            CREATE TABLE IF NOT EXISTS helligdage (
+                id       INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato     TEXT    NOT NULL UNIQUE,
+                navn     TEXT    NOT NULL,
+                type     TEXT    DEFAULT 'normal'
+            );
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -3519,6 +3526,42 @@ def hent_basis_bestilling_produkter() -> List[Dict]:
             ORDER BY varenavn
         """).fetchall()
     return [dict(r) for r in rows]
+
+
+# ── HELLIGDAGE ────────────────────────────────────────────────────────────────
+
+def hent_helligdage(aar: int = None) -> List[Dict]:
+    """Hent alle helligdage, eventuelt filtreret efter år."""
+    with _conn() as conn:
+        if aar:
+            rows = conn.execute(
+                "SELECT dato, navn, type FROM helligdage WHERE dato LIKE ? ORDER BY dato",
+                (f"{aar}-%",)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT dato, navn, type FROM helligdage ORDER BY dato"
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def er_helligdag(dato: str) -> bool:
+    """Check om en dato er helligdag."""
+    with _conn() as conn:
+        result = conn.execute(
+            "SELECT 1 FROM helligdage WHERE dato = ?", (dato,)
+        ).fetchone()
+    return result is not None
+
+
+def gem_helligdag(dato: str, navn: str, type_: str = 'normal'):
+    """Gem eller opdater en helligdag."""
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO helligdage (dato, navn, type) VALUES (?, ?, ?)",
+            (dato, navn, type_)
+        )
+        conn.commit()
 
 
 # ── VF DRILL-DOWN ─────────────────────────────────────────────────────────────

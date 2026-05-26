@@ -874,6 +874,13 @@ async def api_basis_bestilling_produkter(request: Request):
     return {"ok": True, "data": database.hent_basis_bestilling_produkter()}
 
 
+@app.get("/api/helligdage")
+async def api_helligdage(request: Request, aar: Optional[int] = None):
+    """Hent helligdage."""
+    _kræv_login(request)
+    return {"ok": True, "data": database.hent_helligdage(aar)}
+
+
 @app.post("/api/bager/upload-pdf")
 async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
     """Parse bager-faktura PDF med Claude og returner ekstraherede felter."""

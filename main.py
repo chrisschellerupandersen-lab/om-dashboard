@@ -443,31 +443,23 @@ Vurder BEGGE risici for HVER dag:
 - Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
 - Er svage dage bestilt for højt? Overskud = TGTG-tab.
 
-Returner UDELUKKENDE valid JSON uden markdown eller backticks:
+Svar UDELUKKENDE med JSON. Intet andet tekst før eller efter. Ingen markdown, ingen backticks, BARE JSON.
 
+SVAR-FORMAT:
 {{
-  "vurdering": "1-2 sætninger, simpel dansk tekst",
+  "vurdering": "kort vurdering her",
   "klar": true,
-  "justeringer": [
-    {{
-      "varenavn": "Boller almindelige",
-      "dag": "man",
-      "fra": 100,
-      "til": 120,
-      "grund": "simpel beskrivelse"
-    }}
-  ]
+  "justeringer": []
 }}
 
-REGLER (VIGTIG - læs nøje):
-1. JSON-SYNTAKS: Alle tekstværdier SKAL være omgivet af citationstegn. Tal uden citationstegn. true/false uden citationstegn.
-2. TEKSTVÆRDIER: Skriv tekst direkte uden specielle tegn. HVIS du skal skrive et citationstegn INDEN for en tekstværdi, skriv det som \" (backslash + citationstegn).
-3. INGEN NEWLINES: Alle tekstværdier må IKKE indeholde linjeskift. Brug ord adskilt med mellemrum, ikke flere linjer.
-4. vurdering: 1-2 sætninger om den samlede bestilling. Kun almindelig dansk tekst.
-5. justeringer: array af objekter. HVIS ingen justeringer nødvendige, brug tom liste []
-6. grund: kort beskrivelse (f.eks. "tabt salg", "høj TGTG-risiko", "for meget retur")
-7. Brug præcist disse dag-navne: man, tir, ons, tor, fre, loe, son
-8. Maximum 10 justeringer, sorter efter økonomisk impact""".format(
+INSTRUKTIONER:
+- vurdering: 1-2 sætninger. VIGTIG: Kun disse tegn tilladt i tekst: bogstaver, tal, mellemrum, punktum, komma, bindesteg
+- klar: true hvis bestilling virker fin, false hvis problemer
+- justeringer: liste af justeringer. HVIS INGEN justeringer, brug tom liste []
+- Hver justering: varenavn (tekst), dag (man/tir/ons/tor/fre/loe/son), fra (tal), til (tal), grund (kort tekst, kun bogstaver/tal/mellemrum)
+- grund eksempler: tabt salg, hoj TGTG risiko, lav sell-through, for meget retur
+- Maksimum 10 justeringer
+- VIGTIG REGEL: Ingen citationstegn, apostrof, eller special tegn i tekstværdier. Kun bogstaver a-z, tal 0-9, mellemrum, punktum, komma, bindesteg""".format(
             sanitize_prompt_input(body.get('uge')),
             sanitize_prompt_input(body.get('aar')),
             sanitize_prompt_input(body.get('dato_range','')),

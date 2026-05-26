@@ -5648,11 +5648,12 @@ async function basisInitFromHistory() {
   if (!confirmed) return;
 
   const spinner = document.createElement('div');
+  spinner.id = 'basis-init-spinner';
   spinner.textContent = '⏳ Henter 26 ugers data og ekskluderer helligdage...';
   spinner.style.cssText = 'padding:12px;background:var(--forest);color:var(--amber);border-radius:4px;margin-bottom:16px;';
-  document.querySelector('#p-basis .page-hdr').parentElement.insertBefore(
-    spinner, document.querySelector('#p-basis .page-hdr').nextSibling
-  );
+  const targetEl = document.querySelector('#p-basis');
+  const pageHdr = targetEl.querySelector('.page-hdr');
+  pageHdr.parentElement.insertBefore(spinner, pageHdr.nextElementSibling);
 
   try {
     // Hent helligdage fra 2024-2026
@@ -5674,7 +5675,8 @@ async function basisInitFromHistory() {
     const ugerResp = await ugerRes.json();
     if (!Array.isArray(ugerResp)) {
       alert('Fejl: Kunne ikke hente ugeliste');
-      spinner.remove();
+      const el = document.getElementById('basis-init-spinner');
+      if (el && el.parentElement) el.remove();
       return;
     }
 
@@ -5685,7 +5687,8 @@ async function basisInitFromHistory() {
 
     if (uger.length === 0) {
       alert('Ingen bestillinger fundet i systemet');
-      spinner.remove();
+      const el = document.getElementById('basis-init-spinner');
+      if (el && el.parentElement) el.remove();
       return;
     }
 
@@ -5783,7 +5786,8 @@ async function basisInitFromHistory() {
 
     if (updates.length === 0) {
       alert('Ingen data fundet i historikken (eller alle dage var helligdage)');
-      spinner.remove();
+      const el = document.getElementById('basis-init-spinner');
+      if (el && el.parentElement) el.remove();
       return;
     }
 
@@ -5801,14 +5805,19 @@ async function basisInitFromHistory() {
       spinner.textContent = `✓ ${updates.length} værdier gemt fra gennemsnit af 26 uger (helligdage udelukket)`;
       spinner.style.background = 'var(--moss)';
       await loadBasis();
-      setTimeout(() => spinner.remove(), 4000);
+      setTimeout(() => {
+        const el = document.getElementById('basis-init-spinner');
+        if (el && el.parentElement) el.remove();
+      }, 4000);
     } else {
       alert('Fejl ved gemning: ' + (saveResp.fejl || 'ukendt'));
-      spinner.remove();
+      const el = document.getElementById('basis-init-spinner');
+      if (el && el.parentElement) el.remove();
     }
   } catch (e) {
     alert('Fejl: ' + e.message);
-    spinner.remove();
+    const el = document.getElementById('basis-init-spinner');
+    if (el && el.parentElement) el.remove();
   }
 }
 

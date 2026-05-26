@@ -496,7 +496,10 @@ Regler:
         }
     except Exception as e:
         import traceback
-        return {"ok": False, "fejl": f"Bestillingsværdier kunne ikke genereres: {type(e).__name__}"}
+        tb = traceback.format_exc()
+        # Log den faktiske fejl
+        print(f"Fejl i bestilling/vurder: {type(e).__name__}: {str(e)}\n{tb}")
+        return {"ok": False, "fejl": f"Bestillingsværdier kunne ikke genereres: {type(e).__name__} - {str(e)[:50]}"}
 
 
 @app.get("/api/bestilling/sellthrough")

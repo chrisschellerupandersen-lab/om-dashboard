@@ -443,11 +443,10 @@ Vurder BEGGE risici for HVER dag:
 - Er stærke dage (fre, lør, begivenhedsdage) bestilt højt nok? Tomme hylder = tabt salg.
 - Er svage dage bestilt for højt? Overskud = TGTG-tab.
 
-Returner UDELUKKENDE valid JSON - INGEN anden tekst før eller efter:
+Returner UDELUKKENDE valid JSON uden markdown eller backticks:
 
-FORMAT EKSEMPEL (alle felter som vist, ingen ekstra felter):
 {{
-  "vurdering": "2-4 sætninger med konkrete tal og dage.",
+  "vurdering": "1-2 sætninger, simpel dansk tekst",
   "klar": true,
   "justeringer": [
     {{
@@ -455,21 +454,20 @@ FORMAT EKSEMPEL (alle felter som vist, ingen ekstra felter):
       "dag": "man",
       "fra": 100,
       "til": 120,
-      "grund": "tabt salg mandag stærk"
+      "grund": "simpel beskrivelse"
     }}
   ]
 }}
 
-VIGTIGE REGLER:
-- JSON skal være syntaktisk korrekt — alle strings i anførselstegn, alle tal uden anførselstegn, booleans som true/false
-- vurdering: kort tekst uden * # \\ eller kodeblokkemærker — bare almindelig dansk tekst
-- justeringer: array af objekter med nøjagtig disse nøgler: varenavn, dag, fra, til, grund
-- grund: kort tekst som "tabt salg", "lav sell-through", "for meget retur", "høj TGTG-risiko"
-- både UP (til > fra) og DOWN (til < fra) justeringer
-- minimum 2 stk eller 20% ændring
-- max 10 justeringer
-- tom liste [] hvis alt er ok
-- klar: true hvis bestillingen virker fin, false hvis der er væsentlige risici""".format(
+REGLER (VIGTIG - læs nøje):
+1. JSON-SYNTAKS: Alle tekstværdier SKAL være omgivet af citationstegn. Tal uden citationstegn. true/false uden citationstegn.
+2. TEKSTVÆRDIER: Skriv tekst direkte uden specielle tegn. HVIS du skal skrive et citationstegn INDEN for en tekstværdi, skriv det som \" (backslash + citationstegn).
+3. INGEN NEWLINES: Alle tekstværdier må IKKE indeholde linjeskift. Brug ord adskilt med mellemrum, ikke flere linjer.
+4. vurdering: 1-2 sætninger om den samlede bestilling. Kun almindelig dansk tekst.
+5. justeringer: array af objekter. HVIS ingen justeringer nødvendige, brug tom liste []
+6. grund: kort beskrivelse (f.eks. "tabt salg", "høj TGTG-risiko", "for meget retur")
+7. Brug præcist disse dag-navne: man, tir, ons, tor, fre, loe, son
+8. Maximum 10 justeringer, sorter efter økonomisk impact""".format(
             sanitize_prompt_input(body.get('uge')),
             sanitize_prompt_input(body.get('aar')),
             sanitize_prompt_input(body.get('dato_range','')),
@@ -497,34 +495,67 @@ VIGTIGE REGLER:
         raw = raw.strip()
 
         # Log Claude's raw response for debugging
-        print(f"[DEBUG] Claude raw response ({len(raw)} chars): {raw[:200]}...")
+        print(f"[DEBUG] Claude response length: {len(raw)}, first 300 chars:\n{raw[:300]}")
+
+        import re
+
+        def parse_claude_json(text):
+            """Forsøg at parse Claude's JSON response med flere strategier"""
+            # Strategi 1: Direkte parsing
+            try:
+                return _json.loads(text)
+            except _json.JSONDecodeError as e1:
+                pass
+
+            # Strategi 2: Fjern alle newlines og normaliser whitespace
+            try:
+                text_fixed = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+                text_fixed = re.sub(r'  +', ' ', text_fixed)
+                return _json.loads(text_fixed)
+            except _json.JSONDecodeError as e2:
+                pass
+
+            # Strategi 3: Fjern markdown-wrapper
+            try:
+                text_fixed = text.replace('```json', '').replace('```', '')
+                text_fixed = text_fixed.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+                text_fixed = re.sub(r'  +', ' ', text_fixed)
+                return _json.loads(text_fixed)
+            except _json.JSONDecodeError as e3:
+                pass
+
+            # Strategi 4: Escape alle uescapede citationstegn inden for strenge
+            try:
+                # Find alle { og } for at lokalisere strings
+                in_string = False
+                escaped = False
+                result = []
+                for i, char in enumerate(text):
+                    if char == '\\' and not escaped:
+                        escaped = True
+                        result.append(char)
+                    elif char == '"' and not escaped:
+                        in_string = not in_string
+                        result.append(char)
+                    elif char in '\n\r' and in_string:
+                        result.append(' ')
+                    else:
+                        escaped = False
+                        result.append(char)
+
+                text_fixed = ''.join(result)
+                return _json.loads(text_fixed)
+            except _json.JSONDecodeError as e4:
+                pass
+
+            # Hvis alle strategier fejler, kast fejl med info
+            raise ValueError(f"Kunne ikke parse JSON. Sidste fejl: {e4.msg if 'e4' in locals() else 'unknown'}")
 
         try:
-            parsed = _json.loads(raw)
-        except _json.JSONDecodeError as je:
-            print(f"[DEBUG] First parse failed: {je.msg} at line {je.lineno}")
-            # Prøv igen efter at have fjernet problematiske tegn
-            try:
-                import re
-                # Erstat almindelige problemer: ukontrollerede linjeskift i værdier
-                raw_fixed = raw.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-                # Erstat dobbelte mellemrum
-                raw_fixed = re.sub(r'  +', ' ', raw_fixed)
-                # Prøv at parse igen
-                print(f"[DEBUG] Trying fixed version: {raw_fixed[:200]}...")
-                parsed = _json.loads(raw_fixed)
-            except _json.JSONDecodeError as je2:
-                print(f"[DEBUG] Second parse failed: {je2.msg}")
-                # Sidste forsøg: fjern markdown-koder og ekstra tegn
-                try:
-                    raw_fixed = raw.replace('```json', '').replace('```', '')
-                    raw_fixed = raw_fixed.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-                    raw_fixed = re.sub(r'  +', ' ', raw_fixed)
-                    print(f"[DEBUG] Trying markdown-cleaned version: {raw_fixed[:200]}...")
-                    parsed = _json.loads(raw_fixed)
-                except Exception as e3:
-                    print(f"[DEBUG] All parse attempts failed: {str(e3)}")
-                    return {"ok": False, "fejl": f"JSON invalidt: {je.msg} (linje {je.lineno}). Prøv igen."}
+            parsed = parse_claude_json(raw)
+        except Exception as je:
+            print(f"[DEBUG] JSON parse fejl: {str(je)}")
+            return {"ok": False, "fejl": f"JSON invalidt. Prøv igen."}  # Simplificeret fejlbesked
 
         return {
             "ok": True,

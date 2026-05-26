@@ -2346,11 +2346,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="card" id="bern-analyse-kort" style="margin-top:16px;display:none;">
           <div class="aar2-chart-hdr">
             <span class="aar2-chart-ttl">📋 Management vurdering</span>
-            <button id="bern-analyse-btn" onclick="bernGenererAnalyse()"
-              style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 12px;
-                     background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
-              Generer ny ↻
-            </button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div style="display:flex;gap:4px;align-items:center;font-size:12px;">
+                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">Uge</label>
+                <input id="bern-analyse-uge" type="number" min="1" max="52" value="23"
+                  style="width:50px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
+                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
+                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">År</label>
+                <input id="bern-analyse-aar" type="number" min="2020" max="2099" value="2026"
+                  style="width:60px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
+                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
+              </div>
+              <button id="bern-analyse-btn" onclick="bernGenererAnalyse()"
+                style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 12px;
+                       background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
+                Generer ny ↻
+              </button>
+            </div>
           </div>
           <div id="bern-analyse-tekst" style="margin-top:12px;font-size:14px;line-height:1.7;color:var(--forest);white-space:pre-wrap;"></div>
         </div>
@@ -6882,15 +6894,21 @@ async function bernAnvendAlle() {
 }
 
 async function bernGenererAnalyse() {
-  if (!_bernUge || !_bernAar) return;
   const btn  = document.getElementById('bern-analyse-btn');
   const tekst = document.getElementById('bern-analyse-tekst');
+
+  // Læs uge og år fra input-felterne (eller brug Bestillingsberegner værdier som fallback)
+  const uge = parseInt(document.getElementById('bern-analyse-uge')?.value) || _bernUge || 23;
+  const aar = parseInt(document.getElementById('bern-analyse-aar')?.value) || _bernAar || 2026;
+
+  if (!uge || !aar) return;
+
   btn.textContent = 'Analyserer…';
   btn.disabled    = true;
   tekst.style.color = 'var(--ash)';
   tekst.textContent = '🤔 Henter bestillingsdata og vurderer…';
 
-  const res = await api(`/api/bestilling/management-analyse?uge=${_bernUge}&aar=${_bernAar}`);
+  const res = await api(`/api/bestilling/management-analyse?uge=${uge}&aar=${aar}`);
 
   btn.textContent = 'Generer ny ↻';
   btn.disabled    = false;

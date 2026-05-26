@@ -157,7 +157,8 @@
       "Bash(find /c/Users/ChrisSchellerupAnder -name \".git\" -type d 2>/dev/null | head -5)",
       "Bash(cd \"/c/Users/ChrisSchellerupAnder/OneDrive - Toolpack Solutions ApS/Dokumenter/Claude/dashboard\" && grep -n \"/api/varestamdata\\\\|/api/stamdata\" main.py | head -10)",
       "Bash(python3 -m py_compile main.py database.py)",
-      "Bash(grep -n \"api/basis-bestilling/$\\\\|api/basis-bestilling\\\\\"\" \"C:\\\\Users\\\\ChrisSchellerupAnder\\\\OneDrive - Toolpack Solutions ApS\\\\Dokumenter\\\\Claude\\\\main.py\")"
+      "Bash(grep -n \"api/basis-bestilling/$\\\\|api/basis-bestilling\\\\\"\" \"C:\\\\Users\\\\ChrisSchellerupAnder\\\\OneDrive - Toolpack Solutions ApS\\\\Dokumenter\\\\Claude\\\\main.py\")",
+      "mcp__Claude_in_Chrome__switch_browser"
     ]
   }
 }

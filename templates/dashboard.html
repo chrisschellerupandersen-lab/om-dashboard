@@ -5723,21 +5723,48 @@ async function basisInitFromHistory() {
       }
     };
 
-    // Hent varestamdata først for at få korrekte kategorier
-    const stamRes = await fetch('/api/stamdata');
-    const stamData = await stamRes.json();
-    console.log('stamData type:', typeof stamData, 'is array:', Array.isArray(stamData), stamData);
-    const stamMap = {};
-    if (Array.isArray(stamData)) {
-      stamData.forEach(s => {
-        const key = s.varenavn?.toLowerCase();
-        stamMap[key] = s.type || 'Øvrige';
-      });
-      console.log('stamMap built with', Object.keys(stamMap).length, 'produkter');
-      console.log('First 5 entries:', Object.entries(stamMap).slice(0, 5));
-    } else {
-      console.warn('stamData er ikke et array! Det er:', stamData);
-    }
+    // Funktion til at bestemme kategori — kopieret fra database._kat()
+    const bestemKategori = (varenavn) => {
+      const n = (varenavn || '').toLowerCase();
+
+      // Rugbrød
+      if (n.includes('rugbrød') || n.includes('rugbrod')) return 'Rugbrød';
+
+      // Flute
+      if (n.includes('flute') || n.includes('flûte')) return 'Flute';
+
+      // Boller
+      if (n.includes('bolle')) return 'Boller';
+
+      // Wienerbrød — tjekkes FØR brød/kage så croissant/snegl ikke lander forkert
+      if (['wiener', 'spandauer', 'croissant', 'snegl', 'snurrer', 'tebirkes',
+           'grovbirkes', 'fastelavns', 'wienerstang', 'kanelstang', 'frøsnapper',
+           'marcipan', 'romsnegl'].some(k => n.includes(k))) {
+        return 'Wiener';
+      }
+
+      // Brød (men ikke studenterbrød som er kage)
+      if ((n.includes('brød') || n.includes('brod')) && !n.includes('studenter')) {
+        return 'Brød';
+      }
+
+      // Brød-varer uden 'brød' i varenavn (focaccia, formbrød mv.)
+      if (['focaccia', 'foccacia', 'formbrød', 'franskbrød'].some(k => n.includes(k))) {
+        return 'Brød';
+      }
+
+      // Kager
+      if (['kage', 'cookie', 'muffin', 'brownie', 'romkugl', 'kokostoppe',
+           'napoleonshat', 'studenterbr', 'snitter', 'stammer', 'honningbomb',
+           'honninghjerter'].some(k => n.includes(k))) {
+        return 'Kage';
+      }
+
+      // Fallback — hvis intet andet passer, antagværselsesmængde er det "Kage" eller "Øvrige"
+      return 'Øvrige';
+    };
+
+    console.log('bestemKategori funktion klar');
 
     // Hent data fra hver uge og aggreger (ekskl. helligdage)
     const produktAggregate = {};
@@ -5757,11 +5784,8 @@ async function basisInitFromHistory() {
         data.forEach(prod => {
           const vn = prod.varenavn;
           if (!produktAggregate[vn]) {
-            // Hent kategori fra varestamdata, fallback til prod.type, så 'Øvrige'
-            let kategori = stamMap[vn?.toLowerCase()] || prod.type || 'Øvrige';
-            if (Math.random() < 0.1) { // Log ~10% af første gang vi ser hvert produkt
-              console.log(`Produkt: "${vn}" -> kategori: "${kategori}" (from stamMap: ${stamMap[vn?.toLowerCase()]}, from prod.type: ${prod.type})`);
-            }
+            // Bestem kategori på samme måde som database._kat()
+            let kategori = bestemKategori(vn);
             produktAggregate[vn] = {
               varenavn: prod.varenavn,
               kategori: kategori,

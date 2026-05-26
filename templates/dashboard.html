@@ -5726,13 +5726,18 @@ async function basisInitFromHistory() {
     // Hent varestamdata først for at få korrekte kategorier
     const stamRes = await fetch('/api/stamdata');
     const stamData = await stamRes.json();
+    console.log('stamData type:', typeof stamData, 'is array:', Array.isArray(stamData), stamData);
     const stamMap = {};
     if (Array.isArray(stamData)) {
       stamData.forEach(s => {
-        stamMap[s.varenavn?.toLowerCase()] = s.type || 'Øvrige';
+        const key = s.varenavn?.toLowerCase();
+        stamMap[key] = s.type || 'Øvrige';
       });
+      console.log('stamMap built with', Object.keys(stamMap).length, 'produkter');
+      console.log('First 5 entries:', Object.entries(stamMap).slice(0, 5));
+    } else {
+      console.warn('stamData er ikke et array! Det er:', stamData);
     }
-    console.log('stamMap built:', Object.keys(stamMap).length, 'produkter');
 
     // Hent data fra hver uge og aggreger (ekskl. helligdage)
     const produktAggregate = {};
@@ -5754,6 +5759,9 @@ async function basisInitFromHistory() {
           if (!produktAggregate[vn]) {
             // Hent kategori fra varestamdata, fallback til prod.type, så 'Øvrige'
             let kategori = stamMap[vn?.toLowerCase()] || prod.type || 'Øvrige';
+            if (Math.random() < 0.1) { // Log ~10% af første gang vi ser hvert produkt
+              console.log(`Produkt: "${vn}" -> kategori: "${kategori}" (from stamMap: ${stamMap[vn?.toLowerCase()]}, from prod.type: ${prod.type})`);
+            }
             produktAggregate[vn] = {
               varenavn: prod.varenavn,
               kategori: kategori,
@@ -5796,6 +5804,14 @@ async function basisInitFromHistory() {
         }
       });
     }
+
+    console.log('Updates to save (first 5):', updates.slice(0, 5));
+    console.log('Kategori distribution:',
+      Object.values(produktAggregate).reduce((acc, p) => {
+        acc[p.kategori] = (acc[p.kategori] || 0) + 1;
+        return acc;
+      }, {})
+    );
 
     if (updates.length === 0) {
       alert('Ingen data fundet i historikken (eller alle dage var helligdage)');

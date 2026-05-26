@@ -7005,7 +7005,7 @@ async function loadBernUge(uge, aar) {
     return;
   }
 
-  // Hvis basis_bestilling findes, brug den som basis i stedet for beregnet
+  // Hvis basis_bestilling findes, brug den som basis og anvend SI + trend
   if (basisData.length > 0) {
     const basisMap = {};
     basisData.forEach(row => {
@@ -7013,14 +7013,26 @@ async function loadBernUge(uge, aar) {
       basisMap[row.varenavn][row.dag] = row.anbefalet_antal;
     });
 
-    // Opdater produktlisten med basis-værdier
+    // Hent SI og vækst fra d
+    const SI = d.si || 1.0;
+    const vaekstFaktor = 1 + ((d.vaekst_pct || 0) / 100);
+
+    // Opdater produktlisten med basis-værdier JUSTERET med SI + trend
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {
-        // Hvis basis findes, brug den som basis i stedet
+        // Gem original basis
         prod.basis = basisMap[prod.varenavn];
-        prod.anbefalet = basisMap[prod.varenavn];
+
+        // Anvend SI + trend på basis-værdierne
+        prod.anbefalet = {};
+        const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+        DAGE.forEach(dag => {
+          const basisVal = basisMap[prod.varenavn][dag] || 0;
+          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor);
+        });
+
         prod.total_basis = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
-        prod.total_anbefalet = prod.total_basis;
+        prod.total_anbefalet = Object.values(prod.anbefalet).reduce((s, v) => s + v, 0);
         prod.total_pris = prod.total_anbefalet * prod.pris_ex_moms;
       }
     });

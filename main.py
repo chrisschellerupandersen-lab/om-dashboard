@@ -433,14 +433,10 @@ Vurder BEGGE risici for HVER dag:
 - Er svage dage bestilt for højt? Overskud = TGTG-tab.
 
 Returner UDELUKKENDE valid JSON - INGEN anden tekst før eller efter:
-- KUN bokstaver, tal, mellemrum i tekst-værdier
-- ALDRIG citationstegn, backticks, eller specielle tegn i tekst
-- Hvis du skal referere til et produkt, brug dets navn fra produktlisten uden ændring
-- Alle talværdier uden citationstegn: "fra": 12 IKKE "fra": "12"
-- Booleans uden citationstegn: "klar": true IKKE "klar": "true"
 
+FORMAT EKSEMPEL (alle felter som vist, ingen ekstra felter):
 {{
-  "vurdering": "2-4 sætninger med konkrete tal og dage. Ingen specielle tegn.",
+  "vurdering": "2-4 sætninger med konkrete tal og dage.",
   "klar": true,
   "justeringer": [
     {{
@@ -453,12 +449,16 @@ Returner UDELUKKENDE valid JSON - INGEN anden tekst før eller efter:
   ]
 }}
 
-Regler:
-- vurdering: kun almindelig tekst, ingen citationstegn eller symboler
-- justeringer: både OP og NED, min 2 stk eller 20 pct
-- Max 10, prioriter økonomisk effekt
-- Tomme liste [] hvis alt OK
-- VIGTIG: Udelukkende JSON, ingen markdown eller ekstra tekst""".format(
+VIGTIGE REGLER:
+- JSON skal være syntaktisk korrekt — alle strings i anførselstegn, alle tal uden anførselstegn, booleans som true/false
+- vurdering: kort tekst uden * # \\ eller kodeblokkemærker — bare almindelig dansk tekst
+- justeringer: array af objekter med nøjagtig disse nøgler: varenavn, dag, fra, til, grund
+- grund: kort tekst som "tabt salg", "lav sell-through", "for meget retur", "høj TGTG-risiko"
+- både UP (til > fra) og DOWN (til < fra) justeringer
+- minimum 2 stk eller 20% ændring
+- max 10 justeringer
+- tom liste [] hvis alt er ok
+- klar: true hvis bestillingen virker fin, false hvis der er væsentlige risici""".format(
             body.get('uge'), body.get('aar'), body.get('dato_range',''),
             body.get('event','ingen'),
             body.get('si',1.0), body.get('vaekst','?'),

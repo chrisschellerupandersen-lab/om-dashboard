@@ -5460,7 +5460,9 @@ function buildBasisTable() {
 
   // Build body rows grouped by category
   let bodyRows = '';
-  const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+  // Sort categories: predefined order first, then others alphabetically, then Øvrige last
+  const otherKats = Object.keys(groups).filter(k => !KAT_ORD.includes(k) && k !== 'Øvrige').sort();
+  const katOrder = [...KAT_ORD.filter(k => groups[k]), ...otherKats, ...(groups['Øvrige'] ? ['Øvrige'] : [])];
 
   for (const kat of katOrder) {
     const prods = groups[kat];

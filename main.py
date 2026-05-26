@@ -390,6 +390,17 @@ async def api_beregner_vurder(request: Request):
             if field not in body or body[field] is None:
                 return {"ok": False, "fejl": f"Manglende felt: {field}"}
 
+        # Sanitér input-data: fjern problematiske tegn der kan bryde Claude's JSON output
+        def sanitize_prompt_input(text):
+            if not isinstance(text, str):
+                return str(text) if text is not None else ""
+            # Erstat newlines med space
+            text = text.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+            # Begræns flere mellemrum
+            import re
+            text = re.sub(r'  +', ' ', text)
+            return text.strip()
+
         # Brug .format() i stedet for f-string for at undgå curly-brace fortolkning
         prompt = """Du er bestillingsrådgiver for Organic Market Greve — specialbutik med bageri.
 
@@ -459,15 +470,18 @@ VIGTIGE REGLER:
 - max 10 justeringer
 - tom liste [] hvis alt er ok
 - klar: true hvis bestillingen virker fin, false hvis der er væsentlige risici""".format(
-            body.get('uge'), body.get('aar'), body.get('dato_range',''),
-            body.get('event','ingen'),
-            body.get('si',1.0), body.get('vaekst','?'),
-            body.get('tgtg','ingen data'),
-            body.get('dag_snit',''),
-            body.get('sellthrough', 'ingen data'),
-            body.get('mobilepay_andel', 'MobilePay-andel ukendt'),
-            body.get('dag_totaler',''),
-            body.get('produkter','')
+            sanitize_prompt_input(body.get('uge')),
+            sanitize_prompt_input(body.get('aar')),
+            sanitize_prompt_input(body.get('dato_range','')),
+            sanitize_prompt_input(body.get('event','ingen')),
+            sanitize_prompt_input(body.get('si',1.0)),
+            sanitize_prompt_input(body.get('vaekst','?')),
+            sanitize_prompt_input(body.get('tgtg','ingen data')),
+            sanitize_prompt_input(body.get('dag_snit','')),
+            sanitize_prompt_input(body.get('sellthrough', 'ingen data')),
+            sanitize_prompt_input(body.get('mobilepay_andel', 'MobilePay-andel ukendt')),
+            sanitize_prompt_input(body.get('dag_totaler','')),
+            sanitize_prompt_input(body.get('produkter',''))
         )
 
         client = _ant.Anthropic(api_key=api_key)
@@ -482,34 +496,27 @@ VIGTIGE REGLER:
             if raw.lower().startswith("json"): raw = raw[4:]
         raw = raw.strip()
 
-        # Forsøg at reparere almindelige JSON-fejl
-        def repair_json(text):
-            import re
-            # Erstat uescapede tegn inden i strengværdier
-            # Find alle tekststrenge og escape indre citationstegn
-            def fix_string(m):
-                s = m.group(1)
-                # Erstat ikkeescapede citationstegn med escapede
-                s = re.sub(r'(?<!\\)"', r'\\"', s)
-                # Erstat ikkeescapede backslashes (undtagen allerede escapede)
-                s = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', s)
-                return '"' + s + '"'
-            # Denne regex kan være farlig, så gør i stedet en simpel erstatning
-            return text
-
         try:
             parsed = _json.loads(raw)
         except _json.JSONDecodeError as je:
             # Prøv igen efter at have fjernet problematiske tegn
             try:
-                # Erstat almindelige problemer: ukontrollerede linjeskift i værdier
-                raw_fixed = raw.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
-                # Erstat dobbelte mellemrum
                 import re
+                # Erstat almindelige problemer: ukontrollerede linjeskift i værdier
+                raw_fixed = raw.replace('\r\n', '\\n').replace('\n', ' ').replace('\r', ' ')
+                # Erstat dobbelte mellemrum
                 raw_fixed = re.sub(r'  +', ' ', raw_fixed)
+                # Prøv at parse igen
                 parsed = _json.loads(raw_fixed)
-            except:
-                return {"ok": False, "fejl": f"JSON invalidt: {je.msg} (linje {je.lineno}). Prøv igen."}
+            except _json.JSONDecodeError:
+                # Sidste forsøg: fjern markdown-koder og ekstra tegn
+                try:
+                    raw_fixed = raw.replace('```json', '').replace('```', '')
+                    raw_fixed = raw_fixed.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
+                    raw_fixed = re.sub(r'  +', ' ', raw_fixed)
+                    parsed = _json.loads(raw_fixed)
+                except:
+                    return {"ok": False, "fejl": f"JSON invalidt: {je.msg} (linje {je.lineno}). Prøv igen."}
 
         return {
             "ok": True,

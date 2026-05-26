@@ -5477,8 +5477,8 @@ function buildBasisTable() {
     if (filteredProds.length === 0) continue;
 
     // Category header
-    bodyRows += `<tr style="background:rgba(45,74,45,.07);border-top:1px solid rgba(200,168,75,.12);">
-      <td colspan="9" style="font-weight:600;font-size:11px;color:var(--forest);padding:6px 16px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
+    bodyRows += `<tr style="background:rgba(45,74,45,.07);">
+      <td colspan="10" style="font-weight:600;font-size:11px;color:var(--forest);padding:5px 8px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
     </tr>`;
 
     // Product rows (same as beregner)
@@ -5498,6 +5498,7 @@ function buildBasisTable() {
       bodyRows += `<tr data-vn="${p.varenummer}">
         <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
         ${dagCells}
+        <td class="num" style="${mono}font-weight:600;">${total}</td>
         <td style="padding:8px 4px;text-align:center;">
           <button onclick="basisDeleteProduct('${p.varenummer}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;">×</button>
         </td>
@@ -5513,7 +5514,8 @@ function buildBasisTable() {
     bodyRows += `<tr style="background:rgba(45,74,45,.04);border-top:1px solid rgba(45,74,45,.15);">
       <td style="font-size:11px;font-weight:600;color:var(--forest);padding-left:16px;">${kat} i alt</td>
       ${katDagCells}
-      <td class="num" style="${mono}font-weight:600;color:var(--forest);">${katTotal}</td>
+      <td class="num" style="${mono}font-weight:700;color:var(--forest);">${katTotal}</td>
+      <td></td>
     </tr>`;
   }
 
@@ -5540,11 +5542,13 @@ function buildBasisTable() {
         <table class="aar2-tbl" style="min-width:600px;">
           <thead><tr>
             <th style="min-width:180px;">Produkt</th>${thDage}
+            <th class="num">Total</th>
             <th class="num" style="min-width:40px;">Ret</th>
           </tr></thead>
           <tbody>${bodyRows}</tbody>
           <tfoot><tr><td>I alt</td>${footDage}
             <td class="num" style="font-weight:700;">${totalAlmindeligt}</td>
+            <td></td>
           </tr></tfoot>
         </table>
       </div>

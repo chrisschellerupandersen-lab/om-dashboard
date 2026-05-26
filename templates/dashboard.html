@@ -5556,6 +5556,9 @@ function basisEditCell(varenummer, dag) {
     const newValue = parseInt(input.value) || 0;
     const prodInfo = _basisData.find(r => r.varenummer === varenummer);
 
+    // Tjek at cell stadig er i DOM før du updater
+    if (!cell.parentElement) return;
+
     cell.innerHTML = '<span style="opacity:0.5;">…</span>';
 
     try {
@@ -5579,14 +5582,21 @@ function basisEditCell(varenummer, dag) {
           _basisData.push(found);
         }
         found.anbefalet_antal = newValue;
-        cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
+        // Tjek igen at cell stadig er i DOM
+        if (cell.parentElement) {
+          cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
+        }
         updateBasisSaveTime();
       } else {
-        cell.innerHTML = originalHtml;
+        if (cell.parentElement) {
+          cell.innerHTML = originalHtml;
+        }
         alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
       }
     } catch (e) {
-      cell.innerHTML = originalHtml;
+      if (cell.parentElement) {
+        cell.innerHTML = originalHtml;
+      }
       alert('Fejl: ' + e.message);
     }
   };

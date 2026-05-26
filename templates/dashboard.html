@@ -1578,6 +1578,45 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- BASIS BESTILLING -->
+      <div class="panel" id="p-basis">
+        <div class="page-hdr">
+          <h2>Basis Bestilling — Daglig Skabelon</h2>
+          <p>Definer hvilket produkter du normalt bestiller på hver ugedag · bruges som udgangspunkt for bestillingsberegneren</p>
+        </div>
+
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+          <input type="text" id="basis-filter-input" placeholder="Søg efter produkt..."
+            style="padding:8px 12px;border:1px solid var(--border);border-radius:4px;font-family:'DM Sans',sans-serif;font-size:12px;width:200px;">
+          <button onclick="basisAddProduct()"
+            style="padding:8px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;cursor:pointer;font-weight:500;">
+            + Tilføj produkt
+          </button>
+          <span id="basis-save-status" style="font-size:11px;color:var(--ash);margin-left:auto;">—</span>
+        </div>
+
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:16px;">
+          <table id="basis-tabel" style="width:100%;border-collapse:collapse;background:var(--white);">
+            <thead>
+              <tr style="background:var(--forest);color:var(--amber);">
+                <th style="padding:12px;text-align:left;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;">Produkt (Kategori)</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Man</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tir</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Ons</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tor</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Fre</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Lør</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Søn</th>
+                <th style="padding:12px;text-align:center;font-weight:500;font-size:12px;width:40px;">Ret</th>
+              </tr>
+            </thead>
+            <tbody id="basis-tbody">
+              <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- TOO GOOD TO GO -->
       <div class="panel" id="p-tgtg">
         <div class="page-hdr">
@@ -2819,6 +2858,8 @@ function showPanel(id, el) {
     _navGrpSetCollapsed(navDef.group, false);
     _buildNav();
   }
+  // Load specific page data
+  if (id === 'basis') loadBasis();
   closeSidebar();
 }
 
@@ -2835,6 +2876,7 @@ const NAV_SVG = {
   kaffe:        '<path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/>',
   trend:        '<path d="M1 12l4-5 3 3 4-6 3 3V12H1z"/>',
   bestilling:   '<path d="M2 2h12v2H2zm0 3h12v9H2V5zm2 2v5h8V7H4zm1 1h2v3H5V8zm4 0h2v3H9V8z"/>',
+  basis:        '<path d="M2 2h12v2H2zm0 3h12v2H2zm0 3h12v2H2zm0 3h12v2H2z"/>',
   bager:        '<path d="M2 10c0-3.3 2.7-6 6-6s6 2.7 6 6v2H2v-2zm1.5 0c0-2.5 2-4.5 4.5-4.5s4.5 2 4.5 4.5H3.5zM1 13h14v1H1z"/>',
   retur:        '<path d="M3 8h8a4 4 0 010 8H6m-3-8l3-3m-3 3l3 3M11 4a4 4 0 014 4"/>',
   svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
@@ -2858,6 +2900,7 @@ const NAV_DEFAULT = [
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
+  {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
   {id:'retur',       label:'Retur registrering',    group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
@@ -5363,6 +5406,236 @@ async function loadBestilling(force = false) {
   </tr>`).join('');
 }
 
+// ── BASIS BESTILLING: DAGLIG SKABELON ────────────────────────────────────────
+
+let _basisData = [];
+const DAGE_BASIS = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'];
+
+async function loadBasis() {
+  try {
+    const res = await fetch('/api/basis-bestilling/');
+    const resp = await res.json();
+    if (!resp.ok) {
+      document.getElementById('basis-tbody').innerHTML =
+        `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--danger);">Fejl: ${resp.fejl || 'Ukendt fejl'}</td></tr>`;
+      return;
+    }
+    _basisData = resp.data || [];
+    buildBasisTable();
+  } catch (e) {
+    document.getElementById('basis-tbody').innerHTML =
+      `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--danger);">Fejl ved indlæsning: ${e.message}</td></tr>`;
+  }
+}
+
+function buildBasisTable() {
+  const filter = document.getElementById('basis-filter-input').value.toLowerCase();
+
+  // Group by product
+  const produkter = {};
+  _basisData.forEach(row => {
+    if (!produkter[row.varenummer]) {
+      produkter[row.varenummer] = {
+        varenavn: row.varenavn,
+        kategori: row.kategori,
+        data: {}
+      };
+    }
+    produkter[row.varenummer].data[row.dag] = row.anbefalet_antal;
+  });
+
+  const tbody = document.getElementById('basis-tbody');
+  const rows = [];
+
+  for (const [vn, prod] of Object.entries(produkter)) {
+    const display = `${prod.varenavn} (${prod.kategori || 'ukendt'})`;
+    if (filter && !display.toLowerCase().includes(filter)) continue;
+
+    const dayCells = DAGE_BASIS.map(dag =>
+      `<td style="padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);cursor:pointer;"
+         onclick="basisEditCell('${vn}', '${dag}')"
+         data-vn="${vn}" data-dag="${dag}"
+         style="background:${['loe','son'].includes(dag)?'rgba(45,90,45,.03)':'var(--white)'};padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);cursor:pointer;">
+        <span class="basis-val">${prod.data[dag] || '—'}</span>
+      </td>`
+    ).join('');
+
+    const weekendStyle = `background:rgba(45,90,45,.03);`;
+    rows.push(`
+      <tr style="border-bottom:1px solid rgba(30,58,30,.08);">
+        <td style="padding:8px 12px;text-align:left;border-right:1px solid rgba(30,58,30,.08);font-size:12px;font-weight:500;">${display}</td>
+        ${dayCells}
+        <td style="padding:8px;text-align:center;">
+          <button onclick="basisDeleteProduct('${vn}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;">×</button>
+        </td>
+      </tr>
+    `);
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Ingen produkter. Klik "+Tilføj produkt" for at begynde.</td></tr>`;
+  } else {
+    tbody.innerHTML = rows.join('');
+  }
+}
+
+function basisEditCell(varenummer, dag) {
+  const cell = event.target.closest('td');
+  const currentValue = _basisData.find(r => r.varenummer === varenummer && r.dag === dag)?.anbefalet_antal || 0;
+
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.value = currentValue;
+  input.style.cssText = 'width:100%;padding:4px;border:1px solid var(--gold);border-radius:2px;font-size:12px;';
+
+  const originalHtml = cell.innerHTML;
+  cell.innerHTML = '';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+
+  const save = async () => {
+    const newValue = parseInt(input.value) || 0;
+    const prodInfo = _basisData.find(r => r.varenummer === varenummer);
+
+    cell.innerHTML = '<span style="opacity:0.5;">…</span>';
+
+    try {
+      const res = await fetch('/api/basis-bestilling/gem', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          varenummer,
+          varenavn: prodInfo?.varenavn || '',
+          dag,
+          anbefalet_antal: newValue,
+          kategori: prodInfo?.kategori || ''
+        })
+      });
+      const resp = await res.json();
+      if (resp.ok) {
+        // Update local data
+        let found = _basisData.find(r => r.varenummer === varenummer && r.dag === dag);
+        if (!found) {
+          found = {varenummer, varenavn: prodInfo?.varenavn || '', dag, kategori: prodInfo?.kategori || ''};
+          _basisData.push(found);
+        }
+        found.anbefalet_antal = newValue;
+        cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
+        updateBasisSaveTime();
+      } else {
+        cell.innerHTML = originalHtml;
+        alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
+      }
+    } catch (e) {
+      cell.innerHTML = originalHtml;
+      alert('Fejl: ' + e.message);
+    }
+  };
+
+  input.onblur = save;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') cell.innerHTML = originalHtml;
+  };
+}
+
+async function basisDeleteProduct(varenummer) {
+  if (!confirm('Slet dette produkt fra basis-bestillingen?')) return;
+
+  // Get all days for this product
+  const daysToDelete = DAGE_BASIS.filter(dag =>
+    _basisData.some(r => r.varenummer === varenummer && r.dag === dag)
+  );
+
+  try {
+    for (const dag of daysToDelete) {
+      const res = await fetch('/api/basis-bestilling/slet', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ varenummer, dag })
+      });
+      const resp = await res.json();
+      if (!resp.ok) {
+        alert('Fejl ved sletning: ' + (resp.fejl || 'Ukendt fejl'));
+        return;
+      }
+    }
+
+    // Remove from local data
+    _basisData = _basisData.filter(r => r.varenummer !== varenummer);
+    buildBasisTable();
+    updateBasisSaveTime();
+  } catch (e) {
+    alert('Fejl: ' + e.message);
+  }
+}
+
+async function basisAddProduct() {
+  // Fetch available products
+  try {
+    const res = await fetch('/api/stamdata');
+    const resp = await res.json();
+    const allProducts = resp.data || [];
+
+    // Get products already in basis
+    const inBasis = new Set(_basisData.map(r => r.varenummer));
+    const available = allProducts.filter(p => !inBasis.has(p.varenavn));
+
+    if (available.length === 0) {
+      alert('Alle produkter er allerede i basis-bestillingen.');
+      return;
+    }
+
+    // Simple prompt for product selection
+    const productList = available.map(p => `${p.varenavn} (${p.type || 'ukendt'})`).join('\n');
+    const selected = prompt('Vælg produkt (eller skriv navn):\n\n' + productList);
+    if (!selected) return;
+
+    const prod = available.find(p => p.varenavn === selected || p.varenavn.includes(selected));
+    if (!prod) {
+      alert('Produkt ikke fundet.');
+      return;
+    }
+
+    // Add default quantity of 5 to all days
+    const updates = DAGE_BASIS.map(dag => ({
+      varenummer: prod.varenavn,
+      varenavn: prod.varenavn,
+      dag,
+      anbefalet_antal: 5,
+      kategori: prod.type || ''
+    }));
+
+    const saveRes = await fetch('/api/basis-bestilling/bulk-gem', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ updates })
+    });
+    const saveResp = await saveRes.json();
+    if (saveResp.ok) {
+      await loadBasis();
+      updateBasisSaveTime();
+    } else {
+      alert('Fejl ved gemning: ' + (saveResp.fejl || 'Ukendt fejl'));
+    }
+  } catch (e) {
+    alert('Fejl: ' + e.message);
+  }
+}
+
+function updateBasisSaveTime() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('da-DK', {hour:'2-digit', minute:'2-digit'});
+  document.getElementById('basis-save-status').textContent = `✓ Gemt kl. ${timeStr}`;
+  setTimeout(() => {
+    document.getElementById('basis-save-status').textContent = '—';
+  }, 3000);
+}
+
+document.getElementById('basis-filter-input')?.addEventListener('input', buildBasisTable);
+
 // ── DAGSOVERBLIK: BESTILT VS. SOLGT ───────────────────────────────────────────
 let _dagUge = null, _dagAar = null;
 
@@ -6398,12 +6671,50 @@ async function loadBernUge(uge, aar) {
     '<div style="padding:20px;color:var(--ash);">Indlæser…</div>';
 
   const d = await api('/api/bestilling/anbefaling?uge=' + uge + '&aar=' + aar);
+
+  // Load basis bestilling hvis den findes
+  let basisData = [];
+  try {
+    const basisRes = await fetch('/api/basis-bestilling/');
+    const basisResp = await basisRes.json();
+    if (basisResp.ok && basisResp.data) {
+      basisData = basisResp.data;
+    }
+  } catch (e) {
+    console.warn('Kunne ikke indlæse basis bestilling:', e);
+  }
+
   _bernBusy = false;
   if (!d) return;
   if (d.error) {
     document.getElementById('beregner-tabel').innerHTML =
       '<div style="padding:20px;color:var(--danger);">' + d.error + '</div>';
     return;
+  }
+
+  // Hvis basis_bestilling findes, brug den som basis i stedet for beregnet
+  if (basisData.length > 0) {
+    const basisMap = {};
+    basisData.forEach(row => {
+      if (!basisMap[row.varenavn]) basisMap[row.varenavn] = {};
+      basisMap[row.varenavn][row.dag] = row.anbefalet_antal;
+    });
+
+    // Opdater produktlisten med basis-værdier
+    d.produkter.forEach(prod => {
+      if (basisMap[prod.varenavn]) {
+        // Hvis basis findes, brug den som basis i stedet
+        prod.basis = basisMap[prod.varenavn];
+        prod.anbefalet = basisMap[prod.varenavn];
+        prod.total_basis = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
+        prod.total_anbefalet = prod.total_basis;
+        prod.total_pris = prod.total_anbefalet * prod.pris_ex_moms;
+      }
+    });
+
+    // Genberegn totaler
+    d.total_stk = d.produkter.reduce((s, p) => s + (p.total_anbefalet || 0), 0);
+    d.total_kr = d.produkter.reduce((s, p) => s + (p.total_pris || 0), 0);
   }
 
   const MND  = ['','jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];

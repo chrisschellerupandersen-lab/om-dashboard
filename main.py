@@ -795,6 +795,85 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
     return buf.getvalue()
 
 
+# ── BASIS BESTILLING API ──────────────────────────────────────────────────────
+
+@app.get("/api/basis-bestilling/")
+async def api_basis_bestilling_get(request: Request):
+    """Hent alle basis-bestillinger."""
+    _kræv_login(request)
+    return {"ok": True, "data": database.hent_basis_bestilling()}
+
+
+@app.get("/api/basis-bestilling/dag/{dag}")
+async def api_basis_bestilling_dag(request: Request, dag: str):
+    """Hent basis-bestillinger for en specifik dag."""
+    _kræv_login(request)
+    if dag not in ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']:
+        raise HTTPException(status_code=400, detail="Ugyldigt dagnavn")
+    return {"ok": True, "data": database.hent_basis_bestilling_ved_dag(dag)}
+
+
+@app.post("/api/basis-bestilling/gem")
+async def api_basis_bestilling_gem(request: Request, body: dict):
+    """Gem eller opdater en basis-bestillingslinje."""
+    _kræv_login(request)
+    try:
+        varenummer = body.get('varenummer')
+        varenavn = body.get('varenavn', '')
+        dag = body.get('dag')
+        antal = int(body.get('anbefalet_antal', 0))
+        kategori = body.get('kategori', '')
+
+        if not varenummer or not dag:
+            raise ValueError("varenummer og dag er påkrævet")
+        if dag not in ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']:
+            raise ValueError(f"Ugyldigt dagnavn: {dag}")
+
+        database.gem_basis_bestilling(varenummer, varenavn, dag, antal, kategori)
+        return {"ok": True, "varenummer": varenummer, "dag": dag, "anbefalet_antal": antal}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
+@app.post("/api/basis-bestilling/bulk-gem")
+async def api_basis_bestilling_bulk_gem(request: Request, body: dict):
+    """Batch-gem flere basis-bestillinger."""
+    _kræv_login(request)
+    try:
+        updates = body.get('updates', [])
+        if not isinstance(updates, list):
+            raise ValueError("updates skal være en liste")
+
+        database.bulk_opdater_basis_bestilling(updates)
+        return {"ok": True, "updated_count": len(updates)}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
+@app.post("/api/basis-bestilling/slet")
+async def api_basis_bestilling_slet(request: Request, body: dict):
+    """Slet en basis-bestillingslinje."""
+    _kræv_login(request)
+    try:
+        varenummer = body.get('varenummer')
+        dag = body.get('dag')
+
+        if not varenummer or not dag:
+            raise ValueError("varenummer og dag er påkrævet")
+
+        database.slet_basis_bestilling_linje(varenummer, dag)
+        return {"ok": True, "varenummer": varenummer, "dag": dag}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)}
+
+
+@app.get("/api/basis-bestilling/produkter")
+async def api_basis_bestilling_produkter(request: Request):
+    """Hent alle produkter i basis_bestilling."""
+    _kræv_login(request)
+    return {"ok": True, "data": database.hent_basis_bestilling_produkter()}
+
+
 @app.post("/api/bager/upload-pdf")
 async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
     """Parse bager-faktura PDF med Claude og returner ekstraherede felter."""

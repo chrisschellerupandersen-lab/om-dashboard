@@ -1427,13 +1427,13 @@ async def management_review_hent(request: Request):
 
 
 @app.post("/api/management/review/opdater")
-async def management_review_opdater(request: Request):
+async def management_review_opdater(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY ikke sat i miljøvariable")
     try:
-        review = database.generer_management_review(api_key)
+        review = database.generer_management_review(api_key, uge=uge, aar=aar)
         return {"ok": True, "review": review}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fejl ved generering: {str(e)}")

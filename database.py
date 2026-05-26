@@ -4517,11 +4517,15 @@ def _format_management_prompt(d: dict) -> str:
     return "\n".join(lines)
 
 
-def generer_management_review(api_key: str) -> dict:
-    """Kalder Claude API og gemmer review i databasen. Returnerer det nye review."""
+def generer_management_review(api_key: str, uge: int = None, aar: int = None) -> dict:
+    """Kalder Claude API og gemmer review i databasen. Returnerer det nye review.
+
+    Note: uge og aar parametre er reserveret for fremtidig brug. I øjeblikket analyseres altid nuværende data.
+    """
     import anthropic, json
     from datetime import datetime
 
+    # TODO: Implementer uge/aar-filtrering i hent_management_data() når der er behov
     data = hent_management_data()
     prompt = _format_management_prompt(data)
 

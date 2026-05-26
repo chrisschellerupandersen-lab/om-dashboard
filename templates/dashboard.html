@@ -5402,7 +5402,9 @@ async function loadBestilling(force = false) {
 // ── BASIS BESTILLING: DAGLIG SKABELON ────────────────────────────────────────
 
 let _basisData = [];
-const DAGE_BASIS = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'];
+const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+const WEEKEND = new Set(['loe','son']);
 
 async function loadBasis() {
   try {
@@ -5450,9 +5452,6 @@ function buildBasisTable() {
   });
 
   const mono = "font-family:'DM Mono',monospace;";
-  const DAGE = ['man','tir','ons','tor','fre','loe','son'];
-  const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
-  const WEEKEND = new Set(['loe','son']);
 
   // Build header row with days (same as beregner)
   const thDage = DAGE.map(dag =>
@@ -5599,7 +5598,7 @@ async function basisDeleteProduct(varenummer) {
   if (!confirm('Slet dette produkt fra basis-bestillingen?')) return;
 
   // Get all days for this product
-  const daysToDelete = DAGE_BASIS.filter(dag =>
+  const daysToDelete = DAGE.filter(dag =>
     _basisData.some(r => r.varenummer === varenummer && r.dag === dag)
   );
 
@@ -5670,7 +5669,7 @@ async function basisAddProduct() {
     };
     kategori = katMap[kategori] || kategori;
 
-    const updates = DAGE_BASIS.map(dag => ({
+    const updates = DAGE.map(dag => ({
       varenummer,
       varenavn: prod.varenavn,
       dag,

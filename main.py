@@ -814,10 +814,11 @@ async def api_basis_bestilling_dag(request: Request, dag: str):
 
 
 @app.post("/api/basis-bestilling/gem")
-async def api_basis_bestilling_gem(request: Request, body: dict):
+async def api_basis_bestilling_gem(request: Request):
     """Gem eller opdater en basis-bestillingslinje."""
     _kræv_login(request)
     try:
+        body = await request.json()
         varenummer = body.get('varenummer')
         varenavn = body.get('varenavn', '')
         dag = body.get('dag')
@@ -836,10 +837,11 @@ async def api_basis_bestilling_gem(request: Request, body: dict):
 
 
 @app.post("/api/basis-bestilling/bulk-gem")
-async def api_basis_bestilling_bulk_gem(request: Request, body: dict):
+async def api_basis_bestilling_bulk_gem(request: Request):
     """Batch-gem flere basis-bestillinger."""
     _kræv_login(request)
     try:
+        body = await request.json()
         updates = body.get('updates', [])
         if not isinstance(updates, list):
             raise ValueError("updates skal være en liste")
@@ -851,10 +853,11 @@ async def api_basis_bestilling_bulk_gem(request: Request, body: dict):
 
 
 @app.post("/api/basis-bestilling/slet")
-async def api_basis_bestilling_slet(request: Request, body: dict):
+async def api_basis_bestilling_slet(request: Request):
     """Slet en basis-bestillingslinje."""
     _kræv_login(request)
     try:
+        body = await request.json()
         varenummer = body.get('varenummer')
         dag = body.get('dag')
 

@@ -655,6 +655,41 @@ def hent_dag_produkter(aar: int = None) -> Dict:
     return {"dato": seneste_dato, "produkter": [dict(r) for r in rows]}
 
 
+def hent_dag_produkter_by_date(dato: str, aar: int = None) -> Dict:
+    """Produkter solgt på specificeret dag, sorteret efter omsætning."""
+    with _conn() as conn:
+        # Valider dato format (YYYY-MM-DD)
+        try:
+            from datetime import datetime
+            datetime.strptime(dato, '%Y-%m-%d')
+        except ValueError:
+            return {"dato": None, "produkter": []}
+
+        # Kontroller at dato eksisterer i databasen
+        exists = conn.execute(
+            "SELECT COUNT(*) FROM transaktioner WHERE dato = ?",
+            (dato,)
+        ).fetchone()[0]
+
+        if not exists:
+            return {"dato": dato, "produkter": []}
+
+        rows = conn.execute("""
+            SELECT varenavn,
+                   MAX(kategori)               AS kategori,
+                   ROUND(SUM(antal), 0)        AS antal,
+                   ROUND(SUM(omsætning), 0)    AS omsaetning,
+                   ROUND(SUM(vf_korrekt), 0)   AS vareforbrug,
+                   ROUND(SUM(db_korrekt), 0)   AS db_kr,
+                   ROUND(CASE WHEN SUM(omsætning)>0 THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100 ELSE 0 END, 1) AS db_pct
+            FROM v_transaktioner
+            WHERE dato = ?
+            GROUP BY varenavn
+            ORDER BY omsaetning DESC
+        """, (dato,)).fetchall()
+    return {"dato": dato, "produkter": [dict(r) for r in rows]}
+
+
 def hent_dage(n: int = 14, aar: int = None) -> List[Dict]:
     with _conn() as conn:
         where = "WHERE strftime('%Y', dato) = ?" if aar else ""

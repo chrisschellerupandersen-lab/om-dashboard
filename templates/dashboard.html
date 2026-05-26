@@ -772,9 +772,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       <!-- FORSIDE -->
       <div class="panel active" id="p-forside">
-        <div class="page-hdr">
-          <h2>Overblik</h2>
-          <p id="hdr-forside-sub">Organic Market Greve</p>
+        <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2>Overblik</h2>
+            <p id="hdr-forside-sub">Organic Market Greve</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <input type="date" id="forside-date-picker"
+              style="padding:7px 12px;border:1px solid var(--border);border-radius:3px;font-family:'DM Sans',sans-serif;font-size:12px;color:var(--charcoal);"
+              onchange="forsideChangeDatePicker()" />
+          </div>
         </div>
 
         <!-- NYT OVERBLIK DESIGN -->
@@ -3186,6 +3193,56 @@ async function loadAll() {
 
   if (kpi) setSyncNow();
   loadReturStatus();
+
+  // Sæt date picker til dagens dato
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('forside-date-picker').value = today;
+}
+
+async function forsideChangeDatePicker() {
+  const datoPicker = document.getElementById('forside-date-picker');
+  const selectedDato = datoPicker.value;
+
+  if (!selectedDato) return;
+
+  try {
+    // Hent data for den valgte dato
+    const dagData = await api(`/api/salg/dag/${selectedDato}?aar=${VALGT_AAR}`);
+
+    if (dagData && dagData.dato) {
+      // Hent også KPI data for sammenligning
+      const kpiData = await api(`/api/kpi?aar=${VALGT_AAR}`);
+
+      if (kpiData) {
+        // Erstat dag-data i kpi med data for den valgte dato
+        kpiData.dag = {
+          omsaetning: 0,
+          vareforbrug: 0,
+          db_kr: 0,
+          db_pct: 0,
+          transak: 0
+        };
+
+        // Beregn totaler fra produkter
+        if (dagData.produkter && dagData.produkter.length) {
+          dagData.produkter.forEach(p => {
+            kpiData.dag.omsaetning = (kpiData.dag.omsaetning || 0) + (p.omsaetning || 0);
+            kpiData.dag.vareforbrug = (kpiData.dag.vareforbrug || 0) + (p.vareforbrug || 0);
+            kpiData.dag.db_kr = (kpiData.dag.db_kr || 0) + (p.db_kr || 0);
+          });
+
+          if (kpiData.dag.omsaetning > 0) {
+            kpiData.dag.db_pct = (kpiData.dag.db_kr / kpiData.dag.omsaetning * 100) * 1.25;
+          }
+        }
+
+        // Genopbygn forside med nye data
+        buildForside(kpiData, null, null, dagData, null);
+      }
+    }
+  } catch (e) {
+    console.error('Fejl ved hentning af dato data:', e);
+  }
 }
 
 function setSyncNow() {

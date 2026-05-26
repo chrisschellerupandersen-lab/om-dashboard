@@ -496,26 +496,34 @@ VIGTIGE REGLER:
             if raw.lower().startswith("json"): raw = raw[4:]
         raw = raw.strip()
 
+        # Log Claude's raw response for debugging
+        print(f"[DEBUG] Claude raw response ({len(raw)} chars): {raw[:200]}...")
+
         try:
             parsed = _json.loads(raw)
         except _json.JSONDecodeError as je:
+            print(f"[DEBUG] First parse failed: {je.msg} at line {je.lineno}")
             # Prøv igen efter at have fjernet problematiske tegn
             try:
                 import re
                 # Erstat almindelige problemer: ukontrollerede linjeskift i værdier
-                raw_fixed = raw.replace('\r\n', '\\n').replace('\n', ' ').replace('\r', ' ')
+                raw_fixed = raw.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
                 # Erstat dobbelte mellemrum
                 raw_fixed = re.sub(r'  +', ' ', raw_fixed)
                 # Prøv at parse igen
+                print(f"[DEBUG] Trying fixed version: {raw_fixed[:200]}...")
                 parsed = _json.loads(raw_fixed)
-            except _json.JSONDecodeError:
+            except _json.JSONDecodeError as je2:
+                print(f"[DEBUG] Second parse failed: {je2.msg}")
                 # Sidste forsøg: fjern markdown-koder og ekstra tegn
                 try:
                     raw_fixed = raw.replace('```json', '').replace('```', '')
                     raw_fixed = raw_fixed.replace('\r\n', ' ').replace('\n', ' ').replace('\r', ' ')
                     raw_fixed = re.sub(r'  +', ' ', raw_fixed)
+                    print(f"[DEBUG] Trying markdown-cleaned version: {raw_fixed[:200]}...")
                     parsed = _json.loads(raw_fixed)
-                except:
+                except Exception as e3:
+                    print(f"[DEBUG] All parse attempts failed: {str(e3)}")
                     return {"ok": False, "fejl": f"JSON invalidt: {je.msg} (linje {je.lineno}). Prøv igen."}
 
         return {

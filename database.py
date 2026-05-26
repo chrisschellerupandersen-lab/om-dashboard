@@ -4192,14 +4192,34 @@ Skriv i du-form. Vær KONKRET — brug tal og dagenavne. Ingen generelle råd.""
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
 
-def hent_management_data() -> dict:
-    """Samler detaljerede KPI-data til management review."""
+def hent_management_data(uge: int = None, aar: int = None) -> dict:
+    """Samler detaljerede KPI-data til management review for en specifik uge eller nuværende uge."""
     from datetime import date, timedelta
     from collections import defaultdict
     today = date.today()
 
+    # Hvis uge/år ikke er angivet, brug nuværende uge
+    if uge is None or aar is None:
+        uge = int(today.strftime('%W')) + 1  # ISO week (0-based, så +1)
+        aar = today.year
+
+    # Find dato-interval for den ISO-uge
+    # ISO-uge starter mandag, slutter søndag
+    jan4 = date(aar, 1, 4)
+    week1_monday = jan4 - timedelta(days=jan4.weekday())
+    target_monday = week1_monday + timedelta(weeks=uge - 1)
+    target_sunday = target_monday + timedelta(days=6)
+
+    # Sikr at datoerne ikke går uden for året
+    year_start = date(aar, 1, 1)
+    year_end = date(aar, 12, 31)
+    target_monday = max(target_monday, year_start)
+    target_sunday = min(target_sunday, year_end)
+
     with _conn() as conn:
-        # Ugentlig omsætning + DB + kunder, seneste 10 ISO-uger
+        # Ugentlig omsætning + DB + kunder omkring den valgte uge (+-5 uger kontekst)
+        start_context = target_monday - timedelta(weeks=5)
+        end_context = target_sunday + timedelta(weeks=5)
         uger_iso = conn.execute("""
             SELECT
                 CAST(strftime('%Y', dato) AS INTEGER) AS aar,
@@ -4211,43 +4231,38 @@ def hent_management_data() -> dict:
                 COUNT(DISTINCT dato) AS dage,
                 COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
             FROM transaktioner
-            WHERE dato >= date('now','-70 days')
+            WHERE dato >= ? AND dato <= ?
             GROUP BY strftime('%Y-%W', dato)
-            ORDER BY dato DESC LIMIT 10
-        """).fetchall()
+            ORDER BY dato DESC LIMIT 15
+        """, (start_context.isoformat(), end_context.isoformat())).fetchall()
 
-        # Seneste salgsdag + samme dag forrige uge
-        seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
-        seneste_dag = None
-        prev_dag_oms = None
-        if seneste_dato:
-            seneste_dag = conn.execute("""
-                SELECT ROUND(SUM(omsætning),0) AS oms,
-                       ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
-                       COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
-                FROM transaktioner WHERE dato=?
-            """, (seneste_dato,)).fetchone()
-            prev_dag = conn.execute("SELECT date(?,'-7 days')", (seneste_dato,)).fetchone()[0]
-            prev_dag_oms = conn.execute(
-                "SELECT ROUND(SUM(omsætning),0) AS oms FROM transaktioner WHERE dato=?",
-                (prev_dag,)
-            ).fetchone()
+        # Dagdata for den valgte uge
+        uge_data = conn.execute("""
+            SELECT dato, SUM(omsætning) AS oms, SUM(avance) AS db_kr,
+                   ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
+                   COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY dato ORDER BY dato
+        """, (target_monday.isoformat(), target_sunday.isoformat())).fetchall()
 
-        # Kategorier seneste 30 dage med vaekst vs forrige 30 dage
+        # Kategorier i den valgte uge med vaekst vs samme uge året før
+        prev_monday = target_monday - timedelta(weeks=52)
+        prev_sunday = target_sunday - timedelta(weeks=52)
         kat_nu = conn.execute("""
             SELECT kategori, ROUND(SUM(omsætning),0) AS oms,
                    ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
             FROM transaktioner
-            WHERE dato >= date('now','-30 days') AND kategori != ''
+            WHERE dato >= ? AND dato <= ? AND kategori != ''
             GROUP BY kategori ORDER BY oms DESC LIMIT 10
-        """).fetchall()
+        """, (target_monday.isoformat(), target_sunday.isoformat())).fetchall()
         kat_prev = {r['kategori']: r['oms'] for r in conn.execute("""
             SELECT kategori, ROUND(SUM(omsætning),0) AS oms FROM transaktioner
-            WHERE dato >= date('now','-60 days') AND dato < date('now','-30 days') AND kategori != ''
+            WHERE dato >= ? AND dato <= ? AND kategori != ''
             GROUP BY kategori
-        """).fetchall()}
+        """, (prev_monday.isoformat(), prev_sunday.isoformat())).fetchall()}
 
-        # Dag-af-uge snit, seneste 12 uger
+        # Dag-af-uge snit, 12 uger omkring den valgte uge
         dag_snit = conn.execute("""
             SELECT
                 CASE CAST(strftime('%w',dato) AS INTEGER)
@@ -4261,56 +4276,58 @@ def hent_management_data() -> dict:
             FROM (
                 SELECT dato, SUM(omsætning) AS dag_oms,
                        COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS dag_kunder
-                FROM transaktioner WHERE dato >= date('now','-84 days')
+                FROM transaktioner WHERE dato >= ? AND dato <= ?
                 GROUP BY dato
             ) GROUP BY dag_nr ORDER BY dag_nr
-        """).fetchall()
+        """, (start_context.isoformat(), end_context.isoformat())).fetchall()
 
-        # Top 15 produkter seneste 14 dage + vaekst
+        # Top 15 produkter i den valgte uge + sammenligningperiode (samme uge året før)
         top_nu = conn.execute("""
             SELECT varenavn, ROUND(SUM(omsætning),0) AS oms, SUM(antal) AS antal,
                    ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct
             FROM transaktioner
-            WHERE dato >= date('now','-14 days') AND varenavn != ''
+            WHERE dato >= ? AND dato <= ? AND varenavn != ''
             GROUP BY varenavn ORDER BY oms DESC LIMIT 15
-        """).fetchall()
+        """, (target_monday.isoformat(), target_sunday.isoformat())).fetchall()
         top_prev_map = {r['varenavn']: r['oms'] for r in conn.execute("""
             SELECT varenavn, ROUND(SUM(omsætning),0) AS oms FROM transaktioner
-            WHERE dato >= date('now','-28 days') AND dato < date('now','-14 days') AND varenavn != ''
+            WHERE dato >= ? AND dato <= ? AND varenavn != ''
             GROUP BY varenavn
-        """).fetchall()}
+        """, (prev_monday.isoformat(), prev_sunday.isoformat())).fetchall()}
 
-        # TGTG seneste 8 uger
+        # TGTG omkring den valgte uge (+-5 uger kontekst)
         tgtg_uger = conn.execute("""
             SELECT strftime('%Y-%W', dato) AS yw, MIN(dato) AS fra,
                    SUM(antal) AS poser, ROUND(SUM(kreditering),0) AS kr
             FROM tgtg_dagssalg
-            WHERE dato >= date('now','-56 days')
+            WHERE dato >= ? AND dato <= ?
             GROUP BY yw ORDER BY yw DESC LIMIT 8
-        """).fetchall()
+        """, (start_context.isoformat(), end_context.isoformat())).fetchall()
 
-        # Retur pr uge og pr vare (seneste 6 uger)
+        # Retur omkring den valgte uge
+        retur_start = start_context
+        retur_end = end_context
         retur_uger = conn.execute("""
             SELECT registreret_dato, kategori, SUM(antal) AS antal
-            FROM retur_detaljer WHERE registreret_dato >= date('now','-42 days')
+            FROM retur_detaljer WHERE registreret_dato >= ? AND registreret_dato <= ?
             GROUP BY registreret_dato, kategori ORDER BY registreret_dato DESC
-        """).fetchall()
+        """, (retur_start.isoformat(), retur_end.isoformat())).fetchall()
         retur_varer = conn.execute("""
             SELECT produkt, kategori, SUM(antal) AS antal
-            FROM retur_detaljer WHERE registreret_dato >= date('now','-28 days')
+            FROM retur_detaljer WHERE registreret_dato >= ? AND registreret_dato <= ?
             GROUP BY produkt, kategori ORDER BY antal DESC LIMIT 12
-        """).fetchall()
+        """, (target_monday.isoformat(), target_sunday.isoformat())).fetchall()
 
-        # Bestilling aktuel + naeste uge
-        iso_nu  = today.isocalendar()
-        iso_nxt = (today + timedelta(weeks=1)).isocalendar()
+        # Bestilling for den valgte uge + næste uge
         best_nu = conn.execute(
             "SELECT varenavn, total_antal FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 15",
-            (iso_nu[1], iso_nu[0])
+            (uge, aar)
         ).fetchall()
+        next_uge = uge + 1 if uge < 52 else 1
+        next_aar = aar if uge < 52 else aar + 1
         best_nxt = conn.execute(
             "SELECT varenavn, total_antal FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 15",
-            (iso_nxt[1], iso_nxt[0])
+            (next_uge, next_aar)
         ).fetchall()
 
     # Berig med vaekst
@@ -4525,8 +4542,8 @@ def generer_management_review(api_key: str, uge: int = None, aar: int = None) ->
     import anthropic, json
     from datetime import datetime
 
-    # TODO: Implementer uge/aar-filtrering i hent_management_data() når der er behov
-    data = hent_management_data()
+    # Hent data for den valgte uge (eller nuværende hvis ikke specificeret)
+    data = hent_management_data(uge=uge, aar=aar)
     prompt = _format_management_prompt(data)
 
     client = anthropic.Anthropic(api_key=api_key)

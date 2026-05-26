@@ -7274,7 +7274,8 @@ async function loadBernUge(uge, aar) {
 
   // Byg Basis vs Forslag sammenligning
   let basisSammenligning = '';
-  if (basisData.length > 0) {
+  // Vis ALTID sammenligningen (hvis data findes)
+  if (d.produkter && d.produkter.length > 0) {
     const DAGE = ['man','tir','ons','tor','fre','loe','son'];
     const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
     const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];

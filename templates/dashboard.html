@@ -1990,25 +1990,57 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="kpi-s" id="svind-netto-sub">faktura − retur</div>
           </div>
         </div>
-        <!-- SCORECARD -->
+        <!-- SCORECARD - FORBEDRET MED BEDRE FORKLARINGER -->
         <div class="scorecard" id="svind-scorecard" style="display:none;">
+          <!-- SVIND KORT -->
           <div class="sc-card">
-            <div class="sc-grade" id="sc-svind-grade">—</div>
-            <div class="sc-label">Svind</div>
-            <div class="sc-val" id="sc-svind-val">—</div>
-            <div class="sc-bench">A &lt;15% · B &lt;22% · C ≥22%</div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+              <div>
+                <div class="sc-grade" id="sc-svind-grade">—</div>
+                <div class="sc-label">Svind (Kassation)</div>
+                <div class="sc-val" id="sc-svind-val" style="font-size:18px;">—</div>
+              </div>
+              <div style="cursor:help;font-size:18px;opacity:.6;" title="Hvor meget af indkøbet bliver kasseret (mold, dårlige varer). Lavere = bedre.">❓</div>
+            </div>
+            <div style="padding-top:10px;border-top:1px solid rgba(30,58,30,.15);margin-top:10px;font-size:10px;color:rgba(30,58,30,.7);">
+              <div style="margin-bottom:4px;"><strong style="color:#2d5a2d;">A</strong> (Udmærket): Under 15%</div>
+              <div style="margin-bottom:4px;"><strong style="color:#4a7c4a;">B</strong> (Godt): 15-22% · også normalt for håndværk</div>
+              <div style="color:#8b4513;"><strong>C</strong> (Skal forbedres): Over 22%</div>
+            </div>
           </div>
+
+          <!-- RETUR KORT -->
           <div class="sc-card">
-            <div class="sc-grade" id="sc-retur-grade">—</div>
-            <div class="sc-label">Retur</div>
-            <div class="sc-val" id="sc-retur-val">—</div>
-            <div class="sc-bench">A &lt;8% · B &lt;14% · C ≥14%</div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+              <div>
+                <div class="sc-grade" id="sc-retur-grade">—</div>
+                <div class="sc-label">Retur (% af indkøb)</div>
+                <div class="sc-val" id="sc-retur-val" style="font-size:18px;">—</div>
+              </div>
+              <div style="cursor:help;font-size:18px;opacity:.6;" title="Returværdi som % af det du indkøbte. Inkluderer TGTG-salg. Højere = bedre resultat.">❓</div>
+            </div>
+            <div style="padding-top:10px;border-top:1px solid rgba(30,58,30,.15);margin-top:10px;font-size:10px;color:rgba(30,58,30,.7);">
+              <div style="margin-bottom:4px;"><strong style="color:#2d5a2d;">A</strong> (Udmærket): Under 8%</div>
+              <div style="margin-bottom:4px;"><strong style="color:#4a7c4a;">B</strong> (Godt): 8-14%</div>
+              <div style="color:#8b4513;"><strong>C</strong> (Skal forbedres): Over 14%</div>
+            </div>
           </div>
+
+          <!-- NETTO KORT -->
           <div class="sc-card">
-            <div class="sc-grade" id="sc-netto-grade">—</div>
-            <div class="sc-label">Netto</div>
-            <div class="sc-val" id="sc-netto-val">—</div>
-            <div class="sc-bench">A ≥85% · B ≥75% · C &lt;75%</div>
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;">
+              <div>
+                <div class="sc-grade" id="sc-netto-grade">—</div>
+                <div class="sc-label">Netto Regning</div>
+                <div class="sc-val" id="sc-netto-val" style="font-size:18px;">—</div>
+              </div>
+              <div style="cursor:help;font-size:18px;opacity:.6;" title="Hvad du betaler efter retur er trukket fra. Højere % = mindre spild.">❓</div>
+            </div>
+            <div style="padding-top:10px;border-top:1px solid rgba(30,58,30,.15);margin-top:10px;font-size:10px;color:rgba(30,58,30,.7);">
+              <div style="margin-bottom:4px;"><strong style="color:#2d5a2d;">A</strong> (Udmærket): Over 85%</div>
+              <div style="margin-bottom:4px;"><strong style="color:#4a7c4a;">B</strong> (Godt): 75-85%</div>
+              <div style="color:#8b4513;"><strong>C</strong> (Skal forbedres): Under 75%</div>
+            </div>
           </div>
         </div>
 

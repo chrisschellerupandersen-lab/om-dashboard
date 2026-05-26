@@ -123,6 +123,19 @@ def init_db():
                 PRIMARY KEY (uge, aar, varenummer, dag)
             );
 
+            CREATE TABLE IF NOT EXISTS basis_bestilling (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                varenummer      TEXT    NOT NULL,
+                varenavn        TEXT    NOT NULL,
+                dag             TEXT    NOT NULL,
+                anbefalet_antal INTEGER NOT NULL DEFAULT 0,
+                kategori        TEXT    DEFAULT '',
+                opdateret       TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(varenummer, dag) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_basis_vare ON basis_bestilling(varenummer);
+            CREATE INDEX IF NOT EXISTS idx_basis_dag ON basis_bestilling(dag);
+
             CREATE TABLE IF NOT EXISTS mobilepay (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 aar        INTEGER NOT NULL,
@@ -3426,6 +3439,86 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         "total_kr":        round(total_kr, 2),
         "faktisk":         False,
     }
+
+
+# ── BASIS BESTILLING (DAGLIG SKABELON) ────────────────────────────────────────
+
+def hent_basis_bestilling() -> List[Dict]:
+    """Hent alle basis-bestillinger (produkt × dag) med vareinfo."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT bb.varenummer, bb.varenavn, bb.dag, bb.anbefalet_antal,
+                   bb.kategori, bb.opdateret
+            FROM basis_bestilling bb
+            ORDER BY bb.varenavn, CASE bb.dag
+                WHEN 'man' THEN 0 WHEN 'tir' THEN 1 WHEN 'ons' THEN 2
+                WHEN 'tor' THEN 3 WHEN 'fre' THEN 4 WHEN 'loe' THEN 5
+                WHEN 'son' THEN 6 ELSE 7 END
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_basis_bestilling_ved_dag(dag: str) -> List[Dict]:
+    """Hent basis-bestillinger for en specifik ugedag."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT varenummer, varenavn, anbefalet_antal, kategori
+            FROM basis_bestilling
+            WHERE dag = ?
+            ORDER BY varenavn
+        """, (dag,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def gem_basis_bestilling(varenummer: str, varenavn: str, dag: str, antal: int, kategori: str = ''):
+    """Gem eller opdater en basis-bestillingslinje (produkt × dag)."""
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO basis_bestilling (varenummer, varenavn, dag, anbefalet_antal, kategori, opdateret)
+            VALUES (?, ?, ?, ?, ?, datetime('now','localtime'))
+            ON CONFLICT(varenummer, dag) DO UPDATE SET
+                anbefalet_antal = excluded.anbefalet_antal,
+                varenavn = excluded.varenavn,
+                kategori = excluded.kategori,
+                opdateret = datetime('now','localtime')
+        """, (varenummer, varenavn, dag, antal, kategori))
+        conn.commit()
+
+
+def slet_basis_bestilling_linje(varenummer: str, dag: str):
+    """Fjern en basis-bestillingslinje."""
+    with _conn() as conn:
+        conn.execute("DELETE FROM basis_bestilling WHERE varenummer = ? AND dag = ?",
+                    (varenummer, dag))
+        conn.commit()
+
+
+def bulk_opdater_basis_bestilling(updates: List[Dict]):
+    """Batch-opdater flere basis-bestillinger.
+
+    Input: [{varenummer, varenavn, dag, anbefalet_antal, kategori}, ...]
+    """
+    with _conn() as conn:
+        for upd in updates:
+            gem_basis_bestilling(
+                upd['varenummer'],
+                upd.get('varenavn', ''),
+                upd['dag'],
+                upd.get('anbefalet_antal', 0),
+                upd.get('kategori', '')
+            )
+        conn.commit()
+
+
+def hent_basis_bestilling_produkter() -> List[Dict]:
+    """Hent alle unikke produkter der er i basis_bestilling med deres kategori."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT varenummer, varenavn, kategori
+            FROM basis_bestilling
+            ORDER BY varenavn
+        """).fetchall()
+    return [dict(r) for r in rows]
 
 
 # ── VF DRILL-DOWN ─────────────────────────────────────────────────────────────

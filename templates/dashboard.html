@@ -5556,12 +5556,16 @@ function basisEditCell(varenummer, dag) {
     const newValue = parseInt(input.value) || 0;
     const prodInfo = _basisData.find(r => r.varenummer === varenummer);
 
-    // Tjek at cell stadig er i DOM før du updater
-    if (!cell.parentElement) return;
-
-    cell.innerHTML = '<span style="opacity:0.5;">…</span>';
-
     try {
+      // Vis loading-state hvis cell stadig eksisterer
+      try {
+        if (cell.parentElement) {
+          cell.innerHTML = '<span style="opacity:0.5;">…</span>';
+        }
+      } catch (e) {
+        // Ignorer fejl ved innerHTML
+      }
+
       const res = await fetch('/api/basis-bestilling/gem', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
@@ -5582,20 +5586,33 @@ function basisEditCell(varenummer, dag) {
           _basisData.push(found);
         }
         found.anbefalet_antal = newValue;
-        // Tjek igen at cell stadig er i DOM
-        if (cell.parentElement) {
-          cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
+
+        // Prøv at update cell, men ignorer fejl hvis det ikke virker
+        try {
+          if (cell.parentElement) {
+            cell.innerHTML = `<span class="basis-val">${newValue || '—'}</span>`;
+          }
+        } catch (e) {
+          // Cell er måske slettet fra DOM - det er OK, data er gemt
         }
         updateBasisSaveTime();
       } else {
-        if (cell.parentElement) {
-          cell.innerHTML = originalHtml;
+        try {
+          if (cell.parentElement) {
+            cell.innerHTML = originalHtml;
+          }
+        } catch (e) {
+          // Ignorer fejl
         }
         alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
       }
     } catch (e) {
-      if (cell.parentElement) {
-        cell.innerHTML = originalHtml;
+      try {
+        if (cell.parentElement) {
+          cell.innerHTML = originalHtml;
+        }
+      } catch (e2) {
+        // Ignorer fejl
       }
       alert('Fejl: ' + e.message);
     }

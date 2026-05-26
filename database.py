@@ -4246,6 +4246,32 @@ def hent_management_data(uge: int = None, aar: int = None) -> dict:
             GROUP BY dato ORDER BY dato
         """, (target_monday.isoformat(), target_sunday.isoformat())).fetchall()
 
+        # Seneste salgsdag (for sammenligning)
+        seneste_dato = None
+        seneste_dag = None
+        prev_dag_oms = None
+
+        # Hvis vi analyserer den valgte uge, brug sidste dag i den uge. Ellers brug seneste dag totalt
+        if uge_data:
+            seneste_dato = uge_data[-1]['dato']  # Sidste dag i den valgte uge
+        else:
+            seneste_dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+
+        if seneste_dato:
+            seneste_dag = conn.execute("""
+                SELECT ROUND(SUM(omsætning),0) AS oms,
+                       ROUND(SUM(avance)*100.0/NULLIF(SUM(omsætning),0),1) AS db_pct,
+                       COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS kunder
+                FROM transaktioner WHERE dato=?
+            """, (seneste_dato,)).fetchone()
+            # Samme dag forrige uge
+            prev_dag = (target_sunday - timedelta(weeks=1)).isoformat() if target_sunday else None
+            if prev_dag:
+                prev_dag_oms = conn.execute(
+                    "SELECT ROUND(SUM(omsætning),0) AS oms FROM transaktioner WHERE dato=?",
+                    (prev_dag,)
+                ).fetchone()
+
         # Kategorier i den valgte uge med vaekst vs samme uge året før
         prev_monday = target_monday - timedelta(weeks=52)
         prev_sunday = target_sunday - timedelta(weeks=52)
@@ -4376,7 +4402,7 @@ def hent_management_data(uge: int = None, aar: int = None) -> dict:
         "bestilling_nu":     [dict(r) for r in best_nu],
         "bestilling_naeste": [dict(r) for r in best_nxt],
         "kommende_events":   kommende_evt,
-        "aktuel_uge":        iso_nu[1],
+        "aktuel_uge":        uge,
     }
 
 def _tabel_findes(conn, navn: str) -> bool:

@@ -7272,7 +7272,92 @@ async function loadBernUge(uge, aar) {
     document.getElementById('bern-vurder-kort').style.display = 'none';
   }
 
+  // Byg Basis vs Forslag sammenligning
+  let basisSammenligning = '';
+  if (basisData.length > 0) {
+    const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+    const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+    const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+
+    // Gruppér efter kategori
+    const groups = {};
+    d.produkter.forEach(prod => {
+      const kat = prod.kategori || 'Andet';
+      if (!groups[kat]) groups[kat] = [];
+      groups[kat].push(prod);
+    });
+
+    let sammenligningRows = '';
+    const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+
+    for (const kat of katOrder) {
+      const prods = groups[kat];
+      if (!prods) continue;
+
+      sammenligningRows += `<tr style="background:rgba(45,74,45,.07);"><td colspan="9" style="font-weight:600;padding:8px;color:var(--forest);">${kat.toUpperCase()}</td></tr>`;
+
+      for (const prod of prods) {
+        DAGE.forEach(dag => {
+          const basis = prod.basis?.[dag] || 0;
+          const forslag = prod.anbefalet?.[dag] || 0;
+          const diff = forslag - basis;
+          const pct = basis > 0 ? Math.round((diff / basis) * 100) : 0;
+          const color = diff > 0 ? 'var(--moss)' : diff < 0 ? 'var(--danger)' : 'inherit';
+          const arrow = diff > 0 ? '⬆️' : diff < 0 ? '⬇️' : '✓';
+
+          sammenligningRows += `<tr style="font-size:12px;border-bottom:1px solid rgba(30,58,30,.08);">
+            <td style="padding:6px 8px;text-align:left;">${prod.varenavn} (${DAG_LBL[dag]})</td>
+            <td style="padding:6px;text-align:center;font-weight:500;">${basis}</td>
+            <td style="padding:6px;text-align:center;font-weight:500;">${forslag}</td>
+            <td style="padding:6px;text-align:center;color:${color};font-weight:600;">${diff > 0 ? '+' : ''}${diff} (${pct > 0 ? '+' : ''}${pct}%)</td>
+            <td style="padding:6px;text-align:center;">${arrow}</td>
+          </tr>`;
+        });
+      }
+    }
+
+    const totalBasis = d.produkter.reduce((s,p) => s + (p.total_basis || 0), 0);
+    const totalForslag = d.total_stk;
+    const totalDiff = totalForslag - totalBasis;
+    const totalPct = totalBasis > 0 ? Math.round((totalDiff / totalBasis) * 100) : 0;
+
+    basisSammenligning = `
+    <div style="background:rgba(45,74,45,.04);border:1px solid rgba(45,74,45,.15);border-radius:6px;padding:16px;margin-bottom:20px;">
+      <h3 style="margin:0 0 12px 0;color:var(--forest);font-size:14px;">📊 DIN BESTILLING VS BASIS</h3>
+
+      <div style="background:white;border-radius:4px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6;color:#333;">
+        <strong style="color:var(--forest);">Beregning:</strong><br>
+        Din Basis <strong>×</strong> SI ${d.si.toFixed(2)} (sæson) <strong>×</strong> ${(1 + (d.vaekst_pct||0)/100).toFixed(2)} (trend) ${d.event ? '<strong>×</strong> Event ('+d.event.navn+')' : ''} <strong>=</strong> Dit Forslag
+      </div>
+
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr style="background:rgba(45,74,45,.08);">
+            <th style="padding:8px;text-align:left;font-weight:600;color:var(--forest);">Produkt (Dag)</th>
+            <th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Basis</th>
+            <th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Forslag</th>
+            <th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Ændring</th>
+            <th style="padding:8px;text-align:center;">–</th>
+          </tr>
+        </thead>
+        <tbody>${sammenligningRows}</tbody>
+        <tfoot>
+          <tr style="background:rgba(45,74,45,.12);font-weight:700;border-top:2px solid var(--forest);">
+            <td style="padding:8px;text-align:left;color:var(--forest);">TOTAL</td>
+            <td style="padding:8px;text-align:center;color:var(--forest);">${totalBasis}</td>
+            <td style="padding:8px;text-align:center;color:var(--forest);">${totalForslag}</td>
+            <td style="padding:8px;text-align:center;color:${totalDiff > 0 ? 'var(--moss)' : totalDiff < 0 ? 'var(--danger)' : 'inherit'};font-weight:700;">
+              ${totalDiff > 0 ? '+' : ''}${totalDiff} (${totalPct > 0 ? '+' : ''}${totalPct}%)
+            </td>
+            <td style="padding:8px;text-align:center;">${totalDiff > 0 ? '⬆️' : totalDiff < 0 ? '⬇️' : '✓'}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }
+
   document.getElementById('beregner-tabel').innerHTML = `
+    ${basisSammenligning}
     ${evtNote}
     <div class="aar2-tbl-wrap">
       <div class="aar2-tbl-hdr">

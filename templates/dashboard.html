@@ -7425,11 +7425,7 @@ function bernVisSellthrough(data) {
         ${hdrCells}
       </tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-    <div style="padding:6px 14px;font-size:10px;color:var(--ash);line-height:1.6;border-top:1px solid var(--border);margin-top:2px;">
-      🔴 = sidst salg tidligt = sandsynligvis udsolgt &nbsp;·&nbsp; Hover for snit-tal<br>
-      <span style="color:var(--ash);opacity:.85;">⚠ Shopbox er manuelt tastet — stk-tal er estimater.${data.mp_andel_pct > 0 ? ` MobilePay ~${data.mp_andel_pct}% af omsætningen er ikke varekoblet — reelt salg er tilsvarende højere.` : ''}</span>
-    </div>`;
+    </table>`;
 }
 
 function _bernStTilTekst(data) {

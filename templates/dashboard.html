@@ -695,6 +695,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .sc-card{padding:12px 10px 10px;}
 }
 
+@media (max-width: 768px) {
+  /* Dagsoverblik: legend badges på 2 rækker på tablet */
+  #p-dagsoverblik > div:first-of-type > div:last-child {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 480px) {
   .kpi-v{font-size:18px;}
   .ov-top>.kpi:first-child .kpi-v{font-size:24px;}
@@ -715,6 +725,68 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* MobilePay inputfelter: fuld bredde */
   #p-mobilepay input[type="number"],#p-mobilepay select{width:100%;}
+
+  /* KPI rækker: en kolonne på meget små skærme */
+  .kpi-row,.kpi-row-2,.kpi-row-4,.kpi-row-5,.kpi-row-6,.kpi-row-8 {
+    grid-template-columns: 1fr !important;
+  }
+  .kpi-row > *:first-child,.kpi-row-4 > *:first-child,.kpi-row-5 > *:first-child,.kpi-row-6 > *:first-child,.kpi-row-8 > *:first-child {
+    grid-column: 1 !important;
+  }
+
+  /* Dagsoverblik mobile optimizations */
+  #p-dagsoverblik {
+    padding: 12px 8px calc(80px + env(safe-area-inset-bottom));
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:first-child {
+    gap: 6px;
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:first-child button {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  #dag-uge-label {
+    min-width: 60px;
+    font-size: 13px;
+  }
+
+  #dag-dato-range {
+    display: none;
+  }
+
+  /* Legend badges: stack on mobile */
+  #p-dagsoverblik > div:first-of-type > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-left: 0;
+    padding: 8px 0;
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:last-child span {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  /* Dagsoverblik tabel: mindre min-width */
+  #dag-tbl {
+    min-width: 100%;
+    font-size: 11px;
+  }
+
+  #dag-tbl th,#dag-tbl td {
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+
+  #dag-tbl th:first-child,#dag-tbl td:first-child {
+    min-width: 100px;
+    text-align: left;
+  }
 }
 </style>
 </head>

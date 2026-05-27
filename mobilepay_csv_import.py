@@ -92,7 +92,13 @@ def _find_kolonne(headers, kandidater):
 
 def parse_csv(path):
     # type: (str) -> list
-    """Parsér MobilePay portal CSV/Excel — returnerer [{dato, omsaetning_inkl}]."""
+    """Parsér MobilePay portal CSV/Excel — returnerer [{dato, omsaetning_netto, gebyr}].
+
+    For afregningsrapporter:
+    - Bruger kun "Betaling gennemført" entries (udelukker gebyrer, planlagte udbetalinger osv.)
+    - Nettobeløb = det beløb butikken modtager (efter gebyr)
+    - Gebyr = Beløb - Nettobeløb
+    """
     p = Path(path)
 
     # ── Excel (.xlsx) ─────────────────────────────────────────────────────────
@@ -140,46 +146,87 @@ def parse_csv(path):
     # Dato: 'Bogføringsdato' (afregningsrapport) eller 'Dato'/'Date'
     i_dato = _find_kolonne(headers, ['bogføringsdato', 'dato', 'date', 'dag', 'planlagt udbetalingsdato'])
 
-    # Beløb: 'Beløb' (afregningsrapport) eller 'Salg'/'Omsætning'
-    # Vigtigt: 'beløb' SKAL stå før 'salg' så 'Salgssted' ikke matches
-    i_salg = _find_kolonne(headers, ['beløb', 'nettobeløb', 'omsætning', 'amount', 'salg', 'sale'])
+    # Type-kolonne: filtrerer "Betaling gennemført"
+    i_type = _find_kolonne(headers, ['type'])
 
-    if i_dato is None or i_salg is None:
+    # Beløb (brutto, inkl. gebyr): primær beløb-kolonne
+    i_belob = _find_kolonne(headers, ['beløb', 'amount'])
+
+    # Nettobeløb (efter gebyr): beløb som butikken modtager
+    i_netto = _find_kolonne(headers, ['nettobeløb'])
+
+    if i_dato is None:
         raise RuntimeError(
-            f"Kan ikke finde Dato/Beløb-kolonner.\nFundne kolonner: {headers}"
+            f"Kan ikke finde Dato-kolonne.\nFundne kolonner: {headers}"
+        )
+    if i_belob is None:
+        raise RuntimeError(
+            f"Kan ikke finde Beløb-kolonne.\nFundne kolonner: {headers}"
         )
 
     print(f"Parsér '{p.name}'  ({len(data_rows)} rækker)")
-    print(f"Kolonner: Dato={headers[i_dato]!r}  Beløb={headers[i_salg]!r}")
+    print(f"Kolonner: Dato={headers[i_dato]!r}  Beløb={headers[i_belob]!r}", end='')
+    if i_netto is not None:
+        print(f"  Netto={headers[i_netto]!r}")
+    else:
+        print("  (ingen Nettobeløb-kolonne)")
+    if i_type is not None:
+        print(f"Type={headers[i_type]!r}")
 
     linjer = []
     for row in data_rows:
         if not any(c.strip() if isinstance(c, str) else c for c in row):
             continue
+
+        # Hvis der er en Type-kolonne, filtrer til kun "Betaling gennemført"
+        if i_type is not None:
+            type_val = row[i_type].strip() if i_type < len(row) else ''
+            if 'betaling gennemf' not in type_val.lower():
+                continue
+
         try:
             dato = _dato(row[i_dato]) if i_dato < len(row) else None
-            salg = _tal(row[i_salg]) if i_salg < len(row) else 0.0
+            belob = _tal(row[i_belob]) if i_belob < len(row) else 0.0
+            netto = _tal(row[i_netto]) if i_netto is not None and i_netto < len(row) else belob
         except Exception:
             continue
-        if dato is None or salg == 0:
+
+        if dato is None or belob == 0:
             continue
-        # Afregningsrapport-beløb er negative (udbetaling fra MobilePay → konto)
-        # → vi gemmer absolut-værdien som omsætning
-        salg = abs(salg)
+
+        # Afregningsrapport-beløb kan være negative (udbetaling fra MobilePay → konto)
+        # → vi gemmer absolut-værdien
+        belob = abs(belob)
+        netto = abs(netto)
+
+        # Gebyr = forskel mellem brutto og netto
+        gebyr = round(belob - netto, 2)
+
         linjer.append({
-            "dato":            dato,
-            "omsaetning_inkl": round(salg, 2),
-            "kilde":           "csv-portal",
+            "dato":               dato,
+            "omsaetning_netto": round(netto, 2),
+            "gebyr":             max(0, gebyr),  # Sikr at gebyr aldrig er negativt
+            "kilde":             "csv-portal",
         })
 
     # Aggregér hvis flere rækker per dato
     agg = {}
     for l in linjer:
         d = l["dato"]
-        agg[d] = agg.get(d, 0.0) + l["omsaetning_inkl"]
+        if d not in agg:
+            agg[d] = {"netto": 0.0, "gebyr": 0.0}
+        agg[d]["netto"] += l["omsaetning_netto"]
+        agg[d]["gebyr"] += l["gebyr"]
 
-    result = [{"dato": d, "omsaetning_inkl": round(v, 2), "kilde": "csv-portal"}
-              for d, v in sorted(agg.items())]
+    result = [
+        {
+            "dato":               d,
+            "omsaetning_netto": round(v["netto"], 2),
+            "gebyr":             round(v["gebyr"], 2),
+            "kilde":             "csv-portal"
+        }
+        for d, v in sorted(agg.items())
+    ]
     return result
 
 
@@ -225,12 +272,17 @@ def main():
         return
 
     print(f"\n{len(linjer)} dage klar til import:\n")
-    total = 0.0
+    total_netto = 0.0
+    total_gebyr = 0.0
     for l in linjer:
-        print(f"  {l['dato']}  {l['omsaetning_inkl']:>10,.2f} kr")
-        total += l["omsaetning_inkl"]
-    print(f"  {'-'*30}")
-    print(f"  Total        {total:>10,.2f} kr\n")
+        netto = l["omsaetning_netto"]
+        gebyr = l["gebyr"]
+        brutto = netto + gebyr
+        print(f"  {l['dato']}  Netto: {netto:>10,.2f}  Gebyr: {gebyr:>8,.2f}  (Brutto: {brutto:>10,.2f})")
+        total_netto += netto
+        total_gebyr += gebyr
+    print(f"  {'-'*70}")
+    print(f"  Total       Netto: {total_netto:>10,.2f}  Gebyr: {total_gebyr:>8,.2f}  (Brutto: {total_netto + total_gebyr:>10,.2f})\n")
 
     if args.vis:
         print("(--vis tilstand — ingen upload)")

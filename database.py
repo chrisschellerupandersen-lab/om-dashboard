@@ -145,10 +145,12 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS mobilepay_dag (
-                dato            TEXT    PRIMARY KEY,
-                omsaetning_inkl REAL    NOT NULL DEFAULT 0,
-                kilde           TEXT    DEFAULT 'api',
-                indlæst         TEXT    DEFAULT (datetime('now','localtime'))
+                dato              TEXT    PRIMARY KEY,
+                omsaetning_netto  REAL    NOT NULL DEFAULT 0,
+                gebyr             REAL    NOT NULL DEFAULT 0,
+                omsaetning_inkl   REAL    NOT NULL DEFAULT 0,
+                kilde             TEXT    DEFAULT 'api',
+                indlæst           TEXT    DEFAULT (datetime('now','localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS retur_detaljer (
@@ -843,18 +845,30 @@ def _mp_uge_netto(iso_aar: int, iso_uge: int) -> float:
 
 
 def gem_mobilepay_dag(linjer: list) -> int:
-    """Gem/opdater daglig MobilePay-omsætning. linjer = [{dato, omsaetning_inkl, kilde?}]"""
+    """Gem/opdater daglig MobilePay-omsætning.
+    linjer = [{dato, omsaetning_netto, gebyr?, omsaetning_inkl?, kilde?}]
+
+    Hvis kun omsaetning_inkl er givet (fra gammel API), bruges det som netto.
+    """
     with _conn() as conn:
         count = 0
         for l in linjer:
+            dato = l["dato"]
+            omsaetning_netto = l.get("omsaetning_netto") or l.get("omsaetning_inkl", 0)
+            gebyr = l.get("gebyr", 0)
+            omsaetning_inkl = l.get("omsaetning_inkl", omsaetning_netto + gebyr)
+            kilde = l.get("kilde", "api")
+
             conn.execute("""
-                INSERT INTO mobilepay_dag (dato, omsaetning_inkl, kilde)
-                VALUES (?, ?, ?)
+                INSERT INTO mobilepay_dag (dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(dato) DO UPDATE SET
-                    omsaetning_inkl = excluded.omsaetning_inkl,
-                    kilde           = excluded.kilde,
-                    indlæst         = datetime('now','localtime')
-            """, (l["dato"], l["omsaetning_inkl"], l.get("kilde", "api")))
+                    omsaetning_netto = excluded.omsaetning_netto,
+                    gebyr            = excluded.gebyr,
+                    omsaetning_inkl  = excluded.omsaetning_inkl,
+                    kilde            = excluded.kilde,
+                    indlæst          = datetime('now','localtime')
+            """, (dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde))
             count += 1
     return count
 
@@ -863,12 +877,12 @@ def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]
     with _conn() as conn:
         if fra_dato and til_dato:
             rows = conn.execute(
-                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag WHERE dato BETWEEN ? AND ? ORDER BY dato DESC",
+                "SELECT dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde FROM mobilepay_dag WHERE dato BETWEEN ? AND ? ORDER BY dato DESC",
                 (fra_dato, til_dato)
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag ORDER BY dato DESC LIMIT 90"
+                "SELECT dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde FROM mobilepay_dag ORDER BY dato DESC LIMIT 90"
             ).fetchall()
     return [dict(r) for r in rows]
 

@@ -476,7 +476,7 @@ INSTRUKTIONER:
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-3-5-haiku-20241022",
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -547,7 +547,8 @@ INSTRUKTIONER:
             parsed = parse_claude_json(raw)
         except Exception as je:
             print(f"[DEBUG] JSON parse fejl: {str(je)}")
-            return {"ok": False, "fejl": f"JSON invalidt. Prøv igen."}  # Simplificeret fejlbesked
+            print(f"[DEBUG] Raw Claude response: {raw[:500]}")
+            return {"ok": False, "fejl": f"JSON parse fejl: {str(je)[:100]}"}  # Simplificeret fejlbesked
 
         return {
             "ok": True,

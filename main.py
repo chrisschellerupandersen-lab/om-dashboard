@@ -1166,8 +1166,15 @@ async def mobilepay_dagssalg(request: Request):
     linjer = body.get("linjer", [])
     if not linjer:
         return {"ok": True, "linjer": 0}
-    count = database.gem_mobilepay_dag(linjer)
-    return {"ok": True, "linjer": count}
+    try:
+        count = database.gem_mobilepay_dag(linjer)
+        return {"ok": True, "linjer": count}
+    except Exception as e:
+        import traceback
+        err = f"gem_mobilepay_dag fejl: {e}"
+        traceback.print_exc()
+        print(f"[ERROR] {err}")
+        raise HTTPException(status_code=500, detail=err)
 
 
 @app.get("/api/mobilepay/dag")

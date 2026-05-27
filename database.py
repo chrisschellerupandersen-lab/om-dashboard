@@ -250,6 +250,8 @@ def init_db():
             "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
             "ALTER TABLE tgtg_poser ADD COLUMN enheder_per_pose INTEGER DEFAULT 1",
             "ALTER TABLE bager_regnskab ADD COLUMN faktura REAL DEFAULT 0",
+            "ALTER TABLE mobilepay_dag ADD COLUMN omsaetning_netto REAL DEFAULT 0",
+            "ALTER TABLE mobilepay_dag ADD COLUMN gebyr REAL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)

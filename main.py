@@ -379,7 +379,7 @@ async def api_beregner_vurder(request: Request):
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+        return {"ok": False, "fejl": "⚠️ AI-vurdering ikke tilgængelig — ANTHROPIC_API_KEY ikke sat på Railway"}
     try:
         body = await request.json()
         import anthropic as _ant, json as _json

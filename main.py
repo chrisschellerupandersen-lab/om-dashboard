@@ -1199,6 +1199,9 @@ async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
         importlib.reload(_mp_csv)
         linjer = _mp_csv.parse_csv(tmp_path)
     except Exception as exc:
+        print(f"[ERROR] CSV parse fejl: {exc}")
+        import traceback
+        traceback.print_exc()
         return {"ok": False, "fejl": str(exc)}
     finally:
         if tmp_path:
@@ -1207,11 +1210,25 @@ async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
             except OSError:
                 pass
     if not linjer:
-        return {"ok": True, "linjer": 0, "dage": 0, "total": 0,
+        return {"ok": True, "linjer": 0, "dage": 0, "total": 0, "total_gebyr": 0,
                 "besked": "Ingen gyldige rækker fundet — tjek at filen er en Afregningsrapport eller Salgsoversigt fra portalen"}
-    count = database.gem_mobilepay_dag(linjer)
-    total = sum(l["omsaetning_inkl"] for l in linjer)
-    return {"ok": True, "linjer": count, "dage": len(linjer), "total": round(total, 2)}
+    try:
+        count = database.gem_mobilepay_dag(linjer)
+        total_netto = sum(l.get("omsaetning_netto", l.get("omsaetning_inkl", 0)) for l in linjer)
+        total_gebyr = sum(l.get("gebyr", 0) for l in linjer)
+        return {
+            "ok": True,
+            "linjer": count,
+            "dage": len(linjer),
+            "total_netto": round(total_netto, 2),
+            "total_gebyr": round(total_gebyr, 2),
+            "total": round(total_netto + total_gebyr, 2)
+        }
+    except Exception as e:
+        print(f"[ERROR] gem_mobilepay_dag fejl: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"ok": False, "fejl": f"Fejl ved gemning: {str(e)}"}
 
 
 @app.get("/api/salg/mangler-kostpris")

@@ -7997,7 +7997,9 @@ async function mpUploadCsv() {
     if (data.ok === false) throw new Error(data.fejl || 'Ukendt fejl');
     statusEl.style.color = 'var(--moss)';
     if (data.dage > 0) {
-      statusEl.textContent = `✓ ${data.dage} dage importeret · total ${Math.round(data.total).toLocaleString('da-DK')} kr`;
+      const netto = Math.round(data.total_netto || data.total || 0).toLocaleString('da-DK');
+      const gebyr = Math.round(data.total_gebyr || 0).toLocaleString('da-DK');
+      statusEl.textContent = `✓ ${data.dage} dage importeret · netto ${netto} kr (gebyr: ${gebyr} kr)`;
     } else {
       statusEl.textContent = data.besked || '✓ Ingen nye dage (data allerede importeret)';
     }

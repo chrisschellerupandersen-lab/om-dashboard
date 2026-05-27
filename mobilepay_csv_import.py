@@ -238,6 +238,9 @@ def upload_til_railway(linjer):
         json={"secret": WEBHOOK_SECRET, "linjer": linjer},
         timeout=20,
     )
+    if r.status_code != 200:
+        print(f"[FEJL] HTTP {r.status_code}")
+        print(f"Svar: {r.text}")
     r.raise_for_status()
     result = r.json()
     print(f"[OK] Uploadet {result.get('linjer', '?')} dage til Railway")

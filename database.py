@@ -257,6 +257,19 @@ def init_db():
                 conn.execute(sql)
             except Exception:
                 pass  # kolonnen eksisterer allerede
+        # Oprydning MobilePay: tøm gammel data med forkert struktur
+        # (før migration til omsaetning_netto + gebyr)
+        # Tjek om tabellen har nogle rækker uden omsaetning_netto sat (gammelt format)
+        try:
+            result = conn.execute(
+                "SELECT COUNT(*) FROM mobilepay_dag WHERE omsaetning_netto = 0 AND omsaetning_inkl > 0"
+            ).fetchone()
+            if result and result[0] > 0:
+                # Nogle rækker har gammelt format → slet alt og start fresh
+                conn.execute("DELETE FROM mobilepay_dag")
+        except Exception:
+            pass  # Hvis noget går galt, fortsæt uden at slette
+
         # Oprydning: slet alle "ØKO - " stamdata-rækker importeret fra bestilling
         # LOWER() i SQLite håndterer ikke Ø → brug UPPER() i stedet
         conn.execute("DELETE FROM varestamdata WHERE UPPER(SUBSTR(varenavn,1,6)) = 'ØKO - '")

@@ -476,7 +476,7 @@ INSTRUKTIONER:
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-opus-4-8-2025-05-07",
+            model="claude-3-opus-20240229",
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )

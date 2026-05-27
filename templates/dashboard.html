@@ -7000,22 +7000,24 @@ async function loadBernUge(uge, aar) {
       basisMap[row.varenavn][row.dag] = row.anbefalet_antal;
     });
 
-    // Hent SI og vækst fra d
+    // Hent SI, vækst OG event-faktorer fra d
     const SI = d.si || 1.0;
     const vaekstFaktor = 1 + ((d.vaekst_pct || 0) / 100);
+    const eventDagFak = (d.event && d.event.dag_fak) ? d.event.dag_fak : {};
 
-    // Opdater produktlisten med basis-værdier JUSTERET med SI + trend
+    // Opdater produktlisten med basis-værdier JUSTERET med SI + trend + event
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {
         // Gem original basis
         prod.basis = basisMap[prod.varenavn];
 
-        // Anvend SI + trend på basis-værdierne
+        // Anvend SI + trend + event på basis-værdierne
         prod.anbefalet = {};
         const DAGE = ['man','tir','ons','tor','fre','loe','son'];
         DAGE.forEach(dag => {
           const basisVal = basisMap[prod.varenavn][dag] || 0;
-          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor);
+          const dagFak = eventDagFak[dag] || 1.0;  // Event dag-faktor (hvis event exists)
+          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak);
         });
 
         prod.total_basis = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
@@ -7301,7 +7303,8 @@ async function loadBernUge(uge, aar) {
     <div style="background:rgba(45,74,45,.04);border:1px solid rgba(45,74,45,.15);border-radius:6px;padding:16px;margin-bottom:20px;">
       <h3 style="margin:0 0 12px 0;color:var(--forest);font-size:14px;">📊 DIN BESTILLING VS BASIS</h3>
       <div style="background:white;border-radius:4px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6;color:#333;">
-        <strong style="color:var(--forest);">Beregning:</strong> Din Basis × SI ${d.si.toFixed(2)} (sæson) × ${(1 + (d.vaekst_pct||0)/100).toFixed(2)} (trend) ${d.event ? '× Event ('+d.event.navn+')' : ''} = Dit Forslag
+        <strong style="color:var(--forest);">Beregning pr. dag:</strong> Basis × SI ${d.si.toFixed(2)} (sæson) × ${(1 + (d.vaekst_pct||0)/100).toFixed(2)} (trend) ${d.event ? '× Event-faktor ('+d.event.navn+')' : 'uden event'} = Forslag
+        ${d.event && d.event.dag_fak ? '<br><small style="color:var(--ash);">⚠ Events har DAG-specifikke boosts (fx Grundlovsdag Fre: ×1.60) — ikke hele ugen</small>' : ''}
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead><tr style="background:rgba(45,74,45,.08);"><th style="padding:8px;text-align:left;font-weight:600;color:var(--forest);">Kategori</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Basis</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Forslag</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Ændring</th></tr></thead>

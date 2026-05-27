@@ -7520,7 +7520,28 @@ async function bernVurderBestilling() {
 
   const dagStr   = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
   const totalStk = Object.values(dagTotaler).reduce((s,v)=>s+v,0);
-  const evt    = d.event ? d.event.navn + ' — ' + (d.event.note||'') : 'ingen';
+
+  // Forbedret event-info med dag-specifikke faktorer
+  let evt = 'ingen';
+  if (d.event) {
+    const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+    const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+    evt = d.event.navn + ' — ' + (d.event.note||'');
+
+    // Tilføj dag-specifikke faktorer hvis tilgængelige
+    if (d.event.dag_fak) {
+      const starkDage = [];
+      DAGE.forEach((dag, idx) => {
+        const fak = d.event.dag_fak[dag] || 1.0;
+        if (fak > 1.05) {
+          starkDage.push(`${DAGE_DA[idx]}×${fak.toFixed(2)}`);
+        }
+      });
+      if (starkDage.length > 0) {
+        evt += ` [Boost: ${starkDage.join(', ')}]`;
+      }
+    }
+  }
   const vaekst = d.vaekst_pct != null ? d.vaekst_pct + '%' : 'ukendt';
   const tgtg   = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
 

@@ -7524,6 +7524,14 @@ async function bernVurderBestilling() {
   const dagStr   = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
   const totalStk = Object.values(dagTotaler).reduce((s,v)=>s+v,0);
 
+  // DEBUG: Log hvad vi sender til API
+  console.log('[VURDER] DOM-læste værdier:', {
+    totalStk: totalStk,
+    dagTotaler: dagTotaler,
+    cellCount: document.querySelectorAll('.bern-cell').length,
+    produktCount: Object.keys(produktByVN).length,
+  });
+
   // Forbedret event-info med dag-specifikke faktorer
   let evt = 'ingen';
   if (d.event) {

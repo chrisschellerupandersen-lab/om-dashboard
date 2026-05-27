@@ -384,6 +384,12 @@ async def api_beregner_vurder(request: Request):
         body = await request.json()
         import anthropic as _ant, json as _json
 
+        # Debug: check hvis API-nøgle bliver læst
+        if not api_key or api_key.strip() == "":
+            print("[ERROR] ANTHROPIC_API_KEY er tom eller ikke sat!")
+            return {"ok": False, "fejl": "API-nøgle er tom. Kontakt administrator."}
+        print(f"[DEBUG] API-nøgle længde: {len(api_key)}, starter med: {api_key[:10]}...")
+
         # Validér at vi har de vigtigste felter
         required_fields = ['uge', 'aar', 'dag_totaler', 'produkter']
         for field in required_fields:

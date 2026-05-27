@@ -2352,19 +2352,6 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="bern-kontekst-spinner" style="display:none;font-size:12px;color:var(--ash);padding:8px 0;">⏳ Analyserer data…</div>
         </div>
 
-        <!-- Sell-through kort -->
-        <div id="bern-st-kort" class="card" style="margin-bottom:14px;display:none;padding:0;overflow:hidden;">
-          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(30,58,30,.04);border-bottom:1px solid var(--border);">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--charcoal);">📊 SELL-THROUGH PR. DAG (snit <span id="bern-st-uger">—</span> uger)</div>
-            <div style="font-size:10px;color:var(--ash);">
-              <span style="display:inline-block;width:10px;height:10px;background:#2d5a2d;border-radius:2px;margin-right:3px;"></span>>95% udsolgt risk
-              <span style="display:inline-block;width:10px;height:10px;background:#c8a84b;border-radius:2px;margin:0 3px 0 8px;"></span>75-95% ok
-              <span style="display:inline-block;width:10px;height:10px;background:#c0392b;border-radius:2px;margin:0 3px 0 8px;"></span><75% spild
-            </div>
-          </div>
-          <div id="bern-st-tabel" style="overflow-x:auto;padding:0 0 4px;"></div>
-        </div>
-
         <!-- Uge-vælger + Opdater analyse knap -->
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
           <button onclick="bernPrev()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">←</button>
@@ -7360,7 +7347,6 @@ async function loadBeregner() {
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
   // Bemærk: auto-analyse FJERNET - brugeren skal klikke "Opdater analyse"
-  bernHentSellthrough();  // hent sell-through data
 }
 
 // ── SELL-THROUGH ─────────────────────────────────────────────────────────────

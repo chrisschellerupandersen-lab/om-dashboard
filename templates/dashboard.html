@@ -2601,11 +2601,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Dato</th>
-                <th class="num">Beløb inkl. moms</th>
-                <th class="num">Netto ex-moms</th>
+                <th class="num">Omsætning (netto)</th>
+                <th class="num" style="color:var(--ash);">Gebyr</th>
+                <th class="num" style="color:var(--ash);">Brutto</th>
                 <th style="font-size:10px;color:var(--ash);">Kilde</th>
               </tr></thead>
-              <tbody id="mp-dag-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
+              <tbody id="mp-dag-tbody"><tr><td colspan="5" class="empty">Indlæser…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -8028,10 +8029,10 @@ function mpToggleDag(hdr) {
 async function loadMobilepayDag() {
   _mpDagLoaded = true;
   const tbody = document.getElementById('mp-dag-tbody');
-  tbody.innerHTML = '<tr><td colspan="4" class="empty" style="padding:16px;">Indlæser…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:16px;">Indlæser…</td></tr>';
   const data = await api('/api/mobilepay/dag');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">Ingen daglige transaktioner endnu — upload en CSV-fil ovenfor</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Ingen daglige transaktioner endnu — upload en CSV-fil ovenfor</td></tr>';
     document.getElementById('mp-dag-lbl').textContent = '0 transaktioner';
     return;
   }
@@ -8041,14 +8042,16 @@ async function loadMobilepayDag() {
                         : k === 'api'        ? '<span style="color:var(--ash);">API</span>'
                         : k === 'api-feed'   ? '<span style="color:var(--ash);">Feed</span>'
                         : `<span style="color:var(--ash);">${k||'—'}</span>`;
-  // Grupper per måned med subtotaler
-  let html = '', prevMaaned = null, maanedSum = 0;
+  // Grupper per måned med subtotaler (netto + gebyr)
+  let html = '', prevMaaned = null, maanedNetto = 0, maanedGebyr = 0;
   const flush = (m) => {
     if (m == null) return '';
+    const brutto = maanedNetto + maanedGebyr;
     return `<tr style="background:rgba(30,58,30,.04);border-top:1px solid rgba(30,58,30,.1);">
       <td style="${mono}font-size:10px;color:var(--ash);padding:4px 16px;">${m}</td>
-      <td class="num" style="${mono}font-size:11px;font-weight:500;color:var(--forest);">${Math.round(maanedSum).toLocaleString('da-DK')} kr</td>
-      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(maanedSum/1.25).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:11px;font-weight:500;color:var(--forest);">${Math.round(maanedNetto).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(maanedGebyr).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(brutto).toLocaleString('da-DK')} kr</td>
       <td></td>
     </tr>`;
   };
@@ -8057,14 +8060,20 @@ async function loadMobilepayDag() {
     const mKey = `${AAR_MND_NAVNE[d.getMonth()]} ${d.getFullYear()}`;
     if (prevMaaned && mKey !== prevMaaned) {
       html += flush(prevMaaned);
-      maanedSum = 0;
+      maanedNetto = 0;
+      maanedGebyr = 0;
     }
     prevMaaned = mKey;
-    maanedSum += r.omsaetning_inkl;
+    const netto = r.omsaetning_netto || r.omsaetning_inkl || 0;
+    const gebyr = r.gebyr || 0;
+    const brutto = netto + gebyr;
+    maanedNetto += netto;
+    maanedGebyr += gebyr;
     html += `<tr>
       <td style="${mono}font-size:13px;">${fmtDato(r.dato)}</td>
-      <td class="num" style="${mono}">${r.omsaetning_inkl.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
-      <td class="num" style="${mono}color:var(--ash);">${(r.omsaetning_inkl/1.25).toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}">${netto.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}color:var(--ash);">${gebyr.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}color:var(--ash);">${brutto.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
       <td>${kildeLabel(r.kilde)}</td>
     </tr>`;
   }

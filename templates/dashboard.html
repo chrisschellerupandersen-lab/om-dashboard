@@ -7478,17 +7478,45 @@ async function bernVurderBestilling() {
   const DAGE = ['man','tir','ons','tor','fre','loe','son'];
   const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
 
-  // Læs aktuelle værdier direkte fra DOM-cellerne
+  // Læs aktuelle værdier direkte fra DOM-cellerne (ikke cached data)
   const dagTotaler = {};
   DAGE.forEach((dag, i) => { dagTotaler[DAGE_DA[i]] = 0; });
 
-  // Byg produkt-oversigt med varenavn til AI-matching
-  const produktListe = (d.produkter || []).map(p => {
-    const anb = p.anbefalet || {};
-    const total = DAGE.reduce((s,dag) => s + (anb[dag]||0), 0);
-    DAGE.forEach((dag,i) => { dagTotaler[DAGE_DA[i]] += (anb[dag]||0); });
-    return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => dag+':' + (anb[dag]||0)).join(' ')} = ${total} stk`;
-  }).join('\n');
+  // Byg produkt-oversigt ved at læse tabellen
+  const cells = document.querySelectorAll('.bern-cell');
+  const produktByVN = {};
+
+  cells.forEach(cell => {
+    const vn = cell.getAttribute('data-vn');
+    const dag = cell.getAttribute('data-dag');
+    const val = parseInt(cell.textContent) || 0;
+
+    if (!produktByVN[vn]) {
+      const prod = (d.produkter || []).find(p => (p.varenummer || '').toString() === vn);
+      produktByVN[vn] = {
+        vn: vn,
+        varenavn: prod?.varenavn || `Vare ${vn}`,
+        kategori: prod?.kategori || 'Øvrige',
+        dag_val: {}
+      };
+    }
+    produktByVN[vn].dag_val[dag] = val;
+
+    // Akkumulator dagTotaler
+    const dagIdx = DAGE.indexOf(dag);
+    if (dagIdx >= 0) {
+      dagTotaler[DAGE_DA[dagIdx]] += val;
+    }
+  });
+
+  // Byg produkt-oversigt fra DOM-læst data
+  const produktListe = Object.values(produktByVN)
+    .sort((a, b) => a.varenavn.localeCompare(b.varenavn))
+    .map(p => {
+      const total = DAGE.reduce((s, dag) => s + (p.dag_val[dag] || 0), 0);
+      return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => dag+':' + (p.dag_val[dag]||0)).join(' ')} = ${total} stk`;
+    })
+    .join('\n');
 
   const dagStr   = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
   const totalStk = Object.values(dagTotaler).reduce((s,v)=>s+v,0);

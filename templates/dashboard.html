@@ -7806,9 +7806,38 @@ async function bernGenererAnalyse() {
   btn.textContent = 'Analyserer…';
   btn.disabled    = true;
   tekst.style.color = 'var(--ash)';
-  tekst.textContent = '🤔 Henter bestillingsdata og vurderer…';
+  tekst.textContent = '🤔 Læser dine aktuelle tal og vurderer…';
 
-  const res = await api(`/api/bestilling/management-analyse?uge=${uge}&aar=${aar}`);
+  // Saml AKTUELLE værdier fra tabellen (som bernVurderBestilling gør)
+  const produkter = [];
+  const rows = document.querySelectorAll('#bern-table tbody tr');
+  for (const row of rows) {
+    const cells = row.querySelectorAll('.bern-cell');
+    if (!cells.length) continue;
+
+    const vn = row.dataset.vn;
+    const navn = row.querySelector('td:first-child')?.textContent?.trim() || '';
+
+    let total = 0;
+    const dag_values = [];
+    for (const cell of cells) {
+      const val = parseInt(cell.textContent.replace(/\D/g, '') || '0', 10);
+      total += val;
+      dag_values.push(val);
+    }
+
+    if (total > 0) {
+      produkter.push({
+        vn, navn, total, dag_values
+      });
+    }
+  }
+
+  const res = await api(`/api/bestilling/management-analyse?uge=${uge}&aar=${aar}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ produkter })
+  });
 
   btn.textContent = 'Generer ny ↻';
   btn.disabled    = false;

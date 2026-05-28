@@ -624,38 +624,84 @@ async def api_bestillings_anbefaling(
         }
 
 
-@app.get("/api/bestilling/management-analyse")
+@app.post("/api/bestilling/management-analyse")
 async def api_management_analyse(
     request: Request,
     uge: int,
     aar: int,
 ):
+    """Management-analyse med AKTUELLE værdier fra frontend (ikke database)."""
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"analyse": None, "fejl": "ANTHROPIC_API_KEY ikke konfigureret i Railway"}
 
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    # Hent basis-info fra database for sammenligning
     d = database.hent_bestillings_uge(int(uge), int(aar))
     if "fejl" in d or "error" in d:
         return {"analyse": None, "fejl": d.get("fejl") or d.get("error")}
 
-    # Byg kategori-opsummering
-    kat_map = {}
-    for p in d.get("produkter", []):
-        kat = p.get("kategori") or "Øvrige"
-        anbefalet = p.get("total_anbefalet", 0)
-        basis_total = sum((p.get("basis") or {}).values())
-        if kat not in kat_map:
-            kat_map[kat] = {"anbefalet": 0, "basis": 0}
-        kat_map[kat]["anbefalet"] += anbefalet
-        kat_map[kat]["basis"]     += basis_total
+    # Hvis frontend sender produkter, brug dem. Ellers fall back til database
+    produkter_data = body.get("produkter", [])
+
+    if produkter_data:
+        # Brug AKTUELLE værdier fra frontend
+        total_stk = sum(p.get("total", 0) for p in produkter_data)
+        # Estimat af pris baseret på basis-data (vi har ikke detaljerede priser fra frontend)
+        total_kr = total_stk * 12  # Approks gennemsnit
+
+        # Byg kategori-info fra basis for sammenligning
+        kat_map = {}
+        for p in d.get("produkter", []):
+            kat = p.get("kategori") or "Øvrige"
+            basis_total = sum((p.get("basis") or {}).values())
+            if kat not in kat_map:
+                kat_map[kat] = {"basis": 0}
+            kat_map[kat]["basis"] += basis_total
+
+        # Tilføj aktuelle værdier
+        for p_data in produkter_data:
+            navn = p_data.get("navn", "")
+            # Match kategori fra basis-data
+            kat = "Øvrige"
+            for p_basis in d.get("produkter", []):
+                if p_basis.get("varenavn", "").strip() == navn.strip():
+                    kat = p_basis.get("kategori", "Øvrige")
+                    break
+
+            if kat not in kat_map:
+                kat_map[kat] = {"basis": 0, "aktuel": 0}
+            if "aktuel" not in kat_map[kat]:
+                kat_map[kat]["aktuel"] = 0
+            kat_map[kat]["aktuel"] += p_data.get("total", 0)
+    else:
+        # Fall back til database værdier
+        total_stk = d.get("total_stk", 0)
+        total_kr = d.get("total_kr", 0)
+
+        kat_map = {}
+        for p in d.get("produkter", []):
+            kat = p.get("kategori") or "Øvrige"
+            anbefalet = p.get("total_anbefalet", 0)
+            basis_total = sum((p.get("basis") or {}).values())
+            if kat not in kat_map:
+                kat_map[kat] = {"aktuel": 0, "basis": 0}
+            kat_map[kat]["aktuel"] += anbefalet
+            kat_map[kat]["basis"] += basis_total
 
     kat_linjer = []
-    for kat, v in sorted(kat_map.items(), key=lambda x: -x[1]["anbefalet"]):
-        diff = v["anbefalet"] - v["basis"]
-        pct  = round(diff / v["basis"] * 100, 1) if v["basis"] > 0 else 0
+    for kat, v in sorted(kat_map.items(), key=lambda x: -x[1].get("aktuel", x[1].get("anbefalet", 0))):
+        aktuel = v.get("aktuel", v.get("anbefalet", 0))
+        basis = v.get("basis", 0)
+        diff = aktuel - basis
+        pct = round(diff / basis * 100, 1) if basis > 0 else 0
         kat_linjer.append(
-            f"  {kat}: {round(v['anbefalet'])} stk (basis: {round(v['basis'])} stk, "
+            f"  {kat}: {round(aktuel)} stk (basis: {round(basis)} stk, "
             f"ændring: {'+' if diff >= 0 else ''}{round(diff)} stk / {'+' if pct >= 0 else ''}{pct}%)"
         )
 
@@ -666,16 +712,16 @@ async def api_management_analyse(
 
 Gennemgå nedenstående bestillingsdata for uge {d['maal_uge']} {d['maal_aar']} og giv en kort, konkret management-vurdering på dansk.
 
-BESTILLINGSDATA:
+BESTILLINGSDATA (AKTUELLE VÆRDIER):
 - Måluge: {d['maal_uge']} {d['maal_aar']} ({d.get('dato_range','')})
 - Basisuge: {d['basis_uge']} {d['basis_aar']}
-- Anbefalet total: {round(d['total_stk'])} stk / {round(d['total_kr'])} kr ex moms
+- Forslået total: {round(total_stk)} stk / {round(total_kr)} kr ex moms
 - Sæsonindeks (SI): {d['si']:.2f} ({'+' if d['si'] >= 1 else ''}{round((d['si']-1)*100)}% ift. neutral)
 - Væksttrend: {'+' if d['vaekst_pct'] >= 0 else ''}{d['vaekst_pct']:.1f}%
 - Too Good To Go: {round(d['tgtg_kr'])} kr/uge {'⚠ FOR HØJ' if d.get('tgtg_advarsel') else '✓ OK' if d.get('tgtg_ok') else ''}
 {evt_txt}
 
-KATEGORI-FORDELING (anbefalet vs. basisuge):
+KATEGORI-FORDELING (aktuel vs. basis):
 {chr(10).join(kat_linjer)}
 
 Giv en management-vurdering med:
@@ -696,6 +742,9 @@ Vær direkte og konkret. Brug tal. Maks 200 ord."""
         tekst = msg.content[0].text
         return {"analyse": tekst}
     except Exception as e:
+        print(f"[ERROR] management-analyse fejl: {e}")
+        import traceback
+        traceback.print_exc()
         return {"analyse": None, "fejl": str(e)}
 
 

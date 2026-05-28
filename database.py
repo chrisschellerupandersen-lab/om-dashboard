@@ -1424,15 +1424,15 @@ def hent_margin_analyse(aar: int = None, kategori: str = None) -> List[Dict]:
                 varenavn,
                 MAX(kategori) AS kategori,
                 ROUND(SUM(omsætning)/1.25, 2) AS omsat_ex_moms,
-                ROUND(SUM(vf_korrekt), 2) AS vareforbrug,
+                ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vareforbrug,
                 ROUND(SUM(antal), 0) AS antal_solgt,
-                ROUND(SUM(db_korrekt), 2) AS db_kr,
-                ROUND(SUM(db_korrekt)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct,
+                ROUND(COALESCE(SUM(db_korrekt), 0), 2) AS db_kr,
+                ROUND(COALESCE(SUM(db_korrekt), 0)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct,
                 MAX(dato) AS seneste_salg
             FROM v_transaktioner
             WHERE {where_sql}
             GROUP BY varenavn
-            ORDER BY db_pct DESC
+            ORDER BY COALESCE(db_pct, 0) DESC, omsat_ex_moms DESC
         """, params).fetchall()
 
     return [dict(r) for r in rows]

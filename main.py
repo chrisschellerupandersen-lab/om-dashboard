@@ -234,6 +234,12 @@ async def api_top(request: Request, n: int = 20, aar: Optional[int] = None):
     return database.hent_top_produkter(min(n, 100), aar)
 
 
+@app.get("/api/salg/margin-analyse")
+async def api_margin_analyse(request: Request, aar: Optional[int] = None, kategori: Optional[str] = None):
+    _kræv_login(request)
+    return database.hent_margin_analyse(aar, kategori)
+
+
 @app.get("/api/salg/aarsdata")
 async def api_aarsdata(request: Request, aar: Optional[int] = None):
     _kræv_login(request)

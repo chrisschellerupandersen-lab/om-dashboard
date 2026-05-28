@@ -1403,6 +1403,41 @@ def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def hent_margin_analyse(aar: int = None, kategori: str = None) -> List[Dict]:
+    """Margin-analyse per produkt med detaljer."""
+    with _conn() as conn:
+        where_clauses = ["varenavn != ''"]
+        params = []
+
+        if aar:
+            where_clauses.append("strftime('%Y', dato) = ?")
+            params.append(str(aar))
+
+        if kategori:
+            where_clauses.append("kategori = ?")
+            params.append(kategori)
+
+        where_sql = " AND ".join(where_clauses)
+
+        rows = conn.execute(f"""
+            SELECT
+                varenavn,
+                MAX(kategori) AS kategori,
+                ROUND(SUM(omsætning)/1.25, 2) AS omsat_ex_moms,
+                ROUND(SUM(vf_korrekt), 2) AS vareforbrug,
+                ROUND(SUM(antal), 0) AS antal_solgt,
+                ROUND(SUM(db_korrekt), 2) AS db_kr,
+                ROUND(SUM(db_korrekt)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct,
+                MAX(dato) AS seneste_salg
+            FROM v_transaktioner
+            WHERE {where_sql}
+            GROUP BY varenavn
+            ORDER BY db_pct DESC
+        """, params).fetchall()
+
+    return [dict(r) for r in rows]
+
+
 def hent_dashboard_data() -> Dict:
     with _conn() as conn:
         count = conn.execute("SELECT COUNT(*) FROM transaktioner").fetchone()[0]

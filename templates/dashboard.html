@@ -1288,6 +1288,61 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- MARGIN ANALYSE -->
+      <div class="panel" id="p-margin">
+        <div class="page-hdr">
+          <h2>Margin Analyse</h2>
+          <p>Produktprofitabilitet efter omsætning, vareforbrug og bruttoavance</p>
+        </div>
+
+        <!-- Filter og sortering -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <select id="margin-aar-select" onchange="loadMarginAnalyse()"
+            style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-size:13px;">
+            <option value="">Alle år</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+          </select>
+          <select id="margin-kat-select" onchange="loadMarginAnalyse()"
+            style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-size:13px;">
+            <option value="">Alle kategorier</option>
+            <option value="Brød">Brød</option>
+            <option value="Boller">Boller</option>
+            <option value="Wienerbrød">Wienerbrød</option>
+            <option value="Kager">Kager</option>
+            <option value="Diverse">Diverse</option>
+          </select>
+          <button onclick="loadMarginAnalyse()" style="margin-left:auto;background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+
+        <!-- Tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Alle produkter sorteret efter DB%</span>
+            <span class="aar2-tbl-hdr-r" id="margin-tbl-lbl"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="min-width:900px;">
+              <thead>
+                <tr style="background:rgba(30,58,30,.04);">
+                  <th style="text-align:left;padding:8px 12px;">Produkt</th>
+                  <th style="text-align:center;padding:8px 4px;color:var(--ash);font-size:11px;width:80px;">Kategori</th>
+                  <th class="num">Omsætning (ex)</th>
+                  <th class="num">Vareforbrug</th>
+                  <th class="num">DB kr</th>
+                  <th class="num">DB%</th>
+                  <th class="num">Antal</th>
+                  <th class="num" style="font-size:11px;">Seneste</th>
+                </tr>
+              </thead>
+              <tbody id="margin-tbody">
+                <tr><td colspan="8" class="empty">Indlæser…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- DAGE · PRODUKTER -->
       <div class="panel" id="p-dagedetaljer">
         <div class="dage-hdr">
@@ -2935,6 +2990,7 @@ const NAV_SVG = {
   time:         '<path d="M1 12l4-5 3 2 4-6 3 4H1z"/>',
   kategori:     '<path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2l5 3-5 3-5-3 5-3zM3 9.5l4 2.3v2.7l-4-2.3V9.5zm6 2.3l4-2.3v2.7l-4 2.3v-2.7z"/>',
   top:          '<path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/>',
+  margin:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.5 9.5h1v1h-1zm0-4h1v3h-1zm2-2h1v5h-1zm-4 2h1v3h-1z"/>',
   dagedetaljer: '<path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/>',
   aar:          '<path d="M2 14V5l6-4 6 4v9H2zm5-1h2V9H7v4zm-3 0h2v-3H4v3zm6 0h2v-3h-2v3z"/>',
   kaffe:        '<path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/>',
@@ -2960,6 +3016,7 @@ const NAV_DEFAULT = [
   {id:'uge',         label:'Ugeoversigt',           group:'Salg & økonomi',      hidden:false},
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
+  {id:'margin',      label:'Margin Analyse',        group:'Salg & økonomi',      hidden:false},
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
@@ -4379,6 +4436,38 @@ function topToggle(gid, hdr) {
   const open = rows.length > 0 && rows[0].style.display === 'none';
   rows.forEach(r => r.style.display = open ? '' : 'none');
   if (arr) arr.textContent = open ? '▼' : '▶';
+}
+
+// ── MARGIN ANALYSE ────────────────────────────────────────────────────────────
+async function loadMarginAnalyse() {
+  const aar = document.getElementById('margin-aar-select').value;
+  const kat = document.getElementById('margin-kat-select').value;
+  const url = `/api/salg/margin-analyse${aar || kat ? '?' : ''}${aar ? 'aar=' + aar : ''}${aar && kat ? '&' : ''}${kat ? 'kategori=' + encodeURIComponent(kat) : ''}`;
+
+  const data = await api(url);
+  if (!data) return;
+
+  const tbody = document.getElementById('margin-tbody');
+  const mono = "font-family:'DM Mono',monospace;";
+
+  tbody.innerHTML = data.map((r, i) => {
+    const dbColor = r.db_pct >= 35 ? '#2d5a2d' : r.db_pct >= 20 ? '#7a5c00' : '#9b3420';
+    const dbBg = r.db_pct >= 35 ? 'rgba(74,124,74,.1)' : r.db_pct >= 20 ? 'rgba(200,168,75,.15)' : 'rgba(155,52,32,.1)';
+    const datoStr = r.seneste_salg ? r.seneste_salg.substring(5) : '—';
+
+    return `<tr style="background:rgba(30,58,30,.01);">
+      <td style="padding:8px 12px;color:var(--charcoal);">${r.varenavn}</td>
+      <td style="text-align:center;padding:8px 4px;color:var(--ash);font-size:12px;">${r.kategori || '—'}</td>
+      <td class="num" style="font-size:12px;">${Math.round(r.omsat_ex_moms).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}color:var(--ash);">${Math.round(r.vareforbrug).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}">${Math.round(r.db_kr).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span style="${mono}font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct.toFixed(1)}%</span></td>
+      <td class="num" style="font-size:12px;">${Math.round(r.antal_solgt).toLocaleString('da-DK')} stk</td>
+      <td class="num" style="font-size:11px;color:var(--ash);${mono}">${datoStr}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('margin-tbl-lbl').textContent = data.length + ' produkter';
 }
 
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────

@@ -237,7 +237,19 @@ async def api_top(request: Request, n: int = 20, aar: Optional[int] = None):
 @app.get("/api/salg/margin-analyse")
 async def api_margin_analyse(request: Request, aar: Optional[int] = None, kategori: Optional[str] = None):
     _kræv_login(request)
-    return database.hent_margin_analyse(aar, kategori)
+    data = database.hent_margin_analyse(aar, kategori)
+    # DEBUG: hvis ingen data, returnér info om hvad der er i databasen
+    if not data:
+        import sqlite3
+        try:
+            conn = sqlite3.connect(database.DB_PATH)
+            trans_count = conn.execute("SELECT COUNT(*) FROM transaktioner").fetchone()[0]
+            v_trans_count = conn.execute("SELECT COUNT(*) FROM v_transaktioner").fetchone()[0]
+            conn.close()
+            return {"debug": f"transaktioner={trans_count}, v_transaktioner={v_trans_count}", "data": []}
+        except:
+            pass
+    return data
 
 
 @app.get("/api/salg/aarsdata")

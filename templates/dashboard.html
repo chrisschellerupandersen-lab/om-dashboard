@@ -8528,9 +8528,9 @@ async function vfDrillDown(aar, maaned, type) {
     }
     const rows = d.bager_vf.map(r => ({
       ...r,
-      bagerFaktura: (r.faktura||0) - (r.retur_ialt||0),
-      netto: r.netto ?? ((r.faktura||0) - (r.retur_ialt||0)),
-      diff:  (r.netto ?? ((r.faktura||0) - (r.retur_ialt||0))) - ((r.faktura||0) - (r.retur_ialt||0)),
+      bagerFaktura: r.netto || 0,  // netto fra API = faktura - retur allerede beregnet
+      vf_netto: r.netto || 0,
+      diff: 0,  // VF-data ikke tilgængelig på uge-niveau her, viser som —
     }));
     const totalBestilt = rows.reduce((s,r) => s + (r.bestilt_kr||0), 0);
     const totalFaktura = rows.reduce((s,r) => s + (r.bagerFaktura||0), 0);
@@ -8553,17 +8553,17 @@ async function vfDrillDown(aar, maaned, type) {
             <td style="padding:8px 8px;font-weight:500;">Uge ${r.uge}</td>
             <td style="padding:8px 8px;${mono}font-size:11px;color:var(--ash);">${r.aar}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bestilt_kr>0?dk(r.bestilt_kr)+' kr':'—'}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${dk(r.netto)} kr</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr(r.diff)}">${dkDiff(r.diff)}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--forest);font-weight:500;">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">—</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">—</td>
           </tr>`).join('')}
         </tbody>
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
           <td colspan="2" style="padding:10px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalBestilt)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalFaktura)} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:14px;font-weight:600;color:var(--forest);">${dk(totalNetto)} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${diffClr(totalDiff)}">${dkDiff(totalDiff)}</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;color:var(--ash);">—</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;color:var(--ash);">—</td>
         </tr></tfoot>
       </table>`;
   } else {

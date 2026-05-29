@@ -3286,9 +3286,17 @@ async function api(path, opts) {
   try {
     const r = await fetch(path, opts);
     if (r.status === 401) { window.location.href = '/login'; return null; }
-    if (!r.ok) return null;
-    return r.json();
-  } catch { return null; }
+    if (!r.ok) {
+      console.error(`API error for ${path}: status ${r.status}`, r);
+      return null;
+    }
+    const json = await r.json();
+    console.debug(`API success for ${path}:`, json);
+    return json;
+  } catch(e) {
+    console.error(`API fetch error for ${path}:`, e);
+    return null;
+  }
 }
 
 // ── MOMS-TOGGLE ──────────────────────────────────────────────────────────────
@@ -8519,7 +8527,8 @@ async function vfDrillDown(aar, maaned, type) {
   modal.style.display   = 'flex';
 
   const d = await api(`/api/aarsplan/vf-detaljer?aar=${aar}&maaned=${maaned}`);
-  if (!d) { body.innerHTML = `<p style="color:var(--danger);">Fejl ved hentning</p>`; return; }
+  console.log('vfDrillDown API response:', d);
+  if (!d) { body.innerHTML = `<p style="color:var(--danger);">Fejl ved hentning (API returnerede null)</p>`; return; }
 
   if (type === 'bager') {
     if (!d.bager_vf || !d.bager_vf.length) {
@@ -8533,6 +8542,8 @@ async function vfDrillDown(aar, maaned, type) {
       diff: (r.vf_maaned || 0) - (r.netto || 0),  // negativ = sparede, positiv = tabte
     }));
     const totalBestilt = rows.reduce((s,r) => s + (r.bestilt_kr||0), 0);
+    const totalOmsatInkl = rows.reduce((s,r) => s + (r.omsat_inkl_uge||0), 0);
+    const totalOmsatEx = rows.reduce((s,r) => s + (r.omsat_ex_uge||0), 0);
     const totalFaktura = rows.reduce((s,r) => s + (r.bagerFaktura||0), 0);
     const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
     const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);
@@ -8544,6 +8555,8 @@ async function vfDrillDown(aar, maaned, type) {
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;letter-spacing:.08em;color:var(--ash);">UGE</th>
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">ÅR</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BESTILT KR</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">OMSÆTNING INKL. MOMS</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">OMSÆTNING EX-MOMS</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BAGER FAKTURA</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">VF (NETTO)</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">DIFF</th>
@@ -8556,6 +8569,8 @@ async function vfDrillDown(aar, maaned, type) {
             <td style="padding:8px 8px;font-weight:500;">Uge ${r.uge}</td>
             <td style="padding:8px 8px;${mono}font-size:11px;color:var(--ash);">${r.aar}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bestilt_kr>0?dk(r.bestilt_kr)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.omsat_inkl_uge>0?dk(r.omsat_inkl_uge)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.omsat_ex_uge>0?dk(r.omsat_ex_uge)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--forest);font-weight:500;">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${r.vf_netto>0?dk(r.vf_netto)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr}">${dkDiff}</td>
@@ -8564,6 +8579,8 @@ async function vfDrillDown(aar, maaned, type) {
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
           <td colspan="2" style="padding:10px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalBestilt)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalOmsatInkl)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalOmsatEx)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalFaktura)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(rows.reduce((s,r)=>s+r.vf_netto,0))} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${rows.reduce((s,r)=>s+r.diff,0)>0?'color:var(--danger)':'color:var(--moss)'};">${(rows.reduce((s,r)=>s+r.diff,0)>=0?'+':'')+dk(rows.reduce((s,r)=>s+r.diff,0))} kr</td>

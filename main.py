@@ -1479,7 +1479,13 @@ async def api_debug_varer(request: Request, q: str = "", bon: str = ""):
 @app.get("/api/aarsplan/vf-detaljer")
 async def api_vf_detaljer(request: Request, aar: int, maaned: int):
     _kræv_login(request)
-    return database.hent_vf_detaljer(aar, maaned)
+    try:
+        return database.hent_vf_detaljer(aar, maaned)
+    except Exception as e:
+        import traceback
+        print(f"ERROR in vf_detaljer: {e}")
+        traceback.print_exc()
+        return {"error": str(e), "bager_vf": [], "andet_vf": []}
 
 
 @app.get("/api/bager/fordelingsnoegle")

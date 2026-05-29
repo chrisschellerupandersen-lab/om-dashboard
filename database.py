@@ -3672,29 +3672,31 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
 
             dag_data = conn.execute("""
                 SELECT dato,
-                       ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_dag,
+                       ROUND(COALESCE(SUM(omsætning), 0), 2) AS omsat_inkl_dag,
+                       ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_ex_dag,
                        ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_dag
                 FROM v_transaktioner
                 WHERE dato >= ? AND dato <= ?
                 GROUP BY dato ORDER BY dato
             """, (mandag_dato.isoformat(), sondag_dato.isoformat())).fetchall()
 
-            # Byg map: dato → (omsætning, vf)
-            dag_map = {r["dato"]: (r["omsat_dag"], r["vf_dag"]) for r in dag_data}
+            # Byg map: dato → (omsætning inkl, omsætning ex, vf)
+            dag_map = {r["dato"]: (r["omsat_inkl_dag"], r["omsat_ex_dag"], r["vf_dag"]) for r in dag_data}
 
             # Fordel faktura og VF efter FAKTISK SALG hver dag
             netto_maaned = 0.0
             vf_maaned = 0.0
-            omsat_total = sum(v[0] for v in dag_map.values())
+            omsat_total = sum(v[1] for v in dag_map.values())  # ex-moms
+            omsat_total_inkl = sum(v[0] for v in dag_map.values())  # inkl-moms
 
             for i in range(7):
                 dag = mon_dato + _td(days=i)
                 dag_str = dag.isoformat()
-                omsat_dag, vf_dag = dag_map.get(dag_str, (0, 0))
+                omsat_inkl_dag, omsat_ex_dag, vf_dag = dag_map.get(dag_str, (0, 0, 0))
 
                 if dag.month == maaned and dag.year == aar and omsat_total > 0:
                     # Fordel efter andel af samlet uge-salg
-                    andel = omsat_dag / omsat_total
+                    andel = omsat_ex_dag / omsat_total
                     netto_maaned += fakt_netto * andel
                     vf_maaned += vf_dag  # VF allerede fordelt per dag
 
@@ -3703,10 +3705,11 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
                     if (mon_dato + _td(days=i)).month == maaned and (mon_dato + _td(days=i)).year == aar), 2)
                 bager_rækker.append({
                     "uge": w, "aar": y,
+                    "omsat_inkl_uge": round(omsat_total_inkl, 2),
+                    "omsat_ex_uge":   round(omsat_total, 2),
                     "faktura":    round(row["faktura"] or 0, 2),
                     "retur_ialt": round(row["retur_ialt"] or 0, 2),
                     "netto":      round(netto_maaned, 2),
-                    "vf_uge":     round(vf_uge, 2),
                     "vf_maaned":  round(vf_maaned, 2),
                     "bestilt_kr": bestilt_andel,
                 })

@@ -1442,7 +1442,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Måned</th>
-                <th class="num" title="Shopbox omsætning inkl. moms">Omsat</th>
+                <th class="num" title="Shopbox omsætning inkl. moms">Omsætning inkl. moms</th>
+                <th class="num" title="Total omsætning ex-moms (÷1.25)">Omsætning ex-moms</th>
                 <th class="num" title="MobilePay omsætning ex-moms (÷1.25) — indgår i Netto omsat" style="color:rgba(100,200,100,.8);">MP ex-moms</th>
                 <th class="num" title="Total netto ex-moms = (Shopbox + MobilePay) ÷ 1.25">Netto omsat</th>
                 <th class="num" title="Bager faktura efter retur-kreditering (ex-moms)">Bager Faktura</th>
@@ -5039,6 +5040,7 @@ function buildAar() {
     return `<tr class="${r.isIndev?'indev':''}">
       <td><strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
       <td class="num">${dk(r.omsat)}</td>
+      <td class="num">${dk(r.omsat/1.25)}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mpNetto > 0 ? dk(r.mpNetto) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
       <td class="num" style="${ash}">${r.netto!=null?dk(r.netto):'—'}</td>
       <td class="num" style="${ash}${r.bagerVF>0?clk:''}" title="${r.bagerVF>0?'Klik for ugeoversigt':''}"

@@ -8528,10 +8528,12 @@ async function vfDrillDown(aar, maaned, type) {
     }
     const rows = d.bager_vf.map(r => ({
       ...r,
+      bagerFaktura: (r.faktura||0) - (r.retur_ialt||0),
       netto: r.netto ?? ((r.faktura||0) - (r.retur_ialt||0)),
-      diff:  (r.netto ?? ((r.faktura||0) - (r.retur_ialt||0))) - (r.bestilt_kr||0),
+      diff:  (r.netto ?? ((r.faktura||0) - (r.retur_ialt||0))) - ((r.faktura||0) - (r.retur_ialt||0)),
     }));
     const totalBestilt = rows.reduce((s,r) => s + (r.bestilt_kr||0), 0);
+    const totalFaktura = rows.reduce((s,r) => s + (r.bagerFaktura||0), 0);
     const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
     const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);
     const diffClr = v => v > 0 ? 'color:var(--danger)' : v < 0 ? 'color:var(--moss)' : 'color:var(--ash)';
@@ -8542,6 +8544,7 @@ async function vfDrillDown(aar, maaned, type) {
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;letter-spacing:.08em;color:var(--ash);">UGE</th>
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">ÅR</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BESTILT KR</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BAGER FAKTURA</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">VF (NETTO)</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">DIFF</th>
         </tr></thead>
@@ -8550,6 +8553,7 @@ async function vfDrillDown(aar, maaned, type) {
             <td style="padding:8px 8px;font-weight:500;">Uge ${r.uge}</td>
             <td style="padding:8px 8px;${mono}font-size:11px;color:var(--ash);">${r.aar}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bestilt_kr>0?dk(r.bestilt_kr)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${dk(r.netto)} kr</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr(r.diff)}">${dkDiff(r.diff)}</td>
           </tr>`).join('')}
@@ -8557,6 +8561,7 @@ async function vfDrillDown(aar, maaned, type) {
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
           <td colspan="2" style="padding:10px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalBestilt)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalFaktura)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:14px;font-weight:600;color:var(--forest);">${dk(totalNetto)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${diffClr(totalDiff)}">${dkDiff(totalDiff)}</td>
         </tr></tfoot>

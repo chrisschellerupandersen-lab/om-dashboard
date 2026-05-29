@@ -3660,23 +3660,37 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
             """, (w, y)).fetchone()
             if not row or (row["faktura"] or 0) <= 0:
                 continue
+
             fakt_netto = round((row["faktura"] or 0) - (row["retur_ialt"] or 0), 2)
             mon_dato = _date.fromisocalendar(y, w, 1)
-            # Beregn andel der falder i denne måned via fordelingsnøglen
+
+            # Hent faktisk VF fra transaktioner for denne uge (v_transaktioner har vf_korrekt)
+            uge_vf = conn.execute("""
+                SELECT ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_uge
+                FROM v_transaktioner
+                WHERE strftime('%Y', dato) = ? AND CAST(strftime('%W', dato) AS INTEGER) = ?
+            """, (str(y), str(w))).fetchone()
+            vf_uge = uge_vf["vf_uge"] if uge_vf else 0
+
+            # Fordel faktura og VF efter dage i hver måned
             netto_maaned = 0.0
-            vaegt_maaned = 0.0
+            vf_maaned = 0.0
             for i in range(7):
                 dag = mon_dato + _td(days=i)
                 if dag.month == maaned and dag.year == aar:
-                    netto_maaned += fakt_netto * nøgle_vf[i]
-                    vaegt_maaned += nøgle_vf[i]
-            if netto_maaned > 0:
-                bestilt_andel = round((row["bestilt_kr_uge"] or 0) * vaegt_maaned, 2)
+                    netto_maaned += fakt_netto / 7  # ligeligt fordelt per dag
+                    vf_maaned += vf_uge / 7
+
+            if netto_maaned > 0 or vf_maaned > 0:
+                bestilt_andel = round((row["bestilt_kr_uge"] or 0) / 7 * sum(1 for i in range(7)
+                    if (mon_dato + _td(days=i)).month == maaned and (mon_dato + _td(days=i)).year == aar), 2)
                 bager_rækker.append({
                     "uge": w, "aar": y,
                     "faktura":    round(row["faktura"] or 0, 2),
                     "retur_ialt": round(row["retur_ialt"] or 0, 2),
                     "netto":      round(netto_maaned, 2),
+                    "vf_uge":     round(vf_uge, 2),
+                    "vf_maaned":  round(vf_maaned, 2),
                     "bestilt_kr": bestilt_andel,
                 })
 

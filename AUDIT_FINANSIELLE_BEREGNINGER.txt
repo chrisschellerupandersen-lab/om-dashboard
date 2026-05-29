@@ -1,0 +1,204 @@
+================================================================================
+AUDIT: FINANSIELLE BEREGNINGER - KONSISTENS OG KORREKTHED
+================================================================================
+Dato: 2026-05-28
+Status: IN PROGRESS
+
+================================================================================
+1. FORMLER OG KILDER
+================================================================================
+
+[A] OMSAETNING (fra Shopbox transaktioner)
+--------------------------------------------
+Kilde:          POS system (Shopbox)
+Gemt som:       omsætning (inkl. 25% moms)
+Konvertering:   omsætning_ex_moms = omsætning / 1.25
+
+Brugt i:
+- database.py v_transaktioner VIEW (omsaetning_ex_moms)
+- Alle dashboard beregninger
+- KPI beregninger
+- DB beregninger
+
+KRITISK: Alle steder skal bruge SAMME divisor (1.25)
+
+
+[B] VAREFORBRUG (VF)
+--------------------------------------------
+Beregning:      CASE
+                  WHEN varestamdata.pris_ex_moms > 0 AND portioner > 0
+                  THEN antal * pris_ex_moms / portioner
+                  ELSE kostpris (fra transaktioner)
+                END
+
+Kilder:
+- varestamdata.pris_ex_moms (hvis eksisterer)
+- varestamdata.portioner (hvis > 0)
+- FALLBACK: transaktioner.kostpris
+
+VIGTIG:
+- Hvis portioner = 0 eller NULL -> bruges kostpris
+- Hvis pris_ex_moms mangler -> bruges kostpris
+- Alle produkter der deles skal have korrekt portioner!
+  Eksempel: Studenterbrød købt som 1 stk, delt i 16 -> portioner = 16
+
+SENESTE FIX:
+- Studenterbrød portioner sat til 16 (var 1)
+
+
+[C] BRUTTOAVANCE / DB (Deckkingsbidrag)
+--------------------------------------------
+Beregning:      db_korrekt = omsaetning_ex_moms - vf_korrekt
+                           = (omsætning / 1.25) - vf
+
+DB i procent:   db_pct = db_korrekt * 1.25 / NULLIF(omsætning, 0) * 100
+
+Brugt i:
+- database.py hent_dag_db_detalje() funktion
+- Dashboard DB detalje panel
+- KPI beregninger
+
+NOTE: DB% formlen ser uintuitiv ud men er teknisk korrekt:
+- db_korrekt er allerede "ex_moms"
+- omsætning i formlen er "inkl. moms"
+- Derfor faktor 1.25 for at konvertere tilbage
+
+
+[D] BAGER FAKTURA FORDELING (Månedsskift)
+--------------------------------------------
+PROBLEM: Hvis en ISO-uge går over to måneder (fx uge 13: 27 mar - 2 apr),
+skal baker-fakturaen fordeles korrekt mellem månederne.
+
+LØSNING:
+1. Hent faktisk omsætning per dag for ugen (fra v_transaktioner)
+2. Beregn total uge-omsætning
+3. For hver dag i ugen:
+   - Hvis dag ligger i målmåned:
+     - Fordel andel af faktura = (dag_omsætning / uge_omsætning) * faktura_netto
+     - Inkluder faktisk VF for den dag
+
+Formel:  Faktura_måned = SUM(faktura_netto * (omsætning_dag / omsætning_uge))
+         for alle dage i ugen der ligger i måneden
+
+Kilder:
+- bager_regnskab.faktura (indkøbspris)
+- bager_regnskab.retur_ialt (retur-kreditering)
+- transaktioner.omsætning (vægter fordelingen)
+
+Brugt i:
+- database.py hent_vf_detaljer() — uge-detaljer modal
+- Årsplan-rapport når uge går over månedsskift
+
+
+================================================================================
+2. KONSISTENSCHECK - KRITISKE PUNKTER
+================================================================================
+
+[1] ALLE OMSAETNING-KONVERTERINGER
+   Status: SKAL VERIFICERES
+   Check:
+   - Alle beregninger bruger omsætning / 1.25?
+   - Eller bruges der forskellige metoder nogle steder?
+
+[2] VAREFORBRUG KONSISTENS
+   Status: DELVIST VERIFICERET
+   Check:
+   - All produkter har pris_ex_moms i varestamdata?
+   - Alle produkter der deles har korrekt portioner?
+   - Ingen "fallback til kostpris"?
+
+[3] DB% BEREGNING
+   Status: KODE-VERIFICERET
+   Formel: db * 1.25 / omsætning_inkl * 100
+   ADVARSEL: Bruges denne formell OVERALT?
+   - Dashboard: JA
+   - Management vurdering: SKAL CHECKES
+   - Andre steder: ?
+
+[4] MOBILEPAY INTEGRATION
+   Status: FIX UDFOEERT (2026-05-28)
+   Problem: Viste 8266 kr i stedet for 4120 kr
+   Løsning: Separeret netto fra gebyr
+   Check: Matcher netto nu med Shopbox-data samme dag?
+
+[5] BESTILLING OG ANBEFALING
+   Status: BASIS_BESTILLING IKKE IMPLEMENTERET
+   Problem: Hvis basis mangler -> anbefaling starter fra 0
+   Status: Skal implementeres
+
+
+================================================================================
+3. FUNDNE PROBLEMER OG FIXES
+================================================================================
+
+[FIXED] Studenterbrød portioner
+  Før: portioner = 1 (forkert)
+  Efter: portioner = 16 (korrekt)
+  Resultat: VF og DB% nu korrekt
+
+[FIXED] MobilePay dobbelt beløb
+  Før: Viste 8266 kr i stedet for 4120 kr
+  Årsag: Talte brutto + fee separat
+  Løsning: Separeret omsaetning_netto og gebyr
+
+[POTENTIEL] Data-kilde mismatch
+  Problem: MobilePay dato kan ikke stemme med Shopbox
+  Check: Verificeres når der er live data
+
+
+================================================================================
+4. ANBEFALINGER - IMPLEMENTERING
+================================================================================
+
+[PRIO 1] Basis Bestilling
+  Status: IKKE IMPLEMENTERET
+  Formål: Template for daglige ordrebasismængder
+  Impact: Påvirker bestillingsberegner anbefaling
+  Arbejde: Ca. 4-6 timer
+
+[PRIO 2] Data-validation
+  Lav daglig rapport der:
+  - Sammenligner Shopbox total omsætning med MobilePay
+  - Verificerer at alle produkter har stamdata
+  - Flags hvis nogen har portioner = 0
+  - Viser DB% trends
+
+[PRIO 3] Formler-dokumentation
+  Lav officiel liste over:
+  - Alle finansielle formler
+  - Hvor de bruges
+  - Hvilke kilder de bruger
+  - Versionshistorie hvis ændringer
+
+
+================================================================================
+5. NÆSTE TRIN - DETALJERET TESTNING
+================================================================================
+
+For at færdiggøre audittet skal vi:
+
+1. TESTE EN HEL DAG (fra POS til dashboard)
+   - Hent en dag med faktiske data
+   - Trace gennem hver beregning
+   - Verificer at tal matcher fra start til slut
+
+2. SAMMENLIGNE KILDER
+   - Shopbox dagssalg vs. MobilePay netto
+   - Dashboard KPI vs. database direkte queries
+   - Bestillingsberegner vs. export
+
+3. DOKUMENTERE ALLE FORMLER
+   - Lav reference-dokument
+   - Figurer hvor hver værdi beregnes
+   - Hvad skal man gøre hvis data ikke stemmer
+
+4. IMPLEMENTER KONTROLLER
+   - Automated checks som køres ved dataload
+   - Warnings hvis tal ikke passer
+   - Backup if data kvalitet faldt
+
+
+================================================================================
+STATUS: AUDIT I GANG
+Afventer: Din feedback på kritiske checkpoints
+================================================================================

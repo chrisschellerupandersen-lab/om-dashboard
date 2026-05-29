@@ -3664,22 +3664,35 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
             fakt_netto = round((row["faktura"] or 0) - (row["retur_ialt"] or 0), 2)
             mon_dato = _date.fromisocalendar(y, w, 1)
 
-            # Hent faktisk VF fra transaktioner for denne uge (v_transaktioner har vf_korrekt)
-            uge_vf = conn.execute("""
-                SELECT ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_uge
+            # Hent faktisk omsætning og VF per dag fra transaktioner
+            # Bruges til at fordele ugens faktura efter salgsfordeling
+            dag_data = conn.execute("""
+                SELECT dato,
+                       ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_dag,
+                       ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_dag
                 FROM v_transaktioner
                 WHERE strftime('%Y', dato) = ? AND CAST(strftime('%W', dato) AS INTEGER) = ?
-            """, (str(y), str(w))).fetchone()
-            vf_uge = uge_vf["vf_uge"] if uge_vf else 0
+                GROUP BY dato ORDER BY dato
+            """, (str(y), str(w))).fetchall()
 
-            # Fordel faktura og VF efter dage i hver måned
+            # Byg map: dato → (omsætning, vf)
+            dag_map = {r["dato"]: (r["omsat_dag"], r["vf_dag"]) for r in dag_data}
+
+            # Fordel faktura og VF efter FAKTISK SALG hver dag
             netto_maaned = 0.0
             vf_maaned = 0.0
+            omsat_total = sum(v[0] for v in dag_map.values())
+
             for i in range(7):
                 dag = mon_dato + _td(days=i)
-                if dag.month == maaned and dag.year == aar:
-                    netto_maaned += fakt_netto / 7  # ligeligt fordelt per dag
-                    vf_maaned += vf_uge / 7
+                dag_str = dag.isoformat()
+                omsat_dag, vf_dag = dag_map.get(dag_str, (0, 0))
+
+                if dag.month == maaned and dag.year == aar and omsat_total > 0:
+                    # Fordel efter andel af samlet uge-salg
+                    andel = omsat_dag / omsat_total
+                    netto_maaned += fakt_netto * andel
+                    vf_maaned += vf_dag  # VF allerede fordelt per dag
 
             if netto_maaned > 0 or vf_maaned > 0:
                 bestilt_andel = round((row["bestilt_kr_uge"] or 0) / 7 * sum(1 for i in range(7)

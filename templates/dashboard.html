@@ -8544,8 +8544,6 @@ async function vfDrillDown(aar, maaned, type) {
       diff: (r.vf_maaned || 0) - (r.netto || 0),  // negativ = sparede, positiv = tabte
     }));
     const totalBestilt = rows.reduce((s,r) => s + (r.bestilt_kr||0), 0);
-    const totalOmsatInkl = rows.reduce((s,r) => s + (r.omsat_inkl_uge||0), 0);
-    const totalOmsatEx = rows.reduce((s,r) => s + (r.omsat_ex_uge||0), 0);
     const totalFaktura = rows.reduce((s,r) => s + (r.bagerFaktura||0), 0);
     const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
     const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);
@@ -8560,8 +8558,6 @@ async function vfDrillDown(aar, maaned, type) {
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BAGER FAKTURA</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">VF (NETTO)</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">DIFF</th>
-          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">OMSAT</th>
-          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">OMSÆTNING EX-MOMS</th>
         </tr></thead>
         <tbody>
           ${rows.map(r => {
@@ -8574,8 +8570,6 @@ async function vfDrillDown(aar, maaned, type) {
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--forest);font-weight:500;">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${r.vf_netto>0?dk(r.vf_netto)+' kr':'—'}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr}">${dkDiff}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.omsat_inkl_uge>0?dk(r.omsat_inkl_uge)+' kr':'—'}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.omsat_ex_uge>0?dk(r.omsat_ex_uge)+' kr':'—'}</td>
           </tr>`;}).join('')}
         </tbody>
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
@@ -8584,8 +8578,6 @@ async function vfDrillDown(aar, maaned, type) {
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalFaktura)} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(rows.reduce((s,r)=>s+r.vf_netto,0))} kr</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${rows.reduce((s,r)=>s+r.diff,0)>0?'color:var(--danger)':'color:var(--moss)'};">${(rows.reduce((s,r)=>s+r.diff,0)>=0?'+':'')+dk(rows.reduce((s,r)=>s+r.diff,0))} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalOmsatInkl)} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalOmsatEx)} kr</td>
         </tr></tfoot>
       </table>`;
   } else {

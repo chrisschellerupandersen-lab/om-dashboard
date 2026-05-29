@@ -3666,14 +3666,18 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
 
             # Hent faktisk omsætning og VF per dag fra transaktioner
             # Bruges til at fordele ugens faktura efter salgsfordeling
+            # ISO-uge: beregn dato-interval for ugen (mandag-søndag)
+            mandag_dato = _date.fromisocalendar(y, w, 1)
+            sondag_dato = mandag_dato + _td(days=6)
+
             dag_data = conn.execute("""
                 SELECT dato,
                        ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_dag,
                        ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_dag
                 FROM v_transaktioner
-                WHERE strftime('%Y', dato) = ? AND CAST(strftime('%W', dato) AS INTEGER) = ?
+                WHERE dato >= ? AND dato <= ?
                 GROUP BY dato ORDER BY dato
-            """, (str(y), str(w))).fetchall()
+            """, (mandag_dato.isoformat(), sondag_dato.isoformat())).fetchall()
 
             # Byg map: dato → (omsætning, vf)
             dag_map = {r["dato"]: (r["omsat_dag"], r["vf_dag"]) for r in dag_data}

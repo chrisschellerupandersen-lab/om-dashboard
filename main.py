@@ -1686,3 +1686,103 @@ async def management_spørg(request: Request):
         return {"ok": True, "svar": svar}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── BRØD & BOLLER ANALYSE ─────────────────────────────────────────────────────
+
+@app.get("/api/analyse/broed-boller")
+async def api_broed_boller(request: Request, uger: int = 8):
+    _kræv_login(request)
+    try:
+        return database.hent_broed_boller_moenster(uger)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/analyse/broed-boller/raadgiver")
+async def api_broed_boller_raadgiver(request: Request):
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY ikke sat")
+    body = await request.json()
+    uger = int(body.get("uger", 8))
+
+    try:
+        data = database.hent_broed_boller_moenster(uger)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+    import anthropic as _ant
+    import json
+
+    DAG_NAVNE = {1: "Mandag", 2: "Tirsdag", 3: "Onsdag", 4: "Torsdag",
+                 5: "Fredag", 6: "Lørdag", 7: "Søndag"}
+
+    # Byg AI-kontekst
+    snit_tekst = []
+    for wd in range(1, 8):
+        s = data["dag_snit"].get(wd)
+        if s:
+            snit_tekst.append(
+                f"  {s['navn']} ({s['n_dage']} normale dage): Brød={s['broed']} stk, Boller={s['boller']} stk"
+            )
+
+    # Time-mønster: find hvor salget stopper (mulig udsolgt)
+    time_tekst = []
+    for wd_str, wd_data in data["time_normal"].items():
+        wd = int(wd_str)
+        timer = wd_data.get("timer", [])
+        if not timer:
+            continue
+        # Find sidst time med salg
+        boller_tider = [(t["time"], t["boller"]) for t in timer if t["boller"] > 0]
+        broed_tider  = [(t["time"], t["broed"])  for t in timer if t["broed"]  > 0]
+        if boller_tider:
+            sidst_bolle_time = max(t for t, _ in boller_tider)
+            time_tekst.append(f"  {DAG_NAVNE.get(wd,'?')}: Boller sidst solgt kl. {sidst_bolle_time}")
+        if broed_tider:
+            sidst_broed_time = max(t for t, _ in broed_tider)
+            time_tekst.append(f"  {DAG_NAVNE.get(wd,'?')}: Brød sidst solgt kl. {sidst_broed_time}")
+
+    tgtg_tekst = []
+    for dato, poser in sorted(data["tgtg_dagssalg"].items()):
+        if poser > 0:
+            tgtg_tekst.append(f"  {dato}: {poser} TGTG-poser solgt")
+
+    prompt = f"""Du er en bakeri-rådgiver for en lille dansk bagerforretning.
+Analyser salgsmønstrene for brød og boller og giv konkrete, handlingsorienterede anbefalinger.
+
+## Analyseperiode
+{data['fra_dato']} til {data['til_dato']} ({uger} uger)
+Event-dage ekskluderet fra normalen: {', '.join(data['event_datoer']) if data['event_datoer'] else 'Ingen'}
+
+## Gennemsnitligt dagssalg (normale dage)
+{chr(10).join(snit_tekst) if snit_tekst else 'Ingen data'}
+
+## Hvornår stopper salget (indikator for udsolgt eller lukketid)
+{chr(10).join(time_tekst) if time_tekst else 'Ingen tidsdata'}
+
+## TGTG-salg (indikator for overskud — produkter ikke solgt normalt)
+{chr(10).join(tgtg_tekst) if tgtg_tekst else 'Ingen TGTG-salg registreret'}
+
+## Din opgave
+Giv en kort, konkret analyse med:
+1. **Dage du sandsynligvis løber tør** — hvornår og hvad
+2. **Dage du har for meget** — hvad der ender i TGTG
+3. **Specifikke anbefalinger** — f.eks. "Bestil 10 ekstra boller til torsdage" eller "Skær 5 boller til søndage"
+4. **Eventuelle mønstre** du ser på tværs af ugedagene
+
+Vær konkret og brug tallene. Skriv på dansk. Max 300 ord."""
+
+    try:
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=600,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        analyse = msg.content[0].text.strip()
+        return {"ok": True, "analyse": analyse, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -5116,3 +5116,203 @@ Graf-regler:
     raw = raw.strip()
 
     return json.loads(raw)
+
+
+# ── BRØD & BOLLER ANALYSE ─────────────────────────────────────────────────────
+
+def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
+    """Analysér salg af brød og boller per time og ugedag over de seneste N uger.
+    Event-dage (helligdage + særlige begivenheder) markeres og holdes adskilt fra normen.
+    TGTG-data inkluderes som indikator for overskud.
+    """
+    from datetime import date as _date, timedelta as _td, datetime as _dt
+
+    _BROED_WHERE = """(
+        LOWER(varenavn) LIKE '%brød%'
+        OR LOWER(varenavn) LIKE '%brod%'
+        OR LOWER(varenavn) LIKE '%rugbrød%'
+        OR LOWER(varenavn) LIKE '%franskbrød%'
+        OR LOWER(varenavn) LIKE '%toastbrød%'
+    )"""
+
+    _BOLLER_WHERE = """(
+        LOWER(varenavn) LIKE '%bolle%'
+        OR LOWER(varenavn) LIKE '%rundstykke%'
+        OR LOWER(varenavn) LIKE '%morgenbolle%'
+        OR LOWER(varenavn) LIKE '%fuldkornsbolle%'
+        OR LOWER(varenavn) LIKE '%tebirkes%'
+    )"""
+
+    today = _date.today()
+    fra_dato = (today - _td(weeks=periode_uger)).isoformat()
+    til_dato = today.isoformat()
+
+    with _conn() as conn:
+        # Helligdage fra databasen
+        helligdage_rows = conn.execute(
+            "SELECT dato FROM helligdage WHERE dato >= ? AND dato <= ?",
+            (fra_dato, til_dato)
+        ).fetchall()
+        helligdage_set = {r["dato"] for r in helligdage_rows}
+
+        # Event-uger fra det dynamiske system — byg sæt af event-datoer
+        event_datoer: set = set()
+        for i in range(periode_uger + 1):
+            d = today - _td(weeks=i)
+            iso = d.isocalendar()
+            evt = _get_event(iso[1], iso[0])
+            if evt:
+                # Marker alle dage i den uge som event-dage
+                mandag = _date.fromisocalendar(iso[0], iso[1], 1)
+                for j in range(7):
+                    dag = mandag + _td(days=j)
+                    if fra_dato <= dag.isoformat() <= til_dato:
+                        event_datoer.add(dag.isoformat())
+        event_datoer |= helligdage_set
+
+        # Dagligt salg: brød og boller (antal + omsætning) med tidspunkter
+        dag_rows = conn.execute(f"""
+            SELECT
+                dato,
+                CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
+                time_start,
+                SUM(CASE WHEN {_BROED_WHERE} THEN antal ELSE 0 END) AS broed_antal,
+                SUM(CASE WHEN {_BROED_WHERE} THEN omsætning ELSE 0 END) AS broed_oms,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN antal ELSE 0 END) AS boller_antal,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN omsætning ELSE 0 END) AS boller_oms
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ?
+              AND time_start >= 0
+              AND (
+                {_BROED_WHERE} OR {_BOLLER_WHERE}
+              )
+            GROUP BY dato, time_start
+            ORDER BY dato, time_start
+        """, (fra_dato, til_dato)).fetchall()
+
+        # Dagligt totaler (til event-filtrering)
+        dag_totaler = conn.execute(f"""
+            SELECT
+                dato,
+                CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
+                SUM(CASE WHEN {_BROED_WHERE} THEN antal ELSE 0 END) AS broed_antal,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN antal ELSE 0 END) AS boller_antal
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY dato ORDER BY dato
+        """, (fra_dato, til_dato)).fetchall()
+
+        # TGTG data per uge
+        tgtg_rows = conn.execute("""
+            SELECT uge, aar, tgtg FROM bager_regnskab
+            WHERE dato_slut >= ? OR dato_slut IS NULL
+            ORDER BY aar, uge
+        """, (fra_dato,)).fetchall() if False else conn.execute("""
+            SELECT uge, aar, tgtg FROM bager_regnskab
+            WHERE aar >= ?
+            ORDER BY aar, uge
+        """, (today.year - 1,)).fetchall()
+
+        tgtg_map = {}
+        for r in tgtg_rows:
+            y, w = int(r["aar"]), int(r["uge"])
+            mandag = _date.fromisocalendar(y, w, 1)
+            if fra_dato <= mandag.isoformat() <= til_dato:
+                tgtg_map[mandag.isoformat()] = round(r["tgtg"] or 0, 0)
+
+        # TGTG dagssalg
+        tgtg_dag_rows = conn.execute("""
+            SELECT dato, SUM(antal) AS antal FROM tgtg_dagssalg
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY dato
+        """, (fra_dato, til_dato)).fetchall()
+        tgtg_dagssalg = {r["dato"]: int(r["antal"]) for r in tgtg_dag_rows}
+
+    # ── Byg time-mønster per ugedag (0=søn, 1=man, ..., 6=lør i SQLite) ──
+    # Konvertér til 1=man,...,7=søn
+    def _sql_to_iso(d):
+        return d if d > 0 else 7  # SQLite: 0=søndag → 7
+
+    DAG_NAVNE = {1: "Man", 2: "Tir", 3: "Ons", 4: "Tor", 5: "Fre", 6: "Lør", 7: "Søn"}
+
+    # Akkumulér time-mønstre — separat for normale og event-dage
+    # time_moenster[dag][time] = {broed_antal, broed_tæl, boller_antal, boller_tæl}
+    from collections import defaultdict
+    time_normal: Dict = defaultdict(lambda: defaultdict(lambda: {"broed": 0.0, "boller": 0.0, "n": 0}))
+    time_event:  Dict = defaultdict(lambda: defaultdict(lambda: {"broed": 0.0, "boller": 0.0, "n": 0}))
+
+    for r in dag_rows:
+        dato = r["dato"]
+        dag = _sql_to_iso(r["ugedag"])
+        time = r["time_start"]
+        if time < 6 or time > 19:
+            continue
+        bucket = time_event if dato in event_datoer else time_normal
+        bucket[dag][time]["broed"]  += r["broed_antal"]  or 0
+        bucket[dag][time]["boller"] += r["boller_antal"] or 0
+        bucket[dag][time]["n"]      += 1
+
+    # Dagstotaler med event-flag
+    dag_liste = []
+    for r in dag_totaler:
+        dato = r["dato"]
+        dag_iso = _sql_to_iso(r["ugedag"])
+        dag_liste.append({
+            "dato":         dato,
+            "ugedag":       dag_iso,
+            "ugedag_navn":  DAG_NAVNE.get(dag_iso, "?"),
+            "broed_antal":  round(r["broed_antal"]  or 0, 1),
+            "boller_antal": round(r["boller_antal"] or 0, 1),
+            "er_event":     dato in event_datoer,
+            "tgtg_poser":   tgtg_dagssalg.get(dato, 0),
+        })
+
+    # Gennemsnit per ugedag (kun normale dage) til AI-kontekst
+    dag_snit: Dict = {}
+    dag_tæller: Dict = defaultdict(int)
+    dag_sum: Dict = defaultdict(lambda: {"broed": 0.0, "boller": 0.0})
+    for d in dag_liste:
+        if not d["er_event"]:
+            wd = d["ugedag"]
+            dag_sum[wd]["broed"]  += d["broed_antal"]
+            dag_sum[wd]["boller"] += d["boller_antal"]
+            dag_tæller[wd] += 1
+    for wd in range(1, 8):
+        n = dag_tæller[wd]
+        if n:
+            dag_snit[wd] = {
+                "navn":   DAG_NAVNE[wd],
+                "n_dage": n,
+                "broed":  round(dag_sum[wd]["broed"]  / n, 1),
+                "boller": round(dag_sum[wd]["boller"] / n, 1),
+            }
+
+    # Formatér time-mønstre til liste
+    def _fmt_time_moenster(bucket):
+        result = {}
+        for dag, timer in bucket.items():
+            result[dag] = {
+                "navn": DAG_NAVNE.get(dag, "?"),
+                "timer": [
+                    {
+                        "time":   t,
+                        "broed":  round(v["broed"], 1),
+                        "boller": round(v["boller"], 1),
+                    }
+                    for t, v in sorted(timer.items())
+                ]
+            }
+        return result
+
+    return {
+        "periode_uger":    periode_uger,
+        "fra_dato":        fra_dato,
+        "til_dato":        til_dato,
+        "dag_liste":       dag_liste,
+        "dag_snit":        dag_snit,
+        "time_normal":     _fmt_time_moenster(time_normal),
+        "time_event":      _fmt_time_moenster(time_event),
+        "event_datoer":    sorted(event_datoer),
+        "tgtg_map":        tgtg_map,
+        "tgtg_dagssalg":   tgtg_dagssalg,
+    }

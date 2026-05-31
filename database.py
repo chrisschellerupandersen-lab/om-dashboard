@@ -3640,7 +3640,9 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
         dag = first
         while dag <= last:
             mandag = dag - _td(days=dag.weekday())  # mandag i ugen
-            if first <= mandag <= last:
+            sondag = mandag + _td(days=6)  # søndag i ugen
+            # Inkluder uge hvis nogen dag fra ugen ligger i denne måned
+            if not (sondag < first or mandag > last):
                 uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
             dag += _td(days=1)
 
@@ -3677,6 +3679,11 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
                        ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_dag
                 FROM v_transaktioner
                 WHERE dato >= ? AND dato <= ?
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger
+                    WHERE varenummer != '' AND varenummer != '0'
+                  )
                 GROUP BY dato ORDER BY dato
             """, (mandag_dato.isoformat(), sondag_dato.isoformat())).fetchall()
 

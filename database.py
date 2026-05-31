@@ -1179,19 +1179,54 @@ def hent_aarsdata(aar: int = None) -> Dict:
         _DAG_NAVNE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
         bestil_map = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows}
 
-        # Sum baker-fakturaer per måned — en uge tilhører den måned hvor MANDAG ligger
+        # Sum baker-fakturaer per måned — fordeles efter salget ved månedsskift
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
                 fakt_netto = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
                 if fakt_netto <= 0:
                     continue
-                mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
-                # Uge tilhører den måned hvor mandag ligger
-                if mon.year == aar:
+                y, w = int(br["aar"]), int(br["uge"])
+                mon = _date.fromisocalendar(y, w, 1)
+                son = mon + _td(days=6)
+
+                if y != aar:
+                    continue
+
+                # Hvis ugen ligger helt i én måned: simpel sum
+                if mon.month == son.month:
                     faktura_maaned[mon.month] = round(
                         faktura_maaned.get(mon.month, 0.0) + fakt_netto, 2
                     )
+                else:
+                    # Uge går over månedsskift: fordel efter salget på dagene
+                    # Hent dagligt salg for ugen
+                    mon_dato = _date.fromisocalendar(y, w, 1)
+                    son_dato = mon_dato + _td(days=6)
+                    dag_data = conn.execute("""
+                        SELECT dato,
+                               ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_ex_dag
+                        FROM v_transaktioner
+                        WHERE dato >= ? AND dato <= ?
+                        GROUP BY dato ORDER BY dato
+                    """, (mon_dato.isoformat(), son_dato.isoformat())).fetchall()
+
+                    # Beregn salg per måned
+                    salg_maaned = {}
+                    total_salg = 0.0
+                    for dag_row in dag_data:
+                        dag_dato = _date.fromisoformat(dag_row["dato"])
+                        omsat = dag_row["omsat_ex_dag"] or 0
+                        salg_maaned[dag_dato.month] = salg_maaned.get(dag_dato.month, 0.0) + omsat
+                        total_salg += omsat
+
+                    # Fordel faktura efter salget
+                    if total_salg > 0:
+                        for m, salg in salg_maaned.items():
+                            andel = salg / total_salg
+                            faktura_maaned[m] = round(
+                                faktura_maaned.get(m, 0.0) + fakt_netto * andel, 2
+                            )
             except Exception:
                 pass
 

@@ -1125,7 +1125,10 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 CAST(strftime('%m', dato) AS INTEGER) AS maaned,
                 COUNT(DISTINCT dato)                   AS faktiske_dage,
                 ROUND(SUM(omsætning), 2)               AS omsaetning,
-                ROUND(SUM(kostpris),  2)               AS kostpris,
+                ROUND(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                ) THEN kostpris ELSE 0 END), 2) AS kostpris,
                 ROUND(SUM(avance)-SUM(omsætning)*0.2, 2) AS avance,
                 ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner
@@ -1137,7 +1140,10 @@ def hent_aarsdata(aar: int = None) -> Dict:
         prev_dec = conn.execute("""
             SELECT COUNT(DISTINCT dato) AS faktiske_dage,
                    ROUND(SUM(omsætning), 2) AS omsaetning,
-                   ROUND(SUM(kostpris),  2) AS kostpris,
+                   ROUND(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                       FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                   ) THEN kostpris ELSE 0 END), 2) AS kostpris,
                    ROUND(SUM(avance),    2) AS avance,
                    ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner WHERE strftime('%Y-%m', dato) = ?

@@ -3717,7 +3717,10 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
                 SELECT dato,
                        ROUND(COALESCE(SUM(omsætning), 0), 2) AS omsat_inkl_dag,
                        ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_ex_dag,
-                       ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vf_dag
+                       ROUND(COALESCE(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                           SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                           FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                       ) THEN vf_korrekt ELSE 0 END), 0), 2) AS vf_dag
                 FROM v_transaktioner
                 WHERE dato >= ? AND dato <= ?
                 GROUP BY dato ORDER BY dato

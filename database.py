@@ -3693,17 +3693,8 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
             # Fordel faktura og VF efter FAKTISK SALG hver dag
             netto_maaned = 0.0
             vf_maaned = 0.0
-
-            # Beregn salg kun for dage i denne måned (vigtig ved månedsskift)
-            omsat_total = 0.0
-            omsat_total_inkl = 0.0
-            for i in range(7):
-                dag = mon_dato + _td(days=i)
-                if dag.month == maaned and dag.year == aar:
-                    dag_str = dag.isoformat()
-                    if dag_str in dag_map:
-                        omsat_total_inkl += dag_map[dag_str][0]
-                        omsat_total += dag_map[dag_str][1]
+            omsat_total = sum(v[1] for v in dag_map.values())  # ex-moms — hele ugen
+            omsat_total_inkl = sum(v[0] for v in dag_map.values())  # inkl-moms — hele ugen
 
             for i in range(7):
                 dag = mon_dato + _td(days=i)

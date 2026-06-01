@@ -5127,28 +5127,22 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
     """
     from datetime import date as _date, timedelta as _td, datetime as _dt
 
-    # Brød = rugbrød, surdejsbrød, flutes, foccacia og alt med 'brød' i navnet
+    # Brød og Boller klassificeres via varestamdata.type — ikke LIKE-gætteri
+    # Type 'Brød', 'Rugbrød', 'Flute' = brød-kategorier
+    # Type 'Boller' = boller-kategori
     _BROED_WHERE = """(
-        LOWER(varenavn) LIKE '%brød%'
-        OR LOWER(varenavn) LIKE '%brod%'
-        OR LOWER(varenavn) LIKE '%flute%'
-        OR LOWER(varenavn) LIKE '%foccacia%'
-        OR LOWER(varenavn) LIKE '%focaccia%'
-        OR LOWER(varenavn) LIKE '%ciabatta%'
-        OR LOWER(varenavn) LIKE '%baguette%'
+        COALESCE(s.type, '') IN ('Brød', 'Rugbrød', 'Flute')
     )"""
 
-    # Boller = alle småbagt: boller, birkes, frøsnapper, hveder, teboller m.v.
     _BOLLER_WHERE = """(
-        LOWER(varenavn) LIKE '%bolle%'
-        OR LOWER(varenavn) LIKE '%rundstykke%'
-        OR LOWER(varenavn) LIKE '%birkes%'
-        OR LOWER(varenavn) LIKE '%frøsnapper%'
-        OR LOWER(varenavn) LIKE '%frosnapper%'
-        OR LOWER(varenavn) LIKE '%hveder%'
-        OR LOWER(varenavn) LIKE '%horn%'
-        OR LOWER(varenavn) LIKE '%tebolle%'
+        COALESCE(s.type, '') = 'Boller'
     )"""
+
+    _JOIN_STAMDATA = """
+        LEFT JOIN varestamdata s
+            ON (t.varenummer != '' AND t.varenummer IS NOT NULL AND t.varenummer = s.sku)
+            OR (COALESCE(t.varenummer,'') = '' AND LOWER(TRIM(t.varenavn)) = LOWER(TRIM(s.varenavn)))
+    """
 
     today = _date.today()
     fra_dato = (today - _td(weeks=periode_uger)).isoformat()
@@ -5186,33 +5180,33 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
         # Dagligt salg: brød og boller (antal + omsætning) med tidspunkter
         dag_rows = conn.execute(f"""
             SELECT
-                dato,
-                CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
-                time_start,
-                SUM(CASE WHEN {_BROED_WHERE} THEN antal ELSE 0 END) AS broed_antal,
-                SUM(CASE WHEN {_BROED_WHERE} THEN omsætning ELSE 0 END) AS broed_oms,
-                SUM(CASE WHEN {_BOLLER_WHERE} THEN antal ELSE 0 END) AS boller_antal,
-                SUM(CASE WHEN {_BOLLER_WHERE} THEN omsætning ELSE 0 END) AS boller_oms
-            FROM transaktioner
-            WHERE dato >= ? AND dato <= ?
-              AND time_start BETWEEN 6 AND 20
-              AND (
-                {_BROED_WHERE} OR {_BOLLER_WHERE}
-              )
-            GROUP BY dato, time_start
-            ORDER BY dato, time_start
+                t.dato,
+                CAST(strftime('%w', t.dato) AS INTEGER) AS ugedag,
+                t.time_start,
+                SUM(CASE WHEN {_BROED_WHERE} THEN t.antal ELSE 0 END) AS broed_antal,
+                SUM(CASE WHEN {_BROED_WHERE} THEN t.omsætning ELSE 0 END) AS broed_oms,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN t.antal ELSE 0 END) AS boller_antal,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN t.omsætning ELSE 0 END) AS boller_oms
+            FROM transaktioner t
+            {_JOIN_STAMDATA}
+            WHERE t.dato >= ? AND t.dato <= ?
+              AND t.time_start BETWEEN 5 AND 20
+              AND ({_BROED_WHERE} OR {_BOLLER_WHERE})
+            GROUP BY t.dato, t.time_start
+            ORDER BY t.dato, t.time_start
         """, (fra_dato, til_dato)).fetchall()
 
         # Dagligt totaler (til event-filtrering)
         dag_totaler = conn.execute(f"""
             SELECT
-                dato,
-                CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
-                SUM(CASE WHEN {_BROED_WHERE} THEN antal ELSE 0 END) AS broed_antal,
-                SUM(CASE WHEN {_BOLLER_WHERE} THEN antal ELSE 0 END) AS boller_antal
-            FROM transaktioner
-            WHERE dato >= ? AND dato <= ?
-            GROUP BY dato ORDER BY dato
+                t.dato,
+                CAST(strftime('%w', t.dato) AS INTEGER) AS ugedag,
+                SUM(CASE WHEN {_BROED_WHERE} THEN t.antal ELSE 0 END) AS broed_antal,
+                SUM(CASE WHEN {_BOLLER_WHERE} THEN t.antal ELSE 0 END) AS boller_antal
+            FROM transaktioner t
+            {_JOIN_STAMDATA}
+            WHERE t.dato >= ? AND t.dato <= ?
+            GROUP BY t.dato ORDER BY t.dato
         """, (fra_dato, til_dato)).fetchall()
 
         # TGTG data per uge

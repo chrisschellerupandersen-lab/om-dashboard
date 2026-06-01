@@ -4387,11 +4387,21 @@ function topToggle(gid, hdr) {
 // ── MARGIN ANALYSE ────────────────────────────────────────────────────────────
 async function loadMarginAnalyse() {
   const aar = document.getElementById('margin-aar-select').value;
-  const kat = document.getElementById('margin-kat-select').value;
-  const url = `/api/salg/margin-analyse${aar || kat ? '?' : ''}${aar ? 'aar=' + aar : ''}${aar && kat ? '&' : ''}${kat ? 'kategori=' + encodeURIComponent(kat) : ''}`;
+  const katSel = document.getElementById('margin-kat-select');
+  const kat = katSel.value;
+  const url = `/api/salg/margin-analyse${aar ? '?aar=' + aar : ''}`;
 
-  const data = await api(url);
-  if (!data) return;
+  const alleData = await api(url);
+  if (!alleData) return;
+
+  // Byg dropdown fra faktiske kategorier i data (første gang eller ved årsfilter)
+  const kategorier = [...new Set(alleData.map(r => r.kategori).filter(Boolean))].sort();
+  const gammelVal = katSel.value;
+  katSel.innerHTML = '<option value="">Alle kategorier</option>' +
+    kategorier.map(k => `<option value="${k}"${k === gammelVal ? ' selected' : ''}>${k}</option>`).join('');
+
+  // Filtrer lokalt på kategori (undgår ekstra API-kald)
+  const data = kat ? alleData.filter(r => r.kategori === kat) : alleData;
 
   const tbody = document.getElementById('margin-tbody');
   const mono = "font-family:'DM Mono',monospace;";

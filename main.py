@@ -1686,3 +1686,11 @@ async def management_spørg(request: Request):
         return {"ok": True, "svar": svar}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── VEJR ──────────────────────────────────────────────────────────────────────
+
+@app.get("/api/vejr/forecast")
+async def api_vejr_forecast(request: Request):
+    _kræv_login(request)
+    return database.hent_vejr_forecast()

@@ -2495,6 +2495,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="bern-event-note" style="display:none;font-size:11px;color:var(--ash);margin-left:8px;font-style:italic;"></span>
         </div>
 
+        <!-- Vejr-strip -->
+        <div id="bern-vejr-strip" style="display:none;margin-bottom:16px;background:rgba(30,58,30,.08);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--ash);">VEJRUDSIGT · GREVE</span>
+            <span id="bern-vejr-opdateret" style="font-size:10px;color:var(--ash);opacity:.6;"></span>
+          </div>
+          <div id="bern-vejr-dage" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;"></div>
+          <div id="bern-vejr-advarsel" style="display:none;margin-top:8px;font-size:11px;padding:5px 10px;border-radius:4px;"></div>
+        </div>
+
         <!-- KPI-række -->
         <div class="kpi-row-4" style="margin-bottom:12px;">
           <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
@@ -7125,6 +7135,81 @@ function _spildNav(retning) {
   _spildHent(uge, aar);
 }
 
+// ── VEJR ─────────────────────────────────────────────────────────────────────
+let _vejrData = null;
+
+async function vejrLoad() {
+  if (_vejrData) return _vejrData;
+  try {
+    _vejrData = await api('/api/vejr/forecast');
+  } catch(e) { _vejrData = { forecast: {} }; }
+  return _vejrData;
+}
+
+function vejrVisUge(uge, aar) {
+  if (!_vejrData || !_vejrData.forecast) return;
+  const fc = _vejrData.forecast;
+
+  // Find mandag i den valgte uge
+  const jan4 = new Date(aar, 0, 4);
+  const mandag = new Date(jan4);
+  mandag.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (uge - 1) * 7);
+
+  const DAGNAVN = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const dagEl   = document.getElementById('bern-vejr-dage');
+  const strip   = document.getElementById('bern-vejr-strip');
+  const adv     = document.getElementById('bern-vejr-advarsel');
+  const opdEl   = document.getElementById('bern-vejr-opdateret');
+
+  let html = '', harVejr = false, slemDage = [];
+  const idagStr = new Date().toISOString().slice(0,10);
+
+  for (let i = 0; i < 7; i++) {
+    const dag = new Date(mandag);
+    dag.setDate(mandag.getDate() + i);
+    const ds  = dag.toISOString().slice(0,10);
+    const v   = fc[ds];
+    const erIdag = ds === idagStr;
+
+    if (v) {
+      harVejr = true;
+      const fv  = v.juster.farve;
+      const clr = fv === 'green' ? 'var(--moss)' : fv === 'red' ? 'var(--danger)' : fv === 'orange' ? 'var(--gold)' : 'var(--ash)';
+      const bg  = erIdag ? 'rgba(30,58,30,.25)' : 'transparent';
+      const brd = erIdag ? '1px solid rgba(255,255,255,.2)' : '1px solid transparent';
+      html += `<div style="padding:5px 2px;border-radius:5px;background:${bg};border:${brd};">
+        <div style="font-size:10px;color:var(--ash);margin-bottom:2px;">${DAGNAVN[i]}</div>
+        <div style="font-size:16px;line-height:1;">${v.ikon}</div>
+        <div style="font-size:11px;font-weight:600;margin-top:2px;">${v.tmax !== null ? v.tmax + '°' : '—'}</div>
+        <div style="font-size:10px;color:${v.prec > 0 ? clr : 'var(--ash)'};">${v.prec > 0 ? v.prec + 'mm' : '—'}</div>
+      </div>`;
+      if (fv === 'red' || fv === 'orange') slemDage.push({ navn: DAGNAVN[i], label: v.juster.label });
+    } else {
+      html += `<div style="padding:5px 2px;opacity:.3;">
+        <div style="font-size:10px;color:var(--ash);">${DAGNAVN[i]}</div>
+        <div style="font-size:16px;">—</div>
+      </div>`;
+    }
+  }
+
+  if (!harVejr) { strip.style.display = 'none'; return; }
+
+  dagEl.innerHTML = html;
+  strip.style.display = '';
+  if (_vejrData.opdateret) opdEl.textContent = 'opdateret ' + _vejrData.opdateret.slice(11,16);
+
+  if (slemDage.length) {
+    const txt = slemDage.map(d => `${d.navn}: ${d.label}`).join(' · ');
+    adv.textContent = '⚠ Vejrjustering: ' + txt;
+    adv.style.display = '';
+    adv.style.background = 'rgba(200,60,60,.12)';
+    adv.style.color = 'var(--danger)';
+    adv.style.border = '1px solid rgba(200,60,60,.25)';
+  } else {
+    adv.style.display = 'none';
+  }
+}
+
 // ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
 let _bernUge = null, _bernAar = null, _bernBusy = false;
 
@@ -7143,6 +7228,9 @@ async function loadBernUge(uge, aar) {
   document.getElementById('beregner-tabel').innerHTML =
     '<div style="padding:20px;color:var(--ash);">Indlæser…</div>';
 
+  // Hent vejr parallelt med bestillingsdata
+  vejrLoad().then(() => vejrVisUge(uge, aar));
+
   const d = await api('/api/bestilling/anbefaling?uge=' + uge + '&aar=' + aar);
 
   // Load basis bestilling hvis den findes
@@ -7159,6 +7247,8 @@ async function loadBernUge(uge, aar) {
 
   _bernBusy = false;
   if (!d) return;
+  // Opdater vejr-strip (vejr kan nu være hentet færdigt)
+  vejrVisUge(uge, aar);
   if (d.error) {
     document.getElementById('beregner-tabel').innerHTML =
       '<div style="padding:20px;color:var(--danger);">' + d.error + '</div>';

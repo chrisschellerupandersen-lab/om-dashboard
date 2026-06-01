@@ -5116,3 +5116,101 @@ Graf-regler:
     raw = raw.strip()
 
     return json.loads(raw)
+
+
+# ── VEJR (Open-Meteo, Greve DK) ───────────────────────────────────────────────
+
+import time as _time_mod
+_vejr_cache: Dict = {"ts": 0, "data": None}
+_VEJR_LAT = 55.5906
+_VEJR_LON = 12.2985
+
+
+def _vejr_ikon(kode: int) -> str:
+    if kode == 0:              return "☀️"
+    if kode in (1, 2):         return "🌤️"
+    if kode == 3:              return "☁️"
+    if kode in (45, 48):       return "🌫️"
+    if kode in (51, 53, 55):   return "🌦️"
+    if kode in (61, 63, 65):   return "🌧️"
+    if kode in (71, 73, 75):   return "🌨️"
+    if kode in (80, 81, 82):   return "🌦️"
+    if kode in (95, 96, 99):   return "⛈️"
+    return "🌡️"
+
+
+def _vejr_justering(kode: int, prec: float, tmax: float) -> Dict:
+    """Beregn justerings-faktor for bageriet baseret på vejr."""
+    faktor = 1.0
+    if prec >= 10:
+        faktor -= 0.20
+    elif prec >= 5:
+        faktor -= 0.12
+    elif prec >= 2:
+        faktor -= 0.06
+    if kode in (95, 96, 99):
+        faktor -= 0.15
+    if tmax < 2:
+        faktor -= 0.05
+    if prec < 1 and kode in (0, 1) and 15 <= tmax <= 25:
+        faktor += 0.05
+    faktor = round(max(0.6, min(1.2, faktor)), 2)
+    if faktor >= 1.03:
+        return {"faktor": faktor, "farve": "green",   "label": f"Godt vejr +{int((faktor-1)*100)}%"}
+    if faktor <= 0.88:
+        return {"faktor": faktor, "farve": "red",     "label": f"Dårligt vejr {int((faktor-1)*100)}%"}
+    if faktor <= 0.95:
+        return {"faktor": faktor, "farve": "orange",  "label": f"Regn {int((faktor-1)*100)}%"}
+    return {"faktor": faktor, "farve": "neutral", "label": "Normalt vejr"}
+
+
+def hent_vejr_forecast() -> Dict:
+    """Hent 14-dages vejrudsigt for Greve fra Open-Meteo. Cache 3 timer."""
+    import urllib.request as _urlreq
+    import json as _json2
+
+    now = _time_mod.time()
+    if _vejr_cache["data"] and (now - _vejr_cache["ts"]) < 10800:
+        return _vejr_cache["data"]
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={_VEJR_LAT}&longitude={_VEJR_LON}"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
+        f"&timezone=Europe%2FCopenhagen"
+        f"&forecast_days=14"
+    )
+    try:
+        with _urlreq.urlopen(url, timeout=6) as resp:
+            raw = _json2.loads(resp.read())
+        daily  = raw.get("daily", {})
+        dates  = daily.get("time", [])
+        tmax   = daily.get("temperature_2m_max", [])
+        tmin   = daily.get("temperature_2m_min", [])
+        prec   = daily.get("precipitation_sum", [])
+        codes  = daily.get("weathercode", [])
+
+        forecast = {}
+        for i, dato in enumerate(dates):
+            tx = round(tmax[i] or 0, 1) if i < len(tmax) else None
+            pr = round(prec[i] or 0, 1) if i < len(prec) else 0.0
+            kd = int(codes[i]) if i < len(codes) else 0
+            forecast[dato] = {
+                "dato":   dato,
+                "tmax":   tx,
+                "tmin":   round(tmin[i] or 0, 1) if i < len(tmin) else None,
+                "prec":   pr,
+                "kode":   kd,
+                "ikon":   _vejr_ikon(kd),
+                "juster": _vejr_justering(kd, pr, tx or 15),
+            }
+        result = {
+            "opdateret": datetime.now().isoformat(timespec="minutes"),
+            "forecast":  forecast,
+        }
+    except Exception as e:
+        result = {"opdateret": None, "forecast": {}, "fejl": str(e)}
+
+    _vejr_cache["ts"]   = now
+    _vejr_cache["data"] = result
+    return result

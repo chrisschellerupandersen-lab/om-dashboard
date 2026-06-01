@@ -7288,6 +7288,7 @@ async function loadBernUge(uge, aar) {
 
 
   // Produkt-tabel — grupperet efter kategori
+  const vp = d.vaekst_pct || 0;
   const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
   const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
   const WEEKEND = new Set(['fre','loe','son']);

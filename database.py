@@ -5127,22 +5127,30 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
     """
     from datetime import date as _date, timedelta as _td, datetime as _dt
 
-    # Brød og Boller klassificeres via varestamdata.type — ikke LIKE-gætteri
-    # Type 'Brød', 'Rugbrød', 'Flute' = brød-kategorier
-    # Type 'Boller' = boller-kategori
+    # Brød = rugbrød, surdejsbrød, signaturbrød, flutes, foccacia
+    # Ekskluder produkter der har 'brød' i navn men er kager/wienerbrød
     _BROED_WHERE = """(
-        COALESCE(s.type, '') IN ('Brød', 'Rugbrød', 'Flute')
+        (
+            LOWER(t.varenavn) LIKE '%brød%'
+            AND LOWER(t.varenavn) NOT LIKE '%studenter%'
+            AND LOWER(t.varenavn) NOT LIKE '%hindbær%'
+            AND LOWER(t.varenavn) NOT LIKE '%wienerbrød%'
+        )
+        OR LOWER(t.varenavn) LIKE '%flute%'
+        OR LOWER(t.varenavn) LIKE '%foccacia%'
+        OR LOWER(t.varenavn) LIKE '%focaccia%'
     )"""
 
+    # Boller = surdejsboller, birkes, hveder, frøsnapper — men IKKE wienerbrød
     _BOLLER_WHERE = """(
-        COALESCE(s.type, '') = 'Boller'
+        LOWER(t.varenavn) LIKE '%bolle%'
+        OR LOWER(t.varenavn) LIKE '%birkes%'
+        OR LOWER(t.varenavn) LIKE '%hveder%'
+        OR LOWER(t.varenavn) LIKE '%frøsnapper%'
+        OR LOWER(t.varenavn) LIKE '%frosnapper%'
     )"""
 
-    _JOIN_STAMDATA = """
-        LEFT JOIN varestamdata s
-            ON (t.varenummer != '' AND t.varenummer IS NOT NULL AND t.varenummer = s.sku)
-            OR (COALESCE(t.varenummer,'') = '' AND LOWER(TRIM(t.varenavn)) = LOWER(TRIM(s.varenavn)))
-    """
+    _JOIN_STAMDATA = ""  # Ikke nødvendig — varestamdata er ikke populeret
 
     today = _date.today()
     fra_dato = (today - _td(weeks=periode_uger)).isoformat()
@@ -5188,7 +5196,6 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
                 SUM(CASE WHEN {_BOLLER_WHERE} THEN t.antal ELSE 0 END) AS boller_antal,
                 SUM(CASE WHEN {_BOLLER_WHERE} THEN t.omsætning ELSE 0 END) AS boller_oms
             FROM transaktioner t
-            {_JOIN_STAMDATA}
             WHERE t.dato >= ? AND t.dato <= ?
               AND t.time_start BETWEEN 5 AND 20
               AND ({_BROED_WHERE} OR {_BOLLER_WHERE})
@@ -5204,7 +5211,6 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
                 SUM(CASE WHEN {_BROED_WHERE} THEN t.antal ELSE 0 END) AS broed_antal,
                 SUM(CASE WHEN {_BOLLER_WHERE} THEN t.antal ELSE 0 END) AS boller_antal
             FROM transaktioner t
-            {_JOIN_STAMDATA}
             WHERE t.dato >= ? AND t.dato <= ?
             GROUP BY t.dato ORDER BY t.dato
         """, (fra_dato, til_dato)).fetchall()

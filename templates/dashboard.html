@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%231e3a1e'/><path d='M9 20 Q16 10 23 20' stroke='%23c8a84b' stroke-width='1.5' fill='none'/><circle cx='16' cy='14' r='2.5' fill='%23c8a84b'/></svg>">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OM Dashboard">
 <meta name="theme-color" content="#1e3a1e">
@@ -7467,10 +7468,14 @@ async function loadBernUge(uge, aar) {
         ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
         : '';
 
+      const saHtml = p.sidst_aar != null
+        ? `<br><span style="font-size:9px;color:var(--ash);opacity:.7;">${p.sidst_aar_aar}: ${p.sidst_aar} stk</span>`
+        : '';
+
       bodyRows += `<tr data-vn="${p.varenummer || ''}">
         <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
         ${dagCells}
-        <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
+        <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}${saHtml}</td>
         <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
         <td class="num bern-row-kr" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
       </tr>`;

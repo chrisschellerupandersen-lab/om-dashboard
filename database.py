@@ -3389,6 +3389,13 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         if not basis_rows:
             return {"error": "Ingen ugebestillinger indlæst endnu"}
 
+        # Samme uge sidste år (til reference i tabellen)
+        sidst_aar_rows = conn.execute("""
+            SELECT varenummer, total_antal, man, tir, ons, tor, fre, loe, son
+            FROM ugebestillinger WHERE uge=? AND aar=?
+        """, (maal_uge, maal_aar - 1)).fetchall()
+        sidst_aar_map = {r["varenummer"]: dict(r) for r in sidst_aar_rows}
+
         # Primær basis: seneste uge (til produkt-liste og rækkefølge)
         basis_uge = basis_rows[0]["uge"]
         basis_aar = basis_rows[0]["aar"]
@@ -3525,6 +3532,10 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         total_anb   = sum(anb_dag[d]   for d in DAGE)
         pris = float(r["pris_ex_moms"] or 0)
 
+        # Samme uge sidste år for dette produkt
+        sa = sidst_aar_map.get(vn, {})
+        sidst_aar_total = int(sa.get("total_antal") or 0) if sa else None
+
         produkter.append({
             "varenummer":      vn,
             "varenavn":        r["varenavn"],
@@ -3537,6 +3548,8 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             "total_basis":     int(total_basis),
             "total_anbefalet": total_anb,
             "total_pris":      round(total_anb * pris, 2),
+            "sidst_aar":       sidst_aar_total,
+            "sidst_aar_aar":   maal_aar - 1,
         })
 
     total_stk = sum(p["total_anbefalet"] for p in produkter)

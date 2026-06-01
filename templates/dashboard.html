@@ -7441,9 +7441,15 @@ async function loadBernUge(uge, aar) {
     setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
   } catch(e) { console.warn('retur beregning fejl:', e); }
 
-  // Auto-kør AI-analyse efter tabel er indlæst (kun for fremtidige/aktuelle uger)
+  // Vis AI-kort klar til analyse (manuel trigger)
   if (!d.faktisk) {
-    setTimeout(() => bernHentKontekst(), 300);
+    const kort  = document.getElementById('bern-kontekst-kort');
+    const tekst = document.getElementById('bern-kontekst-tekst');
+    if (kort && !tekst.textContent) {
+      kort.style.display = '';
+      tekst.textContent  = 'Klik "🔄 Opdater analyse" for at få AI-vurdering af dagsmængder, vejr og begivenheder.';
+      tekst.style.color  = 'var(--ash)';
+    }
   }
 
   // Byg Basis vs Forslag sammenligning - SIMPEL VERSION
@@ -7662,6 +7668,7 @@ async function bernHentKontekst() {
 
   kort.style.display    = '';
   tekst.textContent     = '';
+  tekst.style.color     = '';
   spinner.style.display = '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   if (mainBtn) { mainBtn.disabled = true; mainBtn.textContent = '⏳ Analyserer…'; }

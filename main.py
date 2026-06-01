@@ -1713,7 +1713,19 @@ async def api_broed_boller_debug(request: Request, uger: int = 8):
             ORDER BY total_antal DESC
             LIMIT 60
         """, (fra,)).fetchall()
-        return {"fra": fra, "varer": [dict(r) for r in varer]}
+        time_stats = conn.execute("""
+            SELECT
+                COUNT(*) as total_rækker,
+                SUM(CASE WHEN time_start >= 0 THEN 1 ELSE 0 END) as med_tid,
+                MIN(time_start) as min_tid,
+                MAX(time_start) as max_tid
+            FROM transaktioner WHERE dato >= ?
+        """, (fra,)).fetchone()
+        return {
+            "fra": fra,
+            "time_stats": dict(time_stats) if time_stats else {},
+            "varer": [dict(r) for r in varer]
+        }
 
 
 @app.post("/api/analyse/broed-boller/raadgiver")

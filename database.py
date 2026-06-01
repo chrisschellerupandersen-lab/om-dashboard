@@ -5182,7 +5182,7 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
                 SUM(CASE WHEN {_BOLLER_WHERE} THEN omsætning ELSE 0 END) AS boller_oms
             FROM transaktioner
             WHERE dato >= ? AND dato <= ?
-              AND time_start >= 0
+              AND time_start BETWEEN 6 AND 20
               AND (
                 {_BROED_WHERE} OR {_BOLLER_WHERE}
               )

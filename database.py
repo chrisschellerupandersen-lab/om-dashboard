@@ -5168,6 +5168,7 @@ def hent_vejr_forecast() -> Dict:
     """Hent 14-dages vejrudsigt for Greve fra Open-Meteo. Cache 3 timer."""
     import urllib.request as _urlreq
     import json as _json2
+    from datetime import datetime as _dt
 
     now = _time_mod.time()
     if _vejr_cache["data"] and (now - _vejr_cache["ts"]) < 10800:
@@ -5205,7 +5206,7 @@ def hent_vejr_forecast() -> Dict:
                 "juster": _vejr_justering(kd, pr, tx or 15),
             }
         result = {
-            "opdateret": datetime.now().isoformat(timespec="minutes"),
+            "opdateret": _dt.now().isoformat(timespec="minutes"),
             "forecast":  forecast,
         }
     except Exception as e:

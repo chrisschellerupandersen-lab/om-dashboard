@@ -788,6 +788,110 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
     text-align: left;
   }
 }
+
+/* ── MOBIL: BESTILLINGSBEREGNER ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Vejr-strip: scroll ved for lidt plads */
+  #bern-vejr-dage {
+    grid-template-columns: repeat(7, minmax(46px, 1fr));
+    gap: 3px;
+  }
+
+  /* Beregner: uge-navigationsknapper — store touch targets */
+  #p-beregner button[onclick*="bernPrev"],
+  #p-beregner button[onclick*="bernNext"] {
+    min-width: 48px; min-height: 48px; font-size: 20px;
+  }
+
+  /* Beregner tabel: sticky produktkolonne + scroll */
+  #p-beregner .aar2-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #p-beregner .aar2-tbl { min-width: 0 !important; border-collapse: separate; border-spacing: 0; }
+  #p-beregner .aar2-tbl th:first-child,
+  #p-beregner .aar2-tbl td:first-child {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--white);
+    box-shadow: 2px 0 6px rgba(0,0,0,.07);
+    max-width: 130px; min-width: 100px;
+    font-size: 11px;
+  }
+  #p-beregner .aar2-tbl th:first-child { background: rgba(30,58,30,.97); }
+  #p-beregner .aar2-tbl tr:hover td:first-child { background: var(--cream); }
+  #p-beregner .aar2-tbl tr.indev td:first-child { background: rgba(200,168,75,.05); }
+  #p-beregner .aar2-tbl th.num,
+  #p-beregner .aar2-tbl td.num,
+  #p-beregner .aar2-tbl td.bern-cell { padding: 8px 6px; min-width: 38px; }
+
+  /* AI kontekst-kort: kompakt på tablet */
+  #bern-kontekst-kort { font-size: 12px; }
+  #bern-kontekst-tekst { font-size: 12px; line-height: 1.6; }
+
+  /* Bager regnskab tabel */
+  #p-bager .aar2-tbl-wrap,
+  #p-bager table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Margin analyse tabel */
+  #p-margin .aar2-tbl-wrap,
+  #p-margin table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Faktorer-linje i beregner: wrap */
+  .bern-faktorer { font-size: 10px; white-space: normal; line-height: 1.6; }
+
+  /* Opdater analyse knap fuld bredde på tablet */
+  #bern-main-btn { flex: 1; justify-content: center; }
+
+  /* Topbar: år-vælger kompakt */
+  .tb-aar-pick { gap: 2px; }
+  .tb-aar-btn { width: 22px; font-size: 16px; }
+  .tb-aar-val { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  /* Vejr-strip: horisontal scroll med flex på phone */
+  #bern-vejr-strip { padding: 8px 10px; }
+  #bern-vejr-dage {
+    display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    gap: 6px; padding-bottom: 4px; grid-template-columns: unset;
+  }
+  #bern-vejr-dage > div { min-width: 50px; flex-shrink: 0; }
+  #bern-vejr-advarsel { font-size: 10px; padding: 4px 8px; }
+
+  /* Side-titler: skjul undertekst for mere plads */
+  .page-hdr p { display: none; }
+  .page-hdr { margin-bottom: 10px; }
+  .page-hdr h2 { font-size: 17px; }
+
+  /* Beregner: ekstra kompakt tabel */
+  #p-beregner .aar2-tbl th,
+  #p-beregner .aar2-tbl td { padding: 7px 4px; font-size: 10px; }
+  #p-beregner .aar2-tbl td:first-child,
+  #p-beregner .aar2-tbl th:first-child { max-width: 100px; min-width: 80px; font-size: 10px; }
+
+  /* Opdater analyse: fuld bredde, større touch */
+  #bern-main-btn { width: 100%; padding: 14px; font-size: 14px; margin-left: 0 !important; }
+
+  /* Uge-label + dato på phone */
+  #bern-dato-label { display: none; }
+  #bern-uge-label { font-size: 18px; }
+
+  /* Basis-label: skjul på phone */
+  #bern-basis-label, #bern-event-note { font-size: 10px; }
+
+  /* Topbar: kompakt på phone */
+  .tb-brand strong { font-size: 13px; }
+  .tb-brand span { display: none; }
+  .tb-aar-pick { display: none; }
+
+  /* Bager: Gmail sync knap kompakt */
+  #gmail-sync-btn { padding: 5px 8px; font-size: 10px; }
+  #gmail-sync-status { display: none; }
+
+  /* Beregner: event badge kompakt */
+  #bern-event-badge { font-size: 10px; padding: 2px 8px; }
+
+  /* AI kontekst-kort: kompakt på phone */
+  #bern-kontekst-tekst { font-size: 11px; line-height: 1.55; }
+  #bern-kontekst-kort .card { padding: 12px 10px; }
+}
 </style>
 </head>
 <body>

@@ -1037,7 +1037,7 @@ async def retur_scan(request: Request, fil: UploadFile = File(...)):
         import json as _json
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-sonnet-4-6",
+            model="claude-opus-4-7",
             max_tokens=1024,
             messages=[{"role": "user", "content": [
                 {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": img_b64}},

@@ -791,18 +791,20 @@ async def api_sellthrough(request: Request, uger: int = 10):
     return database.hent_sellthrough_analyse(uger)
 
 
-@app.get("/api/bestilling/kontekst")
-async def api_beregner_kontekst(
-    request: Request,
-    uge: int,
-    aar: int,
-):
+@app.post("/api/bestilling/kontekst")
+async def api_beregner_kontekst(request: Request):
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
     try:
-        return database.generer_beregner_kontekst(int(uge), int(aar), api_key)
+        body = await request.json()
+        uge  = int(body.get("uge", 0))
+        aar  = int(body.get("aar", 0))
+        dag_totaler = body.get("dag_totaler", {})
+        produkter   = body.get("produkter", [])
+        vejr        = body.get("vejr", {})
+        return database.generer_beregner_kontekst(uge, aar, api_key, dag_totaler, produkter, vejr)
     except Exception as e:
         return {"ok": False, "fejl": str(e)}
 

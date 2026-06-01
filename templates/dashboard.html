@@ -2507,83 +2507,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="bern-vejr-advarsel" style="display:none;margin-top:8px;font-size:11px;padding:5px 10px;border-radius:4px;"></div>
         </div>
 
-        <!-- KPI-række -->
-        <div class="kpi-row-4" style="margin-bottom:12px;">
-          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
-            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
-            <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
-            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-total-sub">stk · kr ex moms</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Sæsonindeks</div>
-            <div class="kpi-v" id="bern-si">—</div>
-            <div class="kpi-s" id="bern-si-sub"></div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">TGTG seneste uge</div>
-            <div class="kpi-v" id="bern-tgtg">—</div>
-            <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Væksttrend</div>
-            <div class="kpi-v" id="bern-vaekst">—</div>
-            <div class="kpi-s" id="bern-vaekst-sub"></div>
-          </div>
-        </div>
-
-        <!-- Retur KPI-kort -->
-        <div class="kpi-row-2" style="margin-bottom:16px;">
-          <div class="kpi" style="background:#f0f7f0;border-color:var(--moss);">
-            <div class="kpi-l" style="color:var(--forest);letter-spacing:.08em;">RETUR BOLLER · DENNE UGE</div>
-            <div class="kpi-v" id="bern-retur-boller" style="color:var(--forest);font-size:32px;">—</div>
-            <div class="kpi-s" id="bern-retur-boller-sub" style="color:var(--moss);">10% af bestilt</div>
-          </div>
-          <div class="kpi" style="background:#f0f7f0;border-color:var(--moss);">
-            <div class="kpi-l" style="color:var(--forest);letter-spacing:.08em;">RETUR WIENERBRØD · DENNE UGE</div>
-            <div class="kpi-v" id="bern-retur-wiener" style="color:var(--forest);font-size:32px;">—</div>
-            <div class="kpi-s" id="bern-retur-wiener-sub" style="color:var(--moss);">13,5% af bestilt</div>
-          </div>
-        </div>
-
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
-
-        <!-- Bestillingsvurdering -->
-        <div id="bern-vurder-kort" class="card" style="margin-top:14px;display:none;border-left:3px solid var(--gold);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--gold);">✅ BESTILLINGSVURDERING</div>
-            <button onclick="bernVurderBestilling()" id="bern-vurder-btn"
-              style="font-size:11px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-weight:500;">
-              Vurder min bestilling →
-            </button>
-          </div>
-          <div id="bern-vurder-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;display:none;"></div>
-          <div id="bern-vurder-spinner" style="display:none;font-size:12px;color:var(--ash);padding:4px 0;">⏳ AI gennemgår bestillingen…</div>
-        </div>
-
-        <!-- Management analyse -->
-        <div class="card" id="bern-analyse-kort" style="margin-top:16px;display:none;">
-          <div class="aar2-chart-hdr">
-            <span class="aar2-chart-ttl">📋 Management vurdering</span>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <div style="display:flex;gap:4px;align-items:center;font-size:12px;">
-                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">Uge</label>
-                <input id="bern-analyse-uge" type="number" min="1" max="52" value="23"
-                  style="width:50px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
-                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
-                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">År</label>
-                <input id="bern-analyse-aar" type="number" min="2020" max="2099" value="2026"
-                  style="width:60px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
-                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
-              </div>
-              <button id="bern-analyse-btn" onclick="bernGenererAnalyse()"
-                style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 12px;
-                       background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
-                Generer ny ↻
-              </button>
-            </div>
-          </div>
-          <div id="bern-analyse-tekst" style="margin-top:12px;font-size:14px;line-height:1.7;color:var(--forest);white-space:pre-wrap;"></div>
-        </div>
       </div>
 
       <!-- MOBILEPAY -->
@@ -7362,44 +7286,6 @@ async function loadBernUge(uge, aar) {
     evtNoteEl.style.display  = 'none';
   }
 
-  // KPI-række: skjul beregner-felter ved faktisk bestilling
-  const kpiCols = document.querySelectorAll('#p-beregner .kpi-row-4 .kpi:not(:first-child)');
-  kpiCols.forEach(el => el.style.opacity = d.faktisk ? '.25' : '');
-
-  // KPI
-  document.getElementById('bern-total').textContent     = d.total_stk.toLocaleString('da-DK') + ' stk';
-  document.getElementById('bern-total-sub').textContent = Math.round(d.total_kr).toLocaleString('da-DK') + ' kr ex moms';
-
-  const siEl = document.getElementById('bern-si');
-  siEl.textContent = 'x' + d.si.toFixed(2);
-  siEl.style.color = d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'inherit';
-  siEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-si-sub').textContent =
-    MND[d.maaned] + (d.si >= 1 ? ' (+' : ' (') + Math.round((d.si - 1) * 100) + '%)' +
-    (d.faktisk ? ' · info' : '');
-
-  const tEl = document.getElementById('bern-tgtg');
-  tEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
-  tEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
-  tEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-tgtg-sub').textContent = d.faktisk
-    ? (d.tgtg_advarsel ? '⚠ For høj' : d.tgtg_ok ? '✓ Under 800 kr' : 'Hold øje') + ' · info'
-    : d.tgtg_advarsel ? '⚠ For høj — -5% auto' : d.tgtg_ok ? '✓ Sundt (under 800 kr)' : 'Hold øje';
-
-  const vp = d.vaekst_pct;
-  const vEl = document.getElementById('bern-vaekst');
-  vEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
-  vEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
-  vEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-vaekst-sub').textContent =
-    (vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt') +
-    (d.faktisk ? ' · info' : '');
-
-  // ── Rings (top 4) ────────────────────────────────────────────────────
-  setRing('ring-bern-total', Math.min(100, d.total_stk / 1000 * 100), 'var(--amber)');
-  setRing('ring-bern-si', Math.min(100, d.si / 1.5 * 100), d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'var(--forest)');
-  setRing('ring-bern-tgtg', Math.min(100, d.tgtg_kr / 1600 * 100), d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)');
-  setRing('ring-bern-vaekst', Math.max(0, Math.min(100, 50 + vp * 5)), vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'var(--forest)');
 
   // Produkt-tabel — grupperet efter kategori
   const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
@@ -7555,17 +7441,9 @@ async function loadBernUge(uge, aar) {
     setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
   } catch(e) { console.warn('retur beregning fejl:', e); }
 
-  // Vis analyse-kort kun for fremtidige/aktuelle uger
+  // Auto-kør AI-analyse efter tabel er indlæst (kun for fremtidige/aktuelle uger)
   if (!d.faktisk) {
-    document.getElementById('bern-analyse-kort').style.display = '';
-    // BEMÆRK: bernGenererAnalyse() FJERNET - brugeren skal klikke knappen
-    // Vis vurderingskortet klar til brug
-    document.getElementById('bern-vurder-kort').style.display = '';
-    document.getElementById('bern-vurder-tekst').style.display = 'none';
-    document.getElementById('bern-vurder-tekst').textContent = '';
-  } else {
-    document.getElementById('bern-analyse-kort').style.display = 'none';
-    document.getElementById('bern-vurder-kort').style.display = 'none';
+    setTimeout(() => bernHentKontekst(), 300);
   }
 
   // Byg Basis vs Forslag sammenligning - SIMPEL VERSION
@@ -7744,32 +7622,78 @@ function _bernStTilTekst(data) {
 }
 
 let _bernKontekstUge = null;
+
+function _bernLaesTabelData() {
+  // Læs aktuelle dagsmængder og produkt-detaljer fra DOM
+  const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
+  const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const dagTotaler = {}, produktByVN = {};
+
+  document.querySelectorAll('.bern-cell').forEach(cell => {
+    const vn  = cell.getAttribute('data-vn');
+    const dag = cell.getAttribute('data-dag');
+    const val = parseInt(cell.textContent) || 0;
+    if (!produktByVN[vn]) {
+      const prod = (window._bernData?.produkter || []).find(p => String(p.varenummer) === vn);
+      produktByVN[vn] = { varenavn: prod?.varenavn || `Vare ${vn}`, kategori: prod?.kategori || '', dag_val: {} };
+    }
+    produktByVN[vn].dag_val[dag] = val;
+    const idx = DAGE.indexOf(dag);
+    if (idx >= 0) dagTotaler[DAGE_DA[idx]] = (dagTotaler[DAGE_DA[idx]] || 0) + val;
+  });
+
+  const produkter = Object.values(produktByVN).map(p => {
+    const dagObj = {};
+    DAGE.forEach(dk => { if (p.dag_val[dk]) dagObj[dk] = p.dag_val[dk]; });
+    return { varenavn: p.varenavn, kategori: p.kategori, ...dagObj };
+  });
+
+  return { dag_totaler: dagTotaler, produkter };
+}
+
 async function bernHentKontekst() {
   if (!_bernUge || !_bernAar) return;
   const kort    = document.getElementById('bern-kontekst-kort');
   const tekst   = document.getElementById('bern-kontekst-tekst');
   const spinner = document.getElementById('bern-kontekst-spinner');
   const btn     = document.getElementById('bern-kontekst-btn');
+  const mainBtn = document.getElementById('bern-main-btn');
   if (!kort) return;
 
   kort.style.display    = '';
   tekst.textContent     = '';
   spinner.style.display = '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  if (mainBtn) { mainBtn.disabled = true; mainBtn.textContent = '⏳ Analyserer…'; }
+
+  const { dag_totaler, produkter } = _bernLaesTabelData();
 
   try {
-    const res = await api('/api/bestilling/kontekst?uge=' + _bernUge + '&aar=' + _bernAar);
+    const res = await fetch('/api/bestilling/kontekst', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uge: _bernUge,
+        aar: _bernAar,
+        dag_totaler,
+        produkter,
+        vejr: _vejrData || {}
+      })
+    });
+    const data = await res.json();
     spinner.style.display = 'none';
     if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
-    if (!res || !res.ok) {
-      tekst.textContent = '⚠ ' + (res?.fejl || 'Fejl ved analyse');
+    if (mainBtn) { mainBtn.disabled = false; mainBtn.textContent = '🔄 Opdater analyse'; }
+    if (!data || !data.ok) {
+      tekst.textContent = '⚠ ' + (data?.fejl || 'Fejl ved analyse');
       return;
     }
-    tekst.textContent = res.tekst;
+    tekst.textContent = data.tekst;
     _bernKontekstUge = _bernUge;
   } catch(e) {
     spinner.style.display = 'none';
     if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
+    if (mainBtn) { mainBtn.disabled = false; mainBtn.textContent = '🔄 Opdater analyse'; }
     tekst.textContent = '⚠ Netværksfejl';
   }
 }

@@ -4272,7 +4272,9 @@ def hent_sellthrough_analyse(uger: int = 10) -> dict:
 
 # ── BESTILLINGSBEREGNER AI-KONTEKST ──────────────────────────────────────────
 
-def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dict:
+def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
+                               dag_totaler: dict = None, produkter: list = None,
+                               vejr: dict = None) -> dict:
     """Genererer AI-hjælpetekst til bestillingsberegneren for den kommende uge."""
     from datetime import date as _d, timedelta as _td
     import anthropic as _ant
@@ -4402,6 +4404,57 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
 
     evt_prev_info = f" (BEMÆRK: forrige uge havde {evt_prev['navn']} — tallene kan være atypiske)" if evt_prev else ''
 
+    # Byg dagsmængde-sektion
+    DAG_NAVNE_DA = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
+    DAG_KEYS     = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+
+    dag_maengde_str = ""
+    if dag_totaler:
+        linjer = []
+        for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+            total = dag_totaler.get(dn, dag_totaler.get(dk, 0))
+            if total:
+                linjer.append(f"  {dn}: {total} stk")
+        dag_maengde_str = "\n".join(linjer) if linjer else "  (ingen data)"
+
+    produkt_str = ""
+    if produkter:
+        linjer = []
+        for p in produkter[:20]:
+            navn = p.get("varenavn", p.get("navn", "?"))
+            kat  = p.get("kategori", "")
+            dage = []
+            for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+                v = p.get(dk, p.get("dag_val", {}).get(dk, 0))
+                if v: dage.append(f"{dn}:{v}")
+            total = p.get("total", sum(p.get(dk, 0) for dk in DAG_KEYS))
+            linjer.append(f"  {navn} ({kat}): {' '.join(dage)} = {total} stk")
+        produkt_str = "\n".join(linjer)
+
+    vejr_str = ""
+    if vejr and vejr.get("forecast"):
+        fc = vejr["forecast"]
+        linjer = []
+        for i in range(7):
+            dag = mon + _td(days=i)
+            ds  = dag.isoformat()
+            dn  = DAG_NAVNE_DA[i]
+            v   = fc.get(ds)
+            if v:
+                j = v.get("juster", {})
+                linje = f"  {dn}: {v.get('ikon','')} {v.get('tmax','?')}° {v.get('prec',0)}mm"
+                if j.get("farve") in ("red", "orange"):
+                    linje += f" → {j.get('label','')}"
+                linjer.append(linje)
+        vejr_str = "\n".join(linjer) if linjer else "  Ingen vejrdata"
+    else:
+        vejr_str = "  Ikke tilgængelig"
+
+    # Sæsonindeks fra evt
+    si_info = ""
+    if evt:
+        si_info = f"Sæsonindeks: ×{evt.get('factor', 1.0):.2f}"
+
     prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med eget bageri i Greve, Danmark.
 
 ═══ FORRETNINGSLOGIK ═══
@@ -4412,57 +4465,61 @@ To LIGE STORE risici — begge er direkte tab:
 Fokus er DAG-PRÆCISION. Lørdage/fredage er typisk stærke. Mandage/tirsdage svage.
 Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
 
-⚠ DATAKVALITET — husk disse forbehold:
-• Shopbox-data er manuelt tastet af personale — varenavn og antal kan indeholde fejl.
-  Sell-through kan UNDERVURDERE reelt salg pga. forkert registrering.
-• MobilePay-omsætning er IKKE varekoblet — en del af bagværkssalget (typisk kontant/MobilePay
-  ved bagerbordet) fremgår ikke i produkt-tallene. Reelt salg er højere end Shopbox viser.
-• Konsekvens: vær forsigtig med at anbefale store reduktioner baseret på lav sell-through alene.
-  Kombiner altid med TGTG-data og retur-data som er mere præcise.
+⚠ DATAKVALITET:
+• Shopbox-data kan undervurdere reelt salg (MobilePay ikke varekoblet).
+• Brug TGTG og retur som de mest præcise spild-indikatorer.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
+{si_info}
 
+BEGIVENHED: {evt_info}
+
+VEJR UGE {maal_uge}:
+{vejr_str}
+
+─── FORESLÅEDE DAGSMÆNGDER (systemets beregning) ───
+Dagstotaler:
+{dag_maengde_str if dag_maengde_str else '  (ikke tilgængelig — klik Opdater analyse efter tabellen er indlæst)'}
+
+Pr. produkt:
+{produkt_str if produkt_str else '  (ikke tilgængelig)'}
+
+─── HISTORIK ───
 FORRIGE UGE ({prev_uge}/{prev_aar}, {prev_mon.strftime('%-d. %b')}–{prev_sun.strftime('%-d. %b')}){evt_prev_info}:
-{'⚠ IGANGVÆRENDE UGE — kun ' + str(prev_dage) + ' dage med data (til og med ' + (prev_seneste_dagsnavn or '?') + '). Ugen er IKKE AFSLUTTET. Sammenlign KUN dag-for-dag, IKKE mod fuld uge fra andre perioder.' if prev_er_igangvaerende else f'Afsluttet uge — {prev_dage} dage med salgsdata.'}
-  Omsætning så langt: {prev_oms:,} kr ({prev_kunder} kunder){' — ⚠ DELVIS UGE, ikke sammenlignelig med fuld uge' if prev_er_igangvaerende else ''}
-  Samme periode 4 uger siden ({prev4_mon.strftime('%-d. %b')}–{(_d.fromisoformat(prev_salg['dato']) if prev_salg and prev_salg.get('dato') else prev_sun).strftime('%-d. %b') if not prev_er_igangvaerende else (prev4_mon + _td(days=prev_dage-1)).strftime('%-d. %b')}): {oms_4u_ago:,} kr
-  Bestilling: {best_str}
+{'⚠ IGANGVÆRENDE — kun ' + str(prev_dage) + ' dage (til ' + (prev_seneste_dagsnavn or '?') + ')' if prev_er_igangvaerende else f'{prev_dage} dage med data'}
+  Omsætning: {prev_oms:,} kr · Bestilling: {best_str}
 
-RETUR FORRIGE UGE:
-  Boller: {retur_b} stk · Wienerbrød: {retur_w} stk (pr. vare: {retur_varer_str})
-  Snit seneste 4 uger: {snit_b} boller + {snit_w} wienerbrød
+RETUR FORRIGE UGE: Boller {retur_b} stk · Wienerbrød {retur_w} stk ({retur_varer_str})
+Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød
 
-TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (snit 4 uger: {tgtg_snit:,} kr · mål: <800 kr)
+TGTG: {tgtg_poser} poser · {tgtg_kr:,} kr (snit 4 uger: {tgtg_snit:,} kr · mål: <800 kr)
 
 TREND: {trend_str}
 
-BEGIVENHED UGE {maal_uge}: {evt_info}
+─── DIN OPGAVE (4 afsnit, ren tekst) ───
 
-─── VEJLEDNING (5 afsnit, ren tekst) ───
+1. DAGSVURDERING — gennemgå de foreslåede dagsmængder dag for dag.
+   Er antallet rigtigt, for højt eller for lavt på hver dag?
+   Husk: {si_info or 'normalt sæsonniveau'}, vejret og eventuelle begivenheder.
+   Format: "Man {dag_totaler.get('Man', dag_totaler.get('man','?')) if dag_totaler else '?'} stk — [vurdering]"
 
-1. UGE — hvilken uge, datoer, overordnet situation
+2. SÆSON & VEJR — hvad betyder sæsonindeks og vejrudsigt konkret for denne uge?
+   Hvilke dage påvirkes mest? Hvad risikerer vi at gå galt?
 
-2. FORRIGE UGE — {'⚠ IKKE AFSLUTTET (' + str(prev_dage) + ' dage til og med ' + (prev_seneste_dagsnavn or '?') + '). Skriv KUN om de dage der er data for. Ingen konklusioner om hele ugen. Sammenlign KUN mod tilsvarende dage fra 4 uger siden — ikke mod en fuld uge.' if prev_er_igangvaerende else 'Afsluttet uge — hvad viser tallene?'}{' Begivenhed kan have påvirket.' if evt_prev else ''}
-   Peg på om vi mistede salg (for lidt) eller havde spild (for meget) på specifikke dage.
+3. TGTG & RETUR — er spildniveauet acceptabelt?
+   Hvilke produkter/dage driver spildet? Hvad skal ned uden at risikere tomme hylder?
 
-3. BEGIVENHED & DAG-FORDELING — hvilke dage bliver stærke/svage næste uge?
-   Beregn risiko begge veje: hvilke dage risikerer vi tomme hylder vs. spild?
+4. KONKRETE ANBEFALINGER — specifikke justeringer med tal og begrundelse.
+   Format: "Fre: +8 boller (stærk dag + godt vejr)"
+            "Man: -5 wienerbrød (svag dag, TGTG-risiko)"
 
-4. TGTG-ANALYSE — {tgtg_kr:,} kr vs. 800 kr mål.
-   Er TGTG pga. for høj bestilling på svage dage, eller forkert dag-fordeling?
-   Hvad konkret skal ned? Hvad må IKKE sænkes (risiko for tabt salg)?
-
-5. ANBEFALING — specifikke dag-justeringer med tal.
-   Format: "Fredag: +10% wienerbrød (stærk dag, risiko for udsolgt)"
-            "Mandag: -15% boller (svag dag, TGTG-risiko)"
-
-Skriv i du-form. Vær KONKRET — brug tal og dagenavne. Ingen generelle råd."""
+Skriv på dansk. Vær KONKRET — brug tal og dagenavne. Max 400 ord."""
 
     client = _ant.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=800,
+        model="claude-sonnet-4-6",
+        max_tokens=900,
         messages=[{"role": "user", "content": prompt}]
     )
     tekst = msg.content[0].text.strip()

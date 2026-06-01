@@ -5162,13 +5162,26 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
         ).fetchall()
         helligdage_set = {r["dato"] for r in helligdage_rows}
 
-        # Event-dage: kun specifikke helligdage — IKKE hele event-uger
-        # (hele uger skævvrider for meget — foråret har event næsten hver uge)
+        # Event-dage: helligdage + specifikke dage fra det dynamiske system
+        # Kun dage med salgs-faktor >= 1.10 eller = 0 (lukket) markeres
+        # — normale dage i event-uger (faktor 1.0) tæller med som normale
+        _DAG_IDX = {"man":1,"tir":2,"ons":3,"tor":4,"fre":5,"loe":6,"son":7}
         event_datoer: set = set(helligdage_set)
-        # Tilføj 1. og 2. pinsedag, Kr. Himmelfart, Grundlovsdag som specifikke dage
-        # via helligdage-tabellen (allerede inkluderet ovenfor via helligdage_set)
-        # Mors dag og lignende ugesbestemte begivenheder ekskluderes fra event-markering
-        # så de indgår som normale dage i analysen
+        for _y in {today.year, today.year - 1}:
+            for (_ew, _ey), _evt in _events_for_aar(_y).items():
+                if _ey != _y:
+                    continue
+                _mandag = _date.fromisocalendar(_ey, _ew, 1)
+                _dag_fak = _evt.get("dag_fak", {})
+                for _dagnavn, _fak in _dag_fak.items():
+                    # Marker kun markant unormale dage (≥10% over/under normal)
+                    if _fak >= 1.10 or _fak <= 0.5:
+                        _didx = _DAG_IDX.get(_dagnavn)
+                        if _didx:
+                            _dag = _mandag + _td(days=_didx - 1)
+                            _ds = _dag.isoformat()
+                            if fra_dato <= _ds <= til_dato:
+                                event_datoer.add(_ds)
 
         # Dagligt salg: brød og boller (antal + omsætning) med tidspunkter
         dag_rows = conn.execute(f"""

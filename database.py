@@ -5141,10 +5141,14 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
         OR LOWER(t.varenavn) LIKE '%focaccia%'
     )"""
 
-    # Boller = surdejsboller, birkes — hveder og frøsnapper er særprodukter/wienerbrød
+    # Boller = surdejsboller, birkes — hveder, frøsnapper, tebirkes og grovbirkes er særprodukter/wienerbrød
     _BOLLER_WHERE = """(
         LOWER(t.varenavn) LIKE '%bolle%'
-        OR LOWER(t.varenavn) LIKE '%birkes%'
+        OR (
+            LOWER(t.varenavn) LIKE '%birkes%'
+            AND LOWER(t.varenavn) NOT LIKE '%tebirkes%'
+            AND LOWER(t.varenavn) NOT LIKE '%grovbirkes%'
+        )
     )"""
 
     _JOIN_STAMDATA = ""  # Ikke nødvendig — varestamdata er ikke populeret

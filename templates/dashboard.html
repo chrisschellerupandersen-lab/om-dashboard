@@ -2379,15 +2379,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <!-- Dagsoversigt-tabel -->
         <div style="margin-bottom:24px;">
-          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:10px;letter-spacing:.04em;">GENNEMSNIT PER UGEDAG (normale dage)</div>
+          <div style="font-size:12px;font-weight:600;color:var(--gold);margin-bottom:10px;letter-spacing:.04em;">SALG PER UGEDAG (normale dage)</div>
           <div style="overflow-x:auto;">
             <table style="width:100%;border-collapse:collapse;font-size:12px;" id="bb-dag-tabel">
               <thead>
                 <tr style="border-bottom:1px solid rgba(255,255,255,.1);">
                   <th style="text-align:left;padding:6px 8px;color:var(--ash);font-weight:500;">DAG</th>
-                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BRØD (stk)</th>
-                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BOLLER (stk)</th>
-                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">DAGE I ANALYSE</th>
+                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BRØD GNS</th>
+                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BRØD TOTAL</th>
+                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BOLLER GNS</th>
+                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">BOLLER TOTAL</th>
+                  <th style="text-align:right;padding:6px 8px;color:var(--ash);font-weight:500;">DAGE</th>
                 </tr>
               </thead>
               <tbody id="bb-dag-tbody"></tbody>
@@ -7663,10 +7665,14 @@ function bbVis(data) {
   for (let wd = 1; wd <= 7; wd++) {
     const s = snit[wd] || snit[String(wd)];
     if (!s) continue;
+    const brTotal  = s.broed_total  ?? (s.broed  * s.n_dage);
+    const bolTotal = s.boller_total ?? (s.boller * s.n_dage);
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
       <td style="padding:7px 8px;font-weight:500;">${s.navn}</td>
       <td style="padding:7px 8px;text-align:right;">${s.broed.toLocaleString('da-DK')}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--ash);">${Math.round(brTotal).toLocaleString('da-DK')}</td>
       <td style="padding:7px 8px;text-align:right;">${s.boller.toLocaleString('da-DK')}</td>
+      <td style="padding:7px 8px;text-align:right;color:var(--ash);">${Math.round(bolTotal).toLocaleString('da-DK')}</td>
       <td style="padding:7px 8px;text-align:right;color:var(--ash);font-size:11px;">${s.n_dage}</td>
     </tr>`;
   }

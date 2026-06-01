@@ -5274,10 +5274,12 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
         n = dag_tæller[wd]
         if n:
             dag_snit[wd] = {
-                "navn":   DAG_NAVNE[wd],
-                "n_dage": n,
-                "broed":  round(dag_sum[wd]["broed"]  / n, 1),
-                "boller": round(dag_sum[wd]["boller"] / n, 1),
+                "navn":        DAG_NAVNE[wd],
+                "n_dage":      n,
+                "broed":       round(dag_sum[wd]["broed"]  / n, 1),
+                "boller":      round(dag_sum[wd]["boller"] / n, 1),
+                "broed_total": round(dag_sum[wd]["broed"],  1),
+                "boller_total":round(dag_sum[wd]["boller"], 1),
             }
 
     # Formatér time-mønstre til liste

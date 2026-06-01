@@ -4397,18 +4397,19 @@ async function loadMarginAnalyse() {
   const mono = "font-family:'DM Mono',monospace;";
 
   tbody.innerHTML = data.map((r, i) => {
-    const dbColor = r.db_pct >= 35 ? '#2d5a2d' : r.db_pct >= 20 ? '#7a5c00' : '#9b3420';
-    const dbBg = r.db_pct >= 35 ? 'rgba(74,124,74,.1)' : r.db_pct >= 20 ? 'rgba(200,168,75,.15)' : 'rgba(155,52,32,.1)';
+    const db    = r.db_pct ?? 0;
+    const dbColor = db >= 35 ? '#2d5a2d' : db >= 20 ? '#7a5c00' : '#9b3420';
+    const dbBg    = db >= 35 ? 'rgba(74,124,74,.1)' : db >= 20 ? 'rgba(200,168,75,.15)' : 'rgba(155,52,32,.1)';
     const datoStr = r.seneste_salg ? r.seneste_salg.substring(5) : '—';
 
     return `<tr style="background:rgba(30,58,30,.01);">
       <td style="padding:8px 12px;color:var(--charcoal);">${r.varenavn}</td>
       <td style="text-align:center;padding:8px 4px;color:var(--ash);font-size:12px;">${r.kategori || '—'}</td>
-      <td class="num" style="font-size:12px;">${Math.round(r.omsat_ex_moms).toLocaleString('da-DK')} kr</td>
-      <td class="num" style="font-size:12px;${mono}color:var(--ash);">${Math.round(r.vareforbrug).toLocaleString('da-DK')} kr</td>
-      <td class="num" style="font-size:12px;${mono}">${Math.round(r.db_kr).toLocaleString('da-DK')} kr</td>
-      <td class="num"><span style="${mono}font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:${dbBg};color:${dbColor};">${r.db_pct.toFixed(1)}%</span></td>
-      <td class="num" style="font-size:12px;">${Math.round(r.antal_solgt).toLocaleString('da-DK')} stk</td>
+      <td class="num" style="font-size:12px;">${Math.round(r.omsat_ex_moms || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}color:var(--ash);">${Math.round(r.vareforbrug || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}">${Math.round(r.db_kr || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span style="${mono}font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:${dbBg};color:${dbColor};">${db.toFixed(1)}%</span></td>
+      <td class="num" style="font-size:12px;">${Math.round(r.antal_solgt || 0).toLocaleString('da-DK')} stk</td>
       <td class="num" style="font-size:11px;color:var(--ash);${mono}">${datoStr}</td>
     </tr>`;
   }).join('');

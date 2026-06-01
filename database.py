@@ -5127,20 +5127,27 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
     """
     from datetime import date as _date, timedelta as _td, datetime as _dt
 
+    # Brød = rugbrød, surdejsbrød, flutes, foccacia og alt med 'brød' i navnet
     _BROED_WHERE = """(
         LOWER(varenavn) LIKE '%brød%'
         OR LOWER(varenavn) LIKE '%brod%'
-        OR LOWER(varenavn) LIKE '%rugbrød%'
-        OR LOWER(varenavn) LIKE '%franskbrød%'
-        OR LOWER(varenavn) LIKE '%toastbrød%'
+        OR LOWER(varenavn) LIKE '%flute%'
+        OR LOWER(varenavn) LIKE '%foccacia%'
+        OR LOWER(varenavn) LIKE '%focaccia%'
+        OR LOWER(varenavn) LIKE '%ciabatta%'
+        OR LOWER(varenavn) LIKE '%baguette%'
     )"""
 
+    # Boller = alle småbagt: boller, birkes, frøsnapper, hveder, teboller m.v.
     _BOLLER_WHERE = """(
         LOWER(varenavn) LIKE '%bolle%'
         OR LOWER(varenavn) LIKE '%rundstykke%'
-        OR LOWER(varenavn) LIKE '%morgenbolle%'
-        OR LOWER(varenavn) LIKE '%fuldkornsbolle%'
-        OR LOWER(varenavn) LIKE '%tebirkes%'
+        OR LOWER(varenavn) LIKE '%birkes%'
+        OR LOWER(varenavn) LIKE '%frøsnapper%'
+        OR LOWER(varenavn) LIKE '%frosnapper%'
+        OR LOWER(varenavn) LIKE '%hveder%'
+        OR LOWER(varenavn) LIKE '%horn%'
+        OR LOWER(varenavn) LIKE '%tebolle%'
     )"""
 
     today = _date.today()

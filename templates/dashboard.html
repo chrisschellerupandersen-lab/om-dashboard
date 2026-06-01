@@ -7213,13 +7213,13 @@ async function loadBernUge(uge, aar) {
     console.warn('Kunne ikke indlæse basis bestilling:', e);
   }
 
-  _bernBusy = false;
-  if (!d) return;
+  if (!d) { _bernBusy = false; return; }
   // Opdater vejr-strip (vejr kan nu være hentet færdigt)
   vejrVisUge(uge, aar);
   if (d.error) {
     document.getElementById('beregner-tabel').innerHTML =
       '<div style="padding:20px;color:var(--danger);">' + d.error + '</div>';
+    _bernBusy = false;
     return;
   }
 
@@ -7533,6 +7533,8 @@ async function loadBernUge(uge, aar) {
       </div>
     </div>
     <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
+
+  _bernBusy = false;
 }
 
 async function loadBeregner() {

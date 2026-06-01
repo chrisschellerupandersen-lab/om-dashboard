@@ -7634,7 +7634,7 @@ function bbVis(data) {
   const tbody = document.getElementById('bb-dag-tbody');
   let html = '';
   for (let wd = 1; wd <= 7; wd++) {
-    const s = snit[wd];
+    const s = snit[wd] || snit[String(wd)];
     if (!s) continue;
     html += `<tr style="border-bottom:1px solid rgba(255,255,255,.06);">
       <td style="padding:7px 8px;font-weight:500;">${s.navn}</td>
@@ -7697,7 +7697,8 @@ function bbOpdaterTabs(availDage) {
 
 function bbTegnGraf(data) {
   const wd = _bbAktivDag;
-  const moenster = (data.time_normal || {})[wd];
+  const tm = data.time_normal || {};
+  const moenster = tm[wd] || tm[String(wd)];
   if (!moenster || !moenster.timer) return;
 
   const timer = moenster.timer;

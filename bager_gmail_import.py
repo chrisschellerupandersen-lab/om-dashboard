@@ -243,10 +243,20 @@ def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
     tgtg = 0.0
     b_kvali = 0.0
     faktura = 0.0
+    subtotal = 0.0
+    _next_er_levering = False  # PDF-linjer kan splits: beskrivelse øverst, beløb næste linje
 
     for linje in tekst.splitlines():
         l = linje.strip()
         l_lower = l.lower()
+
+        # Beløb på linjen EFTER en splittet Levering-linje
+        if _next_er_levering:
+            val = _hent_sidst_tal_paa_linje(l)
+            if val > 100:  # Sanity: leveringsbeløb er aldrig under 100 kr
+                faktura = val
+            _next_er_levering = False
+            continue
 
         # Retur wienerbrød — beløb på linjen
         if re.search(r"retur\s+wien", l_lower):
@@ -265,13 +275,18 @@ def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
             if not re.search(r"retur|wiener|boller|tgtg", l_lower):
                 b_kvali = _hent_sidst_tal_paa_linje(l)
 
-        # Levering iflg. specifikation — bruttobeløb (netto_kr = faktura − retur_ialt = Subtotal)
+        # Levering iflg. specifikation — bruttobeløb
         elif re.search(r"levering", l_lower):
-            faktura = _hent_sidst_tal_paa_linje(l)
+            val = _hent_sidst_tal_paa_linje(l)
+            if val > 100:
+                faktura = val
+            else:
+                # Beløbet er sandsynligvis på næste linje (PDF-linje split)
+                _next_er_levering = True
 
-        # Fallback: Subtotal hvis ingen leveringslinje
-        elif not faktura and re.search(r"subtotal", l_lower):
-            faktura = _hent_sidst_tal_paa_linje(l)
+        # Subtotal — gemmes separat som fallback
+        elif re.search(r"subtotal", l_lower):
+            subtotal = _hent_sidst_tal_paa_linje(l)
 
         # Fallback: Total DKK
         elif not faktura and re.search(r"total\s+dkk\s*:", l_lower):
@@ -279,6 +294,11 @@ def _parse_tekst(tekst: str, uge: int, aar: int) -> dict:
 
     # Retur i alt = sum af alle kreditposter
     retur_ialt = round(retur_wiener + retur_boller + tgtg + b_kvali, 2)
+
+    # Hvis Levering-linjen ikke gav et beløb: beregn brutto fra subtotal + retur
+    # (subtotal = brutto - retur_ialt  →  brutto = subtotal + retur_ialt)
+    if not faktura and subtotal > 0:
+        faktura = round(subtotal + retur_ialt, 2)
 
     return {
         "uge":          uge,

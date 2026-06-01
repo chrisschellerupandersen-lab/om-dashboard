@@ -1,6 +1,9 @@
 import io
 import os
 import base64
+import re
+import json
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -15,10 +18,204 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import database
 import parser as xlsx_parser
 
+# ── Gmail auto-import ─────────────────────────────────────────────────────────
+
+GMAIL_SENDER   = "rmk@organicmarket.dk"
+GMAIL_SCOPES   = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+
+def _gmail_creds():
+    """Byg Gmail Credentials fra GMAIL_TOKEN_JSON env var."""
+    token_json = os.environ.get("GMAIL_TOKEN_JSON", "")
+    if not token_json:
+        raise RuntimeError("GMAIL_TOKEN_JSON env var ikke sat")
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request as GRequest
+    info = json.loads(token_json)
+    creds = Credentials.from_authorized_user_info(info, GMAIL_SCOPES)
+    if not creds.valid and creds.expired and creds.refresh_token:
+        creds.refresh(GRequest())
+    return creds
+
+
+def _iter_parts(payload):
+    yield payload
+    for part in payload.get("parts", []):
+        yield from _iter_parts(part)
+
+
+def _tal(s) -> float:
+    if s is None: return 0.0
+    s = re.sub(r"[^\d,.\-]", "", str(s).strip())
+    if not s or s == "-": return 0.0
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    else:
+        parts = s.lstrip("-").split(".")
+        if not (len(parts) == 2 and len(parts[1]) in (1, 2)):
+            s = s.replace(".", "")
+    try: return float(s)
+    except: return 0.0
+
+
+def _sidst_tal(linje: str) -> float:
+    tal = re.findall(r"-?[0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|-?[0-9]+(?:,[0-9]+)?", linje)
+    return abs(_tal(tal[-1])) if tal else 0.0
+
+
+def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
+    retur_wiener = retur_boller = tgtg = b_kvali = faktura = subtotal = 0.0
+    _next_levering = False
+    for linje in tekst.splitlines():
+        l = linje.strip(); ll = l.lower()
+        if _next_levering:
+            val = _sidst_tal(l)
+            if val > 100: faktura = val
+            _next_levering = False
+            continue
+        if re.search(r"retur\s+wien", ll):
+            retur_wiener = _sidst_tal(l)
+        elif re.search(r"retur\s+boller", ll):
+            retur_boller = _sidst_tal(l)
+        elif re.search(r"tgtg|too\s*good\s*to\s*go", ll):
+            tgtg = _sidst_tal(l)
+        elif re.search(r"kvali|b-?kredit|kvalitets", ll):
+            if not re.search(r"retur|wiener|boller|tgtg", ll):
+                b_kvali = _sidst_tal(l)
+        elif re.search(r"levering", ll):
+            val = _sidst_tal(l)
+            if val > 100: faktura = val
+            else: _next_levering = True
+        elif re.search(r"subtotal", ll):
+            subtotal = _sidst_tal(l)
+        elif not faktura and re.search(r"total\s+dkk\s*:", ll):
+            faktura = _sidst_tal(l)
+    retur_ialt = round(retur_wiener + retur_boller + tgtg + b_kvali, 2)
+    if not faktura and subtotal > 0:
+        faktura = round(subtotal + retur_ialt, 2)
+    return {
+        "uge": uge, "aar": aar,
+        "retur_wiener": round(retur_wiener, 2),
+        "retur_boller": round(retur_boller, 2),
+        "tgtg": round(tgtg, 2),
+        "b_kvali": round(b_kvali, 2),
+        "retur_ialt": retur_ialt,
+        "faktura": round(faktura, 2),
+    }
+
+
+def gmail_sync_run() -> dict:
+    """Hent nye bager-fakturaer fra Gmail og gem i databasen. Returnerer status-dict."""
+    try:
+        from googleapiclient.discovery import build
+        import pdfplumber
+    except ImportError as e:
+        msg = f"Mangler pakke: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+    try:
+        creds = _gmail_creds()
+    except Exception as e:
+        msg = f"Gmail credentials fejl: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+    try:
+        service  = build("gmail", "v1", credentials=creds)
+        allerede = database.hent_gmail_importerede()
+
+        query  = f"from:{GMAIL_SENDER} has:attachment filename:pdf"
+        result = service.users().messages().list(userId="me", q=query, maxResults=50).execute()
+        messages = result.get("messages", [])
+
+        nye = []
+        for msg in messages:
+            msg_id = msg["id"]
+            if msg_id in allerede:
+                continue
+            full    = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
+            headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
+            subject = headers.get("Subject", "")
+            date_str= headers.get("Date", "")
+
+            m_uge = re.search(r"uge\s*(\d+)", subject, re.IGNORECASE)
+            if not m_uge:
+                continue
+            uge = int(m_uge.group(1))
+            m_aar = re.search(r"(202\d)", date_str)
+            aar = int(m_aar.group(1)) if m_aar else datetime.now().year
+
+            att_id = att_name = None
+            for part in _iter_parts(full["payload"]):
+                if part.get("mimeType") == "application/pdf":
+                    att_id   = part["body"].get("attachmentId")
+                    att_name = part.get("filename", "faktura.pdf")
+                    break
+            if not att_id:
+                continue
+
+            att   = service.users().messages().attachments().get(userId="me", messageId=msg_id, id=att_id).execute()
+            pdf_b = base64.urlsafe_b64decode(att.get("data", "") + "==")
+
+            tekst = ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(pdf_b); tmp_path = tmp.name
+            try:
+                with pdfplumber.open(tmp_path) as pdf:
+                    for page in pdf.pages:
+                        tekst += (page.extract_text() or "") + "\n"
+            finally:
+                os.unlink(tmp_path)
+
+            parsed = _parse_faktura_tekst(tekst, uge, aar)
+            nye.append({"msg_id": msg_id, "data": parsed})
+
+        if not nye:
+            database.log_gmail_sync("ingen_nye", "Ingen nye fakturaer fundet", 0)
+            return {"ok": True, "besked": "Ingen nye fakturaer", "antal": 0}
+
+        # Gem i database
+        database.gem_bager_regnskab([e["data"] for e in nye])
+        for entry in nye:
+            database.gem_gmail_importeret(entry["msg_id"], entry["data"]["uge"], entry["data"]["aar"])
+
+        besked = f"Importeret {len(nye)} faktura(er): " + ", ".join(f"uge {e['data']['uge']}/{e['data']['aar']}" for e in nye)
+        database.log_gmail_sync("ok", besked, len(nye))
+        return {"ok": True, "besked": besked, "antal": len(nye)}
+
+    except Exception as e:
+        msg = f"Sync fejl: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+
+# ── APScheduler ───────────────────────────────────────────────────────────────
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+_scheduler = AsyncIOScheduler(timezone="Europe/Copenhagen")
+
+def _planlagt_gmail_sync():
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        result = gmail_sync_run()
+        print(f"[Gmail auto-sync] {result.get('besked','?')}")
+    finally:
+        loop.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
+    if os.environ.get("GMAIL_TOKEN_JSON"):
+        _scheduler.add_job(_planlagt_gmail_sync, "cron", day_of_week="mon,thu", hour=8, minute=0)
+        _scheduler.start()
+        print("[Scheduler] Gmail auto-sync aktiv: man+tor 08:00")
     yield
+    if _scheduler.running:
+        _scheduler.shutdown()
 
 app = FastAPI(title="Organic Market Dashboard", lifespan=lifespan)
 
@@ -1686,6 +1883,23 @@ async def management_spørg(request: Request):
         return {"ok": True, "svar": svar}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── GMAIL AUTO-SYNC ───────────────────────────────────────────────────────────
+
+@app.post("/api/bager/gmail-sync")
+async def api_gmail_sync(request: Request):
+    _kræv_login(request)
+    result = gmail_sync_run()
+    return result
+
+
+@app.get("/api/bager/gmail-status")
+async def api_gmail_status(request: Request):
+    _kræv_login(request)
+    status = database.hent_gmail_sync_status()
+    har_token = bool(os.environ.get("GMAIL_TOKEN_JSON"))
+    return {"ok": True, "status": status, "har_token": har_token}
 
 
 # ── VEJR ──────────────────────────────────────────────────────────────────────

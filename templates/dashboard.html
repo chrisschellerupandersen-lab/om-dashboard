@@ -2000,6 +2000,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="page-hdr">
           <h2>Bager regnskab</h2>
           <p>Alle uger &mdash; faktura, retur &amp; svind oversigt</p>
+          <button onclick="gmailSynkNu()" id="gmail-sync-btn" style="background:rgba(30,58,30,.15);border:1px solid rgba(255,215,0,.3);color:var(--gold);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:500;">↓ Synk Gmail</button>
+          <span id="gmail-sync-status" style="font-size:10px;color:var(--ash);margin-left:6px;"></span>
           <button onclick="_bagerLoaded=false;loadBager();" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">&#8635; Opdater</button>
         </div>
 
@@ -6516,6 +6518,48 @@ async function loadTgtg() {
 // ── BAGER REGNSKAB ───────────────────────────────────────────────────────────
 let _bagerLoaded = false;
 
+async function gmailSynkNu() {
+  const btn    = document.getElementById('gmail-sync-btn');
+  const status = document.getElementById('gmail-sync-status');
+  btn.disabled = true;
+  btn.textContent = '↓ Synkroniserer…';
+  status.textContent = '';
+  try {
+    const r = await fetch('/api/bager/gmail-sync', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = d.antal > 0 ? 'var(--moss)' : 'var(--ash)';
+      status.textContent = d.besked;
+      if (d.antal > 0) { _bagerLoaded = false; loadBager(); }
+    } else {
+      status.style.color = 'var(--danger)';
+      status.textContent = d.besked || 'Fejl';
+    }
+  } catch(e) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Netværksfejl';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↓ Synk Gmail';
+  }
+}
+
+async function gmailStatusLoad() {
+  try {
+    const d = await api('/api/bager/gmail-status');
+    if (!d || !d.har_token) return;
+    const status = document.getElementById('gmail-sync-status');
+    if (d.status) {
+      const t = (d.status.tidspunkt || '').slice(0,16).replace('T',' ');
+      const ok = d.status.status === 'ok';
+      status.style.color = ok ? 'var(--moss)' : d.status.status === 'fejl' ? 'var(--danger)' : 'var(--ash)';
+      status.textContent = `Sidst synk: ${t} · ${d.status.besked}`;
+    } else {
+      document.getElementById('gmail-sync-status').textContent = 'Aldrig synkroniseret';
+    }
+  } catch(e) {}
+}
+
 function bagerUploadToggle(hdr) {
   const wrap = document.getElementById('bager-upload-wrap');
   const lbl  = document.getElementById('bager-upload-lbl');
@@ -8329,7 +8373,7 @@ window.showPanel = function(id, el) {
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
-  if (id === 'bager')        loadBager();
+  if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
   if (id === 'forside')      loadReturStatus();
   if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();

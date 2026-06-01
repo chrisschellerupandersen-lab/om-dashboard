@@ -197,6 +197,21 @@ def init_db():
                 type     TEXT    DEFAULT 'normal'
             );
 
+            CREATE TABLE IF NOT EXISTS gmail_importerede (
+                msg_id     TEXT PRIMARY KEY,
+                uge        INTEGER,
+                aar        INTEGER,
+                importeret TEXT DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS gmail_sync_log (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                tidspunkt TEXT DEFAULT (datetime('now','localtime')),
+                status    TEXT,
+                besked    TEXT,
+                antal     INTEGER DEFAULT 0
+            );
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -5162,6 +5177,36 @@ def _vejr_justering(kode: int, prec: float, tmax: float) -> Dict:
     if faktor <= 0.95:
         return {"faktor": faktor, "farve": "orange",  "label": f"Regn {int((faktor-1)*100)}%"}
     return {"faktor": faktor, "farve": "neutral", "label": "Normalt vejr"}
+
+
+def hent_gmail_importerede() -> set:
+    with _conn() as conn:
+        rows = conn.execute("SELECT msg_id FROM gmail_importerede").fetchall()
+    return {r["msg_id"] for r in rows}
+
+
+def gem_gmail_importeret(msg_id: str, uge: int, aar: int) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO gmail_importerede (msg_id, uge, aar) VALUES (?,?,?)",
+            (msg_id, uge, aar)
+        )
+
+
+def log_gmail_sync(status: str, besked: str, antal: int = 0) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO gmail_sync_log (status, besked, antal) VALUES (?,?,?)",
+            (status, besked, antal)
+        )
+
+
+def hent_gmail_sync_status() -> Optional[Dict]:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM gmail_sync_log ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def hent_vejr_forecast() -> Dict:

@@ -1721,10 +1721,19 @@ async def api_broed_boller_debug(request: Request, uger: int = 8):
                 MAX(time_start) as max_tid
             FROM transaktioner WHERE dato >= ?
         """, (fra,)).fetchone()
+        # Vis typer i varestamdata for de mest solgte bagværk-produkter
+        stamdata_typer = conn.execute("""
+            SELECT s.varenavn, s.type, s.sku
+            FROM varestamdata s
+            WHERE s.type != ''
+            ORDER BY s.type, s.varenavn
+            LIMIT 60
+        """).fetchall()
         return {
             "fra": fra,
             "time_stats": dict(time_stats) if time_stats else {},
-            "varer": [dict(r) for r in varer]
+            "varer": [dict(r) for r in varer],
+            "stamdata_typer": [dict(r) for r in stamdata_typer]
         }
 
 

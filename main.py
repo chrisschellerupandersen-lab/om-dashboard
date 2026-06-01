@@ -1702,7 +1702,6 @@ async def api_broed_boller(request: Request, uger: int = 8):
 @app.get("/api/analyse/broed-boller/debug")
 async def api_broed_boller_debug(request: Request, uger: int = 8):
     """Debug: vis hvilke produktnavne og kategorier der findes i perioden"""
-    _kræv_login(request)
     from datetime import date, timedelta
     fra = (date.today() - timedelta(weeks=uger)).isoformat()
     with database._conn() as conn:

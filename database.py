@@ -5155,20 +5155,13 @@ def hent_broed_boller_moenster(periode_uger: int = 8) -> Dict:
         ).fetchall()
         helligdage_set = {r["dato"] for r in helligdage_rows}
 
-        # Event-uger fra det dynamiske system — byg sæt af event-datoer
-        event_datoer: set = set()
-        for i in range(periode_uger + 1):
-            d = today - _td(weeks=i)
-            iso = d.isocalendar()
-            evt = _get_event(iso[1], iso[0])
-            if evt:
-                # Marker alle dage i den uge som event-dage
-                mandag = _date.fromisocalendar(iso[0], iso[1], 1)
-                for j in range(7):
-                    dag = mandag + _td(days=j)
-                    if fra_dato <= dag.isoformat() <= til_dato:
-                        event_datoer.add(dag.isoformat())
-        event_datoer |= helligdage_set
+        # Event-dage: kun specifikke helligdage — IKKE hele event-uger
+        # (hele uger skævvrider for meget — foråret har event næsten hver uge)
+        event_datoer: set = set(helligdage_set)
+        # Tilføj 1. og 2. pinsedag, Kr. Himmelfart, Grundlovsdag som specifikke dage
+        # via helligdage-tabellen (allerede inkluderet ovenfor via helligdage_set)
+        # Mors dag og lignende ugesbestemte begivenheder ekskluderes fra event-markering
+        # så de indgår som normale dage i analysen
 
         # Dagligt salg: brød og boller (antal + omsætning) med tidspunkter
         dag_rows = conn.execute(f"""

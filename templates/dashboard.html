@@ -7618,14 +7618,41 @@ async function bbLoad(force = false) {
 function bbVis(data) {
   document.getElementById('bb-spinner').style.display = 'none';
 
-  const snit = data.dag_snit || {};
+  // Brug dag_snit (normale dage) eller byg snit fra dag_liste som fallback
+  let snit = data.dag_snit || {};
+  const erSnitFallback = Object.keys(snit).length === 0;
+  if (erSnitFallback) {
+    // Byg snit fra alle dage (inkl. event-dage) som fallback
+    const dagSum = {}, dagN = {};
+    const dagNavnMap = {1:'Man',2:'Tir',3:'Ons',4:'Tor',5:'Fre',6:'Lør',7:'Søn'};
+    for (const d of (data.dag_liste || [])) {
+      const wd = d.ugedag;
+      if (!dagSum[wd]) { dagSum[wd] = {broed:0, boller:0}; dagN[wd] = 0; }
+      dagSum[wd].broed  += d.broed_antal  || 0;
+      dagSum[wd].boller += d.boller_antal || 0;
+      dagN[wd]++;
+    }
+    snit = {};
+    for (let wd = 1; wd <= 7; wd++) {
+      if (dagN[wd]) snit[wd] = {
+        navn: dagNavnMap[wd], n_dage: dagN[wd],
+        broed:  Math.round(dagSum[wd].broed  / dagN[wd] * 10) / 10,
+        boller: Math.round(dagSum[wd].boller / dagN[wd] * 10) / 10,
+      };
+    }
+  }
+
   const harData = Object.keys(snit).length > 0;
   if (!harData) { document.getElementById('bb-tom').style.display = 'block'; return; }
 
   // Event-info
   const evtEl = document.getElementById('bb-event-info');
-  if (data.event_datoer && data.event_datoer.length) {
+  if (erSnitFallback) {
+    evtEl.textContent = 'Perioden har mange event-uger — viser gennemsnit inkl. events';
+    evtEl.style.color = 'var(--gold)';
+  } else if (data.event_datoer && data.event_datoer.length) {
     evtEl.textContent = `${data.event_datoer.length} event-dage ekskluderet fra normalen`;
+    evtEl.style.color = '';
   } else {
     evtEl.textContent = '';
   }
@@ -7645,12 +7672,22 @@ function bbVis(data) {
   }
   tbody.innerHTML = html || '<tr><td colspan="4" class="empty">Ingen data</td></tr>';
 
-  // Dag-tabs
-  const timeMoenster = data.time_normal || {};
+  // Dag-tabs — brug time_normal, men fallback til time_event hvis ingen normale dage
+  const timeNormal = data.time_normal || {};
+  const timeEvent  = data.time_event  || {};
+  const erFallback = Object.keys(timeNormal).length === 0;
+  const timeMoenster = erFallback ? timeEvent : timeNormal;
   const tabs = document.getElementById('bb-dag-tabs');
   tabs.innerHTML = '';
   const dagNavn = {1:'Man',2:'Tir',3:'Ons',4:'Tor',5:'Fre',6:'Lør',7:'Søn'};
   const availDage = Object.keys(timeMoenster).map(Number).sort();
+
+  // Opdater label hvis vi bruger event-data
+  if (erFallback && availDage.length > 0) {
+    document.querySelector('#p-broed-boller .page-hdr p').textContent =
+      'Perioden indeholder primært event-dage (Påske, Pinse m.v.) — viser event-mønster';
+  }
+
   if (availDage.length === 0) return;
 
   // Vælg første dag som aktiv
@@ -7697,7 +7734,10 @@ function bbOpdaterTabs(availDage) {
 
 function bbTegnGraf(data) {
   const wd = _bbAktivDag;
-  const tm = data.time_normal || {};
+  const tmN = data.time_normal || {};
+  const tmE = data.time_event  || {};
+  const erFallback = Object.keys(tmN).length === 0;
+  const tm = erFallback ? tmE : tmN;
   const moenster = tm[wd] || tm[String(wd)];
   if (!moenster || !moenster.timer) return;
 

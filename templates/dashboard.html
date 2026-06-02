@@ -319,15 +319,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
 
 /* ── KOMBINEREDE OVERBLIK KPI-KORT ─────────────────────────────────────────── */
-/* Ophæv hero-styling på første kort */
-.kpi-row-4 .ov-combo-kpi:first-child,
-.kpi-row-4 .ov-combo-kpi {
-  background: var(--white) !important;
-  border-color: rgba(30,58,30,.08) !important;
-  border-left-color: rgba(30,58,30,.08) !important;
+.ov-combo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 14px 0 4px;
 }
-.kpi-row-4 .ov-combo-kpi .kpi-l { color: var(--ash) !important; }
-.kpi-row-4 .ov-combo-kpi .kpi-v { color: var(--charcoal) !important; font-size: 22px !important; }
+@media (max-width: 768px) { .ov-combo-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .ov-combo-grid { grid-template-columns: 1fr 1fr; } }
 
 .ov-combo-kpi { gap: 0; }
 .ov-combo-lbl { font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.65;letter-spacing:.04em;margin-bottom:10px; }
@@ -1024,7 +1023,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <!-- 4 kombinerede KPI-kort: uge / måned / vs forrige -->
-        <div class="kpi-row-4" style="margin:14px 0 4px;">
+        <div class="ov-combo-grid">
 
           <!-- Omsætning -->
           <div class="kpi ov-combo-kpi">

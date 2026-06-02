@@ -4421,8 +4421,30 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
     DAG_NAVNE_DA = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
     DAG_KEYS     = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
 
+    # Filtrer kager fra - konstant leverance, intet spild, irrelevant for AI-vurdering
+    _KAGE_KAT = {"kage", "kager"}
+    produkter_uden_kage = [
+        p for p in (produkter or [])
+        if p.get("kategori", "").lower() not in _KAGE_KAT
+    ]
+
+    # Dag-totaler uden kager (genberegn fra produktlisten)
     dag_maengde_str = ""
-    if dag_totaler:
+    if dag_totaler and produkter_uden_kage:
+        # Træk kage-mængder fra dag-totalerne
+        kage_dag: Dict = {dk: 0 for dk in DAG_KEYS}
+        for p in (produkter or []):
+            if p.get("kategori", "").lower() in _KAGE_KAT:
+                for dk in DAG_KEYS:
+                    kage_dag[dk] += p.get(dk, 0)
+        linjer = []
+        for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+            total = dag_totaler.get(dn, dag_totaler.get(dk, 0))
+            total_uden = total - kage_dag.get(dk, 0)
+            if total_uden > 0:
+                linjer.append(f"  {dn}: {total_uden} stk")
+        dag_maengde_str = "\n".join(linjer) if linjer else "  (ingen data)"
+    elif dag_totaler:
         linjer = []
         for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
             total = dag_totaler.get(dn, dag_totaler.get(dk, 0))
@@ -4431,9 +4453,9 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
         dag_maengde_str = "\n".join(linjer) if linjer else "  (ingen data)"
 
     produkt_str = ""
-    if produkter:
+    if produkter_uden_kage:
         linjer = []
-        for p in produkter[:20]:
+        for p in produkter_uden_kage[:20]:
             navn = p.get("varenavn", p.get("navn", "?"))
             kat  = p.get("kategori", "")
             dage = []
@@ -4481,6 +4503,7 @@ Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
 ⚠ DATAKVALITET:
 • Shopbox-data kan undervurdere reelt salg (MobilePay ikke varekoblet).
 • Brug TGTG og retur som de mest præcise spild-indikatorer.
+• Kager er EKSKLUDERET — de leveres fast 2×/uge, intet spild, irrelevant for bestillingsjustering.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───

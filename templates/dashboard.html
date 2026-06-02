@@ -319,13 +319,29 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
 
 /* ── KOMBINEREDE OVERBLIK KPI-KORT ─────────────────────────────────────────── */
-.ov-combo-kpi{gap:0;}
-.ov-combo-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.7;letter-spacing:.04em;margin-bottom:8px;}
-.ov-combo-sep{height:1px;background:rgba(30,58,30,.08);margin:8px 0;}
-.ov-combo-row{display:flex;align-items:baseline;justify-content:space-between;gap:6px;}
-.ov-combo-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--charcoal);}
-.ov-combo-chg{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--charcoal);}
-.ov-combo-sub{font-size:9px;color:var(--ash);opacity:.7;white-space:nowrap;}
+/* Ophæv hero-styling på første kort */
+.kpi-row-4 .ov-combo-kpi:first-child,
+.kpi-row-4 .ov-combo-kpi {
+  background: var(--white) !important;
+  border-color: rgba(30,58,30,.08) !important;
+  border-left-color: rgba(30,58,30,.08) !important;
+}
+.kpi-row-4 .ov-combo-kpi .kpi-l { color: var(--ash) !important; }
+.kpi-row-4 .ov-combo-kpi .kpi-v { color: var(--charcoal) !important; font-size: 22px !important; }
+
+.ov-combo-kpi { gap: 0; }
+.ov-combo-lbl { font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.65;letter-spacing:.04em;margin-bottom:10px; }
+.ov-combo-sep { height:1px;background:rgba(30,58,30,.08);margin:10px 0; }
+.ov-combo-row { display:flex;align-items:baseline;justify-content:space-between;gap:8px; }
+.ov-combo-val { font-family:'DM Mono',monospace;font-size:14px;font-weight:400;color:var(--charcoal); }
+.ov-combo-chg { font-family:'DM Mono',monospace;font-size:16px;font-weight:600; }
+.ov-combo-sub { font-size:9px;color:var(--ash);opacity:.65;white-space:nowrap; }
+
+/* Mobil: alle 4 kort samme bredde (ingen fuld-bredde første kort) */
+@media (max-width: 768px) {
+  .kpi-row-4:has(.ov-combo-kpi) > *:first-child { grid-column: auto !important; }
+  .kpi-row-4:has(.ov-combo-kpi) { grid-template-columns: 1fr 1fr !important; }
+}
 .aar-pill.warn{color:#9b3420;background:rgba(180,60,40,.07);border-color:rgba(180,60,40,.18);}
 .aar-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
 .aar-kpi-row .kpi-card:first-child{background:var(--forest);border-color:var(--forest);}

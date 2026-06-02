@@ -314,9 +314,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-row:last-child{border-bottom:none;}
 .ov-cmp-label{color:var(--charcoal);}
 .ov-cmp-val{font-family:'DM Mono',monospace;font-weight:400;color:var(--forest);}
-.ov-cmp-val.up,.kpi-v.up{color:var(--moss);}
-.ov-cmp-val.dn,.kpi-v.dn{color:var(--danger);}
-.ov-cmp-val.neutral,.kpi-v.neutral{color:var(--ash);}
+.ov-cmp-val.up,.kpi-v.up,.ov-combo-chg.up{color:var(--moss);}
+.ov-cmp-val.dn,.kpi-v.dn,.ov-combo-chg.dn{color:var(--danger);}
+.ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
+
+/* ── KOMBINEREDE OVERBLIK KPI-KORT ─────────────────────────────────────────── */
+.ov-combo-kpi{gap:0;}
+.ov-combo-lbl{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.7;letter-spacing:.04em;margin-bottom:8px;}
+.ov-combo-sep{height:1px;background:rgba(30,58,30,.08);margin:8px 0;}
+.ov-combo-row{display:flex;align-items:baseline;justify-content:space-between;gap:6px;}
+.ov-combo-val{font-family:'DM Mono',monospace;font-size:13px;font-weight:400;color:var(--charcoal);}
+.ov-combo-chg{font-family:'DM Mono',monospace;font-size:14px;font-weight:500;color:var(--charcoal);}
+.ov-combo-sub{font-size:9px;color:var(--ash);opacity:.7;white-space:nowrap;}
 .aar-pill.warn{color:#9b3420;background:rgba(180,60,40,.07);border-color:rgba(180,60,40,.18);}
 .aar-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
 .aar-kpi-row .kpi-card:first-child{background:var(--forest);border-color:var(--forest);}
@@ -998,67 +1007,77 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
         </div>
 
-        <!-- KPI-kort: Uge til dato -->
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin:16px 0 8px;">Uge til dato</div>
-        <div class="kpi-row-4" style="margin-bottom:16px;">
-          <div class="kpi">
-            <div class="kpi-l">Omsætning</div>
-            <div class="kpi-v" id="new-ov-wtd-oms" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Dækningsbidrag</div>
-            <div class="kpi-v" id="new-ov-wtd-db" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Kunder</div>
-            <div class="kpi-v" id="new-ov-wtd-kunder" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Gns. kurv</div>
-            <div class="kpi-v" id="new-ov-wtd-kurv" style="font-size:22px;">—</div>
-          </div>
-        </div>
+        <!-- 4 kombinerede KPI-kort: uge / måned / vs forrige -->
+        <div class="kpi-row-4" style="margin:14px 0 4px;">
 
-        <!-- KPI-kort: Måned til dato -->
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Måned til dato</div>
-        <div class="kpi-row-4" style="margin-bottom:16px;">
-          <div class="kpi">
+          <!-- Omsætning -->
+          <div class="kpi ov-combo-kpi">
             <div class="kpi-l">Omsætning</div>
-            <div class="kpi-v" id="new-ov-mtd-oms" style="font-size:22px;">—</div>
+            <div class="kpi-v" id="new-ov-wtd-oms" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-oms" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
+            </div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-oms" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
+            </div>
           </div>
-          <div class="kpi">
-            <div class="kpi-l">Dækningsbidrag</div>
-            <div class="kpi-v" id="new-ov-mtd-db" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Kunder</div>
-            <div class="kpi-v" id="new-ov-mtd-kunder" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Gns. kurv</div>
-            <div class="kpi-v" id="new-ov-mtd-kurv" style="font-size:22px;">—</div>
-          </div>
-        </div>
 
-        <!-- KPI-kort: vs forrige uge -->
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Vs. forrige uge</div>
-        <div class="kpi-row-4" style="margin-bottom:4px;">
-          <div class="kpi">
-            <div class="kpi-l">Omsætning</div>
-            <div class="kpi-v" id="new-ov-prev-oms" style="font-size:22px;">—</div>
-          </div>
-          <div class="kpi">
+          <!-- Dækningsbidrag -->
+          <div class="kpi ov-combo-kpi">
             <div class="kpi-l">Dækningsbidrag</div>
-            <div class="kpi-v" id="new-ov-prev-db" style="font-size:22px;">—</div>
+            <div class="kpi-v" id="new-ov-wtd-db" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-db" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
+            </div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-db" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
+            </div>
           </div>
-          <div class="kpi">
+
+          <!-- Kunder -->
+          <div class="kpi ov-combo-kpi">
             <div class="kpi-l">Kunder</div>
-            <div class="kpi-v" id="new-ov-prev-kunder" style="font-size:22px;">—</div>
+            <div class="kpi-v" id="new-ov-wtd-kunder" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-kunder" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
+            </div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-kunder" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
+            </div>
           </div>
-          <div class="kpi">
+
+          <!-- Gns. kurv -->
+          <div class="kpi ov-combo-kpi">
             <div class="kpi-l">Gns. kurv</div>
-            <div class="kpi-v" id="new-ov-prev-kurv" style="font-size:22px;">—</div>
+            <div class="kpi-v" id="new-ov-wtd-kurv" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-kurv" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
+            </div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-kurv" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
+            </div>
           </div>
+
         </div>
 
         <!-- Overblik sammenligning kort -->
@@ -3633,46 +3652,37 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         wtd4.textContent = Math.round(uge.omsaetning / uge.transak).toLocaleString('da-DK') + ' kr';
       }
 
-      // MTD kort
-      const mtd1 = document.getElementById('new-ov-mtd-oms');
-      if (mtd1 && mtd.omsaetning != null) mtd1.textContent = kr(mtd.omsaetning);
-      const mtd2 = document.getElementById('new-ov-mtd-db');
-      if (mtd2 && mtd.db_kr != null) {
-        mtd2.textContent = kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : '');
-      }
-      const mtd3 = document.getElementById('new-ov-mtd-kunder');
-      if (mtd3 && mtd.transak != null) mtd3.textContent = mtd.transak.toLocaleString('da-DK');
-      const mtd4 = document.getElementById('new-ov-mtd-kurv');
-      if (mtd4 && mtd.omsaetning != null && mtd.transak > 0) {
-        mtd4.textContent = Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr';
-      }
+      // MTD (måned til dato)
+      const _setMtd = (id, txt) => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.className = 'ov-combo-val'; } };
+      if (mtd.omsaetning != null) _setMtd('new-ov-mtd-oms', kr(mtd.omsaetning));
+      if (mtd.db_kr != null) _setMtd('new-ov-mtd-db', kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : ''));
+      if (mtd.transak != null) _setMtd('new-ov-mtd-kunder', mtd.transak.toLocaleString('da-DK'));
+      if (mtd.omsaetning != null && mtd.transak > 0) _setMtd('new-ov-mtd-kurv', Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr');
 
       // vs forrige uge kort
-      const prev1 = document.getElementById('new-ov-prev-oms');
-      if (prev1 && uge.omsaetning != null && prevUge.omsaetning > 0) {
+      const _setPrev = (id, pct, tekst) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = tekst;
+        el.className = 'ov-combo-chg ' + (pct >= 2 ? 'up' : pct <= -2 ? 'dn' : 'neutral');
+      };
+      if (uge.omsaetning != null && prevUge.omsaetning > 0) {
         const pct = ((uge.omsaetning / prevUge.omsaetning) - 1) * 100;
-        prev1.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-        prev1.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+        _setPrev('new-ov-prev-oms', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev2 = document.getElementById('new-ov-prev-db');
-      if (prev2 && uge.db_kr != null && prevUge.db_kr > 0) {
+      if (uge.db_kr != null && prevUge.db_kr > 0) {
         const pct = ((uge.db_kr / prevUge.db_kr) - 1) * 100;
-        prev2.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-        prev2.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+        _setPrev('new-ov-prev-db', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev3 = document.getElementById('new-ov-prev-kunder');
-      if (prev3 && typeof uge.transak === 'number' && prevUge.transak > 0) {
+      if (typeof uge.transak === 'number' && prevUge.transak > 0) {
         const pct = ((uge.transak / prevUge.transak) - 1) * 100;
-        prev3.textContent = uge.transak.toLocaleString('da-DK') + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
-        prev3.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+        _setPrev('new-ov-prev-kunder', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev4 = document.getElementById('new-ov-prev-kurv');
-      if (prev4 && uge.transak > 0 && prevUge.transak > 0) {
-        const kurvDag = Math.round(uge.omsaetning / uge.transak);
+      if (uge.transak > 0 && prevUge.transak > 0) {
+        const kurvNu   = Math.round(uge.omsaetning / uge.transak);
         const kurvPrev = Math.round(prevUge.omsaetning / prevUge.transak);
-        const pct = (kurvDag / kurvPrev - 1) * 100;
-        prev4.textContent = kurvDag.toLocaleString('da-DK') + ' kr (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
-        prev4.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
+        const pct = (kurvNu / kurvPrev - 1) * 100;
+        _setPrev('new-ov-prev-kurv', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
     } catch (e) {
       console.log('Nyt Overblik fejl:', e);

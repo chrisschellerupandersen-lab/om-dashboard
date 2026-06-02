@@ -4503,7 +4503,8 @@ Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
 ⚠ DATAKVALITET:
 • Shopbox-data kan undervurdere reelt salg (MobilePay ikke varekoblet).
 • Brug TGTG og retur som de mest præcise spild-indikatorer.
-• Kager er EKSKLUDERET — de leveres fast 2×/uge, intet spild, irrelevant for bestillingsjustering.
+• Kager leveres fast 2×/uge i konstant mængde — intet spild. Analyser dem IKKE for spild/retur.
+  Eneste undtagelse: nævn kort hvis en begivenhed tilsiger at bestille lidt ekstra (fx "husk evt. ekstra kager til X").
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───

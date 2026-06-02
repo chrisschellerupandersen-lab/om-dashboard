@@ -7455,19 +7455,24 @@ async function loadBernUge(uge, aar) {
       const vnSafe = (p.varenummer || '').replace(/[^a-zA-Z0-9_-]/g, '_');
       const dagCells = DAGE.map(dag => {
         const v         = p.anbefalet[dag] || 0;
+        const b         = p.basis[dag] || 0;
+        const diff      = v - b;
         const isManuel  = p.manuel && p.manuel[dag];
         const isMinAnb  = (p.min_anb_dage || []).includes(dag);
         const wkBg      = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
         const manStyle  = isManuel ? 'border-bottom:2px solid var(--gold);' : '';
         const minStyle  = isMinAnb ? 'border-bottom:2px dashed var(--amber);color:var(--amber);' : '';
         const tipAttr   = isMinAnb ? ' title="Normalt 0 — minimum-anbefaling pga. begivenhed"' : '';
+        const diffHtml  = diff !== 0
+          ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};line-height:1;">${diff>0?'+':''}${diff}</span>`
+          : '';
         return `<td class="num bern-cell" contenteditable="true"
           data-vn="${p.varenummer || ''}" data-dag="${dag}"
           onblur="bernCellSave(this)"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
           style="${mono}${wkBg}${v===0&&!isMinAnb?'color:var(--ash);':''}${manStyle}${minStyle}cursor:text;min-width:28px;"${tipAttr}
-        >${v}</td>`;
+        >${v}${diffHtml}</td>`;
       }).join('');
 
       const diffTotal   = p.total_anbefalet - p.total_basis;

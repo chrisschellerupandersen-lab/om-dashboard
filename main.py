@@ -803,7 +803,8 @@ async def api_beregner_kontekst(request: Request):
         aar  = int(body.get("aar", 0))
         dag_totaler = body.get("dag_totaler", {})
         produkter   = body.get("produkter", [])
-        vejr        = body.get("vejr", {})
+        # Hent vejr DIREKTE fra server-cache — ikke fra JS (kan være forældet/tom)
+        vejr = database.hent_vejr_forecast()
         return database.generer_beregner_kontekst(uge, aar, api_key, dag_totaler, produkter, vejr)
     except Exception as e:
         return {"ok": False, "fejl": str(e)}

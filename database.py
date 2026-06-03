@@ -2110,7 +2110,7 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
     ]
     if not datoer:
         return {"uge": uge, "aar": aar, "har_data": False}
-    ph = ','.join('?' * 7)
+    ph = ','.join('?' * len(datoer))
     try:
         with _conn() as conn:
             # Bestilt (ekskl. kager)

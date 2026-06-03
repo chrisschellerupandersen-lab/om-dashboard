@@ -4680,7 +4680,9 @@ PRODUKTREGLER — VIGTIGT FOR BESTILLINGEN:
 │                                                                  │
 │ GROV TEBIRKES   → KAN IKKE returneres til bageriet.             │
 │ FRØSNAPPER      → Kun TGTG eller kasseres = fuldt tab.          │
-│                   Bestil kun hvad du er sikker på at sælge.     │
+│ HØJ KANELSNEGL  → KAN IKKE returneres (med creme).              │
+│ ROSINBOLLER     → KAN IKKE returneres.                          │
+│                   Alle fire: bestil kun hvad du er sikker på.   │
 │                                                                  │
 │ WIENERBRØD      → Retur til bageriet (13,5% krediteres)         │
 │  (øvrige)         ELLER TGTG. Normal spildhåndtering.           │
@@ -4730,7 +4732,7 @@ Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.
    Regn reducerer kundeflow. Begivenheder kan løfte markant. Vær specifik.
 
 3. RETUR & TGTG — brug produktreglerne aktivt:
-   • Brød / grov tebirkes / frøsnapper: KAN IKKE returneres → overskud = fuldt tab.
+   • Brød / grov tebirkes / frøsnapper / høj kanelsnegl (creme) / rosinboller: KAN IKKE returneres → overskud = fuldt tab.
      Hvis disse ender i TGTG konsekvent → reducer bestillingen næste uge.
    • Boller: retur-mulighed, men 10% kreditering er ikke gratis.
    • Rugbrød: kan stå til næste dag — lav spildrisiko.

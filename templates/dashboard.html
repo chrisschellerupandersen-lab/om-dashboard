@@ -7837,7 +7837,7 @@ async function loadBernUge(uge, aar) {
         : '';
 
       const ikkeIBasisHtml = p._ikkeIBasis
-        ? `<br><span style="font-size:9px;color:var(--danger);font-weight:500;">⚠ Ikke i din basis</span>`
+        ? `<br><span style="font-size:9px;color:var(--gold);font-weight:500;" title="Mangler i din daglige skabelon — tilføj i Basis Bestilling hvis du stadig bestiller dette">⚠ Mangler i basis</span>`
         : '';
 
       bodyRows += `<tr data-vn="${p.varenummer || ''}">

@@ -4534,9 +4534,10 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
             HAVING dage_med_salg >= 3
             ORDER BY snit_sidst_time ASC
         """, (mon.isoformat(), mon.isoformat())).fetchall()
-        # Klassificer: sidst solgt < 12 = sandsynligvis udsolgt, > 16 = typisk overskud
-        udsolgt_tidligt = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] < 12]
-        overskud_sent   = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] > 16]
+        # Butik lukker kl. 20 — ubemandet.
+        # Sidst solgt < 14 = udsolgt tidligt (tabt salg 14-20). > 18 = overskud tæt på lukketid.
+        udsolgt_tidligt = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] < 14]
+        overskud_sent   = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] > 18]
 
         # Trend 8 uger
         trend_rows = conn.execute("""
@@ -4670,6 +4671,12 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
 Organic Market er FRANCHISE-TAGER og driver IKKE eget bageri.
 Bagværk bestilles hos franchise-bageriet og leveres HVER MORGEN KL. 05:00.
 
+BUTIK:
+• Organic Market Greve er UBEMANDET og SELVBETJENING
+• Åbningstid: kl. 06:00 – 20:00 (åbner/lukker automatisk)
+• Ingen personale → ingen manuel justering eller fjernelse af varer i åbningstiden
+• Friske produkter leveres kl. 05:00 og skal holde fra 06:00 til 20:00
+
 BESTILLINGSPROCES:
 • Deadline: senest TORSDAG for HELE den efterfølgende uge (man–søn)
 • Du angiver mængde per dag i bestillingen
@@ -4747,9 +4754,9 @@ TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (4-ugers snit: {tgtg_snit
 SALGSTREND: {trend_str}
 
 ─── SALGSMØNSTER: HVORNÅR STOPPER VI MED AT SÆLGE? (seneste 4 uger) ───
-{'SANDSYNLIGVIS UDSOLGT TIDLIGT (sidst solgt før kl. 12 i snit):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in udsolgt_tidligt[:8]) if udsolgt_tidligt else '  Ingen varer der konsekvent sælger ud tidligt'}
+{'SÆLGER UD TIDLIGT — tomme hylder i timevis (sidst solgt FØR kl. 14, butik åben til 20):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 → {20-int(r["snit_sidst_time"])} timers tomme hylder ({r["dage_med_salg"]} dage)' for r in udsolgt_tidligt[:8]) if udsolgt_tidligt else '  Ingen varer der konsekvent sælger ud for tidligt'}
 
-{'TYPISK OVERSKUD (sidst solgt efter kl. 16 i snit — har varer til lukketid):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in overskud_sent[:8]) if overskud_sent else '  Ingen varer med konsekvent overskud'}
+{'TYPISK OVERSKUD VED LUKKETID (sidst solgt EFTER kl. 18 — varer tæt på lukketid kl. 20):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in overskud_sent[:8]) if overskud_sent else '  Ingen varer med konsekvent overskud ved lukketid'}
 
 ─── DIN BESTILLINGSOPGAVE (4 afsnit) ───
 Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.

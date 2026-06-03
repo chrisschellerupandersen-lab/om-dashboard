@@ -2248,25 +2248,26 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste).fetchall()
             kasse_map = {r['dato']: int(r['antal'] or 0) for r in kasse_rows}
 
-            # ── TGTG per dato (D+1 offset) — i stk (antal × enheder_per_pose) ──
-            # Produktionsdag D → tgtg_dagssalg.dato = D+1
-            tgtg_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
+            # ── TGTG per dato — henter samme dag OG næste dag (TGTG sælges typisk samme aften)
+            # Bruger bredere dato-vindue: ugens 7 dage + dagen efter ugen
+            tgtg_alle_datoer = [d.isoformat() for d in datoer] + [(datoer[-1] + timedelta(days=1)).isoformat()]
+            ph_tgtg = ','.join('?' * len(tgtg_alle_datoer))
             tgtg_rows = conn.execute(f"""
                 SELECT ds.dato,
                        SUM(ds.antal) AS poser,
                        SUM(ds.antal * COALESCE(tp.enheder_per_pose, 1)) AS stk
                 FROM tgtg_dagssalg ds
                 LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
-                WHERE ds.dato IN ({placeholders})
+                WHERE ds.dato IN ({ph_tgtg})
                 GROUP BY ds.dato
-            """, tgtg_datoer).fetchall()
-            # Map: produktionsdato → {poser, stk}
-            tgtg_map  = {}  # stk (til spildberegning)
-            tgtg_poser_map = {}  # antal poser (til visning)
+            """, tgtg_alle_datoer).fetchall()
+            # Map: dato → {poser, stk} — match på selve salgsdagen
+            tgtg_map  = {}
+            tgtg_poser_map = {}
             for r in tgtg_rows:
-                prod_dato = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
-                tgtg_map[prod_dato]       = int(r['stk']   or 0)
-                tgtg_poser_map[prod_dato] = int(r['poser'] or 0)
+                dato = r['dato']
+                tgtg_map[dato]       = int(r['stk']   or 0)
+                tgtg_poser_map[dato] = int(r['poser'] or 0)
 
             # ── KW kombos per dato ────────────────────────────────────────────
             # COUNT(DISTINCT bon_nr) på boner der har BÅDE kaffe og wiener

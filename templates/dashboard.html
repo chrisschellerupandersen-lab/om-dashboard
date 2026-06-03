@@ -5101,11 +5101,13 @@ function buildAar() {
     const entry = maaneder.find(r => r.m === thisMonth);
     if (entry) {
       if (entry.type === 'faktisk' && entry.faktDage < entry.dage) {
-        const snit = entry.omsat / entry.faktDage;
+        const faktSnit = Math.round(entry.omsat / entry.faktDage);
         const restDage = entry.dage - entry.faktDage;
-        const estRest = Math.round(snit * restDage);
+        // Brug årsplan-konfigurationens forventede dagsnit for resten (sæson × vækst)
+        const planSnit = Math.round(c.base * (1 + c.vaekst / 100) * (c.saeson[entry.m - 1] || 1));
+        const estRest  = Math.round(planSnit * restDage);
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:estRest,
-                  totalProj:entry.omsat+estRest, dagSnit:Math.round(snit), restDage, isLive:true };
+                  totalProj:entry.omsat+estRest, dagSnit:faktSnit, restDage, isLive:true };
       } else if (entry.type === 'faktisk') {
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:0,
                   totalProj:entry.omsat, dagSnit:Math.round(entry.omsat/entry.faktDage), restDage:0, isLive:false };

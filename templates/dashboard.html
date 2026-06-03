@@ -7686,24 +7686,32 @@ async function loadBernUge(uge, aar) {
     // Markér produkter der ikke er i basis med advarsel
     d.produkter.forEach(prod => { prod._ikkeIBasis = !basisMap[prod.varenavn]; });
 
-    // Opdater produktlisten med basis-værdier JUSTERET med SI + trend + event
+    // Byg vejr-faktor per dag (fra strip-data)
+    const vejrFc   = (_vejrData && _vejrData.forecast) ? _vejrData.forecast : {};
+    const vejrDagFak = {};
+    const DAGE_IDX2  = {man:0,tir:1,ons:2,tor:3,fre:4,loe:5,son:6};
+    Object.entries(DAGE_IDX2).forEach(([dk, i]) => {
+      const dagD2 = new Date(_mandag); dagD2.setDate(_mandag.getDate() + i);
+      const v2 = vejrFc[_datoStr(dagD2)];
+      vejrDagFak[dk] = (v2 && v2.juster && v2.juster.faktor) ? v2.juster.faktor : 1.0;
+    });
+
+    // Opdater produktlisten med basis × SI × vækst × event × VEJR
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {
-        // Gem original basis
         prod.basis = basisMap[prod.varenavn];
-
-        // Anvend SI + trend + event på basis-værdierne
         prod.anbefalet = {};
         const DAGE = ['man','tir','ons','tor','fre','loe','son'];
         DAGE.forEach(dag => {
           const basisVal = basisMap[prod.varenavn][dag] || 0;
-          const dagFak = eventDagFak[dag] || 1.0;  // Event dag-faktor (hvis event exists)
-          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak);
+          const dagFak   = eventDagFak[dag]  || 1.0;
+          const vejrFak  = vejrDagFak[dag]   || 1.0;
+          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak * vejrFak);
         });
 
-        prod.total_basis = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
+        prod.total_basis    = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
         prod.total_anbefalet = Object.values(prod.anbefalet).reduce((s, v) => s + v, 0);
-        prod.total_pris = prod.total_anbefalet * prod.pris_ex_moms;
+        prod.total_pris      = prod.total_anbefalet * prod.pris_ex_moms;
       }
     });
 
@@ -7829,7 +7837,7 @@ async function loadBernUge(uge, aar) {
           ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};line-height:1;">${diff>0?'+':''}${diff}</span>`
           : '';
 
-        // Vejr-justeret forslag
+        // Vejr-indikator: vis hvad vejr HAR ændret (allerede indregnet)
         const dagDato = new Date(_mandag); dagDato.setDate(_mandag.getDate() + DAG_IDX[dag]);
         const dagDs   = _datoStr(dagDato);
         const vDagKp  = _vejrFc[dagDs];
@@ -7837,13 +7845,14 @@ async function loadBernUge(uge, aar) {
         if (vDagKp && v > 0) {
           const faktor = (vDagKp.juster || {}).faktor;
           if (faktor && Math.abs(faktor - 1) >= 0.05) {
-            const vJust = Math.round(v * faktor);
-            const vDiff = vJust - v;
-            if (vDiff !== 0) {  // skjul hvis afrunding giver 0 ændring
+            // Beregn hvad der ville have været UDEN vejr
+            const udenVejr = Math.round(v / faktor);
+            const vejrDiff = v - udenVejr;
+            if (vejrDiff !== 0) {
               const fv  = (vDagKp.juster || {}).farve;
               const clr = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
               const ikon = vDagKp.ikon || '🌡️';
-              vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} vejr: ${vJust} stk foreslået">${ikon}${vDiff>0?'+':''}${vDiff}</span>`;
+              vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} Vejr indregnet: ${vejrDiff>0?'+':''}${vejrDiff} stk">${ikon}${vejrDiff>0?'+':''}${vejrDiff}</span>`;
             }
           }
         }
@@ -7914,8 +7923,10 @@ async function loadBernUge(uge, aar) {
         const vDiff = vJust - t;
         const fv    = (vFoot.juster || {}).farve;
         const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
-        if (vDiff !== 0)
-          vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr-justeret total: ${vJust} stk">${vFoot.ikon||'🌡️'}${vDiff>0?'+':''}${vDiff}</span>`;
+        const udenVejrFoot = Math.round(t / faktor);
+        const vejrDiffFoot = t - udenVejrFoot;
+        if (vejrDiffFoot !== 0)
+          vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr indregnet: ${vejrDiffFoot>0?'+':''}${vejrDiffFoot} stk">${vFoot.ikon||'🌡️'}${vejrDiffFoot>0?'+':''}${vejrDiffFoot}</span>`;
       }
     }
 

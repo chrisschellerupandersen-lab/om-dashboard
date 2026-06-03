@@ -2617,7 +2617,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <button onclick="bernHentKontekst()" id="bern-kontekst-btn"
               style="font-size:10px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:3px;padding:3px 8px;cursor:pointer;">↻ Opdater</button>
           </div>
-          <div id="bern-kontekst-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;"></div>
+          <div id="bern-kontekst-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);"></div>
           <div id="bern-kontekst-spinner" style="display:none;font-size:12px;color:var(--ash);padding:8px 0;">⏳ Analyserer data…</div>
         </div>
 
@@ -7787,6 +7787,29 @@ function _bernStTilTekst(data) {
   return lines.join('\n');
 }
 
+function _mdTilHtml(tekst) {
+  // Simpel markdown → HTML: headers, fed, punktliste, linjeskift
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return tekst
+    .split('\n')
+    .map(l => {
+      if (/^###\s+/.test(l)) return `<h5 style="margin:12px 0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--forest);text-transform:uppercase;">${esc(l.replace(/^###\s+/,''))}</h5>`;
+      if (/^##\s+/.test(l))  return `<h4 style="margin:14px 0 5px;font-size:13px;font-weight:600;color:var(--forest);">${esc(l.replace(/^##\s+/,''))}</h4>`;
+      if (/^#\s+/.test(l))   return `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--forest);">${esc(l.replace(/^#\s+/,''))}</h3>`;
+      if (/^[-*]\s+/.test(l)) return `<div style="padding:2px 0 2px 14px;position:relative;"><span style="position:absolute;left:0;color:var(--moss);">•</span>${_inlineMd(esc(l.replace(/^[-*]\s+/,'').trim()))}</div>`;
+      if (l.trim() === '')    return '<div style="height:6px;"></div>';
+      return `<div style="padding:2px 0;">${_inlineMd(esc(l))}</div>`;
+    })
+    .join('');
+}
+
+function _inlineMd(s) {
+  // **fed** og *kursiv*
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em style="color:var(--forest);">$1</em>');
+}
+
 let _bernKontekstUge = null;
 
 function _bernLaesTabelData() {
@@ -7855,7 +7878,7 @@ async function bernHentKontekst() {
       tekst.textContent = '⚠ ' + (data?.fejl || 'Fejl ved analyse');
       return;
     }
-    tekst.textContent = data.tekst;
+    tekst.innerHTML = _mdTilHtml(data.tekst);
     _bernKontekstUge = _bernUge;
   } catch(e) {
     spinner.style.display = 'none';

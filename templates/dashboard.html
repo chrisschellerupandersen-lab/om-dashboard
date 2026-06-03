@@ -7848,7 +7848,24 @@ async function loadBernUge(uge, aar) {
     const diff = t - base;
     const diffHtml = diff !== 0
       ? `<br><span style="font-size:9px;opacity:.7;">${diff>0?'+':''}${diff}</span>` : '';
-    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}</td>`;
+
+    // Vejr-justering total for denne dag
+    const dagDato2 = new Date(_mandag); dagDato2.setDate(_mandag.getDate() + DAG_IDX[dag]);
+    const dagDs2   = dagDato2.toISOString().slice(0,10);
+    const vFoot    = _vejrFc[dagDs2];
+    let vejrFootHtml = '';
+    if (vFoot && t > 0) {
+      const faktor = (vFoot.juster || {}).faktor;
+      if (faktor && Math.abs(faktor - 1) >= 0.05) {
+        const vJust = Math.round(t * faktor);
+        const vDiff = vJust - t;
+        const fv    = (vFoot.juster || {}).farve;
+        const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
+        vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr-justeret total: ${vJust} stk">${vFoot.ikon||'🌡️'}${vDiff>0?'+':''}${vDiff}</span>`;
+      }
+    }
+
+    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}${vejrFootHtml}</td>`;
   }).join('');
 
   console.log('TABLE DEBUG:', {

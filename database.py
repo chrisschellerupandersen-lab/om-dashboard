@@ -4516,6 +4516,52 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
             WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 12
         """, (prev_uge, prev_aar)).fetchall()
 
+        # Dag×time heatmap — trafik-profil over seneste 8 uger
+        _DAG_NAVNE_KORT = {0:'søn',1:'man',2:'tir',3:'ons',4:'tor',5:'fre',6:'lør'}
+        heatmap_rows = conn.execute("""
+            SELECT CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
+                   time_start AS time,
+                   ROUND(AVG(dag_time_oms),0) AS snit_oms
+            FROM (
+                SELECT dato, time_start,
+                       SUM(omsætning) AS dag_time_oms
+                FROM transaktioner
+                WHERE dato >= date(?, '-56 days') AND dato < ?
+                  AND time_start BETWEEN 6 AND 19
+                GROUP BY dato, time_start
+            )
+            GROUP BY ugedag, time_start
+            ORDER BY ugedag, time_start
+        """, (mon.isoformat(), mon.isoformat())).fetchall()
+
+        # Byg komprimeret profil: top-tider per dag + relativt styrke-indeks
+        from collections import defaultdict
+        dag_time_map = defaultdict(dict)
+        for r in heatmap_rows:
+            dag_time_map[r['ugedag']][r['time']] = float(r['snit_oms'] or 0)
+
+        dag_profil_str = ""
+        if dag_time_map:
+            dag_linjer = []
+            # Beregn total per dag (0=søn..6=lør → konverter til man=1..søn=7)
+            dag_totaler_hm = {}
+            for wd in range(7):
+                dag_totaler_hm[wd] = sum(dag_time_map[wd].values())
+            max_dag = max(dag_totaler_hm.values()) if dag_totaler_hm else 1
+            DAG_ISO = [1,2,3,4,5,6,0]  # man,tir,ons,tor,fre,lør,søn i ISO ordre
+            DAG_NAVN_ISO = ['Man','Tir','Ons','Tor','Fre','Lør','Søn']
+            for iso_i, (wd, dn) in enumerate(zip(DAG_ISO, DAG_NAVN_ISO)):
+                if not dag_time_map[wd]:
+                    continue
+                dag_tot = dag_totaler_hm[wd]
+                styrke = round(dag_tot / max_dag * 100)
+                bar = '█' * (styrke // 10) + '░' * (10 - styrke // 10)
+                # Top 3 timer
+                top_timer = sorted(dag_time_map[wd].items(), key=lambda x: -x[1])[:3]
+                top_str = ', '.join([f"kl.{t:02d}" for t,_ in top_timer])
+                dag_linjer.append(f"  {dn}: {bar} {styrke:3d}%  (top: {top_str})")
+            dag_profil_str = '\n'.join(dag_linjer)
+
         # Sidst-solgt tidspunkt per vare (seneste 4 uger) — indikator for udsolgt vs. overskud
         # Lukketid er typisk kl. 18. Sidst solgt kl. 11 = sandsynligvis udsolgt tidligt.
         sidst_solgt_rows = conn.execute("""
@@ -4752,6 +4798,9 @@ Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød returneret
 TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (4-ugers snit: {tgtg_snit:,} kr · mål: <800 kr)
 
 SALGSTREND: {trend_str}
+
+─── TRAFIK-PROFIL: DAG × KLOKKETIME (seneste 8 uger, butik 06-20) ───
+{dag_profil_str if dag_profil_str else '  (ingen data)'}
 
 ─── SALGSMØNSTER: HVORNÅR STOPPER VI MED AT SÆLGE? (seneste 4 uger) ───
 {'SÆLGER UD TIDLIGT — tomme hylder i timevis (sidst solgt FØR kl. 14, butik åben til 20):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 → {20-int(r["snit_sidst_time"])} timers tomme hylder ({r["dage_med_salg"]} dage)' for r in udsolgt_tidligt[:8]) if udsolgt_tidligt else '  Ingen varer der konsekvent sælger ud for tidligt'}

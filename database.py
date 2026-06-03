@@ -2096,11 +2096,20 @@ def hent_mangler_kostpris() -> Dict:
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
 def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
-    """Letvægts spild-overblik for én uge — kun totaler, ingen dag-detaljer."""
+    """Letvægts spild-overblik for én uge — kun totaler, ingen dag-detaljer.
+    Ekskluderer dags dato (uafsluttet dag) fra beregningen.
+    """
     from datetime import date as _d, timedelta as _td
-    jan4 = _d(aar, 1, 4)
-    man  = jan4 - _td(days=jan4.weekday()) + _td(weeks=uge - 1)
-    datoer = [(man + _td(days=i)).isoformat() for i in range(7)]
+    jan4  = _d(aar, 1, 4)
+    man   = jan4 - _td(days=jan4.weekday()) + _td(weeks=uge - 1)
+    idag  = _d.today().isoformat()
+    datoer = [
+        (man + _td(days=i)).isoformat()
+        for i in range(7)
+        if (man + _td(days=i)).isoformat() < idag   # ekskluder i dag
+    ]
+    if not datoer:
+        return {"uge": uge, "aar": aar, "har_data": False}
     ph = ','.join('?' * 7)
     try:
         with _conn() as conn:

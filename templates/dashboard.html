@@ -8207,8 +8207,10 @@ async function bernHentKontekst() {
 
   const { dag_totaler, produkter } = _bernLaesTabelData();
 
-  // Sørg for vejr er indlæst inden analyse sendes
+  // Hent FRISK vejr fra server inden analyse — sikrer strip og AI bruger samme data
+  _vejrData = null; // nulstil cache
   await vejrLoad();
+  vejrVisUge(_bernUge, _bernAar); // opdater strip med samme data
 
   try {
     const res = await fetch('/api/bestilling/kontekst', {

@@ -7790,13 +7790,15 @@ async function loadBernUge(uge, aar) {
         let vejrCellHtml = '';
         if (vDagKp && v > 0) {
           const faktor = (vDagKp.juster || {}).faktor;
-          if (faktor && Math.abs(faktor - 1) >= 0.05) { // kun vis ved ≥5% justering
+          if (faktor && Math.abs(faktor - 1) >= 0.05) {
             const vJust = Math.round(v * faktor);
             const vDiff = vJust - v;
-            const fv    = (vDagKp.juster || {}).farve;
-            const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
-            const ikon  = vDagKp.ikon || '🌡️';
-            vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} vejr: ${vJust} stk foreslået">${ikon}${vDiff>0?'+':''}${vDiff}</span>`;
+            if (vDiff !== 0) {  // skjul hvis afrunding giver 0 ændring
+              const fv  = (vDagKp.juster || {}).farve;
+              const clr = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
+              const ikon = vDagKp.ikon || '🌡️';
+              vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} vejr: ${vJust} stk foreslået">${ikon}${vDiff>0?'+':''}${vDiff}</span>`;
+            }
           }
         }
 
@@ -7862,7 +7864,8 @@ async function loadBernUge(uge, aar) {
         const vDiff = vJust - t;
         const fv    = (vFoot.juster || {}).farve;
         const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
-        vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr-justeret total: ${vJust} stk">${vFoot.ikon||'🌡️'}${vDiff>0?'+':''}${vDiff}</span>`;
+        if (vDiff !== 0)
+          vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr-justeret total: ${vJust} stk">${vFoot.ikon||'🌡️'}${vDiff>0?'+':''}${vDiff}</span>`;
       }
     }
 

@@ -8264,10 +8264,11 @@ async function bernHentKontekst() {
 
   const { dag_totaler, produkter } = _bernLaesTabelData();
 
-  // Hent FRISK vejr fra server inden analyse — sikrer strip og AI bruger samme data
-  _vejrData = null; // nulstil cache
+  // Tving frisk vejr fra Open-Meteo (nulstil begge caches) — strip og AI bruger samme data
+  _vejrData = null; _vejrTs = 0;
+  try { await api('/api/vejr/forecast?force=true'); } catch(e) {}
   await vejrLoad();
-  vejrVisUge(_bernUge, _bernAar); // opdater strip med samme data
+  vejrVisUge(_bernUge, _bernAar);
 
   try {
     const res = await fetch('/api/bestilling/kontekst', {

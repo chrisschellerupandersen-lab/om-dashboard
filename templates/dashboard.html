@@ -7701,16 +7701,22 @@ async function loadBernUge(uge, aar) {
     });
 
     // Opdater produktlisten med basis × SI × vækst × event × VEJR
+    // Kager: neutralt fra basis (holder 3-4 dage, fast leverance — ingen justering)
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {
         prod.basis = basisMap[prod.varenavn];
         prod.anbefalet = {};
+        const erKage = (prod.kategori || '').toLowerCase().includes('kage');
         const DAGE = ['man','tir','ons','tor','fre','loe','son'];
         DAGE.forEach(dag => {
           const basisVal = basisMap[prod.varenavn][dag] || 0;
-          const dagFak   = eventDagFak[dag]  || 1.0;
-          const vejrFak  = vejrDagFak[dag]   || 1.0;
-          prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak * vejrFak);
+          if (erKage) {
+            prod.anbefalet[dag] = basisVal; // kager: direkte fra basis
+          } else {
+            const dagFak  = eventDagFak[dag] || 1.0;
+            const vejrFak = vejrDagFak[dag]  || 1.0;
+            prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak * vejrFak);
+          }
         });
 
         prod.total_basis    = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);

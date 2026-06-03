@@ -1631,7 +1631,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="card" style="margin-bottom:0;">
               <div class="aar2-chart-hdr">
                 <span class="aar2-chart-ttl">Månedligt resultat</span>
-                <span class="aar2-chart-sub">Grøn = faktisk · Amber = estimat</span>
+                <span class="aar2-chart-sub">Mørkgrøn = faktisk · Lysgrøn = indeværende (projekteret) · Amber = estimat</span>
               </div>
               <div style="position:relative;height:200px;"><canvas id="c-aar-res"></canvas></div>
             </div>
@@ -5241,20 +5241,39 @@ function buildAar() {
   }, 50);
 
   // ── Charts ─────────────────────────────────────────────────────────────────
+  const cBgF  = 'rgba(30,58,30,.75)';   // faktisk (afsluttet)
+  const cBgE  = 'rgba(200,168,75,.55)'; // estimat (fremtidig)
+  const cBgI  = 'rgba(74,124,74,.55)';  // indeværende (delvis faktisk + estimat) — lysere grøn
+  const cBgFd = 'rgba(30,58,30,.65)';
+  const cBgEd = 'rgba(200,168,75,.45)';
+  const cBgId = 'rgba(74,124,74,.50)';
+
+  // Byg chart-data — brug projekterede værdier for indeværende måned
   const chartData = [];
-  maaneder.forEach(r => chartData.push({ label:AAR_MND_KORT[r.m-1], type:r.type, res:r.res, avance:r.avance }));
-  const cBgF = 'rgba(30,58,30,.75)', cBgE = 'rgba(200,168,75,.55)';
-  const cBgFd = 'rgba(30,58,30,.65)', cBgEd = 'rgba(200,168,75,.45)';
+  maaneder.forEach(r => {
+    const isIndev = aar === thisYear && r.m === thisMonth && indev && indev.isLive;
+    let res = r.res, avance = r.avance;
+    if (isIndev && indev) {
+      // Skaler avance proportionalt med projektion
+      const projFaktor = indev.totalProj > 0 && r.omsat > 0 ? indev.totalProj / r.omsat : 1;
+      avance = Math.round((r.avance || 0) * projFaktor);
+      res    = Math.round(avance - (r.faste || 0));
+    }
+    chartData.push({ label: AAR_MND_KORT[r.m-1], type: r.type, isIndev, res, avance });
+  });
+
+  const barClr  = r => r.isIndev ? cBgI  : r.type==='faktisk' ? cBgF  : cBgE;
+  const barClrD = r => r.isIndev ? cBgId : r.type==='faktisk' ? cBgFd : cBgEd;
 
   mk('c-aar-res','bar', chartData.map(r=>r.label),
     [{ label:'Resultat', data:chartData.map(r=>+(r.res/1000).toFixed(1)),
-       backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgF:cBgE), borderWidth:0, borderRadius:2 }],
+       backgroundColor:chartData.map(barClr), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
       plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
   mk('c-aar-db','bar', chartData.map(r=>r.label),
     [{ label:'DB', data:chartData.map(r=>+(r.avance/1000).toFixed(1)),
-       backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgFd:cBgEd), borderWidth:0, borderRadius:2 }],
+       backgroundColor:chartData.map(barClrD), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
       plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 

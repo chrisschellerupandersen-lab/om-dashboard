@@ -5668,22 +5668,35 @@ def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
     """
     from datetime import date as _d, timedelta as _td
     fra = (_d.today() - _td(weeks=uger)).isoformat()
+    _KAGE_EXCL = (
+        "LOWER(t.varenavn) LIKE '%kage%' OR LOWER(t.varenavn) LIKE '%cookie%' "
+        "OR LOWER(t.varenavn) LIKE '%muffin%' OR LOWER(t.varenavn) LIKE '%brownie%' "
+        "OR LOWER(t.varenavn) LIKE '%romkugl%' OR LOWER(t.varenavn) LIKE '%napoleon%' "
+        "OR LOWER(t.varenavn) LIKE '%studenterbr%'"
+    )
     with _conn() as conn:
-        rows = conn.execute("""
-            SELECT varenavn,
+        rows = conn.execute(f"""
+            SELECT t.varenavn,
                    ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
                    COUNT(DISTINCT dato)       AS dage_med_salg,
                    MIN(sidst_time)            AS min_tid,
                    MAX(sidst_time)            AS max_tid
             FROM (
-                SELECT dato, varenavn, MAX(time_start) AS sidst_time
-                FROM transaktioner
-                WHERE dato >= ?
-                  AND time_start BETWEEN 6 AND 19
-                  AND antal > 0
-                GROUP BY dato, varenavn
-            )
-            GROUP BY varenavn
+                SELECT t.dato, t.varenavn, MAX(t.time_start) AS sidst_time
+                FROM transaktioner t
+                WHERE t.dato >= ?
+                  AND t.time_start BETWEEN 6 AND 19
+                  AND t.antal > 0
+                  -- Kun bagværk fra ugebestillinger (ekskl. kager)
+                  AND CAST(CAST(t.varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                        AND NOT ({_KAGE_EXCL.replace('t.varenavn','varenavn')})
+                  )
+                GROUP BY t.dato, t.varenavn
+            ) t
+            GROUP BY t.varenavn
             HAVING dage_med_salg >= 3
             ORDER BY snit_sidst_time ASC
         """, (fra,)).fetchall()

@@ -2096,88 +2096,33 @@ def hent_mangler_kostpris() -> Dict:
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
 def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
-    """Letvægts spild-overblik for én uge — kun totaler, ingen dag-detaljer.
+    """Spild-overblik for én uge — bruger samme beregning som spild-rapporten.
     Ekskluderer dags dato (uafsluttet dag) fra beregningen.
     """
     from datetime import date as _d, timedelta as _td
-    jan4  = _d(aar, 1, 4)
-    man   = jan4 - _td(days=jan4.weekday()) + _td(weeks=uge - 1)
-    idag  = _d.today().isoformat()
-    datoer = [
-        (man + _td(days=i)).isoformat()
-        for i in range(7)
-        if (man + _td(days=i)).isoformat() < idag   # ekskluder i dag
-    ]
-    if not datoer:
-        return {"uge": uge, "aar": aar, "har_data": False}
-    ph = ','.join('?' * len(datoer))
-
-    # Find hvilke ugedags-kolonner der svarer til de inkluderede datoer
-    DAG_COLS = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
-    dag_idx  = [(man + _td(days=i)) for i in range(7)]
-    aktive_cols = [
-        DAG_COLS[i] for i, d in enumerate(dag_idx)
-        if d.isoformat() < idag
-    ]
-    if not aktive_cols:
-        return {"uge": uge, "aar": aar, "har_data": False}
-    bestil_sum = '+'.join(aktive_cols)  # fx "man+tir"
-
+    idag = _d.today().isoformat()
     try:
-        with _conn() as conn:
-            # Bestilt KUN for de inkluderede dage (ekskl. kager)
-            bestil = conn.execute(f"""
-                SELECT SUM({bestil_sum}) AS total
-                FROM ugebestillinger WHERE uge=? AND aar=?
-                  AND NOT (LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%cookie%'
-                        OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%')
-            """, (uge, aar)).fetchone()
-            bestilt = int(bestil['total'] or 0) if bestil else 0
-            if bestilt == 0:
-                return {"uge": uge, "aar": aar, "har_data": False}
+        d = hent_spild_dagsniveau(uge, aar)
+        if "error" in d:
+            return {"uge": uge, "aar": aar, "har_data": False}
 
-            # Kassesalg
-            kasse = conn.execute(f"""
-                SELECT ROUND(SUM(antal),0) AS total FROM transaktioner
-                WHERE dato IN ({ph})
-                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
-                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
-                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
-                      AND NOT (LOWER(varenavn) LIKE '%kage%'))
-            """, datoer).fetchone()
-            kassesalg = int(kasse['total'] or 0) if kasse else 0
+        # Filtrer kun afsluttede dage (ekskl. i dag)
+        dage = [dag for dag in d.get("dage", []) if dag["har_data"] and dag["dato"] < idag]
+        if not dage:
+            return {"uge": uge, "aar": aar, "har_data": False}
 
-            # TGTG
-            tgtg = conn.execute(f"""
-                SELECT SUM(ds.antal * COALESCE(tp.enheder_per_pose,1)) AS stk
-                FROM tgtg_dagssalg ds LEFT JOIN tgtg_poser tp ON ds.item_id=tp.item_id
-                WHERE ds.dato IN ({ph})
-            """, datoer).fetchone()
-            tgtg_stk = int(tgtg['stk'] or 0) if tgtg else 0
+        bestilt   = sum(dag["bestilt"]   for dag in dage)
+        kassesalg = sum(dag["kassesalg"] for dag in dage)
+        tgtg      = sum(dag["tgtg"]      for dag in dage)
+        svind_stk = sum(dag["svind"] or 0 for dag in dage)
+        svind_pct = round(svind_stk / bestilt * 100, 1) if bestilt > 0 else None
+        n_dage    = len(dage)
 
-            # Registreret retur
-            ret = conn.execute("""
-                SELECT SUM(antal) AS total FROM retur_detaljer WHERE uge=? AND aar=?
-            """, (uge, aar)).fetchone()
-            retur_reg = int(ret['total'] or 0) if ret else 0
-
-            # Dage med data
-            dage_data = conn.execute(f"""
-                SELECT COUNT(DISTINCT dato) AS n FROM transaktioner WHERE dato IN ({ph})
-            """, datoer).fetchone()
-            n_dage = int(dage_data['n'] or 0) if dage_data else 0
-
-        effektivt = kassesalg + tgtg_stk
-        retur = retur_reg  # brug faktisk retur
-        svind = max(0, bestilt - effektivt - retur)
-        svind_pct = round(svind / bestilt * 100, 1) if bestilt > 0 else None
         return {
             "uge": uge, "aar": aar, "har_data": True,
-            "bestilt": bestilt, "kassesalg": kassesalg,
-            "tgtg": tgtg_stk, "retur": retur,
-            "svind": svind, "svind_pct": svind_pct,
-            "n_dage": n_dage,
-            "er_komplet": n_dage >= 6,
+            "bestilt": bestilt, "kassesalg": kassesalg, "tgtg": tgtg,
+            "svind": svind_stk, "svind_pct": svind_pct,
+            "n_dage": n_dage, "er_komplet": n_dage >= 6,
         }
     except Exception as e:
         return {"uge": uge, "aar": aar, "har_data": False, "fejl": str(e)}

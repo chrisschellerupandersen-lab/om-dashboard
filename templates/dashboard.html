@@ -7129,7 +7129,11 @@ async function _spildHent(uge, aar) {
         }</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:#6b9e6b;" title="Estimeret retur til bageren">${dag.retur_mulig > 0 ? dag.retur_mulig : '<span style="color:var(--ash);">0</span>'}</td>
-        <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);" title="Registreret retur kendes kun på ugeniveau">—</td>
+        <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--moss);">${
+          dag.retur_reg_total > 0
+            ? `<span style="font-weight:600;">${dag.retur_reg_total}</span><br><span style="font-size:9px;color:var(--ash);">${dag.retur_reg_boller}b·${dag.retur_reg_wiener}w</span>`
+            : '<span style="color:var(--ash);">—</span>'
+        }</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
         <td style="padding:10px;">${bar}${deltaIcon}</td>
         <td class="num" style="padding:10px;">${avgTxt}</td>

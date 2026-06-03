@@ -2417,18 +2417,33 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 'varer':     kage_varer,
             }
 
-            # ── Registrerede returneringer for ugen ──────────────────────────
-            retur_reg_rows = conn.execute("""
-                SELECT produkt, SUM(antal) AS antal, kategori
+            # ── Registrerede returneringer per dag ────────────────────────────
+            retur_reg_dag_rows = conn.execute("""
+                SELECT registreret_dato,
+                       SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
+                       SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener,
+                       SUM(antal) AS total
                 FROM retur_detaljer
                 WHERE uge = ? AND aar = ?
-                GROUP BY produkt, kategori
-                ORDER BY antal DESC
+                GROUP BY registreret_dato
             """, (uge, aar)).fetchall()
-            retur_registreret = [dict(r) for r in retur_reg_rows]
-            retur_registreret_total = sum(int(r['antal'] or 0) for r in retur_reg_rows)
-            retur_boller_reg  = sum(int(r['antal'] or 0) for r in retur_reg_rows if r['kategori'] == 'boller')
-            retur_wiener_reg  = sum(int(r['antal'] or 0) for r in retur_reg_rows if r['kategori'] == 'wienerbroed')
+            # Map: dato → {boller, wiener, total}
+            retur_dag_map = {
+                r['registreret_dato']: {
+                    'boller': int(r['boller'] or 0),
+                    'wiener': int(r['wiener'] or 0),
+                    'total':  int(r['total']  or 0),
+                }
+                for r in retur_reg_dag_rows
+            }
+            retur_registreret_total = sum(v['total'] for v in retur_dag_map.values())
+            retur_boller_reg = sum(v['boller'] for v in retur_dag_map.values())
+            retur_wiener_reg = sum(v['wiener'] for v in retur_dag_map.values())
+            retur_registreret = [dict(r) for r in conn.execute("""
+                SELECT produkt, SUM(antal) AS antal, kategori
+                FROM retur_detaljer WHERE uge=? AND aar=?
+                GROUP BY produkt, kategori ORDER BY antal DESC
+            """, (uge, aar)).fetchall()]
 
             # ── Historiske snit: seneste 4 uger per ugedag ────────────────────
             # Beregn de 4 foregående uger (ekskl. indeværende)
@@ -2520,15 +2535,20 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         kbmo        = kbmo_map.get(dato_str, 0)
         retur_mulig = retur_per_dag.get(dag, 0)
         tgtg_poser_dag = tgtg_poser_map.get(dato_str, 0)
+        retur_dag  = retur_dag_map.get(dato_str, {})
 
-        # Rester = hvad der er tilovers ved lukketid inden TGTG sælger næste dag
-        # KW tælles ikke fra — wienerbrød er allerede i kassesalg
+        # Rester = hvad der er tilovers ved lukketid
         rester = max(0, bestilt - kassesalg - kbmo) if bestilt > 0 else 0
 
         effektivt   = kassesalg + tgtg + kbmo
-        # Retur kan højst være det der faktisk er til overs efter salg
-        retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
-        svind       = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
+        # Brug faktisk registreret retur hvis tilgængeligt, ellers estimat
+        retur_faktisk = retur_dag.get('total', 0)
+        if retur_faktisk > 0:
+            retur_anvendt = retur_faktisk
+        else:
+            retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
+            retur_anvendt = retur_mulig
+        svind       = max(0, bestilt - effektivt - retur_anvendt) if bestilt > 0 else None
         svind_pct   = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
         rester_pct  = round(rester / bestilt * 100, 1) if bestilt > 0 else None
 
@@ -2563,6 +2583,9 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'tgtg':             tgtg,
             'tgtg_poser':       tgtg_poser_dag,
             'retur_mulig':      retur_mulig,
+            'retur_reg_boller': retur_dag.get('boller', 0),
+            'retur_reg_wiener': retur_dag.get('wiener', 0),
+            'retur_reg_total':  retur_dag.get('total', 0),
             'effektivt':        effektivt,
             'svind':            svind,
             'svind_pct':        svind_pct,

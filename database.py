@@ -4627,9 +4627,18 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
 
     evt_info = ''
     if evt:
-        dag_fak = evt.get('dag_fak', {})
-        dag_str = ', '.join([f"{d}: ×{v}" for d,v in dag_fak.items() if v != 1.0])
-        evt_info = f"{evt['navn']} — faktor {evt['factor']} ({evt.get('note','')}). Dag-faktorer: {dag_str}"
+        dag_fak  = evt.get('dag_fak', {})
+        # Beregn faktiske datoer for ugedagene så AI kan nævne dem eksplicit
+        _DAG_KEYS2 = ['man','tir','ons','tor','fre','loe','son']
+        _DAG_DA2   = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+        dag_str_list = []
+        for dk, dn in zip(_DAG_KEYS2, _DAG_DA2):
+            fak = dag_fak.get(dk, 1.0)
+            if fak != 1.0:
+                dag_dato_str = (mon + _td(days=_DAG_KEYS2.index(dk))).strftime('%-d/%-m')
+                dag_str_list.append(f"{dn} {dag_dato_str}: ×{fak}")
+        dag_str  = ', '.join(dag_str_list)
+        evt_info = f"{evt['navn']} — faktor ×{evt['factor']} ({evt.get('note','')}).\nDag-faktorer med dato: {dag_str}"
     else:
         evt_info = 'Ingen kendte begivenheder'
 

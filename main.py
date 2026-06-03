@@ -1990,6 +1990,5 @@ async def api_vejr_forecast(request: Request, force: bool = False):
     """Vejr-forecast. force=true tvinger ny hentning fra Open-Meteo."""
     _kræv_login(request)
     if force:
-        import database as _db
-        _db._vejr_cache["ts"] = 0  # nulstil server-cache
+        database._vejr_cache["ts"] = 0  # nulstil server-cache
     return database.hent_vejr_forecast()

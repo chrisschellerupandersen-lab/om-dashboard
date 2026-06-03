@@ -4720,7 +4720,17 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
                 linjer.append(linje)
             else:
                 linjer.append(f"  {dn} ({dato_kort}): ingen vejrdata")
-        vejr_str = "\n".join(linjer) if linjer else "  Ingen vejrdata"
+        # Tilføj eksplicit opsummering så AI ikke forveksler dage
+        regn_dage = [l.split(':')[0].strip() for l in linjer if '← REGN' in l or '← DÅRLIGT VEJR' in l]
+        godt_dage = [l.split(':')[0].strip() for l in linjer if '← GODT VEJR' in l]
+        opsummering = "\n  VEJR-OPSUMMERING:"
+        if regn_dage:
+            opsummering += f"\n  • REGN/DÅRLIGT VEJR (reducer bestilling): {', '.join(regn_dage)}"
+        if godt_dage:
+            opsummering += f"\n  • GODT VEJR (overvej ekstra): {', '.join(godt_dage)}"
+        if not regn_dage and not godt_dage:
+            opsummering += "\n  • Normalt vejr hele ugen"
+        vejr_str = "\n".join(linjer) + opsummering if linjer else "  Ingen vejrdata"
     else:
         vejr_str = "  Ikke tilgængelig — vejrdata ikke indlæst"
 

@@ -2858,6 +2858,66 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- KOSTPRIS HISTORIK -->
+      <div class="panel" id="p-kp-historik">
+        <div class="page-hdr">
+          <h2>Kostpris historik</h2>
+          <p>Automatisk registrerede prisændringer · systemet opdager ændringer ved hvert Shopbox-upload</p>
+          <button onclick="kpLoad(true)" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+
+        <!-- Søg -->
+        <div style="margin-bottom:14px;">
+          <input id="kp-soeg" type="text" placeholder="Søg varenavn eller nummer…"
+            oninput="kpFilter()"
+            style="width:100%;max-width:360px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--charcoal);">
+        </div>
+
+        <!-- Tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Aktuelle kostpriser med ændringshistorik</span>
+            <span class="aar2-tbl-hdr-r" id="kp-tbl-lbl"></span>
+          </div>
+          <table class="aar2-tbl" id="kp-tbl">
+            <thead><tr>
+              <th style="width:35%;">Varenavn</th>
+              <th style="width:12%;">Varenr.</th>
+              <th class="num">Aktuel pris/stk</th>
+              <th class="num">Gyldig fra</th>
+              <th class="num">Ændringer</th>
+              <th class="num">Kilde</th>
+              <th style="width:10%;"></th>
+            </tr></thead>
+            <tbody id="kp-tbody">
+              <tr><td colspan="7" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Korriger modal -->
+        <div id="kp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;">
+          <div style="background:var(--bg);border-radius:12px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+            <h3 style="margin:0 0 16px;font-size:16px;" id="kp-modal-titel">Korriger kostpris</h3>
+            <input type="hidden" id="kp-modal-vn">
+            <div style="margin-bottom:12px;">
+              <label style="font-size:12px;color:var(--ash);display:block;margin-bottom:4px;">Ny kostpris per stk (kr excl. moms)</label>
+              <input id="kp-modal-pris" type="number" step="0.01" min="0"
+                style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+            </div>
+            <div style="margin-bottom:20px;">
+              <label style="font-size:12px;color:var(--ash);display:block;margin-bottom:4px;">Gyldig fra dato</label>
+              <input id="kp-modal-fra" type="date"
+                style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+              <button onclick="kpModalLuk()" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;">Annuller</button>
+              <button onclick="kpGem()" style="padding:8px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-weight:500;cursor:pointer;">Gem ændring</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- VARESTAMDATA -->
       <div class="panel" id="p-stamdata">
         <div class="page-hdr">
@@ -3178,6 +3238,7 @@ const NAV_DEFAULT = [
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Analyse & rapporter',  hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',       hidden:false},
+  {id:'kp-historik', label:'Kostpris historik',     group:'Administration',       hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',       hidden:false},
   {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Administration',       hidden:false},
 ];
@@ -8691,6 +8752,7 @@ window.showPanel = function(id, el) {
   if (id === 'trend'       && !_trendLoaded) loadTrend(_trendDage);
   if (id === 'aar'         && !_aarLoaded)   loadAar();
   if (id === 'kostpris')   loadKostpris();
+  if (id === 'kp-historik') kpLoad();
   if (id === 'margin')     loadMarginAnalyse();
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
@@ -8705,6 +8767,71 @@ window.showPanel = function(id, el) {
   if (id === 'stamdata')   loadStamdata();
   if (id === 'management') { mgmtIndlaes(); mgmtInitForslag(); }
 };
+
+// ── KOSTPRIS HISTORIK ────────────────────────────────────────────────────────
+let _kpData = null, _kpLoaded = false;
+
+async function kpLoad(force = false) {
+  if (_kpLoaded && !force) return;
+  const d = await api('/api/kostpris/oversigt');
+  if (!d || !d.varer) return;
+  _kpData   = d.varer;
+  _kpLoaded = true;
+  kpVis(_kpData);
+}
+
+function kpFilter() {
+  if (!_kpData) return;
+  const q = document.getElementById('kp-soeg').value.toLowerCase();
+  kpVis(q ? _kpData.filter(r => (r.varenavn||'').toLowerCase().includes(q) || (r.varenummer||'').includes(q)) : _kpData);
+}
+
+function kpVis(varer) {
+  const tbody = document.getElementById('kp-tbody');
+  const mono  = "font-family:'DM Mono',monospace;";
+  document.getElementById('kp-tbl-lbl').textContent = varer.length + ' varer';
+  if (!varer.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Ingen kostpriser registreret endnu — upload Shopbox-data for at starte</td></tr>'; return; }
+  tbody.innerHTML = varer.map(r => {
+    const kildeIkon = r.kilde === 'manuel' ? '✏️' : '🤖';
+    const aendring  = r.antal_ændringer > 1
+      ? `<span style="color:var(--gold);">${r.antal_ændringer}×</span>`
+      : `<span style="color:var(--ash);">1×</span>`;
+    return `<tr>
+      <td style="font-size:12px;">${r.varenavn || '—'}</td>
+      <td style="${mono}font-size:11px;color:var(--ash);">${r.varenummer}</td>
+      <td class="num" style="${mono}font-weight:600;">${(r.kostpris_enhed||0).toLocaleString('da-DK',{minimumFractionDigits:2,maximumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${(r.gyldig_fra||'').slice(0,10)}</td>
+      <td class="num">${aendring}</td>
+      <td class="num" style="font-size:12px;" title="${r.kilde==='manuel'?'Manuelt korrigeret':'Automatisk opdaget'}">${kildeIkon} ${r.kilde}</td>
+      <td class="num"><button onclick="kpModalAaben('${r.varenummer}','${(r.varenavn||'').replace(/'/g,"\\'")}',${r.kostpris_enhed})"
+        style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--ash);">Korriger</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function kpModalAaben(vn, navn, pris) {
+  document.getElementById('kp-modal-vn').value    = vn;
+  document.getElementById('kp-modal-titel').textContent = 'Korriger: ' + navn;
+  document.getElementById('kp-modal-pris').value  = pris;
+  document.getElementById('kp-modal-fra').value   = new Date().toISOString().slice(0,10);
+  document.getElementById('kp-modal').style.display = 'flex';
+}
+
+function kpModalLuk() {
+  document.getElementById('kp-modal').style.display = 'none';
+}
+
+async function kpGem() {
+  const vn   = document.getElementById('kp-modal-vn').value;
+  const pris = parseFloat(document.getElementById('kp-modal-pris').value);
+  const fra  = document.getElementById('kp-modal-fra').value;
+  if (!vn || !pris || !fra) return alert('Udfyld alle felter');
+  const r = await fetch('/api/kostpris/korriger', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({varenummer:vn, kostpris_enhed:pris, gyldig_fra:fra})
+  });
+  if ((await r.json()).ok) { kpModalLuk(); kpLoad(true); }
+}
 
 // ── VARESTAMDATA ─────────────────────────────────────────────────────────────
 const SD_TYPER = ['Brød','Flute','Rugbrød','Boller','Wienerbrød','Kage','Jul'];

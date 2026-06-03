@@ -212,10 +212,22 @@ def init_db():
                 antal     INTEGER DEFAULT 0
             );
 
+            CREATE TABLE IF NOT EXISTS varekostpris (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                varenummer     TEXT    NOT NULL,
+                varenavn       TEXT    NOT NULL DEFAULT '',
+                kostpris_enhed REAL    NOT NULL DEFAULT 0,
+                gyldig_fra     TEXT    NOT NULL,
+                gyldig_til     TEXT,
+                kilde          TEXT    DEFAULT 'auto',
+                opdateret      TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(varenummer, gyldig_fra) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_kp_vn ON varekostpris(varenummer, gyldig_fra);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
-                -- Boner hvor mindst én vare har omsætning<=0 men kostpris>0 (menu-split eller rabatlinje)
                 SELECT dato, bon_nr
                 FROM transaktioner
                 WHERE bon_nr != '' AND omsætning <= 0 AND kostpris > 0
@@ -230,12 +242,9 @@ def init_db():
                 GROUP BY t.dato, t.bon_nr
             ),
             t_korr AS (
-                -- Fordel bon-omsætning proportionalt efter kostpris for menu-boner
                 SELECT t.*,
                        CASE
-                           WHEN bt.bon_nr IS NOT NULL
-                                AND bt.bon_kost > 0
-                                AND bt.bon_oms  > 0
+                           WHEN bt.bon_nr IS NOT NULL AND bt.bon_kost > 0 AND bt.bon_oms > 0
                            THEN bt.bon_oms * t.kostpris / bt.bon_kost
                            ELSE t.omsætning
                        END AS omsætning_korr
@@ -244,17 +253,30 @@ def init_db():
             )
             SELECT tc.*,
                    tc.omsætning_korr / 1.25 AS omsaetning_ex_moms,
-                   CASE WHEN s.pris_ex_moms > 0
-                        THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                        ELSE tc.kostpris END AS vf_korrekt,
+                   CASE
+                       WHEN s.pris_ex_moms > 0
+                           THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                       WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
+                           THEN ROUND(tc.antal * kp.kostpris_enhed, 4)
+                       ELSE tc.kostpris
+                   END AS vf_korrekt,
                    tc.omsætning_korr / 1.25
-                       - CASE WHEN s.pris_ex_moms > 0
-                              THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                              ELSE tc.kostpris END AS db_korrekt
+                       - CASE
+                             WHEN s.pris_ex_moms > 0
+                                 THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                             WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
+                                 THEN ROUND(tc.antal * kp.kostpris_enhed, 4)
+                             ELSE tc.kostpris
+                         END AS db_korrekt
             FROM t_korr tc
             LEFT JOIN varestamdata s
                 ON (tc.varenummer != '' AND tc.varenummer IS NOT NULL AND tc.varenummer = s.sku)
-                OR (COALESCE(tc.varenummer,'') = '' AND LOWER(TRIM(tc.varenavn)) = LOWER(TRIM(s.varenavn)));
+                OR (COALESCE(tc.varenummer,'') = '' AND LOWER(TRIM(tc.varenavn)) = LOWER(TRIM(s.varenavn)))
+            LEFT JOIN varekostpris kp
+                ON tc.varenummer != ''
+                AND tc.varenummer = kp.varenummer
+                AND kp.gyldig_fra <= tc.dato
+                AND (kp.gyldig_til IS NULL OR kp.gyldig_til >= tc.dato);
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -355,8 +377,57 @@ def init_db():
             )
 
 
+def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str) -> None:
+    """Sammenlign nye priser med gemt historik og opret poster automatisk ved ændringer."""
+    from collections import defaultdict
+    priser: Dict = defaultdict(list)
+    navne:  Dict = {}
+    for t in transaktioner:
+        vn   = str(t.get("varenummer", "") or "").strip()
+        if not vn or vn in ("0", ""):
+            continue
+        antal = float(t.get("antal", 0) or 0)
+        kost  = float(t.get("kostpris", 0) or 0)
+        if antal > 0 and kost > 0:
+            priser[vn].append(round(kost / antal, 6))
+            navne[vn] = t.get("varenavn", "") or ""
+
+    for vn, pris_liste in priser.items():
+        sorted_p  = sorted(pris_liste)
+        median_p  = round(sorted_p[len(sorted_p) // 2], 4)
+        if median_p <= 0:
+            continue
+
+        aktuel = conn.execute(
+            "SELECT id, kostpris_enhed FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
+            (vn,)
+        ).fetchone()
+
+        if aktuel is None:
+            # Første gang — opret startpost
+            conn.execute(
+                "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
+                (vn, navne.get(vn, ""), median_p, import_dato)
+            )
+        else:
+            gammel = float(aktuel["kostpris_enhed"] or 0)
+            if gammel > 0 and abs(median_p - gammel) / gammel > 0.02:  # >2% ændring
+                from datetime import date as _d, timedelta as _td
+                gaeldende_til = (_d.fromisoformat(import_dato) - _td(days=1)).isoformat()
+                conn.execute(
+                    "UPDATE varekostpris SET gyldig_til=? WHERE id=?",
+                    (gaeldende_til, aktuel["id"])
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
+                    (vn, navne.get(vn, ""), median_p, import_dato)
+                )
+
+
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
     with _conn() as conn:
+        # Opdater kostpris-historik FØR sletning — bevar historisk korrekthed
+        _opdater_kostpris_historik(conn, transaktioner, rapport_dato)
         conn.execute("DELETE FROM transaktioner")
         conn.execute("DELETE FROM uploads")
 
@@ -5352,6 +5423,47 @@ def _vejr_justering(kode: int, prec: float, tmax: float) -> Dict:
     if faktor <= 0.95:
         return {"faktor": faktor, "farve": "orange",  "label": f"Regn {int((faktor-1)*100)}%"}
     return {"faktor": faktor, "farve": "neutral", "label": "Normalt vejr"}
+
+
+def hent_varekostpris_oversigt() -> List[Dict]:
+    """Alle varer med aktuel kostpris og antal historiske ændringer."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT kp.varenummer, kp.varenavn, kp.kostpris_enhed, kp.gyldig_fra, kp.kilde,
+                   (SELECT COUNT(*) FROM varekostpris h WHERE h.varenummer = kp.varenummer) AS antal_ændringer
+            FROM varekostpris kp
+            WHERE kp.gyldig_til IS NULL
+            ORDER BY kp.varenavn
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_varekostpris_historik(varenummer: str) -> List[Dict]:
+    """Fuld prishistorik for én vare."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM varekostpris WHERE varenummer=?
+            ORDER BY gyldig_fra DESC
+        """, (varenummer,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def korriger_varekostpris(varenummer: str, kostpris_enhed: float, gyldig_fra: str) -> None:
+    """Manuel korrektion — lukker aktuel post og opretter ny."""
+    with _conn() as conn:
+        aktuel = conn.execute(
+            "SELECT id FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
+            (varenummer,)
+        ).fetchone()
+        if aktuel:
+            from datetime import date as _d, timedelta as _td
+            til = (_d.fromisoformat(gyldig_fra) - _td(days=1)).isoformat()
+            conn.execute("UPDATE varekostpris SET gyldig_til=? WHERE id=?", (til, aktuel["id"]))
+        conn.execute(
+            "INSERT OR REPLACE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) "
+            "SELECT varenummer, varenavn, ?, ?, 'manuel' FROM varekostpris WHERE varenummer=? LIMIT 1",
+            (round(kostpris_enhed, 4), gyldig_fra, varenummer)
+        )
 
 
 def hent_gmail_importerede() -> set:

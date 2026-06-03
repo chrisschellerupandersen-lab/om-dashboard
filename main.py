@@ -1901,6 +1901,33 @@ async def management_spørg(request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ── VAREKOSTPRIS ──────────────────────────────────────────────────────────────
+
+@app.get("/api/kostpris/oversigt")
+async def api_kostpris_oversigt(request: Request):
+    _kræv_login(request)
+    return {"ok": True, "varer": database.hent_varekostpris_oversigt()}
+
+
+@app.get("/api/kostpris/historik/{varenummer}")
+async def api_kostpris_historik(request: Request, varenummer: str):
+    _kræv_login(request)
+    return {"ok": True, "historik": database.hent_varekostpris_historik(varenummer)}
+
+
+@app.post("/api/kostpris/korriger")
+async def api_kostpris_korriger(request: Request):
+    _kræv_login(request)
+    body = await request.json()
+    vn   = str(body.get("varenummer", ""))
+    pris = float(body.get("kostpris_enhed", 0))
+    fra  = str(body.get("gyldig_fra", ""))
+    if not vn or pris <= 0 or not fra:
+        raise HTTPException(status_code=400, detail="varenummer, kostpris_enhed og gyldig_fra er påkrævet")
+    database.korriger_varekostpris(vn, pris, fra)
+    return {"ok": True}
+
+
 # ── GMAIL AUTO-SYNC ───────────────────────────────────────────────────────────
 
 @app.post("/api/bager/gmail-sync")

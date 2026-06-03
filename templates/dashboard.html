@@ -7538,12 +7538,17 @@ function _spildNav(retning) {
 
 // ── VEJR ─────────────────────────────────────────────────────────────────────
 let _vejrData = null;
+let _vejrTs   = 0;
+const _VEJR_TTL = 30 * 60 * 1000; // 30 minutter
 
 async function vejrLoad() {
-  // Hent vejr igen hvis cached data er tom
-  if (_vejrData && _vejrData.forecast && Object.keys(_vejrData.forecast).length > 0) return _vejrData;
+  const nu = Date.now();
+  // Brug cache kun hvis den er frisk (< 30 min) og har data
+  if (_vejrData && _vejrData.forecast && Object.keys(_vejrData.forecast).length > 0
+      && (nu - _vejrTs) < _VEJR_TTL) return _vejrData;
   try {
     _vejrData = await api('/api/vejr/forecast');
+    _vejrTs   = nu;
   } catch(e) { _vejrData = { forecast: {} }; }
   return _vejrData;
 }

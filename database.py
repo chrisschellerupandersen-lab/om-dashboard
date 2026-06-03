@@ -4639,68 +4639,81 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
     if evt:
         si_info = f"Sæsonindeks: ×{evt.get('factor', 1.0):.2f}"
 
-    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med eget bageri i Greve, Danmark.
+    # Find ugedag for torsdag i mål-ugen (bestillingsdeadline er FORRIGE torsdag)
+    tor_deadline = (mon - _td(days=4)).strftime('%-d. %B')  # torsdagen ugen før
 
-═══ FORRETNINGSLOGIK ═══
-To LIGE STORE risici — begge er direkte tab:
-① FOR MEGET på svage dage → TGTG/retur → tab af kostpris + arbejdstid
-② FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder
+    prompt = f"""Du er indkøbsrådgiver for Organic Market Greve — en franchise-butik i Greve, Danmark.
 
-Fokus er DAG-PRÆCISION. Lørdage/fredage er typisk stærke. Mandage/tirsdage svage.
-Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
+═══ FORRETNINGSMODEL ═══
+Organic Market er FRANCHISE-TAGER og driver IKKE eget bageri.
+Bagværk bestilles hos franchise-bageriet og leveres HVER MORGEN KL. 05:00.
+
+BESTILLINGSPROCES:
+• Deadline: senest TORSDAG for HELE den efterfølgende uge (man–søn)
+• Du angiver mængde per dag i bestillingen
+• Levering sker dagligt kl. 05:00 baseret på din fordeling
+• Du kan IKKE ændre bestillingen midt i ugen
+
+ØKONOMI:
+• For meget → noget sælges via TGTG (Too Good To Go) som pose → delvis dækning
+• Overskud sendes retur til bageriet → krediteres på næste faktura (boller 10%, wienerbrød 13,5%)
+• For lidt → tomme hylder → tabt salg + skuffede kunder → direkte tab
+• Kager: leveres fast 2×/uge i aftalt mængde — analyser dem ikke medmindre begivenhed tilsiger extra.
+
+MÅL: Bestil præcis nok per dag — minimér både tomme hylder OG overskud.
+TGTG-mål: under 800 kr/uge (= acceptabelt overskudsniveau).
 
 ⚠ DATAKVALITET:
-• Shopbox-data kan undervurdere reelt salg (MobilePay ikke varekoblet).
-• Brug TGTG og retur som de mest præcise spild-indikatorer.
-• Kager leveres fast 2×/uge i konstant mængde — intet spild. Analyser dem IKKE for spild/retur.
-  Eneste undtagelse: nævn kort hvis en begivenhed tilsiger at bestille lidt ekstra (fx "husk evt. ekstra kager til X").
+• Shopbox undervurderer reelt salg (MobilePay ikke varekoblet — typisk bagværk ved bordet).
+• TGTG og retur er de mest præcise spild-indikatorer.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
+Bestillingsdeadline: torsdag {tor_deadline} (bestil for hele denne uge)
 {si_info}
 
 BEGIVENHED: {evt_info}
 
-VEJR UGE {maal_uge}:
+VEJR UGE {maal_uge} (alle 7 dage du bestiller til):
 {vejr_str}
 
-─── FORESLÅEDE DAGSMÆNGDER (systemets beregning) ───
-Dagstotaler:
+─── FORESLÅEDE DAGSMÆNGDER (systemets beregning til din torsdags-bestilling) ───
+Dagstotaler (excl. kager):
 {dag_maengde_str if dag_maengde_str else '  (ikke tilgængelig — klik Opdater analyse efter tabellen er indlæst)'}
 
 Pr. produkt:
 {produkt_str if produkt_str else '  (ikke tilgængelig)'}
 
-─── HISTORIK ───
+─── HISTORIK (basis for din vurdering) ───
 FORRIGE UGE ({prev_uge}/{prev_aar}, {prev_mon.strftime('%-d. %b')}–{prev_sun.strftime('%-d. %b')}){evt_prev_info}:
 {'⚠ IGANGVÆRENDE — kun ' + str(prev_dage) + ' dage (til ' + (prev_seneste_dagsnavn or '?') + ')' if prev_er_igangvaerende else f'{prev_dage} dage med data'}
   Omsætning: {prev_oms:,} kr · Bestilling: {best_str}
 
-RETUR FORRIGE UGE: Boller {retur_b} stk · Wienerbrød {retur_w} stk ({retur_varer_str})
-Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød
+RETUR TIL BAGERIET FORRIGE UGE: {retur_b} boller + {retur_w} wienerbrød ({retur_varer_str})
+Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød returneret
 
-TGTG: {tgtg_poser} poser · {tgtg_kr:,} kr (snit 4 uger: {tgtg_snit:,} kr · mål: <800 kr)
+TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (4-ugers snit: {tgtg_snit:,} kr · mål: <800 kr)
 
-TREND: {trend_str}
+SALGSTREND: {trend_str}
 
-─── DIN OPGAVE (4 afsnit, ren tekst) ───
+─── DIN BESTILLINGSOPGAVE (4 afsnit) ───
+Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.
 
-1. DAGSVURDERING — gennemgå de foreslåede dagsmængder dag for dag.
-   Er antallet rigtigt, for højt eller for lavt på hver dag?
-   Husk: {si_info or 'normalt sæsonniveau'}, vejret og eventuelle begivenheder.
+1. DAGSVURDERING — er de foreslåede dagsmængder rigtige?
+   Tag højde for: ugedag (fre/lør stærke, man/tir svage), vejr, begivenhed, sæson.
    Format: "Man {dag_totaler.get('Man', dag_totaler.get('man','?')) if dag_totaler else '?'} stk — [vurdering]"
 
-2. SÆSON & VEJR — hvad betyder sæsonindeks og vejrudsigt konkret for denne uge?
-   Hvilke dage påvirkes mest? Hvad risikerer vi at gå galt?
+2. VEJR & BEGIVENHED — hvilke dage i den kommende uge kræver særlig opmærksomhed?
+   Regn reducerer kundeflow. Begivenheder kan løfte markant. Vær specifik.
 
-3. TGTG & RETUR — er spildniveauet acceptabelt?
-   Hvilke produkter/dage driver spildet? Hvad skal ned uden at risikere tomme hylder?
+3. RETUR & TGTG — afspejler tallene den rigtige balance?
+   Høj retur/TGTG = for meget bestilt. Lav = risiko for tomme hylder.
 
-4. KONKRETE ANBEFALINGER — specifikke justeringer med tal og begrundelse.
-   Format: "Fre: +8 boller (stærk dag + godt vejr)"
-            "Man: -5 wienerbrød (svag dag, TGTG-risiko)"
+4. BESTILLINGSANBEFALING — hvad skal du justere inden torsdag?
+   Format: "Fre: +8 boller (stærk dag + godt vejr — risiko for udsolgt)"
+            "Man: -5 wienerbrød (svag dag + regn — vil ende som retur)"
 
-Skriv på dansk. Vær KONKRET — brug tal og dagenavne. Max 400 ord."""
+Skriv på dansk. Vær KONKRET med tal og dagenavne. Husk: én bestilling, hele ugen. Max 400 ord."""
 
     client = _ant.Anthropic(api_key=api_key)
     msg = client.messages.create(

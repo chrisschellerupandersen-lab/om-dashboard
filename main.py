@@ -791,6 +791,29 @@ async def api_sellthrough(request: Request, uger: int = 10):
     return database.hent_sellthrough_analyse(uger)
 
 
+@app.get("/api/bestilling/vejr-debug")
+async def api_vejr_debug(request: Request, uge: int, aar: int):
+    """Debug: vis præcis hvilke vejrdata der bruges til AI for en given uge."""
+    _kræv_login(request)
+    from datetime import date, timedelta
+    vejr = database.hent_vejr_forecast()
+    fc   = vejr.get("forecast", {})
+    mon  = date.fromisocalendar(aar, uge, 1)
+    DAG  = ["Man","Tir","Ons","Tor","Fre","Lør","Søn"]
+    result = []
+    for i in range(7):
+        dag = mon + timedelta(days=i)
+        ds  = dag.isoformat()
+        v   = fc.get(ds)
+        result.append({
+            "dag": DAG[i], "dato": ds,
+            "fundet": v is not None,
+            "data": v
+        })
+    return {"uge": uge, "aar": aar, "mandag": mon.isoformat(),
+            "forecast_keys_sample": list(fc.keys())[:5], "dage": result}
+
+
 @app.post("/api/bestilling/kontekst")
 async def api_beregner_kontekst(request: Request):
     _kræv_login(request)

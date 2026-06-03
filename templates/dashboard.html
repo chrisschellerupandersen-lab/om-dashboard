@@ -7781,13 +7781,31 @@ async function loadBernUge(uge, aar) {
         const diffHtml  = diff !== 0
           ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};line-height:1;">${diff>0?'+':''}${diff}</span>`
           : '';
+
+        // Vejr-justeret forslag
+        const dagDato = new Date(_mandag); dagDato.setDate(_mandag.getDate() + DAG_IDX[dag]);
+        const dagDs   = dagDato.toISOString().slice(0,10);
+        const vDagKp  = _vejrFc[dagDs];
+        let vejrCellHtml = '';
+        if (vDagKp && v > 0) {
+          const faktor = (vDagKp.juster || {}).faktor;
+          if (faktor && Math.abs(faktor - 1) >= 0.05) { // kun vis ved ≥5% justering
+            const vJust = Math.round(v * faktor);
+            const vDiff = vJust - v;
+            const fv    = (vDagKp.juster || {}).farve;
+            const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
+            const ikon  = vDagKp.ikon || '🌡️';
+            vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} vejr: ${vJust} stk foreslået">${ikon}${vDiff>0?'+':''}${vDiff}</span>`;
+          }
+        }
+
         return `<td class="num bern-cell" contenteditable="true"
           data-vn="${p.varenummer || ''}" data-dag="${dag}"
           onblur="bernCellSave(this)"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
           style="${mono}${wkBg}${v===0&&!isMinAnb?'color:var(--ash);':''}${manStyle}${minStyle}cursor:text;min-width:28px;"${tipAttr}
-        >${v}${diffHtml}</td>`;
+        >${v}${diffHtml}${vejrCellHtml}</td>`;
       }).join('');
 
       const diffTotal   = p.total_anbefalet - p.total_basis;

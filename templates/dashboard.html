@@ -7685,10 +7685,23 @@ async function loadBernUge(uge, aar) {
   // Header
   document.getElementById('bern-uge-label').textContent  = 'Uge ' + d.maal_uge;
   document.getElementById('bern-dato-label').textContent = d.dato_range + ' · ' + d.maal_aar;
-  document.getElementById('bern-basis-label').textContent = d.faktisk
-    ? '✓ Faktisk bestilling — indlæst fra Excel'
-    : 'Basis: snit af ' + (d.basis_uger_snit || 1) + ' seneste bestillingsuger (seneste: uge ' + d.basis_uge + '/' + d.basis_aar + ')';
-  document.getElementById('bern-basis-label').style.color = d.faktisk ? 'var(--moss)' : '';
+  // Basis-label: vis hvad der faktisk bruges som udgangspunkt
+  let basisLbl = '';
+  if (d.faktisk) {
+    basisLbl = '✓ Faktisk bestilling — indlæst fra Excel';
+    document.getElementById('bern-basis-label').style.color = 'var(--moss)';
+  } else if (basisData && basisData.length > 0) {
+    // Basis bestilling (daglig skabelon) er aktiv — det er det der bruges
+    const si   = d.si ? ' · SI ×' + d.si.toFixed(2) : '';
+    const vaek = d.vaekst_pct ? ' · vækst ' + (d.vaekst_pct >= 0 ? '+' : '') + d.vaekst_pct + '%' : '';
+    basisLbl = '📋 Basis: din daglige skabelon justeret med sæson' + si + vaek;
+    document.getElementById('bern-basis-label').style.color = 'var(--forest)';
+  } else {
+    // Historisk snit fra ugebestillinger
+    basisLbl = 'Basis: historisk snit af ' + (d.basis_uger_snit || 1) + ' bestillingsuger (seneste: uge ' + d.basis_uge + '/' + d.basis_aar + ')';
+    document.getElementById('bern-basis-label').style.color = '';
+  }
+  document.getElementById('bern-basis-label').textContent = basisLbl;
 
   // Event-badge (header)
   const evtBadgeEl = document.getElementById('bern-event-badge');

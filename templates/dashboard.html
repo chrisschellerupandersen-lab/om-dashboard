@@ -5157,27 +5157,44 @@ function buildAar() {
     const estPct  = 100 - factPct;
     const badge   = indev.isLive ? '<span class="aar2-badge live">LIVE + ESTIMAT</span>'
                                  : (indev.type==='faktisk' ? '<span class="aar2-badge live">FAKTISK</span>' : '<span class="aar2-badge prog">ESTIMAT</span>');
+    const faktDage  = indev.faktDage || 0;
+    const restDage  = indev.restDage || 0;
+    const faktBarPct = indev.dage > 0 ? Math.max(2, Math.round(faktDage / indev.dage * 100)) : 2;
+    const estBarPct  = 100 - faktBarPct;
     document.getElementById('aar2-month-card').innerHTML = `
       <div class="aar2-mnd-hdr">
         <span class="aar2-mnd-label">Indeværende måned — ${AAR_MND_NAVNE[indev.m-1].toUpperCase()} ${aar}</span>
         ${badge}
       </div>
-      <div class="aar2-proj-omsat">${dk(indev.totalProj)} kr <span style="font-size:13px;color:var(--ash);font-weight:300;">projekteret</span></div>
-      <div class="aar2-proj-sub">${indev.dage} dage total · ${indev.faktDage||0} faktiske dage</div>
-      <div class="aar2-progbar">
-        <div class="aar2-progbar-faktisk" style="width:${factPct}%;">
-          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--amber);white-space:nowrap;">${indev.dage} dage</span>
-        </div>
-        ${estPct>2 ? `<div class="aar2-progbar-estimat" style="width:${estPct}%;"><span style="font-family:'DM Mono',monospace;font-size:7px;color:var(--forest);white-space:nowrap;">+${indev.restDage}</span></div>` : ''}
+
+      <!-- Hvad forventer vi hele måneden -->
+      <div style="margin-bottom:4px;">
+        <span style="font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">Forventet omsætning hele måneden</span>
       </div>
-      <div class="aar2-legend">
-        ${indev.faktiskOmsat>0 ? `<span><span class="aar2-legend-dot" style="background:var(--forest);"></span>Faktisk ${dk(indev.faktiskOmsat)} kr</span>` : ''}
-        ${indev.estimatOmsat>0 ? `<span><span class="aar2-legend-dot" style="background:var(--amber);"></span>Estimat ${dk(indev.estimatOmsat)} kr</span>` : ''}
+      <div class="aar2-proj-omsat">${dk(indev.totalProj)} kr</div>
+      <div class="aar2-proj-sub" style="margin-bottom:14px;">
+        ${dk(indev.faktiskOmsat)} kr opnået på ${faktDage} dage
+        ${restDage > 0 ? ` · estimat ${dk(indev.estimatOmsat)} kr for ${restDage} resterende dage` : ''}
       </div>
+
+      <!-- Månedsprogress: faktisk vs estimeret -->
+      <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--ash);margin-bottom:4px;display:flex;justify-content:space-between;">
+        <span>${faktDage} dage faktisk</span>
+        <span>${restDage} dage estimeret</span>
+      </div>
+      <div class="aar2-progbar" style="margin-bottom:8px;">
+        <div class="aar2-progbar-faktisk" style="width:${faktBarPct}%;"></div>
+        ${estBarPct > 2 ? `<div class="aar2-progbar-estimat" style="width:${estBarPct}%;"></div>` : ''}
+      </div>
+      <div class="aar2-legend" style="margin-bottom:14px;">
+        ${indev.faktiskOmsat > 0 ? `<span><span class="aar2-legend-dot" style="background:var(--forest);"></span>Faktisk ${dk(indev.faktiskOmsat)} kr</span>` : ''}
+        ${indev.estimatOmsat > 0 ? `<span><span class="aar2-legend-dot" style="background:var(--amber);"></span>Estimeret ${dk(indev.estimatOmsat)} kr</span>` : ''}
+      </div>
+
       <div class="aar2-mnd-stats">
-        <div><div class="aar2-stat-l">DB Faktisk</div><div class="aar2-stat-v">${indev.faktiskOmsat>0 ? dk(indev.avance)+' kr' : '—'}</div></div>
-        <div><div class="aar2-stat-l">Resultat</div><div class="aar2-stat-v">${dk(indev.res)} kr</div></div>
-        <div><div class="aar2-stat-l">Dag-snit</div><div class="aar2-stat-v">${dk(indev.dagSnit)} kr</div></div>
+        <div><div class="aar2-stat-l">DB · faktiske dage</div><div class="aar2-stat-v">${indev.faktiskOmsat > 0 ? dk(indev.avance)+' kr' : '—'}</div></div>
+        <div><div class="aar2-stat-l">Resultat (est.)</div><div class="aar2-stat-v">${dk(indev.res)} kr</div></div>
+        <div><div class="aar2-stat-l">Dag-snit · faktisk</div><div class="aar2-stat-v">${dk(indev.dagSnit)} kr</div></div>
       </div>`;
   }
 

@@ -7536,6 +7536,14 @@ function _spildNav(retning) {
   _spildHent(uge, aar);
 }
 
+// Timezone-safe dato-string (undgår UTC-offset problem med toISOString i DK)
+function _datoStr(d) {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
 // ── VEJR ─────────────────────────────────────────────────────────────────────
 let _vejrData = null;
 let _vejrTs   = 0;
@@ -7569,12 +7577,12 @@ function vejrVisUge(uge, aar) {
   const opdEl   = document.getElementById('bern-vejr-opdateret');
 
   let html = '', harVejr = false, slemDage = [];
-  const idagStr = new Date().toISOString().slice(0,10);
+  const idagStr = _datoStr(new Date());
 
   for (let i = 0; i < 7; i++) {
     const dag = new Date(mandag);
     dag.setDate(mandag.getDate() + i);
-    const ds  = dag.toISOString().slice(0,10);
+    const ds  = _datoStr(dag);
     const v   = fc[ds];
     const erIdag = ds === idagStr;
 
@@ -7762,7 +7770,7 @@ async function loadBernUge(uge, aar) {
     const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.12);' : '';
     const dagD  = new Date(_mandag);
     dagD.setDate(_mandag.getDate() + DAG_IDX[dag]);
-    const ds    = dagD.toISOString().slice(0,10);
+    const ds    = _datoStr(dagD);
     const vDag  = _vejrFc[ds];
     let vejrHtml = '';
     if (vDag) {
@@ -7823,7 +7831,7 @@ async function loadBernUge(uge, aar) {
 
         // Vejr-justeret forslag
         const dagDato = new Date(_mandag); dagDato.setDate(_mandag.getDate() + DAG_IDX[dag]);
-        const dagDs   = dagDato.toISOString().slice(0,10);
+        const dagDs   = _datoStr(dagDato);
         const vDagKp  = _vejrFc[dagDs];
         let vejrCellHtml = '';
         if (vDagKp && v > 0) {
@@ -7896,7 +7904,7 @@ async function loadBernUge(uge, aar) {
 
     // Vejr-justering total for denne dag
     const dagDato2 = new Date(_mandag); dagDato2.setDate(_mandag.getDate() + DAG_IDX[dag]);
-    const dagDs2   = dagDato2.toISOString().slice(0,10);
+    const dagDs2   = _datoStr(dagDato2);
     const vFoot    = _vejrFc[dagDs2];
     let vejrFootHtml = '';
     if (vFoot && t > 0) {

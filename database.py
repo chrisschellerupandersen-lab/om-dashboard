@@ -4713,6 +4713,9 @@ PRODUKTREGLER — VIGTIGT FOR BESTILLINGEN:
 ⚠ DATAKVALITET:
 • Shopbox undervurderer reelt salg (MobilePay ikke varekoblet — typisk bagværk ved bordet).
 • TGTG og retur er de mest præcise spild-indikatorer.
+• UGEBESTILLINGER tastes MANUELT af personale — kan indeholde tastefejl.
+  Hvis en dags bestilling ser urealistisk ud (fx 200 boller en mandag eller 0 fredag),
+  er det sandsynligvis en tastefejl — ikke et reelt mønster. Brug historisk snit til korrektion.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───

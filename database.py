@@ -5660,6 +5660,56 @@ def hent_gmail_sync_status() -> Optional[Dict]:
     return dict(row) if row else None
 
 
+def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
+    """Beregn gennemsnitlig sidst-solgt tid per vare over de seneste N uger.
+    Butik åbner 06:00, lukker 20:00.
+    < 14:00 = sandsynligvis udsolgt (tomme hylder)
+    > 18:00 = overskud ved lukketid
+    """
+    from datetime import date as _d, timedelta as _td
+    fra = (_d.today() - _td(weeks=uger)).isoformat()
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT varenavn,
+                   ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
+                   COUNT(DISTINCT dato)       AS dage_med_salg,
+                   MIN(sidst_time)            AS min_tid,
+                   MAX(sidst_time)            AS max_tid
+            FROM (
+                SELECT dato, varenavn, MAX(time_start) AS sidst_time
+                FROM transaktioner
+                WHERE dato >= ?
+                  AND time_start BETWEEN 6 AND 19
+                  AND antal > 0
+                GROUP BY dato, varenavn
+            )
+            GROUP BY varenavn
+            HAVING dage_med_salg >= 3
+            ORDER BY snit_sidst_time ASC
+        """, (fra,)).fetchall()
+
+    udsolgt = []
+    overskud = []
+    for r in rows:
+        t = int(r['snit_sidst_time'] or 0)
+        item = {
+            "varenavn":     r['varenavn'],
+            "snit_time":    t,
+            "dage":         int(r['dage_med_salg']),
+            "tomme_timer":  20 - t,
+        }
+        if t < 14:
+            udsolgt.append(item)
+        elif t > 18:
+            overskud.append(item)
+
+    return {
+        "udsolgt_tidligt": sorted(udsolgt,  key=lambda x: x['snit_time']),
+        "overskud_sent":   sorted(overskud, key=lambda x: -x['snit_time']),
+        "periode_uger":    uger,
+    }
+
+
 def hent_vejr_forecast() -> Dict:
     """Hent 14-dages vejrudsigt for Greve fra Open-Meteo. Cache 3 timer."""
     import urllib.request as _urlreq

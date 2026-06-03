@@ -1975,6 +1975,14 @@ async def api_gmail_status(request: Request):
     return {"ok": True, "status": status, "har_token": har_token}
 
 
+# ── SALGSMØNSTER ─────────────────────────────────────────────────────────────
+
+@app.get("/api/salg/sidst-solgt")
+async def api_sidst_solgt(request: Request, uger: int = 4):
+    _kræv_login(request)
+    return database.hent_sidst_solgt_moenster(uger)
+
+
 # ── VEJR ──────────────────────────────────────────────────────────────────────
 
 @app.get("/api/vejr/forecast")

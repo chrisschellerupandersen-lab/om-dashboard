@@ -2717,6 +2717,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
+
+        <!-- Salgsmønster: sidst-solgt -->
+        <div id="bern-sidst-solgt" style="display:none;margin-top:20px;border-top:1px solid rgba(30,58,30,.08);padding-top:16px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">
+            SALGSMØNSTER · SENESTE 4 UGER · hvornår sælger vi ud?
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--danger);margin-bottom:8px;">🔴 Sælger ud for tidligt — tomme hylder</div>
+              <div id="bern-udsolgt-liste" style="font-size:12px;"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--gold);margin-bottom:8px;">🟡 Til stede ved lukketid — overskud</div>
+              <div id="bern-overskud-liste" style="font-size:12px;"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- MOBILEPAY -->
@@ -8049,7 +8066,42 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
-  // Bemærk: auto-analyse FJERNET - brugeren skal klikke "Opdater analyse"
+  bernLoadSidstSolgt();
+}
+
+async function bernLoadSidstSolgt() {
+  const d = await api('/api/salg/sidst-solgt?uger=4');
+  if (!d) return;
+  const wrap = document.getElementById('bern-sidst-solgt');
+  const mono = "font-family:'DM Mono',monospace;";
+
+  const udsolgt  = d.udsolgt_tidligt || [];
+  const overskud = d.overskud_sent   || [];
+  if (!udsolgt.length && !overskud.length) return;
+
+  const fmtRad = (item, farve) =>
+    `<div style="padding:4px 0;border-bottom:1px solid rgba(30,58,30,.05);">
+      <span style="font-size:12px;">${item.varenavn}</span>
+      <span style="${mono}font-size:11px;color:${farve};float:right;">
+        kl. ${item.snit_time < 10 ? '0' : ''}${item.snit_time}:00
+        <span style="color:var(--ash);font-size:10px;"> · ${item.tomme_timer}t tomme hylder</span>
+      </span>
+    </div>`;
+
+  const fmtOvr = (item) =>
+    `<div style="padding:4px 0;border-bottom:1px solid rgba(30,58,30,.05);">
+      <span style="font-size:12px;">${item.varenavn}</span>
+      <span style="${mono}font-size:11px;color:var(--gold);float:right;">
+        kl. ${item.snit_time < 10 ? '0' : ''}${item.snit_time}:00
+      </span>
+    </div>`;
+
+  document.getElementById('bern-udsolgt-liste').innerHTML =
+    udsolgt.length ? udsolgt.map(r => fmtRad(r, 'var(--danger)')).join('') : '<div style="color:var(--ash);font-size:11px;">Ingen</div>';
+  document.getElementById('bern-overskud-liste').innerHTML =
+    overskud.length ? overskud.map(fmtOvr).join('') : '<div style="color:var(--ash);font-size:11px;">Ingen</div>';
+
+  wrap.style.display = '';
 }
 
 

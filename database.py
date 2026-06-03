@@ -2416,6 +2416,19 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 'varer':     kage_varer,
             }
 
+            # ── Registrerede returneringer for ugen ──────────────────────────
+            retur_reg_rows = conn.execute("""
+                SELECT produkt, SUM(antal) AS antal, kategori
+                FROM retur_detaljer
+                WHERE uge = ? AND aar = ?
+                GROUP BY produkt, kategori
+                ORDER BY antal DESC
+            """, (uge, aar)).fetchall()
+            retur_registreret = [dict(r) for r in retur_reg_rows]
+            retur_registreret_total = sum(int(r['antal'] or 0) for r in retur_reg_rows)
+            retur_boller_reg  = sum(int(r['antal'] or 0) for r in retur_reg_rows if r['kategori'] == 'boller')
+            retur_wiener_reg  = sum(int(r['antal'] or 0) for r in retur_reg_rows if r['kategori'] == 'wienerbroed')
+
             # ── Historiske snit: seneste 4 uger per ugedag ────────────────────
             # Beregn de 4 foregående uger (ekskl. indeværende)
             hist_bestil: Dict[str, list] = {d: [] for d in dag_navne}
@@ -2557,6 +2570,10 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'avg_svind_pct_4u': avg_svind_pct,
         })
 
+    # Brug faktisk registreret retur i total-spild hvis tilgængeligt
+    if retur_registreret_total > 0:
+        total_svind = max(0, total_bestilt - total_kassesalg - total_tgtg - total_kbmo - retur_registreret_total)
+
     total_svind_pct  = round(total_svind  / total_bestilt * 100, 1) if total_bestilt > 0 else None
     total_rester_pct = round(total_rester / total_bestilt * 100, 1) if total_bestilt > 0 else None
 
@@ -2631,10 +2648,14 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'total_kw':         total_kw,
         'total_kbmo':       total_kbmo,
         'total_effektivt':  total_effektivt,
-        'total_retur':      total_retur,
-        'total_svind':      total_svind,
-        'total_svind_pct':  total_svind_pct,
-        'anbefalinger':     anbefalinger,
+        'total_retur':              total_retur,
+        'retur_registreret':        retur_registreret,
+        'retur_registreret_total':  retur_registreret_total,
+        'retur_boller_reg':         retur_boller_reg,
+        'retur_wiener_reg':         retur_wiener_reg,
+        'total_svind':              total_svind,
+        'total_svind_pct':          total_svind_pct,
+        'anbefalinger':             anbefalinger,
         'prev_uge':         prev_uge,
         'prev_aar':         prev_aar,
         'next_uge':         next_uge,

@@ -4663,6 +4663,29 @@ BESTILLINGSPROCES:
 MÅL: Bestil præcis nok per dag — minimér både tomme hylder OG overskud.
 TGTG-mål: under 800 kr/uge (= acceptabelt overskudsniveau).
 
+PRODUKTREGLER — VIGTIGT FOR BESTILLINGEN:
+┌─────────────────────────────────────────────────────────────────┐
+│ RUGBRØD         → kan stå til næste dag. Lav spildrisiko.       │
+│                   Kan bestilles med lidt margin.                 │
+│                                                                  │
+│ BOLLER          → skal sælges samme dag. Retur til bageriet     │
+│                   (10% krediteres) ELLER TGTG.                  │
+│                   OBS: I ender TYPISK med for mange boller.     │
+│                   Vær konservativ, særligt svage dage.          │
+│                                                                  │
+│ BRØD (surdej,   → KAN IKKE returneres til bageriet.             │
+│  flute, focac.) → Kun TGTG eller kasseres = fuldt tab.          │
+│                   Vær EKSTRA konservativ. Hellere lidt for lidt. │
+│                   OBS: I ender TYPISK med for meget brød.       │
+│                                                                  │
+│ GROV TEBIRKES   → KAN IKKE returneres til bageriet.             │
+│ FRØSNAPPER      → Kun TGTG eller kasseres = fuldt tab.          │
+│                   Bestil kun hvad du er sikker på at sælge.     │
+│                                                                  │
+│ WIENERBRØD      → Retur til bageriet (13,5% krediteres)         │
+│  (øvrige)         ELLER TGTG. Normal spildhåndtering.           │
+└─────────────────────────────────────────────────────────────────┘
+
 ⚠ DATAKVALITET:
 • Shopbox undervurderer reelt salg (MobilePay ikke varekoblet — typisk bagværk ved bordet).
 • TGTG og retur er de mest præcise spild-indikatorer.
@@ -4706,12 +4729,17 @@ Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.
 2. VEJR & BEGIVENHED — hvilke dage i den kommende uge kræver særlig opmærksomhed?
    Regn reducerer kundeflow. Begivenheder kan løfte markant. Vær specifik.
 
-3. RETUR & TGTG — afspejler tallene den rigtige balance?
-   Høj retur/TGTG = for meget bestilt. Lav = risiko for tomme hylder.
+3. RETUR & TGTG — brug produktreglerne aktivt:
+   • Brød / grov tebirkes / frøsnapper: KAN IKKE returneres → overskud = fuldt tab.
+     Hvis disse ender i TGTG konsekvent → reducer bestillingen næste uge.
+   • Boller: retur-mulighed, men 10% kreditering er ikke gratis.
+   • Rugbrød: kan stå til næste dag — lav spildrisiko.
 
-4. BESTILLINGSANBEFALING — hvad skal du justere inden torsdag?
-   Format: "Fre: +8 boller (stærk dag + godt vejr — risiko for udsolgt)"
-            "Man: -5 wienerbrød (svag dag + regn — vil ende som retur)"
+4. BESTILLINGSANBEFALING — hvad justeres inden torsdagens bestilling?
+   Prioritér produkter UDEN retur-mulighed højest (brød, grov tebirkes, frøsnapper).
+   Format: "Fre brød: -3 stk (ingen retur — ender som fuldt tab ved TGTG)"
+            "Man boller: -8 stk (svag dag, historisk for mange)"
+            "Lør surdejsboller: +5 stk (stærk dag + godt vejr — risiko for udsolgt)"
 
 Skriv på dansk. Vær KONKRET med tal og dagenavne. Husk: én bestilling, hele ugen. Max 400 ord."""
 

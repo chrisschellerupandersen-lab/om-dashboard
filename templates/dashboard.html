@@ -7847,12 +7847,13 @@ async function loadBernUge(uge, aar) {
           ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};line-height:1;">${diff>0?'+':''}${diff}</span>`
           : '';
 
-        // Vejr-indikator: vis hvad vejr HAR ændret (allerede indregnet)
+        // Vejr-indikator: vis hvad vejr HAR ændret (kun bagværk — ikke kager)
         const dagDato = new Date(_mandag); dagDato.setDate(_mandag.getDate() + DAG_IDX[dag]);
         const dagDs   = _datoStr(dagDato);
         const vDagKp  = _vejrFc[dagDs];
+        const erPKage = (p.kategori || '').toLowerCase().includes('kage');
         let vejrCellHtml = '';
-        if (vDagKp && v > 0) {
+        if (!erPKage && vDagKp && v > 0) {
           const faktor = (vDagKp.juster || {}).faktor;
           if (faktor && Math.abs(faktor - 1) >= 0.05) {
             // Beregn hvad der ville have været UDEN vejr

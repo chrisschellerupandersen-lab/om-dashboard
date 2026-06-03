@@ -2111,11 +2111,23 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
     if not datoer:
         return {"uge": uge, "aar": aar, "har_data": False}
     ph = ','.join('?' * len(datoer))
+
+    # Find hvilke ugedags-kolonner der svarer til de inkluderede datoer
+    DAG_COLS = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    dag_idx  = [(man + _td(days=i)) for i in range(7)]
+    aktive_cols = [
+        DAG_COLS[i] for i, d in enumerate(dag_idx)
+        if d.isoformat() < idag
+    ]
+    if not aktive_cols:
+        return {"uge": uge, "aar": aar, "har_data": False}
+    bestil_sum = '+'.join(aktive_cols)  # fx "man+tir"
+
     try:
         with _conn() as conn:
-            # Bestilt (ekskl. kager)
+            # Bestilt KUN for de inkluderede dage (ekskl. kager)
             bestil = conn.execute(f"""
-                SELECT SUM(man+tir+ons+tor+fre+loe+son) AS total
+                SELECT SUM({bestil_sum}) AS total
                 FROM ugebestillinger WHERE uge=? AND aar=?
                   AND NOT (LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%cookie%'
                         OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%')

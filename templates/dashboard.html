@@ -8183,6 +8183,9 @@ async function bernHentKontekst() {
 
   const { dag_totaler, produkter } = _bernLaesTabelData();
 
+  // Sørg for vejr er indlæst inden analyse sendes
+  await vejrLoad();
+
   try {
     const res = await fetch('/api/bestilling/kontekst', {
       method: 'POST',

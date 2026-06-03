@@ -4692,16 +4692,28 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
             dag = mon + _td(days=i)
             ds  = dag.isoformat()
             dn  = DAG_NAVNE_DA[i]
+            dato_kort = dag.strftime('%-d/%-m')
             v   = fc.get(ds)
             if v:
-                j = v.get("juster", {})
-                linje = f"  {dn}: {v.get('ikon','')} {v.get('tmax','?')}° {v.get('prec',0)}mm"
-                if j.get("farve") in ("red", "orange"):
-                    linje += f" → {j.get('label','')}"
+                j    = v.get("juster", {})
+                prec = v.get('prec', 0)
+                tmax = v.get('tmax', '?')
+                ikon = v.get('ikon', '')
+                linje = f"  {dn} ({dato_kort}): {ikon} {tmax}°C, nedbør {prec}mm"
+                if j.get("farve") == "red":
+                    linje += f"  ← DÅRLIGT VEJR: {j.get('label','')} (reducer bestilling)"
+                elif j.get("farve") == "orange":
+                    linje += f"  ← REGN: {j.get('label','')} (overvej reduktion)"
+                elif j.get("farve") == "green":
+                    linje += f"  ← GODT VEJR: {j.get('label','')} (overvej ekstra)"
+                else:
+                    linje += "  (normalt)"
                 linjer.append(linje)
+            else:
+                linjer.append(f"  {dn} ({dato_kort}): ingen vejrdata")
         vejr_str = "\n".join(linjer) if linjer else "  Ingen vejrdata"
     else:
-        vejr_str = "  Ikke tilgængelig"
+        vejr_str = "  Ikke tilgængelig — vejrdata ikke indlæst"
 
     # Sæsonindeks fra evt
     si_info = ""

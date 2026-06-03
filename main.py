@@ -1549,6 +1549,20 @@ async def api_tgtg_nulstil(request: Request):
 
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
+@app.get("/api/spild/overblik")
+async def api_spild_overblik(request: Request):
+    """Spild-overblik for denne uge + forrige afsluttede uge til forside."""
+    _kræv_login(request)
+    from datetime import date
+    iso  = date.today().isocalendar()
+    uge, aar = iso[1], iso[0]
+    prev_uge = uge - 1 if uge > 1 else 52
+    prev_aar = aar if uge > 1 else aar - 1
+    denne  = database.hent_spild_uge_overblik(uge,      aar)
+    forrig = database.hent_spild_uge_overblik(prev_uge, prev_aar)
+    return {"denne_uge": denne, "forrige_uge": forrig}
+
+
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)

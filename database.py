@@ -2095,6 +2095,73 @@ def hent_mangler_kostpris() -> Dict:
 
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
+def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
+    """Letvægts spild-overblik for én uge — kun totaler, ingen dag-detaljer."""
+    from datetime import date as _d, timedelta as _td
+    jan4 = _d(aar, 1, 4)
+    man  = jan4 - _td(days=jan4.weekday()) + _td(weeks=uge - 1)
+    datoer = [(man + _td(days=i)).isoformat() for i in range(7)]
+    ph = ','.join('?' * 7)
+    try:
+        with _conn() as conn:
+            # Bestilt (ekskl. kager)
+            bestil = conn.execute(f"""
+                SELECT SUM(man+tir+ons+tor+fre+loe+son) AS total
+                FROM ugebestillinger WHERE uge=? AND aar=?
+                  AND NOT (LOWER(varenavn) LIKE '%kage%' OR LOWER(varenavn) LIKE '%cookie%'
+                        OR LOWER(varenavn) LIKE '%muffin%' OR LOWER(varenavn) LIKE '%brownie%')
+            """, (uge, aar)).fetchone()
+            bestilt = int(bestil['total'] or 0) if bestil else 0
+            if bestilt == 0:
+                return {"uge": uge, "aar": aar, "har_data": False}
+
+            # Kassesalg
+            kasse = conn.execute(f"""
+                SELECT ROUND(SUM(antal),0) AS total FROM transaktioner
+                WHERE dato IN ({ph})
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer!='' AND varenummer!='0'
+                      AND NOT (LOWER(varenavn) LIKE '%kage%'))
+            """, datoer).fetchone()
+            kassesalg = int(kasse['total'] or 0) if kasse else 0
+
+            # TGTG
+            tgtg = conn.execute(f"""
+                SELECT SUM(ds.antal * COALESCE(tp.enheder_per_pose,1)) AS stk
+                FROM tgtg_dagssalg ds LEFT JOIN tgtg_poser tp ON ds.item_id=tp.item_id
+                WHERE ds.dato IN ({ph})
+            """, datoer).fetchone()
+            tgtg_stk = int(tgtg['stk'] or 0) if tgtg else 0
+
+            # Registreret retur
+            ret = conn.execute("""
+                SELECT SUM(antal) AS total FROM retur_detaljer WHERE uge=? AND aar=?
+            """, (uge, aar)).fetchone()
+            retur_reg = int(ret['total'] or 0) if ret else 0
+
+            # Dage med data
+            dage_data = conn.execute(f"""
+                SELECT COUNT(DISTINCT dato) AS n FROM transaktioner WHERE dato IN ({ph})
+            """, datoer).fetchone()
+            n_dage = int(dage_data['n'] or 0) if dage_data else 0
+
+        effektivt = kassesalg + tgtg_stk
+        retur = retur_reg  # brug faktisk retur
+        svind = max(0, bestilt - effektivt - retur)
+        svind_pct = round(svind / bestilt * 100, 1) if bestilt > 0 else None
+        return {
+            "uge": uge, "aar": aar, "har_data": True,
+            "bestilt": bestilt, "kassesalg": kassesalg,
+            "tgtg": tgtg_stk, "retur": retur,
+            "svind": svind, "svind_pct": svind_pct,
+            "n_dage": n_dage,
+            "er_komplet": n_dage >= 6,
+        }
+    except Exception as e:
+        return {"uge": uge, "aar": aar, "har_data": False, "fejl": str(e)}
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 

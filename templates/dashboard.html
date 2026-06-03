@@ -3482,6 +3482,7 @@ async function loadAll() {
 
   if (kpi) setSyncNow();
   loadReturStatus();
+  loadSpildOverblik();
 
   // Sæt date picker til dagens dato
   const today = new Date().toISOString().split('T')[0];
@@ -3971,18 +3972,43 @@ function buildAlerts(kpi) {
   strip.style.display = '';
 }
 
-// Tilføj svind-alert (kaldes fra loadSvind)
+// Tilføj svind-alert (kaldes fra loadSvind — historisk snit)
 function addSvindAlert(gnsSvind, uge) {
-  const chips = document.getElementById('alert-chips');
-  if (!chips || gnsSvind === '—') return;
-  const g   = parseFloat(gnsSvind);
+  // Historisk snit vises ikke mere på forsiden — erstattet af aktuelle uger
+}
+
+function _spildAlertTxt(d, label) {
+  if (!d || !d.har_data || d.svind_pct == null) return null;
+  const g   = d.svind_pct;
   const sev = g >= 22 ? 'red' : g >= 15 ? 'amber' : 'green';
   const ico = g >= 22 ? '⚠️' : g >= 15 ? '⚠️' : '✓';
-  const txt = g >= 22 ? `Svind snit ${g.toFixed(1)}% — kritisk (over 22%)` :
-              g >= 15 ? `Svind snit ${g.toFixed(1)}% — hold øje (15–22%)` :
-                        `Svind snit ${g.toFixed(1)}% — godt (under 15%)`;
-  chips.innerHTML += `<div class="alert-chip ${sev}"><span class="alert-icon">${ico}</span><span>${txt}</span></div>`;
-  document.getElementById('alert-strip').style.display = '';
+  const dage = d.n_dage > 0 ? ` · ${d.n_dage} dage` : '';
+  const txt = `Spild ${label}: ${g.toFixed(1)}%${dage} — ` +
+              (g >= 22 ? 'kritisk' : g >= 15 ? 'hold øje' : 'godt');
+  return { sev, ico, txt };
+}
+
+async function loadSpildOverblik() {
+  try {
+    const d = await api('/api/spild/overblik');
+    if (!d) return;
+    const chips = document.getElementById('alert-chips');
+    if (!chips) return;
+    let changed = false;
+    // Forrige (afsluttede) uge
+    const a = _spildAlertTxt(d.forrige_uge, `uge ${d.forrige_uge?.uge}`);
+    if (a) {
+      chips.innerHTML += `<div class="alert-chip ${a.sev}"><span class="alert-icon">${a.ico}</span><span>${a.txt}</span></div>`;
+      changed = true;
+    }
+    // Denne uge (igangværende)
+    const b = _spildAlertTxt(d.denne_uge, `uge ${d.denne_uge?.uge} (nu)`);
+    if (b) {
+      chips.innerHTML += `<div class="alert-chip ${b.sev}"><span class="alert-icon">${b.ico}</span><span>${b.txt}</span></div>`;
+      changed = true;
+    }
+    if (changed) document.getElementById('alert-strip').style.display = '';
+  } catch(e) {}
 }
 
 // ── DAGSOVERBLIK PROGRESS ─────────────────────────────────────────────────────

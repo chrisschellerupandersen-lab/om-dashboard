@@ -7690,8 +7690,12 @@ async function loadBernUge(uge, aar) {
     const vejrFc   = (_vejrData && _vejrData.forecast) ? _vejrData.forecast : {};
     const vejrDagFak = {};
     const DAGE_IDX2  = {man:0,tir:1,ons:2,tor:3,fre:4,loe:5,son:6};
+    // Beregn mandag for mål-ugen lokalt (kan ikke bruge _mandag der defineres senere)
+    const _jan4v = new Date(d.maal_aar, 0, 4);
+    const _mandagV = new Date(_jan4v);
+    _mandagV.setDate(_jan4v.getDate() - ((_jan4v.getDay() + 6) % 7) + (d.maal_uge - 1) * 7);
     Object.entries(DAGE_IDX2).forEach(([dk, i]) => {
-      const dagD2 = new Date(_mandag); dagD2.setDate(_mandag.getDate() + i);
+      const dagD2 = new Date(_mandagV); dagD2.setDate(_mandagV.getDate() + i);
       const v2 = vejrFc[_datoStr(dagD2)];
       vejrDagFak[dk] = (v2 && v2.juster && v2.juster.faktor) ? v2.juster.faktor : 1.0;
     });

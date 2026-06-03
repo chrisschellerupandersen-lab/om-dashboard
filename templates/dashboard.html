@@ -7653,6 +7653,9 @@ async function loadBernUge(uge, aar) {
     const vaekstFaktor = 1 + ((d.vaekst_pct || 0) / 100);
     const eventDagFak = (d.event && d.event.dag_fak) ? d.event.dag_fak : {};
 
+    // Fjern produkter der ikke er i basis — bestilles ikke længere
+    d.produkter = d.produkter.filter(prod => basisMap[prod.varenavn]);
+
     // Opdater produktlisten med basis-værdier JUSTERET med SI + trend + event
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {

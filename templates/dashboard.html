@@ -7653,8 +7653,8 @@ async function loadBernUge(uge, aar) {
     const vaekstFaktor = 1 + ((d.vaekst_pct || 0) / 100);
     const eventDagFak = (d.event && d.event.dag_fak) ? d.event.dag_fak : {};
 
-    // Fjern produkter der ikke er i basis — bestilles ikke længere
-    d.produkter = d.produkter.filter(prod => basisMap[prod.varenavn]);
+    // Markér produkter der ikke er i basis med advarsel
+    d.produkter.forEach(prod => { prod._ikkeIBasis = !basisMap[prod.varenavn]; });
 
     // Opdater produktlisten med basis-værdier JUSTERET med SI + trend + event
     d.produkter.forEach(prod => {
@@ -7836,8 +7836,12 @@ async function loadBernUge(uge, aar) {
         ? `<br><span style="font-size:9px;color:var(--ash);opacity:.7;">${p.sidst_aar_aar}: ${p.sidst_aar} stk</span>`
         : '';
 
+      const ikkeIBasisHtml = p._ikkeIBasis
+        ? `<br><span style="font-size:9px;color:var(--danger);font-weight:500;">⚠ Ikke i din basis</span>`
+        : '';
+
       bodyRows += `<tr data-vn="${p.varenummer || ''}">
-        <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
+        <td style="font-size:12px;max-width:180px;padding-left:16px;${p._ikkeIBasis?'color:var(--ash);':''}">${p.varenavn}${ikkeIBasisHtml}</td>
         ${dagCells}
         <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}${saHtml}</td>
         <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>

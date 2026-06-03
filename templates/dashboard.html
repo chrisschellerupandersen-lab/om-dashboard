@@ -8641,9 +8641,12 @@ async function bernGenererAnalyse() {
 }
 
 async function bernCellSave(td) {
-  const raw  = td.textContent.trim().replace(/\D/g, '');
+  // Læs kun første tekstnode (ikke +/- diff eller 🌧️ vejr-spans)
+  const firstTxt = [...td.childNodes].find(n => n.nodeType === 3)?.textContent || '';
+  const raw  = firstTxt.trim().replace(/\D/g, '');
   const val  = raw === '' ? 0 : parseInt(raw, 10);
   if (isNaN(val) || val < 0) { td.textContent = '0'; return; }
+  // Bevar kun tallet — fjern de visuelle indikatorer fra cellen ved redigering
   td.textContent = val;
 
   const vn  = td.dataset.vn;

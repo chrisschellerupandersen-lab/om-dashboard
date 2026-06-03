@@ -7684,8 +7684,6 @@ async function loadBernUge(uge, aar) {
     const eventDagFak = (d.event && d.event.dag_fak) ? d.event.dag_fak : {};
 
     // Markér produkter der ikke er i basis med advarsel
-    // Fjern kager helt — bestilles separat med fast basis
-    d.produkter = d.produkter.filter(p => !(p.kategori || '').toLowerCase().includes('kage'));
     d.produkter.forEach(prod => { prod._ikkeIBasis = !basisMap[prod.varenavn]; });
 
     // Byg vejr-faktor per dag (fra strip-data)

@@ -4787,10 +4787,13 @@ def hent_management_data(uge: int = None, aar: int = None) -> dict:
 
         # TGTG omkring den valgte uge (+-5 uger kontekst)
         tgtg_uger = conn.execute("""
-            SELECT strftime('%Y-%W', dato) AS yw, MIN(dato) AS fra,
-                   SUM(antal) AS poser, ROUND(SUM(kreditering),0) AS kr
-            FROM tgtg_dagssalg
-            WHERE dato >= ? AND dato <= ?
+            SELECT strftime('%Y-%W', ds.dato) AS yw, MIN(ds.dato) AS fra,
+                   SUM(ds.antal) AS poser,
+                   ROUND(SUM(ds.antal * COALESCE(tp.kreditpris,
+                       CASE WHEN ds.kreditering > 0 THEN ds.kreditering / ds.antal ELSE 0 END, 0)), 0) AS kr
+            FROM tgtg_dagssalg ds
+            LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id OR ds.pose_navn = tp.navn
+            WHERE ds.dato >= ? AND ds.dato <= ?
             GROUP BY yw ORDER BY yw DESC LIMIT 8
         """, (start_context.isoformat(), end_context.isoformat())).fetchall()
 

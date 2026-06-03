@@ -7711,9 +7711,31 @@ async function loadBernUge(uge, aar) {
   const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
   window._bernData = d;
 
-  const thDage = DAGE.map(dag =>
-    `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
-  ).join('');
+  // Byg vejr-lookup for ugens dage
+  const _vejrFc = (_vejrData && _vejrData.forecast) ? _vejrData.forecast : {};
+  const _jan4 = new Date(d.maal_aar, 0, 4);
+  const _mandag = new Date(_jan4);
+  _mandag.setDate(_jan4.getDate() - ((_jan4.getDay() + 6) % 7) + (d.maal_uge - 1) * 7);
+
+  const DAG_IDX = {man:0,tir:1,ons:2,tor:3,fre:4,loe:5,son:6};
+
+  const thDage = DAGE.map(dag => {
+    const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.12);' : '';
+    const dagD  = new Date(_mandag);
+    dagD.setDate(_mandag.getDate() + DAG_IDX[dag]);
+    const ds    = dagD.toISOString().slice(0,10);
+    const vDag  = _vejrFc[ds];
+    let vejrHtml = '';
+    if (vDag) {
+      const j    = vDag.juster || {};
+      const fv   = j.farve;
+      const ikon = vDag.ikon || '';
+      const pct  = j.faktor ? Math.round((j.faktor - 1) * 100) : 0;
+      const clr  = fv === 'red' ? 'color:#c0392b;' : fv === 'orange' ? 'color:#e67e22;' : fv === 'green' ? 'color:var(--moss);' : '';
+      vejrHtml = `<br><span style="font-size:9px;${clr}font-weight:400;" title="${vDag.tmax}° · ${vDag.prec}mm · ${j.label||''}">${ikon}${pct !== 0 ? (pct>0?'+':'')+pct+'%' : ''}</span>`;
+    }
+    return `<th class="num" style="${wkBg}">${DAG_LBL[dag]}${vejrHtml}</th>`;
+  }).join('');
 
   // Gruppér produkter efter kategori
   const groups = {};

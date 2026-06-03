@@ -4248,8 +4248,9 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       const d = new Date(dagDato);
       const DAGE = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
       const MND  = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+      const klTxt = kpi.seneste_time != null ? ' · kl. ' + String(kpi.seneste_time).padStart(2,'0') + ':00' : '';
       document.getElementById('hdr-dag-dato').textContent =
-        DAGE[d.getUTCDay()] + ' ' + d.getUTCDate() + '. ' + MND[d.getUTCMonth()];
+        DAGE[d.getUTCDay()] + ' ' + d.getUTCDate() + '. ' + MND[d.getUTCMonth()] + klTxt;
     }
 
     // Omsætning

@@ -7670,8 +7670,8 @@ async function loadBernUge(uge, aar) {
     return;
   }
 
-  // Hvis basis_bestilling findes, brug den som basis og anvend SI + trend
-  if (basisData.length > 0) {
+  // Kun anvend basis-justering for fremtidige/aktuelle uger — faktiske bestillinger holdes urørte
+  if (basisData.length > 0 && !d.faktisk) {
     const basisMap = {};
     basisData.forEach(row => {
       if (!basisMap[row.varenavn]) basisMap[row.varenavn] = {};

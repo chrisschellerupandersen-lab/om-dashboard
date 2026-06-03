@@ -2974,42 +2974,29 @@ def _events_for_aar(aar: int) -> Dict:
             "dag_fak": {"man":1.25,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
         }
 
-    # ── Grundlovsdag (5. juni — oftest fredag) ───────────────────────────
+    # ── Grundlovsdag + Fars dag (5. juni — i Danmark fejres Fars dag på Grundlovsdag) ──
     grundlov = _date(aar, 6, 5)
     gw, gy = _yw(grundlov)
+    # Grundlovsdag er typisk en fredag — stærk dag. Fars dag løfter lørdagen yderligere.
+    dag_fak_gf = {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.30,"son":1.10}
     if (gw, gy) not in ev:
         ev[(gw, gy)] = {
-            "factor": 1.25,
-            "navn": f"Grundlovsdag ({_dname(grundlov)}. jun.)",
-            "note": "Fredag fridag — årets bedste bagværksdag",
-            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.20,"son":1.0},
+            "factor": 1.30,
+            "navn": f"Grundlovsdag + Fars dag (5. jun.)",
+            "note": "Fredag fridag + Fars dag — ekstra kage og brød fredag og lørdag",
+            "dag_fak": dag_fak_gf,
         }
     else:
         existing = dict(ev[(gw, gy)])
         existing["dag_fak"] = dict(existing["dag_fak"])
-        existing["dag_fak"]["fre"] = max(existing["dag_fak"].get("fre", 1.0), 1.50)
-        existing["factor"] = max(existing["factor"], 1.15)
-        existing["navn"] = existing["navn"] + " + Grundlovsdag"
-        ev[(gw, gy)] = existing
-
-    # ── Fars dag (anden søndag i juni — dansk tradition) ─────────────────
-    fars = _anden_soendag_i_maaned(aar, 6)
-    fw, fy = _yw(fars)
-    if (fw, fy) not in ev:
-        ev[(fw, fy)] = {
-            "factor": 1.10,
-            "navn": f"Fars dag ({_dname(fars)}. jun.)",
-            "note": "Ekstra søndag — kage og brød",
-            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.05,"loe":1.10,"son":1.30},
-        }
-    else:
-        existing = dict(ev[(fw, fy)])
-        existing["dag_fak"] = dict(existing["dag_fak"])
-        existing["dag_fak"]["son"] = max(existing["dag_fak"].get("son", 1.0), 1.25)
-        existing["factor"] = max(existing["factor"], 1.10)
-        if "Fars dag" not in existing.get("navn", ""):
+        existing["dag_fak"]["fre"] = max(existing["dag_fak"].get("fre", 1.0), 1.60)
+        existing["dag_fak"]["loe"] = max(existing["dag_fak"].get("loe", 1.0), 1.30)
+        existing["factor"] = max(existing["factor"], 1.25)
+        if "Grundlovsdag" not in existing.get("navn", ""):
+            existing["navn"] = existing["navn"] + " + Grundlovsdag + Fars dag"
+        elif "Fars dag" not in existing.get("navn", ""):
             existing["navn"] = existing["navn"] + " + Fars dag"
-        ev[(fw, fy)] = existing
+        ev[(gw, gy)] = existing
 
     # ── Juleugen (uge med juledag 25. dec.) ─────────────────────────────
     juledag = _date(aar, 12, 25)

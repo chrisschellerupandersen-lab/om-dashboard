@@ -4832,8 +4832,12 @@ SALGSTREND: {trend_str}
 Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.
 
 1. DAGSVURDERING — er de foreslåede dagsmængder rigtige?
-   Tag højde for: ugedag (fre/lør stærke, man/tir svage), vejr, begivenhed, sæson.
-   Format: "Man {dag_totaler.get('Man', dag_totaler.get('man','?')) if dag_totaler else '?'} stk — [vurdering]"
+   VIGTIGT: For HVER dag der har vejrjustering (se VEJR-sektionen ovenfor), SKAL du nævne:
+   - Nedbørsmængden (mm)
+   - Den anbefalede % justering
+   - Det konkrete justerede antal stk
+   Skriv ALDRIG "normalt vejr" på en dag der har nedbør >1mm — brug de faktiske vejrtal.
+   Format: "Man {dag_totaler.get('Man', dag_totaler.get('man','?')) if dag_totaler else '?'} stk — [vurdering inkl. vejrtal hvis regn]"
 
 2. VEJR & BEGIVENHED — hvilke dage i den kommende uge kræver særlig opmærksomhed?
    Regn reducerer kundeflow. Begivenheder kan løfte markant. Vær specifik.

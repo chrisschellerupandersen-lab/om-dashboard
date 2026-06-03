@@ -7523,7 +7523,8 @@ function _spildNav(retning) {
 let _vejrData = null;
 
 async function vejrLoad() {
-  if (_vejrData) return _vejrData;
+  // Hent vejr igen hvis cached data er tom
+  if (_vejrData && _vejrData.forecast && Object.keys(_vejrData.forecast).length > 0) return _vejrData;
   try {
     _vejrData = await api('/api/vejr/forecast');
   } catch(e) { _vejrData = { forecast: {} }; }

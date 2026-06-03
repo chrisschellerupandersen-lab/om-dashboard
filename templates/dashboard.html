@@ -1018,7 +1018,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
           <!-- Sammenligninger vs. forrige uge (samme time) -->
           <div class="ov-banner-cmp" id="new-ov-vs-forrige-uge">
-            <div>vs. forrige uge (KL —): OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>
+            <div>vs. forrige uge (KL <span id="new-ov-cmp-kl">—</span>): OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>
           </div>
         </div>
 
@@ -3624,6 +3624,13 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       const el8 = document.getElementById('new-ov-kurv');
       if (el8 && dag.omsaetning != null && dag.transak > 0) {
         el8.textContent = Math.round(dag.omsaetning / dag.transak).toLocaleString('da-DK') + ' kr';
+      }
+
+      // Sæt aktuel tid i KL-feltet
+      const klEl = document.getElementById('new-ov-cmp-kl');
+      if (klEl) {
+        const nu = new Date();
+        klEl.textContent = String(nu.getHours()).padStart(2,'0') + ':' + String(nu.getMinutes()).padStart(2,'0');
       }
 
       // Sammenligninger (spans som allerede eksisterer i HTML)

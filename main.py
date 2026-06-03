@@ -826,14 +826,8 @@ async def api_beregner_kontekst(request: Request):
         aar  = int(body.get("aar", 0))
         dag_totaler = body.get("dag_totaler", {})
         produkter   = body.get("produkter", [])
-        vejr_js     = body.get("vejr", {})
-        # Brug JS vejr-cache (fra strip) hvis den har data for den relevante uge
-        # Ellers fallback til server-cache — begge kan have forskellig alder
-        from datetime import date, timedelta
-        mon_check = date.fromisocalendar(uge, uge, 1) if False else date.fromisocalendar(aar, uge, 1)
-        mon_str   = mon_check.isoformat()
-        js_har_data = bool(vejr_js.get("forecast", {}).get(mon_str))
-        vejr = vejr_js if js_har_data else database.hent_vejr_forecast()
+        # Brug altid JS vejr — det er hvad brugeren ser i strip'en
+        vejr = body.get("vejr", {})
         return database.generer_beregner_kontekst(uge, aar, api_key, dag_totaler, produkter, vejr)
     except Exception as e:
         return {"ok": False, "fejl": str(e)}

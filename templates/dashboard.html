@@ -8264,9 +8264,7 @@ async function bernHentKontekst() {
 
   const { dag_totaler, produkter } = _bernLaesTabelData();
 
-  // Tving frisk vejr fra Open-Meteo (nulstil begge caches) — strip og AI bruger samme data
-  _vejrData = null; _vejrTs = 0;
-  try { await api('/api/vejr/forecast?force=true'); } catch(e) {}
+  // Sørg for vejr er indlæst — brug det der vises i strip'en (AI og strip skal matche)
   await vejrLoad();
   vejrVisUge(_bernUge, _bernAar);
 

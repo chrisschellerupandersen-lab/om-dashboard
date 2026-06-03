@@ -989,6 +989,39 @@ Vær direkte og konkret. Brug tal. Maks 200 ord."""
         return {"analyse": None, "fejl": str(e)}
 
 
+@app.post("/api/bestilling/eksport-dom")
+async def api_bestilling_eksport_dom(request: Request):
+    """Eksporter Excel med præcis de tal der vises i beregneren (inkl. vejr og rettelser)."""
+    _kræv_login(request)
+    body = await request.json()
+    uge  = int(body.get("uge", 0))
+    aar  = int(body.get("aar", 0))
+    dom_produkter = body.get("produkter", [])  # [{varenummer, man, tir, ...}]
+
+    # Hent basis-data for metadata (varenavn, pris, kategori osv.)
+    d = database.hent_bestillings_uge(uge, aar)
+    if "fejl" in d or "error" in d:
+        raise HTTPException(status_code=404, detail=str(d))
+
+    # Erstat anbefalet-værdier med DOM-værdier
+    DAGE = ['man','tir','ons','tor','fre','loe','son']
+    dom_map = {str(p.get("varenummer","")): p for p in dom_produkter}
+    for prod in d.get("produkter", []):
+        vn = str(prod.get("varenummer",""))
+        if vn in dom_map:
+            dom = dom_map[vn]
+            prod["anbefalet"] = {dag: int(dom.get(dag, 0) or 0) for dag in DAGE}
+            prod["total_anbefalet"] = sum(prod["anbefalet"].values())
+
+    xlsx_bytes = _byg_bestilling_xlsx(d)
+    filename = f"Bestilling uge {uge} {aar}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @app.get("/api/bestilling/eksport")
 async def api_bestilling_eksport(
     request: Request,

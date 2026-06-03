@@ -8071,7 +8071,7 @@ async function loadBernUge(uge, aar) {
         <span class="aar2-tbl-hdr-l">Baseret på uge ${d.basis_uge} · grøn/rød = forskel vs. udgangspunkt</span>
         <span class="aar2-tbl-hdr-r">
           ${d.total_stk.toLocaleString('da-DK')} stk · ${Math.round(d.total_kr).toLocaleString('da-DK')} kr
-          &nbsp;<a href="${eksportUrl}" download style="margin-left:10px;padding:3px 10px;background:var(--forest);color:#fff;border-radius:4px;font-size:11px;text-decoration:none;font-weight:600;">↓ Excel</a>
+          &nbsp;<button onclick="bernEksporter()" style="margin-left:10px;padding:3px 10px;background:var(--forest);color:#fff;border-radius:4px;font-size:11px;border:none;cursor:pointer;font-weight:600;">↓ Excel</button>
         </span>
       </div>
       <div style="overflow-x:auto;">
@@ -8094,6 +8094,36 @@ async function loadBernUge(uge, aar) {
     <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
 
   _bernBusy = false;
+}
+
+async function bernEksporter() {
+  // Læs præcis hvad der vises i tabellen (inkl. vejr og manuelle rettelser)
+  const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+  const produkter = [];
+  document.querySelectorAll('#beregner-tabel tr[data-vn]').forEach(row => {
+    const vn = row.dataset.vn;
+    const dagVals = {};
+    row.querySelectorAll('.bern-cell').forEach(cell => {
+      const dag = cell.dataset.dag;
+      const txt = [...cell.childNodes].find(n => n.nodeType === 3)?.textContent || '0';
+      dagVals[dag] = parseInt(txt.trim()) || 0;
+    });
+    if (vn) produkter.push({ varenummer: vn, ...dagVals });
+  });
+
+  const res = await fetch('/api/bestilling/eksport-dom', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uge: _bernUge, aar: _bernAar, produkter })
+  });
+  if (!res.ok) { alert('Eksport fejlede'); return; }
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `Bestilling uge ${_bernUge} ${_bernAar}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function loadBeregner() {

@@ -318,6 +318,29 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-val.dn,.kpi-v.dn,.ov-combo-chg.dn{color:var(--danger);}
 .ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
 
+/* ── SENESTE DAG: STORE RINGE ───────────────────────────────────────────────── */
+.dag-kpi-row { grid-template-columns: repeat(4,1fr) !important; }
+.dag-kpi { background: var(--white) !important; border-color: rgba(30,58,30,.08) !important;
+           border-left-color: rgba(30,58,30,.08) !important; align-items: center; text-align: center; }
+.dag-kpi .kpi-l, .dag-kpi-lbl {
+  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ash); margin-bottom:12px; font-weight:500; line-height:1.4;
+}
+.dag-ring-wrap { position:relative; width:110px; height:110px; margin:0 auto 10px; }
+.dag-ring-svg  { width:100%; height:100%; }
+.dag-ring-inner { position:absolute; inset:0; display:flex; flex-direction:column;
+                  align-items:center; justify-content:center; gap:2px; }
+.dag-ring-val  { font-size:18px; font-weight:600; color:var(--charcoal); line-height:1; }
+.dag-ring-sub  { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); }
+.dag-kpi-ref   { font-size:11px; color:var(--ash); margin-top:4px; }
+.dag-ring-val.up { color: var(--moss); }
+.dag-ring-val.dn { color: var(--danger); }
+@media (max-width:768px) {
+  .dag-kpi-row { grid-template-columns: 1fr 1fr !important; }
+  .dag-ring-wrap { width:90px; height:90px; }
+  .dag-ring-val { font-size:15px; }
+}
+
 /* ── KOMBINEREDE OVERBLIK KPI-KORT ─────────────────────────────────────────── */
 .ov-combo-grid {
   display: grid;
@@ -1298,36 +1321,70 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Seneste dag · <span id="hdr-dag-dato" style="font-weight:400;color:var(--ash);">—</span></h2>
           <p id="hdr-dag-sub">Omsætning, kunder og avance for dagen · sammenligning med samme dag forrige uge</p>
         </div>
-        <div class="kpi-row">
+        <div class="kpi-row dag-kpi-row">
 
           <!-- Omsætning -->
-          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
-            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning (ekskl. moms)</div>
-            <div class="kpi-v" id="dag-omsat" style="color:var(--amber);font-size:28px;">—</div>
-            <div class="kpi-s" id="dag-omsat-ref" style="color:rgba(255,255,255,.55);">forrige uge: —</div>
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Omsætning</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-omsat">—</div>
+                <div class="dag-ring-sub">ekskl. moms</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-omsat-ref">forrige uge: —</div>
           </div>
 
           <!-- Kunder -->
-          <div class="kpi">
-            <div class="kpi-l">Kunder i dag</div>
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-transak" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-transak">—</div></div></div>
-            <div class="kpi-s" id="dag-snit-kurv">— kr/kurv</div>
-            <div class="kpi-s" id="dag-transak-ref" style="margin-top:2px;font-size:10px;">forrige uge: —</div>
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Kunder</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-transak" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-transak">—</div>
+                <div class="dag-ring-sub" id="dag-snit-kurv">— kr/kurv</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-transak-ref">forrige uge: —</div>
           </div>
 
-          <!-- Dækningsbidrag -->
-          <div class="kpi">
-            <div class="kpi-l">Dækningsbidrag % · <span style="color:var(--ash);font-weight:400;">mål ≥35%</span></div>
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-sendag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-db">—</div></div></div>
-            <div class="kpi-s" id="dag-db-pct">— % · — kr DB</div>
-            <div class="kpi-s" id="dag-db-maal" style="margin-top:2px;font-size:11px;">—</div>
+          <!-- DB% -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Dækningsbidrag <span style="color:var(--ash);font-size:10px;font-weight:400;">mål ≥35%</span></div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-sendag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-db">—</div>
+                <div class="dag-ring-sub" id="dag-db-pct">— kr DB</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-db-maal">—</div>
           </div>
 
-          <!-- vs. forrige uge -->
-          <div class="kpi">
-            <div class="kpi-l">vs. samme dag forrige uge</div>
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-vs-snit">—</div></div></div>
-            <div class="kpi-s" id="dag-vs-sub">forrige uge: — kr</div>
+          <!-- vs forrige uge -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">vs. samme dag forrige uge</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-vs-snit">—</div>
+                <div class="dag-ring-sub">omsætning</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-vs-sub">forrige uge: — kr</div>
           </div>
 
         </div>

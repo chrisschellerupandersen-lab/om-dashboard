@@ -4516,6 +4516,28 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
             WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 12
         """, (prev_uge, prev_aar)).fetchall()
 
+        # Sidst-solgt tidspunkt per vare (seneste 4 uger) — indikator for udsolgt vs. overskud
+        # Lukketid er typisk kl. 18. Sidst solgt kl. 11 = sandsynligvis udsolgt tidligt.
+        sidst_solgt_rows = conn.execute("""
+            SELECT varenavn,
+                   ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
+                   COUNT(DISTINCT dato) AS dage_med_salg
+            FROM (
+                SELECT dato, varenavn, MAX(time_start) AS sidst_time
+                FROM transaktioner
+                WHERE dato >= date(?, '-28 days') AND dato < ?
+                  AND time_start BETWEEN 6 AND 19
+                  AND antal > 0
+                GROUP BY dato, varenavn
+            )
+            GROUP BY varenavn
+            HAVING dage_med_salg >= 3
+            ORDER BY snit_sidst_time ASC
+        """, (mon.isoformat(), mon.isoformat())).fetchall()
+        # Klassificer: sidst solgt < 12 = sandsynligvis udsolgt, > 16 = typisk overskud
+        udsolgt_tidligt = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] < 12]
+        overskud_sent   = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] > 16]
+
         # Trend 8 uger
         trend_rows = conn.execute("""
             SELECT MIN(dato) AS uge_start, SUM(omsætning) AS oms
@@ -4720,6 +4742,11 @@ Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød returneret
 TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (4-ugers snit: {tgtg_snit:,} kr · mål: <800 kr)
 
 SALGSTREND: {trend_str}
+
+─── SALGSMØNSTER: HVORNÅR STOPPER VI MED AT SÆLGE? (seneste 4 uger) ───
+{'SANDSYNLIGVIS UDSOLGT TIDLIGT (sidst solgt før kl. 12 i snit):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in udsolgt_tidligt[:8]) if udsolgt_tidligt else '  Ingen varer der konsekvent sælger ud tidligt'}
+
+{'TYPISK OVERSKUD (sidst solgt efter kl. 16 i snit — har varer til lukketid):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in overskud_sent[:8]) if overskud_sent else '  Ingen varer med konsekvent overskud'}
 
 ─── DIN BESTILLINGSOPGAVE (4 afsnit) ───
 Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.

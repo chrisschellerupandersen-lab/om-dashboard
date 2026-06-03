@@ -1333,7 +1333,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </svg>
               <div class="dag-ring-inner">
                 <div class="dag-ring-val" id="dag-omsat">—</div>
-                <div class="dag-ring-sub">ekskl. moms</div>
+                <div class="dag-ring-sub" id="dag-omsat-moms">inkl. moms</div>
               </div>
             </div>
             <div class="dag-kpi-ref" id="dag-omsat-ref">forrige uge: —</div>
@@ -4252,6 +4252,8 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
 
     // Omsætning
     document.getElementById('dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    const momsEl = document.getElementById('dag-omsat-moms');
+    if (momsEl) momsEl.textContent = MOMS_EX ? 'ekskl. moms' : 'inkl. moms';
     if (prevDag.omsaetning > 0) {
       const pct = ((dag.omsaetning / prevDag.omsaetning) - 1) * 100;
       document.getElementById('dag-omsat-ref').textContent =

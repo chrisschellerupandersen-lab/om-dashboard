@@ -2228,6 +2228,23 @@ async def api_morgenbriefing_ai(request: Request):
     except Exception:
         tgtg_kr = 0
 
+    # Forrige uge total + 4-ugers snit
+    prev_uge_oms = round((kpi.get("prev_uge") or {}).get("omsaetning", 0) / 1.25) if kpi.get("prev_uge") else 0
+    snit_4u = 0
+    try:
+        with database._conn() as conn:
+            snit_r = conn.execute("""
+                SELECT ROUND(AVG(uge_oms)/1.25, 0) AS snit FROM (
+                    SELECT strftime('%Y-%W', dato) AS yw, SUM(omsætning) AS uge_oms
+                    FROM transaktioner
+                    WHERE dato < date(?, 'weekday 1', '-7 days')
+                    GROUP BY yw ORDER BY yw DESC LIMIT 4
+                )
+            """, (today.isoformat(),)).fetchone()
+            snit_4u = int(snit_r["snit"] or 0) if snit_r else 0
+    except Exception:
+        pass
+
     vejr_kontekst = ""
     try:
         vejr_d = database.hent_vejr_forecast()
@@ -2276,7 +2293,8 @@ DATO I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}
 DATA:
 - Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
 - Kunder: {dag_kunder} · DB%: {dag_db_pct:.1f}%
-- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage)
+- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage){f' — forrige uge samme periode: {round(prev_uge_oms * spild_d.get("n_dage",0) / 7):,} kr' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
+- Forrige uge total: {prev_uge_oms:,} kr · 4-ugers snit: {snit_4u:,} kr/uge{f' (denne uge tracker {round((wtd_oms/(prev_uge_oms*spild_d.get("n_dage",1)/7)-1)*100):+}% vs. samme punkt forrige uge)' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
 - Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
 {f'- Vejr i dag: {vejr_kontekst}' if vejr_kontekst else ''}
 {f'- Begivenhed uge {uge}: {evt["navn"]} — {evt_timing}' if evt else '- Ingen begivenhed denne uge'}

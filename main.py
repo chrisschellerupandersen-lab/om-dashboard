@@ -2002,7 +2002,132 @@ async def api_gmail_status(request: Request):
     return {"ok": True, "status": status, "har_token": har_token}
 
 
+
+# ── MORGENBRIEFING ────────────────────────────────────────────────────────────
+
+@app.get("/api/dashboard/morgenbriefing")
+async def api_morgenbriefing(request: Request):
+    _kræv_login(request)
+    from datetime import date, timedelta, datetime as _dt
+    today      = date.today()
+    iso        = today.isocalendar()
+    uge, aar   = iso[1], iso[0]
+    ugedag     = today.weekday()  # 0=man ... 6=søn
+
+    # Dage til næste torsdag (bestillings-deadline)
+    if ugedag <= 3:   # man-tor: denne uges torsdag
+        dage_til_tor = 3 - ugedag
+    else:             # fre-søn: næste uges torsdag
+        dage_til_tor = 7 - ugedag + 3
+
+    # Har vi allerede uge+1-bestilling klar?
+    naeste_uge  = uge + 1 if uge < 52 else 1
+    naeste_aar  = aar if uge < 52 else aar + 1
+    try:
+        naeste_d = database.hent_bestillings_uge(naeste_uge, naeste_aar)
+        bestilling_klar = naeste_d.get("faktisk", False) or (naeste_d.get("total_stk", 0) > 0)
+    except Exception:
+        bestilling_klar = False
+
+    # KPI data (dag + uge)
+    try:
+        kpi = database.hent_kpi(aar=aar)
+    except Exception:
+        kpi = {}
+
+    dag      = kpi.get("dag")      or {}
+    prev_dag = kpi.get("prev_dag") or {}
+    uge_data = kpi.get("uge")      or {}
+    prev_uge = kpi.get("prev_uge") or {}
+    mtd      = kpi.get("mtd")      or {}
+
+    # WTD (week-to-date)
+    wtd_oms  = uge_data.get("omsaetning") or 0
+    wtd_db   = uge_data.get("db_kr")      or 0
+    wtd_dbpct= uge_data.get("db_pct")     or 0
+
+    # Spild denne uge
+    try:
+        spild_d = database.hent_spild_uge_overblik(uge, aar)
+    except Exception:
+        spild_d = {}
+
+    # TGTG denne uge
+    try:
+        man_dato = date.fromisocalendar(aar, uge, 1)
+        son_dato = man_dato + timedelta(days=6)
+        with database._conn() as conn:
+            tgtg_uge = conn.execute("""
+                SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
+                FROM tgtg_dagssalg
+                WHERE dato >= date(?, '+1 day') AND dato <= date(?, '+1 day')
+            """, (man_dato.isoformat(), son_dato.isoformat())).fetchone()
+        tgtg_kr    = round(tgtg_uge["kr"]    or 0) if tgtg_uge else 0
+        tgtg_poser = int(tgtg_uge["poser"] or 0)   if tgtg_uge else 0
+    except Exception:
+        tgtg_kr = tgtg_poser = 0
+
+    # Vejr
+    try:
+        vejr = database.hent_vejr_forecast()
+    except Exception:
+        vejr = {"forecast": {}}
+
+    # Næste event
+    try:
+        evt = database._get_event(naeste_uge, naeste_aar) or database._get_event(uge, aar)
+    except Exception:
+        evt = None
+
+    # Vs. forrige uge
+    dag_oms      = dag.get("omsaetning")  or 0
+    prev_dag_oms = prev_dag.get("omsaetning") or 0
+    dag_pct      = round((dag_oms / prev_dag_oms - 1) * 100) if prev_dag_oms > 0 else None
+
+    dag_db_pct   = dag.get("db_pct") or 0
+    dag_kunder   = dag.get("transak") or 0
+    dag_kurv     = round(dag_oms / dag_kunder) if dag_kunder > 0 else 0
+
+    DAGE_DA = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"]
+    MND_DA  = ["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"]
+
+    return {
+        "ok":            True,
+        "dato":          today.isoformat(),
+        "dato_label":    f"{DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]}",
+        "uge":           uge, "aar": aar,
+        "ugedag":        ugedag,
+        "dage_til_tor":  dage_til_tor,
+        "bestilling_klar": bestilling_klar,
+        "naeste_uge":    naeste_uge,
+        # Dag
+        "dag_oms":       round(dag_oms / 1.25),  # ex moms
+        "dag_db_pct":    round(dag_db_pct, 1),
+        "dag_kunder":    dag_kunder,
+        "dag_kurv":      dag_kurv,
+        "dag_pct":       dag_pct,
+        "dag_dato":      dag.get("dato"),
+        # WTD
+        "wtd_oms":       round(wtd_oms / 1.25),
+        "wtd_db_pct":    round(wtd_dbpct, 1) if wtd_dbpct else None,
+        "wtd_dage":      spild_d.get("n_dage", 0),
+        # TGTG
+        "tgtg_kr":       tgtg_kr,
+        "tgtg_poser":    tgtg_poser,
+        "tgtg_ok":       tgtg_kr < 800,
+        "tgtg_advarsel": tgtg_kr > 1200,
+        # Spild
+        "spild_pct":     spild_d.get("svind_pct"),
+        "spild_ok":      (spild_d.get("svind_pct") or 0) < 15,
+        # Vejr
+        "vejr":          vejr,
+        # Event
+        "evt":           evt,
+    }
+
+
 # ── SALGSMØNSTER ─────────────────────────────────────────────────────────────
+
 
 @app.get("/api/salg/sidst-solgt")
 async def api_sidst_solgt(request: Request, uger: int = 4):

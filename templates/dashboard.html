@@ -994,6 +994,103 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
     <div class="content">
 
+      <!-- MORGENBRIEFING -->
+      <div class="panel" id="p-morgenbriefing" style="padding:0;">
+        <!-- Header -->
+        <div id="mb-hdr" style="background:var(--forest);padding:20px 28px 16px;border-radius:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:rgba(200,168,75,.6);text-transform:uppercase;">Organic Market Greve</div>
+              <div style="font-size:22px;font-weight:500;color:#fff;margin-top:2px;" id="mb-dato-label">—</div>
+            </div>
+            <div id="mb-deadline-badge" style="display:none;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;padding:6px 16px;text-align:center;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(200,168,75,.7);letter-spacing:.08em;">BESTILLING UGE <span id="mb-naeste-uge">—</span></div>
+              <div style="font-size:13px;font-weight:600;color:var(--amber);" id="mb-deadline-txt">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:20px 28px 40px;">
+
+          <!-- ZONE 1: DAG STATUS -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Status i dag</div>
+          <div class="mb-kpi-row" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:10px;margin-bottom:24px;">
+
+            <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+              <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning · ekskl. moms</div>
+              <div class="kpi-v" id="mb-dag-oms" style="color:var(--amber);font-size:28px;">—</div>
+              <div class="kpi-s" id="mb-dag-oms-sub" style="color:rgba(255,255,255,.5);">vs. forrige uge: —</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-l">Dækningsbidrag <span style="color:var(--ash);font-weight:400;">mål ≥35%</span></div>
+              <div class="kpi-v" id="mb-dag-db" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-dag-db-sub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-l">Kunder i dag</div>
+              <div class="kpi-v" id="mb-dag-kunder" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-dag-kurv">— kr/kurv</div>
+            </div>
+
+            <div class="kpi" id="mb-spild-kpi">
+              <div class="kpi-l">Spild denne uge</div>
+              <div class="kpi-v" id="mb-spild" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-spild-sub">mål: under 15%</div>
+            </div>
+          </div>
+
+          <!-- ZONE 2: UGENS PULS -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Ugens puls · <span id="mb-uge-label">uge —</span></div>
+          <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 18px;margin-bottom:24px;">
+            <!-- Progress bar -->
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:5px;">
+                <span>Man</span><span>Tir</span><span>Ons</span><span>Tor</span><span>Fre</span><span>Lør</span><span>Søn</span>
+              </div>
+              <div style="height:6px;background:rgba(30,58,30,.1);border-radius:3px;overflow:hidden;">
+                <div id="mb-uge-progress" style="height:100%;background:var(--forest);border-radius:3px;transition:width .5s;width:0%;"></div>
+              </div>
+            </div>
+            <!-- Uge KPI'er -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">WTD OMSÆTNING</div>
+                <div style="font-size:18px;font-weight:500;color:var(--charcoal);" id="mb-wtd-oms">—</div>
+                <div style="font-size:10px;color:var(--ash);" id="mb-wtd-dage">— dage</div>
+              </div>
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">TGTG DENNE UGE</div>
+                <div style="font-size:18px;font-weight:500;" id="mb-tgtg-kr">—</div>
+                <div style="font-size:10px;" id="mb-tgtg-sub">mål: under 800 kr</div>
+              </div>
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">DB% DENNE UGE</div>
+                <div style="font-size:18px;font-weight:500;" id="mb-wtd-db">—</div>
+                <div style="font-size:10px;color:var(--ash);">dækningsbidrag</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ZONE 3: VEJR + EVENT -->
+          <div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-bottom:24px;align-items:start;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Kommende dage</div>
+              <div id="mb-vejr-strip" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;"></div>
+            </div>
+            <div id="mb-evt-box" style="display:none;background:rgba(30,58,30,.06);border:1px solid rgba(30,58,30,.12);border-radius:10px;padding:12px 16px;min-width:160px;text-align:center;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Begivenhed</div>
+              <div style="font-size:13px;font-weight:600;color:var(--forest);" id="mb-evt-navn">—</div>
+              <div style="font-size:11px;color:var(--ash);margin-top:3px;" id="mb-evt-note">—</div>
+            </div>
+          </div>
+
+          <!-- Opdater knap -->
+          <button onclick="mbLoad(true)" style="background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:6px;padding:5px 14px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+      </div>
+
       <!-- FORSIDE -->
       <div class="panel active" id="p-forside">
         <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
@@ -3232,6 +3329,7 @@ const NAV_SVG = {
   hjaelp:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm.25-3.2c0 .4-.3.7-.7.7H7.7a.7.7 0 01-.7-.7v-.3c0-1 .6-1.7 1.3-2.1.4-.2.7-.6.7-1 0-.6-.4-1-1-1s-1 .4-1 1H5.5C5.5 4 6.6 3 8 3s2.5 1 2.5 2.3c0 .9-.5 1.7-1.3 2.1-.3.2-.5.5-.5.9h.3v.02z"/>',
 };
 const NAV_DEFAULT = [
+  {id:'morgenbriefing', label:'Morgenbriefing',        group:'Dagsoverblik',        hidden:false},
   {id:'forside',     label:'Overblik',              group:'Dagsoverblik',        hidden:false},
   {id:'management',  label:'Management Review',     group:'Dagsoverblik',        hidden:false},
   {id:'dag',         label:'Seneste dag',           group:'Dagsoverblik',        hidden:false},
@@ -7544,6 +7642,107 @@ function _datoStr(d) {
   return `${y}-${m}-${dd}`;
 }
 
+// ── MORGENBRIEFING ───────────────────────────────────────────────────────────
+let _mbLoaded = false;
+
+async function mbLoad(force = false) {
+  if (_mbLoaded && !force) return;
+  const d = await api('/api/dashboard/morgenbriefing');
+  if (!d || !d.ok) return;
+  _mbLoaded = true;
+
+  const dk  = v => Math.round(v).toLocaleString('da-DK') + ' kr';
+  const pct = (v, plus=true) => v == null ? '—' : (plus && v >= 0 ? '+' : '') + v.toFixed(0) + '%';
+  const clr = (ok, warn) => ok ? 'var(--moss)' : warn ? 'var(--danger)' : 'var(--gold)';
+
+  // Header
+  document.getElementById('mb-dato-label').textContent = d.dato_label;
+
+  // Deadline badge
+  const badge = document.getElementById('mb-deadline-badge');
+  document.getElementById('mb-naeste-uge').textContent = d.naeste_uge;
+  if (d.dage_til_tor === 0) {
+    document.getElementById('mb-deadline-txt').textContent = '⚡ BESTIL I DAG!';
+    document.getElementById('mb-deadline-txt').style.color = 'var(--danger)';
+    badge.style.display = '';
+  } else if (d.dage_til_tor <= 2) {
+    document.getElementById('mb-deadline-txt').textContent = `${d.dage_til_tor} dage til deadline`;
+    badge.style.display = '';
+  }
+
+  // Zone 1: Dag
+  document.getElementById('mb-dag-oms').textContent = d.dag_oms > 0 ? dk(d.dag_oms) : '—';
+  if (d.dag_pct != null) {
+    const el = document.getElementById('mb-dag-oms-sub');
+    el.textContent = `vs. forrige uge: ${pct(d.dag_pct)}`;
+    el.style.color = d.dag_pct >= 0 ? 'rgba(200,168,75,.7)' : 'rgba(255,100,100,.7)';
+  }
+
+  const dbEl = document.getElementById('mb-dag-db');
+  dbEl.textContent = d.dag_db_pct > 0 ? d.dag_db_pct.toFixed(1) + '%' : '—';
+  dbEl.style.color = d.dag_db_pct >= 35 ? 'var(--moss)' : d.dag_db_pct >= 28 ? 'var(--gold)' : d.dag_db_pct > 0 ? 'var(--danger)' : 'var(--charcoal)';
+  document.getElementById('mb-dag-db-sub').textContent = d.dag_db_pct >= 35 ? '✓ Over mål' : d.dag_db_pct >= 28 ? '~ Tæt på mål' : d.dag_db_pct > 0 ? '✗ Under mål' : '';
+
+  document.getElementById('mb-dag-kunder').textContent = d.dag_kunder || '—';
+  document.getElementById('mb-dag-kurv').textContent = d.dag_kurv > 0 ? d.dag_kurv.toLocaleString('da-DK') + ' kr/kurv' : '— kr/kurv';
+
+  const spEl = document.getElementById('mb-spild');
+  spEl.textContent = d.spild_pct != null ? d.spild_pct.toFixed(1) + '%' : '—';
+  spEl.style.color = d.spild_ok ? 'var(--moss)' : d.spild_pct < 22 ? 'var(--gold)' : 'var(--danger)';
+  document.getElementById('mb-spild-sub').textContent = d.spild_ok ? '✓ Godt (under 15%)' : d.spild_pct < 22 ? '~ Hold øje' : '⚠ For højt';
+
+  // Zone 2: Uge
+  document.getElementById('mb-uge-label').textContent = `uge ${d.uge}/${d.aar}`;
+  const progress = Math.min(100, Math.round((d.wtd_dage / 7) * 100));
+  document.getElementById('mb-uge-progress').style.width = progress + '%';
+  document.getElementById('mb-wtd-oms').textContent = d.wtd_oms > 0 ? dk(d.wtd_oms) : '—';
+  document.getElementById('mb-wtd-dage').textContent = `${d.wtd_dage} dage med data`;
+
+  const tgtgEl = document.getElementById('mb-tgtg-kr');
+  tgtgEl.textContent = d.tgtg_kr > 0 ? dk(d.tgtg_kr) : '0 kr';
+  tgtgEl.style.color = d.tgtg_ok ? 'var(--moss)' : d.tgtg_advarsel ? 'var(--danger)' : 'var(--gold)';
+  document.getElementById('mb-tgtg-sub').textContent = d.tgtg_ok ? `✓ ${d.tgtg_poser} poser · under mål` : `⚠ ${d.tgtg_poser} poser · over mål`;
+  document.getElementById('mb-tgtg-sub').style.color = d.tgtg_ok ? 'var(--moss)' : 'var(--danger)';
+
+  const dbUgeEl = document.getElementById('mb-wtd-db');
+  dbUgeEl.textContent = d.wtd_db_pct != null ? d.wtd_db_pct.toFixed(1) + '%' : '—';
+  dbUgeEl.style.color = (d.wtd_db_pct || 0) >= 35 ? 'var(--moss)' : (d.wtd_db_pct || 0) >= 28 ? 'var(--gold)' : 'var(--charcoal)';
+
+  // Zone 3: Vejr (næste 5 dage fra i dag)
+  const vejrFc = (d.vejr && d.vejr.forecast) ? d.vejr.forecast : {};
+  const strip  = document.getElementById('mb-vejr-strip');
+  const DAG_NAVNE = ['Søn','Man','Tir','Ons','Tor','Fre','Lør'];
+  let vejrHtml = '';
+  for (let i = 1; i <= 5; i++) {
+    const dagD = new Date();
+    dagD.setDate(dagD.getDate() + i);
+    const ds = _datoStr(dagD);
+    const v  = vejrFc[ds];
+    const dn = DAG_NAVNE[dagD.getDay()];
+    if (v) {
+      const j   = v.juster || {};
+      const fv  = j.farve;
+      const clrV = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : fv === 'green' ? 'var(--moss)' : 'var(--charcoal)';
+      const bgV  = fv === 'red' ? 'rgba(192,57,43,.06)' : fv === 'orange' ? 'rgba(230,126,34,.06)' : 'rgba(30,58,30,.04)';
+      vejrHtml += `<div style="text-align:center;padding:8px 4px;background:${bgV};border-radius:8px;border:1px solid rgba(30,58,30,.08);">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${dn}</div>
+        <div style="font-size:18px;margin:4px 0;">${v.ikon}</div>
+        <div style="font-size:12px;font-weight:600;color:var(--charcoal);">${v.tmax}°</div>
+        <div style="font-size:10px;color:${v.prec > 0 ? clrV : 'var(--ash)'};">${v.prec > 0 ? v.prec+'mm' : '—'}</div>
+        ${j.faktor && Math.abs(j.faktor-1)>=0.05 ? `<div style="font-size:9px;color:${clrV};font-weight:600;">${Math.round((j.faktor-1)*100)}%</div>` : ''}
+      </div>`;
+    }
+  }
+  strip.innerHTML = vejrHtml || '<div style="color:var(--ash);font-size:11px;">Ingen vejrdata</div>';
+
+  // Event
+  if (d.evt && d.evt.navn) {
+    document.getElementById('mb-evt-navn').textContent = d.evt.navn;
+    document.getElementById('mb-evt-note').textContent = d.evt.note || '';
+    document.getElementById('mb-evt-box').style.display = '';
+  }
+}
+
 // ── VEJR ─────────────────────────────────────────────────────────────────────
 let _vejrData = null;
 let _vejrTs   = 0;
@@ -8963,6 +9162,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
+  if (id === 'morgenbriefing') mbLoad();
   if (id === 'forside')      loadReturStatus();
   if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();

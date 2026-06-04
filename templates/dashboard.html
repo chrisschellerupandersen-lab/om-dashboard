@@ -7654,6 +7654,37 @@ function _datoStr(d) {
   return `${y}-${m}-${dd}`;
 }
 
+// Farv AI-briefing tekst med pile og farver
+function _mbFarveText(tekst) {
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let t = esc(tekst);
+
+  // +X% eller stigning → grøn pil op
+  t = t.replace(/(\+\d+[\.,]?\d*\s*%)/g,
+    '<span style="color:var(--moss);font-weight:600;">↑ $1</span>');
+
+  // -X% eller fald → rød pil ned (undgå at matche normale bindestreger)
+  t = t.replace(/(-\d+[\.,]?\d*\s*%)/g,
+    '<span style="color:var(--danger);font-weight:600;">↓ $1</span>');
+
+  // ×1.xx faktor → grøn hvis > 1
+  t = t.replace(/(×\s*[12]\s*[,\.]\s*\d+)/g, (m) => {
+    const v = parseFloat(m.replace('×','').replace(',','.'));
+    const clr = v > 1.1 ? 'var(--moss)' : v > 1.0 ? 'var(--gold)' : 'var(--danger)';
+    return `<span style="color:${clr};font-weight:600;">${m}</span>`;
+  });
+
+  // Nøgleord: under mål → grøn, over mål → rød
+  t = t.replace(/\b(under målet?|godt under|godt niveau|stærk\w*)\b/gi,
+    '<span style="color:var(--moss);font-weight:500;">$1</span>');
+  t = t.replace(/\b(over målet?|for højt?|kritisk\w*|advarsel\w*)\b/gi,
+    '<span style="color:var(--danger);font-weight:500;">$1</span>');
+
+  // Linjeskift
+  t = t.replace(/\n/g, '<br>');
+  return t;
+}
+
 // ── MORGENBRIEFING ───────────────────────────────────────────────────────────
 let _mbLoaded = false;
 
@@ -7795,7 +7826,7 @@ async function mbLoad(force = false) {
     const br = await api('/api/dashboard/briefing');
     const el = document.getElementById('mb-briefing-tekst');
     if (br && br.ok && br.tekst) {
-      el.textContent = br.tekst;
+      el.innerHTML = _mbFarveText(br.tekst);
     } else {
       el.innerHTML = '<span style="color:var(--ash);font-size:11px;">Briefing ikke tilgængelig</span>';
     }

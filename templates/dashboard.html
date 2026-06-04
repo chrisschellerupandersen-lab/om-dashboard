@@ -1073,16 +1073,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
           </div>
 
-          <!-- ZONE 3: VEJR + EVENT -->
-          <div style="display:grid;grid-template-columns:1fr auto;gap:14px;margin-bottom:24px;align-items:start;">
-            <div>
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Kommende dage</div>
-              <div id="mb-vejr-strip" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;"></div>
-            </div>
-            <div id="mb-evt-box" style="display:none;background:rgba(30,58,30,.06);border:1px solid rgba(30,58,30,.12);border-radius:10px;padding:12px 16px;min-width:160px;text-align:center;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Begivenhed</div>
-              <div style="font-size:13px;font-weight:600;color:var(--forest);" id="mb-evt-navn">—</div>
-              <div style="font-size:11px;color:var(--ash);margin-top:3px;" id="mb-evt-note">—</div>
+          <!-- ZONE 3: AI DAGSBRIEFING -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">AI dagsbriefing</div>
+          <div id="mb-briefing-boks" style="background:rgba(30,58,30,.04);border:1px solid rgba(30,58,30,.10);border-radius:12px;padding:16px 18px;margin-bottom:24px;min-height:60px;">
+            <div id="mb-briefing-tekst" style="font-size:14px;line-height:1.7;color:var(--charcoal);">
+              <span style="color:var(--ash);font-size:12px;">Henter dagsbriefing…</span>
             </div>
           </div>
 
@@ -7795,39 +7790,15 @@ async function mbLoad(force = false) {
     alertEl.style.display = '';
   }
 
-  // Zone 3: Vejr (næste 5 dage fra i dag)
-  const vejrFc = (d.vejr && d.vejr.forecast) ? d.vejr.forecast : {};
-  const strip  = document.getElementById('mb-vejr-strip');
-  const DAG_NAVNE = ['Søn','Man','Tir','Ons','Tor','Fre','Lør'];
-  let vejrHtml = '';
-  for (let i = 1; i <= 5; i++) {
-    const dagD = new Date();
-    dagD.setDate(dagD.getDate() + i);
-    const ds = _datoStr(dagD);
-    const v  = vejrFc[ds];
-    const dn = DAG_NAVNE[dagD.getDay()];
-    if (v) {
-      const j   = v.juster || {};
-      const fv  = j.farve;
-      const clrV = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : fv === 'green' ? 'var(--moss)' : 'var(--charcoal)';
-      const bgV  = fv === 'red' ? 'rgba(192,57,43,.06)' : fv === 'orange' ? 'rgba(230,126,34,.06)' : 'rgba(30,58,30,.04)';
-      vejrHtml += `<div style="text-align:center;padding:8px 4px;background:${bgV};border-radius:8px;border:1px solid rgba(30,58,30,.08);">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${dn}</div>
-        <div style="font-size:18px;margin:4px 0;">${v.ikon}</div>
-        <div style="font-size:12px;font-weight:600;color:var(--charcoal);">${v.tmax}°</div>
-        <div style="font-size:10px;color:${v.prec > 0 ? clrV : 'var(--ash)'};">${v.prec > 0 ? v.prec+'mm' : '—'}</div>
-        ${j.faktor && Math.abs(j.faktor-1)>=0.05 ? `<div style="font-size:9px;color:${clrV};font-weight:600;">${Math.round((j.faktor-1)*100)}%</div>` : ''}
-      </div>`;
+  // Zone 3: AI dagsbriefing (hentes parallelt — blokerer ikke resten)
+  api('/api/dashboard/briefing').then(br => {
+    const el = document.getElementById('mb-briefing-tekst');
+    if (br && br.ok && br.tekst) {
+      el.textContent = br.tekst;
+    } else {
+      el.innerHTML = '<span style="color:var(--ash);font-size:11px;">Briefing ikke tilgængelig</span>';
     }
-  }
-  strip.innerHTML = vejrHtml || '<div style="color:var(--ash);font-size:11px;">Ingen vejrdata</div>';
-
-  // Event
-  if (d.evt && d.evt.navn) {
-    document.getElementById('mb-evt-navn').textContent = d.evt.navn;
-    document.getElementById('mb-evt-note').textContent = d.evt.note || '';
-    document.getElementById('mb-evt-box').style.display = '';
-  }
+  });
 }
 
 // ── VEJR ─────────────────────────────────────────────────────────────────────

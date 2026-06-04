@@ -2180,6 +2180,110 @@ async def api_morgenbriefing(request: Request):
     }
 
 
+@app.get("/api/dashboard/briefing")
+async def api_morgenbriefing_ai(request: Request):
+    """AI-genereret dagsbriefing — forklarer hvad der sker i forretningen og hvorfor."""
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "tekst": ""}
+
+    from datetime import date, timedelta
+    today   = date.today()
+    iso     = today.isocalendar()
+    uge, aar = iso[1], iso[0]
+    ugedag  = today.weekday()
+    DAGE_DA = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"]
+    MND_DA  = ["januar","februar","marts","april","maj","juni","juli","august","september","oktober","november","december"]
+
+    try:
+        kpi      = database.hent_kpi(aar=aar)
+        dag      = kpi.get("dag")      or {}
+        prev_dag = kpi.get("prev_dag") or {}
+        uge_data = kpi.get("uge")      or {}
+    except Exception:
+        dag = prev_dag = uge_data = {}
+
+    dag_oms      = round((dag.get("omsaetning") or 0) / 1.25)
+    prev_dag_oms = round((prev_dag.get("omsaetning") or 0) / 1.25)
+    dag_pct      = round((dag_oms / prev_dag_oms - 1) * 100) if prev_dag_oms > 0 else None
+    dag_kunder   = dag.get("transak") or 0
+    dag_db_pct   = dag.get("db_pct") or 0
+    wtd_oms      = round((uge_data.get("omsaetning") or 0) / 1.25)
+
+    try:
+        spild_d = database.hent_spild_uge_overblik(uge, aar)
+    except Exception:
+        spild_d = {}
+
+    try:
+        man_dato = date.fromisocalendar(aar, uge, 1)
+        son_dato = man_dato + timedelta(days=6)
+        with database._conn() as conn:
+            tgtg_uge = conn.execute("""
+                SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
+                FROM tgtg_dagssalg WHERE dato >= date(?,'+1 day') AND dato <= date(?,'+1 day')
+            """, (man_dato.isoformat(), son_dato.isoformat())).fetchone()
+        tgtg_kr = round(tgtg_uge["kr"] or 0) if tgtg_uge else 0
+    except Exception:
+        tgtg_kr = 0
+
+    vejr_kontekst = ""
+    try:
+        vejr_d = database.hent_vejr_forecast()
+        fc = vejr_d.get("forecast", {})
+        dag_d = date.today()
+        v = fc.get(dag_d.isoformat())
+        if v and v.get("prec", 0) > 2:
+            vejr_kontekst = f"I dag: {v['ikon']} {v['prec']}mm nedbør ({v['juster']['label'] if v.get('juster') else 'regn'})."
+    except Exception:
+        pass
+
+    evt = None
+    try:
+        evt = database._get_event(uge, aar)
+    except Exception:
+        pass
+
+    sidst_advarsel = ""
+    try:
+        sidst = database.hent_sidst_solgt_moenster(uger=4)
+        if sidst.get("udsolgt_tidligt"):
+            top = sidst["udsolgt_tidligt"][0]
+            sidst_advarsel = f"{top['varenavn']} solgte ud kl. {top['snit_time']:02d}:00 i snit ({top['dage']} dage)."
+    except Exception:
+        pass
+
+    prompt = f"""Du er daglig briefing-assistent for Organic Market Greve — ubemandet franchise-butik, åben 06-20.
+
+DATA I DAG ({DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]}):
+- Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge)' if dag_pct is not None else ''}
+- Kunder: {dag_kunder}  · DB%: {dag_db_pct:.1f}%
+- WTD omsætning uge {uge}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage)
+- Spild denne uge: {spild_d.get('svind_pct','—')}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
+{f'- Vejr: {vejr_kontekst}' if vejr_kontekst else ''}
+{f'- Begivenhed: {evt["navn"]} (faktor ×{evt["factor"]})' if evt else ''}
+{f'- Salgsdata: {sidst_advarsel}' if sidst_advarsel else ''}
+
+Skriv en dagsbriefing på MAX 4 sætninger på dansk.
+- Forklar hvad der sker og HVORFOR (vejr, event, sæson, dag-type)
+- Brug de faktiske tal
+- Ingen anbefalinger — kun forklaring og kontekst
+- Direkte, konkret tone — skriv til en travl butiksejer"""
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {"ok": True, "tekst": msg.content[0].text.strip()}
+    except Exception as e:
+        return {"ok": False, "tekst": str(e)}
+
+
 # ── SALGSMØNSTER ─────────────────────────────────────────────────────────────
 
 

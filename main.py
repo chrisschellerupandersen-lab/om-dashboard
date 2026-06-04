@@ -2173,6 +2173,11 @@ async def api_morgenbriefing(request: Request):
         "vejr":          vejr,
         # Event
         "evt":           evt,
+        # Kaffe
+        "kaffe_idag":    kaffe_idag,
+        "kaffe_prev":    kaffe_prev,
+        "kaffe_pct":     kaffe_pct,
+        "kaffe_trend":   kaffe_trend,
         # Sparklines
         "sparklines":    sparklines,
         # Smart alert
@@ -2245,6 +2250,33 @@ async def api_morgenbriefing_ai(request: Request):
     except Exception:
         pass
 
+    # Kaffe i dag + forrige uge + 7-dages trend
+    kaffe_idag = 0
+    kaffe_prev = 0
+    kaffe_trend = []
+    try:
+        _KAFFE = ("LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+                  "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+                  "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%'")
+        with database._conn() as conn:
+            k = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                             (today.isoformat(),)).fetchone()
+            kaffe_idag = int(k["antal"] or 0) if k else 0
+            prev_dato = (today - timedelta(days=7)).isoformat()
+            kp = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                              (prev_dato,)).fetchone()
+            kaffe_prev = int(kp["antal"] or 0) if kp else 0
+            # 7-dages trend
+            kt = conn.execute(f"""
+                SELECT dato, ROUND(SUM(antal),0) AS antal FROM transaktioner
+                WHERE dato >= date(?,'-7 days') AND dato <= ? AND ({_KAFFE})
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+            kaffe_trend = [{"dato": r["dato"], "antal": int(r["antal"] or 0)} for r in kt]
+    except Exception:
+        pass
+    kaffe_pct = round((kaffe_idag / kaffe_prev - 1) * 100) if kaffe_prev > 0 else None
+
     vejr_kontekst = ""
     try:
         vejr_d = database.hent_vejr_forecast()
@@ -2293,6 +2325,7 @@ DATO I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}
 DATA:
 - Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
 - Kunder: {dag_kunder} · DB%: {dag_db_pct:.1f}%
+- Kaffesalg: {kaffe_idag} kopper{f' ({kaffe_pct:+}% vs. forrige uge samme dag)' if kaffe_pct is not None else ''}
 - WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage){f' — forrige uge samme periode: {round(prev_uge_oms * spild_d.get("n_dage",0) / 7):,} kr' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
 - Forrige uge total: {prev_uge_oms:,} kr · 4-ugers snit: {snit_4u:,} kr/uge{f' (denne uge tracker {round((wtd_oms/(prev_uge_oms*spild_d.get("n_dage",1)/7)-1)*100):+}% vs. samme punkt forrige uge)' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
 - Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)

@@ -1581,6 +1581,18 @@ async def api_tgtg_dagssalg(request: Request):
     return {"ok": True, "linjer": n}
 
 
+@app.get("/api/tgtg/poser-liste")
+async def api_tgtg_poser_liste(request: Request):
+    """Returnerer aktive pose-typer til manuel registrering."""
+    _kræv_login(request)
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT item_id, navn, kreditpris, kostpris_pose, enheder_per_pose
+            FROM tgtg_poser WHERE aktiv=1 ORDER BY navn
+        """).fetchall()
+    return {"ok": True, "poser": [dict(r) for r in rows]}
+
+
 @app.post("/api/tgtg/poser")
 async def api_tgtg_poser(request: Request):
     """Opdater pose-definitioner (navn + kreditpris)."""

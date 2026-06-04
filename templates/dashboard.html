@@ -2082,6 +2082,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p>Dagligt salg · kreditering til bager · <span style="color:var(--ash);">dato = produktionsdato (salgsdag −1)</span></p>
         </div>
 
+        <!-- Manuel registrering -->
+        <div class="card" style="margin-bottom:20px;border-left:3px solid var(--gold);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--gold);">REGISTRER TGTG SALG</div>
+              <div style="font-size:11px;color:var(--ash);margin-top:2px;">Bruges indtil auto-sync kører · overskrives af nøjagtige TGTG-tal</div>
+            </div>
+            <input type="date" id="tgtg-reg-dato" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--charcoal);">
+          </div>
+          <div id="tgtg-reg-poser" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px;"></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onclick="tgtgGemManuel()" id="tgtg-reg-btn"
+              style="background:var(--forest);color:var(--amber);border:none;border-radius:6px;padding:8px 18px;font-weight:500;font-size:13px;cursor:pointer;">
+              💾 Gem salg
+            </button>
+            <span id="tgtg-reg-status" style="font-size:12px;color:var(--ash);"></span>
+          </div>
+        </div>
+
         <!-- KPI-kort -->
         <div class="kpi-row" style="margin-bottom:16px;">
           <div class="kpi-card">
@@ -6787,9 +6806,68 @@ async function visBestillingDetalje(uge, aar) {
 // ── TOO GOOD TO GO ────────────────────────────────────────────────────────────
 let _tgtgLoaded = false;
 
+async function tgtgBygRegistrering() {
+  // Sæt dato til i dag
+  document.getElementById('tgtg-reg-dato').value = new Date().toISOString().slice(0,10);
+
+  // Hent pose-typer fra server
+  const poser = await api('/api/tgtg/poser-liste');
+  if (!poser || !poser.poser) return;
+
+  const grid = document.getElementById('tgtg-reg-poser');
+  grid.innerHTML = poser.poser.map(p => `
+    <div style="background:rgba(30,58,30,.04);border:1px solid rgba(30,58,30,.1);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:12px;font-weight:500;color:var(--charcoal);margin-bottom:6px;">${p.navn}</div>
+      <div style="font-size:10px;color:var(--ash);margin-bottom:6px;">${p.kreditpris.toFixed(2)} kr/pose · ${p.enheder_per_pose} stk/pose</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="this.nextElementSibling.value=Math.max(0,parseInt(this.nextElementSibling.value||0)-1)"
+          style="width:28px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;font-size:16px;">−</button>
+        <input type="number" min="0" max="50" value="0" data-item-id="${p.item_id}" data-navn="${p.navn.replace(/"/g,'&quot;')}"
+          style="width:50px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-weight:600;">
+        <button onclick="this.previousElementSibling.value=parseInt(this.previousElementSibling.value||0)+1"
+          style="width:28px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;font-size:16px;">+</button>
+      </div>
+    </div>`).join('');
+}
+
+async function tgtgGemManuel() {
+  const dato   = document.getElementById('tgtg-reg-dato').value;
+  const btn    = document.getElementById('tgtg-reg-btn');
+  const status = document.getElementById('tgtg-reg-status');
+  if (!dato) { status.textContent = 'Vælg dato'; return; }
+
+  const linjer = [];
+  document.querySelectorAll('#tgtg-reg-poser input[data-item-id]').forEach(inp => {
+    const antal = parseInt(inp.value) || 0;
+    if (antal > 0) linjer.push({
+      dato, item_id: inp.dataset.itemId || inp.getAttribute('data-item-id'),
+      pose_navn: inp.getAttribute('data-navn'), antal
+    });
+  });
+
+  if (!linjer.length) { status.textContent = 'Ingen poser at gemme (alle er 0)'; return; }
+
+  btn.disabled = true; btn.textContent = '⏳ Gemmer…';
+  const r = await fetch('/api/tgtg/dagssalg', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ secret: 'OM-Greve-2026-Hemlig', linjer })
+  });
+  const res = await r.json();
+  btn.disabled = false; btn.textContent = '💾 Gem salg';
+  if (res.ok) {
+    status.style.color = 'var(--moss)';
+    status.textContent = `✓ Gemt ${linjer.length} pose-type(r) for ${dato}`;
+    _tgtgLoaded = false; loadTgtg(); // genindlæs tabel
+  } else {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Fejl ved gem';
+  }
+}
+
 async function loadTgtg() {
   if (_tgtgLoaded) return;
   _tgtgLoaded = true;
+  tgtgBygRegistrering(); // byg manuel registrering
 
   const d = await api(`/api/tgtg/overblik?aar=${VALGT_AAR}`);
   if (!d) { _tgtgLoaded = false; return; }

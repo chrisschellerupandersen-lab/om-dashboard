@@ -2311,7 +2311,7 @@ Skriv en dagsbriefing på MAX 4 sætninger på dansk.
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=200,
+            max_tokens=400,
             messages=[{"role": "user", "content": prompt}]
         )
         return {"ok": True, "tekst": msg.content[0].text.strip()}

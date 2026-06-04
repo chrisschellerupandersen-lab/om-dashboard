@@ -2254,22 +2254,39 @@ async def api_morgenbriefing_ai(request: Request):
     except Exception:
         pass
 
+    # Find om event er i dag eller en anden dag i ugen
+    evt_dag_info = ""
+    if evt:
+        dag_fak = evt.get("dag_fak", {})
+        DAG_KEYS_EVT = ["man","tir","ons","tor","fre","loe","son"]
+        DAGE_DA_KORT = ["mandag","tirsdag","onsdag","torsdag","fredag","lørdag","søndag"]
+        stærke = [(DAGE_DA_KORT[i], dag_fak.get(k, 1.0))
+                  for i, k in enumerate(DAG_KEYS_EVT)
+                  if dag_fak.get(k, 1.0) > 1.05]
+        if stærke:
+            evt_dag_info = ", ".join([f"{n} ×{f:.2f}" for n, f in stærke])
+        idag_key = DAG_KEYS_EVT[ugedag]
+        idag_evt = idag_key in dag_fak and dag_fak[idag_key] > 1.0
+        evt_timing = "I DAG" if idag_evt else f"Ikke i dag — stærke dage: {evt_dag_info}"
+
     prompt = f"""Du er daglig briefing-assistent for Organic Market Greve — ubemandet franchise-butik, åben 06-20.
 
-DATA I DAG ({DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]}):
-- Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge)' if dag_pct is not None else ''}
-- Kunder: {dag_kunder}  · DB%: {dag_db_pct:.1f}%
-- WTD omsætning uge {uge}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage)
-- Spild denne uge: {spild_d.get('svind_pct','—')}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
-{f'- Vejr: {vejr_kontekst}' if vejr_kontekst else ''}
-{f'- Begivenhed: {evt["navn"]} (faktor ×{evt["factor"]})' if evt else ''}
+DATO I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}
+
+DATA:
+- Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
+- Kunder: {dag_kunder} · DB%: {dag_db_pct:.1f}%
+- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage)
+- Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
+{f'- Vejr i dag: {vejr_kontekst}' if vejr_kontekst else ''}
+{f'- Begivenhed uge {uge}: {evt["navn"]} — {evt_timing}' if evt else '- Ingen begivenhed denne uge'}
 {f'- Salgsdata: {sidst_advarsel}' if sidst_advarsel else ''}
 
 Skriv en dagsbriefing på MAX 4 sætninger på dansk.
-- Forklar hvad der sker og HVORFOR (vejr, event, sæson, dag-type)
-- Brug de faktiske tal
-- Ingen anbefalinger — kun forklaring og kontekst
-- Direkte, konkret tone — skriv til en travl butiksejer"""
+- Start med "God [ugedag]" eller tilsvarende — ALDRIG med "Dagsbriefing"
+- Forklar hvad der sker og HVORFOR — brug de faktiske tal og den korrekte dato
+- Hvis begivenhed IKKE er i dag: nævn hvilken dag den er og hvad du forventer
+- Ingen anbefalinger — kun forklaring og kontekst"""
 
     try:
         import anthropic as _ant

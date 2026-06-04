@@ -7681,19 +7681,18 @@ async function mbLoad(force = false) {
     `<div style="font-family:'DM Mono',monospace;font-size:10px;color:${d.aktuel_klar?'rgba(200,168,75,.8)':'rgba(255,100,100,.8)'};margin-bottom:4px;">${aktuelTxt}</div>`
   );
 
-  if (d.dage_til_tor === 0) {
+  // Vis altid badge — tjek bestilling FØR deadline
+  if (d.bestilling_klar) {
+    document.getElementById('mb-deadline-txt').textContent = `✓ Uge ${d.naeste_uge} bestilt`;
+    document.getElementById('mb-deadline-txt').style.color = 'rgba(200,168,75,.9)';
+  } else if (d.dage_til_tor === 0) {
     document.getElementById('mb-deadline-txt').textContent = `⚡ Bestil uge ${d.naeste_uge} I DAG!`;
     document.getElementById('mb-deadline-txt').style.color = 'var(--danger)';
-    badge.style.display = '';
-  } else if (d.bestilling_klar) {
-    document.getElementById('mb-deadline-txt').textContent = `✓ Uge ${d.naeste_uge} klar`;
-    document.getElementById('mb-deadline-txt').style.color = 'rgba(200,168,75,.9)';
-    badge.style.display = '';
   } else {
-    document.getElementById('mb-deadline-txt').textContent = `Bestil inden torsdag · ${d.dage_til_tor} dage`;
+    document.getElementById('mb-deadline-txt').textContent = `Bestil uge ${d.naeste_uge} · ${d.dage_til_tor} dage til torsdag`;
     document.getElementById('mb-deadline-txt').style.color = d.dage_til_tor <= 1 ? 'var(--danger)' : 'var(--amber)';
-    badge.style.display = '';
   }
+  badge.style.display = '';
 
   // Zone 1: Dag
   document.getElementById('mb-dag-oms').textContent = d.dag_oms > 0 ? dk(d.dag_oms) : '—';
@@ -7790,15 +7789,16 @@ async function mbLoad(force = false) {
     alertEl.style.display = '';
   }
 
-  // Zone 3: AI dagsbriefing (hentes parallelt — blokerer ikke resten)
-  api('/api/dashboard/briefing').then(br => {
+  // Zone 3: AI dagsbriefing hentes efter siden er vist (blokerer ikke loading)
+  setTimeout(async () => {
+    const br = await api('/api/dashboard/briefing');
     const el = document.getElementById('mb-briefing-tekst');
     if (br && br.ok && br.tekst) {
       el.textContent = br.tekst;
     } else {
       el.innerHTML = '<span style="color:var(--ash);font-size:11px;">Briefing ikke tilgængelig</span>';
     }
-  });
+  }, 100);
 }
 
 // ── VEJR ─────────────────────────────────────────────────────────────────────

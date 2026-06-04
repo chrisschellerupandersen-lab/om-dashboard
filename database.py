@@ -2352,10 +2352,12 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste).fetchall()
             kasse_map = {r['dato']: int(r['antal'] or 0) for r in kasse_rows}
 
-            # ── TGTG per dato — henter samme dag OG næste dag (TGTG sælges typisk samme aften)
-            # Bruger bredere dato-vindue: ugens 7 dage + dagen efter ugen
-            tgtg_alle_datoer = [d.isoformat() for d in datoer] + [(datoer[-1] + timedelta(days=1)).isoformat()]
-            ph_tgtg = ','.join('?' * len(tgtg_alle_datoer))
+            # ── TGTG per produktionsdag (D+1 offset) ─────────────────────────
+            # Produktionsdag D → TGTG afhentes af kunder dagen efter (D+1)
+            # Eksempel: mandag rester listes aften → tirsdag morgen afhentes → tgtg_dagssalg.dato = tirsdag
+            # Derfor: for at finde mandags TGTG, slår vi op på tirsdagens salg
+            tgtg_salgs_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
+            ph_tgtg = ','.join('?' * len(tgtg_salgs_datoer))
             tgtg_rows = conn.execute(f"""
                 SELECT ds.dato,
                        SUM(ds.antal) AS poser,
@@ -2364,14 +2366,14 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
                 WHERE ds.dato IN ({ph_tgtg})
                 GROUP BY ds.dato
-            """, tgtg_alle_datoer).fetchall()
-            # Map: dato → {poser, stk} — match på selve salgsdagen
+            """, tgtg_salgs_datoer).fetchall()
+            # Map: produktionsdato → {poser, stk}  (salgsdag - 1 dag = produktionsdag)
             tgtg_map  = {}
             tgtg_poser_map = {}
             for r in tgtg_rows:
-                dato = r['dato']
-                tgtg_map[dato]       = int(r['stk']   or 0)
-                tgtg_poser_map[dato] = int(r['poser'] or 0)
+                prod_dato = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
+                tgtg_map[prod_dato]       = int(r['stk']   or 0)
+                tgtg_poser_map[prod_dato] = int(r['poser'] or 0)
 
             # ── KW kombos per dato ────────────────────────────────────────────
             # COUNT(DISTINCT bon_nr) på boner der har BÅDE kaffe og wiener
@@ -4473,10 +4475,12 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
             ) GROUP BY yw ORDER BY yw DESC LIMIT 4
         """, (mon.isoformat(), prev_sun.isoformat())).fetchall()
 
-        # TGTG fra tgtg_dagssalg tabellen (mere præcis)
+        # TGTG fra tgtg_dagssalg (D+1 offset: poser afhentes dagen efter produktion)
+        # Forrige uges produktioner → TGTG solgt man-søn = tirsdag (uge start+1) til mandag (næste uge)
         tgtg_dag = conn.execute("""
             SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
-            FROM tgtg_dagssalg WHERE dato>=? AND dato<=?
+            FROM tgtg_dagssalg
+            WHERE dato >= date(?, '+1 day') AND dato <= date(?, '+1 day')
         """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
 
         # Retur forrige uge pr. produkt

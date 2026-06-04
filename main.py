@@ -2087,6 +2087,46 @@ async def api_morgenbriefing(request: Request):
     except Exception:
         evt = None
 
+    # Sparklines: seneste 7 dages omsætning + DB%
+    try:
+        with database._conn() as conn:
+            spark_rows = conn.execute("""
+                SELECT dato,
+                       ROUND(SUM(omsætning)/1.25, 0) AS oms_ex,
+                       ROUND(AVG(CASE WHEN omsætning > 0 THEN
+                           (omsætning/1.25 - COALESCE(vf_korrekt,0)) / (omsætning/1.25) * 100
+                           ELSE NULL END), 1) AS db_pct
+                FROM v_transaktioner
+                WHERE dato >= date(?, '-7 days') AND dato <= ?
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+        sparklines = [{"dato": r["dato"], "oms": int(r["oms_ex"] or 0), "db_pct": r["db_pct"]} for r in spark_rows]
+    except Exception:
+        sparklines = []
+
+    # Smart alert: find det vigtigste råd
+    smart_alert = None
+    try:
+        sidst = database.hent_sidst_solgt_moenster(uger=4)
+        if sidst.get("udsolgt_tidligt"):
+            top = sidst["udsolgt_tidligt"][0]
+            smart_alert = {"type": "udsolgt", "ikon": "🔴",
+                "tekst": f"{top['varenavn']} sælger ud kl. {top['snit_time']:02d}:00 — {top['tomme_timer']} tomme timer. Bestil mere."}
+        elif tgtg_kr > 1200:
+            smart_alert = {"type": "tgtg", "ikon": "🟡",
+                "tekst": f"TGTG {tgtg_kr:,} kr denne uge — over 1.200 kr. Reducer bestillingen på svage dage."}
+        elif (spild_d.get("svind_pct") or 0) > 22:
+            smart_alert = {"type": "spild", "ikon": "🔴",
+                "tekst": f"Spild {spild_d['svind_pct']:.1f}% — kritisk. Tjek hvilke dage der driver spildet."}
+        elif dag_db_pct > 0 and dag_db_pct < 30:
+            smart_alert = {"type": "db", "ikon": "🟡",
+                "tekst": f"DB% i dag kun {dag_db_pct:.1f}% — langt under mål. Tjek vareforbrug eller prisregistrering."}
+        elif dage_til_tor == 1 and not bestilling_klar:
+            smart_alert = {"type": "deadline", "ikon": "⚡",
+                "tekst": f"Bestil uge {naeste_uge} inden i morgen torsdag!"}
+    except Exception:
+        pass
+
     # Vs. forrige uge
     dag_oms      = dag.get("omsaetning")  or 0
     prev_dag_oms = prev_dag.get("omsaetning") or 0
@@ -2133,6 +2173,10 @@ async def api_morgenbriefing(request: Request):
         "vejr":          vejr,
         # Event
         "evt":           evt,
+        # Sparklines
+        "sparklines":    sparklines,
+        # Smart alert
+        "smart_alert":   smart_alert,
     }
 
 

@@ -2087,6 +2087,29 @@ async def api_morgenbriefing(request: Request):
     except Exception:
         evt = None
 
+    # Kaffe i dag + forrige uge + 7-dages trend
+    kaffe_idag = 0; kaffe_prev = 0; kaffe_trend = []
+    try:
+        _KAFFE = ("LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+                  "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+                  "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%'")
+        with database._conn() as conn:
+            k = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                             (today.isoformat(),)).fetchone()
+            kaffe_idag = int(k["antal"] or 0) if k else 0
+            kp = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                              ((today - timedelta(days=7)).isoformat(),)).fetchone()
+            kaffe_prev = int(kp["antal"] or 0) if kp else 0
+            kt = conn.execute(f"""
+                SELECT dato, ROUND(SUM(antal),0) AS antal FROM transaktioner
+                WHERE dato >= date(?,'-7 days') AND dato <= ? AND ({_KAFFE})
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+            kaffe_trend = [{"dato": r["dato"], "antal": int(r["antal"] or 0)} for r in kt]
+    except Exception:
+        pass
+    kaffe_pct = round((kaffe_idag / kaffe_prev - 1) * 100) if kaffe_prev > 0 else None
+
     # Sparklines: seneste 7 dages omsætning + DB%
     try:
         with database._conn() as conn:

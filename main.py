@@ -2191,6 +2191,7 @@ async def api_morgenbriefing(request: Request):
         "tgtg_advarsel": tgtg_kr > 1200,
         # Spild
         "spild_pct":     spild_d.get("svind_pct"),
+        "spild_stk":     spild_d.get("svind", 0),
         "spild_ok":      (spild_d.get("svind_pct") or 0) < 15,
         # Vejr
         "vejr":          vejr,

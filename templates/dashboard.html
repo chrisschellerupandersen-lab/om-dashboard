@@ -7658,15 +7658,29 @@ async function mbLoad(force = false) {
   // Header
   document.getElementById('mb-dato-label').textContent = d.dato_label;
 
-  // Deadline badge
+  // Bestillings-status badges
   const badge = document.getElementById('mb-deadline-badge');
   document.getElementById('mb-naeste-uge').textContent = d.naeste_uge;
+
+  // Indeværende uge bekræftelse
+  const aktuelTxt = d.aktuel_klar
+    ? `✓ Uge ${d.uge} bestilt · ${d.aktuel_stk.toLocaleString('da-DK')} stk`
+    : `⚠ Uge ${d.uge} mangler bestilling`;
+  document.getElementById('mb-deadline-txt').parentElement.insertAdjacentHTML('beforebegin',
+    `<div style="font-family:'DM Mono',monospace;font-size:10px;color:${d.aktuel_klar?'rgba(200,168,75,.8)':'rgba(255,100,100,.8)'};margin-bottom:4px;">${aktuelTxt}</div>`
+  );
+
   if (d.dage_til_tor === 0) {
-    document.getElementById('mb-deadline-txt').textContent = '⚡ BESTIL I DAG!';
+    document.getElementById('mb-deadline-txt').textContent = `⚡ Bestil uge ${d.naeste_uge} I DAG!`;
     document.getElementById('mb-deadline-txt').style.color = 'var(--danger)';
     badge.style.display = '';
-  } else if (d.dage_til_tor <= 2) {
-    document.getElementById('mb-deadline-txt').textContent = `${d.dage_til_tor} dage til deadline`;
+  } else if (d.bestilling_klar) {
+    document.getElementById('mb-deadline-txt').textContent = `✓ Uge ${d.naeste_uge} klar`;
+    document.getElementById('mb-deadline-txt').style.color = 'rgba(200,168,75,.9)';
+    badge.style.display = '';
+  } else {
+    document.getElementById('mb-deadline-txt').textContent = `Bestil inden torsdag · ${d.dage_til_tor} dage`;
+    document.getElementById('mb-deadline-txt').style.color = d.dage_til_tor <= 1 ? 'var(--danger)' : 'var(--amber)';
     badge.style.display = '';
   }
 

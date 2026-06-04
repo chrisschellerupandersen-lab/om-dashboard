@@ -2020,7 +2020,15 @@ async def api_morgenbriefing(request: Request):
     else:             # fre-søn: næste uges torsdag
         dage_til_tor = 7 - ugedag + 3
 
-    # Har vi allerede uge+1-bestilling klar?
+    # Indeværende uges bestilling (leveres denne uge)
+    try:
+        aktuel_d = database.hent_bestillings_uge(uge, aar)
+        aktuel_klar = aktuel_d.get("faktisk", False) or (aktuel_d.get("total_stk", 0) > 0)
+        aktuel_stk  = aktuel_d.get("total_stk", 0)
+    except Exception:
+        aktuel_klar = False; aktuel_stk = 0
+
+    # Næste uges bestilling (skal laves inden torsdag)
     naeste_uge  = uge + 1 if uge < 52 else 1
     naeste_aar  = aar if uge < 52 else aar + 1
     try:
@@ -2098,6 +2106,8 @@ async def api_morgenbriefing(request: Request):
         "uge":           uge, "aar": aar,
         "ugedag":        ugedag,
         "dage_til_tor":  dage_til_tor,
+        "aktuel_klar":   aktuel_klar,
+        "aktuel_stk":    aktuel_stk,
         "bestilling_klar": bestilling_klar,
         "naeste_uge":    naeste_uge,
         # Dag

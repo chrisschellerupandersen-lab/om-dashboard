@@ -995,7 +995,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
     <div class="content">
 
       <!-- MORGENBRIEFING -->
-      <div class="panel" id="p-morgenbriefing" style="padding:0;">
+      <div class="panel active" id="p-morgenbriefing" style="padding:0;">
         <!-- Header -->
         <div id="mb-hdr" style="background:var(--forest);padding:20px 28px 16px;border-radius:0;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
@@ -1103,7 +1103,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
 
       <!-- FORSIDE -->
-      <div class="panel active" id="p-forside">
+      <div class="panel" id="p-forside">
         <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div>
             <h2>Overblik</h2>
@@ -3295,7 +3295,7 @@ function closeSidebar() {
   document.getElementById('sidebar-backdrop').classList.remove('open');
 }
 
-let _navCurrentId = 'forside';
+let _navCurrentId = 'morgenbriefing';
 function showPanel(id, el) {
   _navCurrentId = id;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -3739,6 +3739,7 @@ async function loadAll() {
 
   if (kpi) setSyncNow();
   loadReturStatus();
+  mbLoad();
   loadSpildOverblik();
 
   // Sæt date picker til dagens dato
@@ -9674,7 +9675,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') vfModalLuk(); 
 <!-- BOTTOM NAVIGATION -->
 <nav class="bnav" id="bnav">
   <div class="bnav-inner">
-    <button class="bnav-item active" id="bn-forside" onclick="_bnavGo('forside',this)">
+    <button class="bnav-item" id="bn-forside" onclick="_bnavGo('forside',this)">
       <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L1.5 7v8h4.5v-4.5h4V15h4.5V7L8 1.5z"/></svg>
       <span class="bnav-lbl">Forside</span>
     </button>

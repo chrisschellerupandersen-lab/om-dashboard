@@ -2304,7 +2304,8 @@ Skriv en dagsbriefing på MAX 4 sætninger på dansk.
 - Start med "God [ugedag]" eller tilsvarende — ALDRIG med "Dagsbriefing"
 - Forklar hvad der sker og HVORFOR — brug de faktiske tal og den korrekte dato
 - Hvis begivenhed IKKE er i dag: nævn hvilken dag den er og hvad du forventer
-- Ingen anbefalinger — kun forklaring og kontekst"""
+- Ingen anbefalinger — kun forklaring og kontekst
+- VIGTIGT: skriv altid procentændringer med + eller - prefix, fx "+26%" eller "-8%"
 
     try:
         import anthropic as _ant

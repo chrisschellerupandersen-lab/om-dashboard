@@ -28,8 +28,22 @@ from typing import Optional
 # ── Konfiguration ─────────────────────────────────────────────────────────────
 RAILWAY_URL      = "https://om-dashboard-production-0f3a.up.railway.app"
 WEBHOOK_SECRET   = "OM-Greve-2026-Hemlig"
-CREDENTIALS_FILE = Path(__file__).parent / "gdrive_credentials.json"
-TOKEN_FILE       = Path(__file__).parent / "gdrive_token.json"
+# Leder efter credentials i denne rækkefølge:
+# 1. gdrive_credentials.json (dedikeret)
+# 2. gmail_credentials.json (samme Google Cloud projekt)
+# 3. dashboard/ undermappen
+_BASE = Path(__file__).parent
+_DASH = _BASE / "dashboard"
+CREDENTIALS_FILE = next(
+    (p for p in [
+        _BASE / "gdrive_credentials.json",
+        _DASH / "gdrive_credentials.json",
+        _BASE / "gmail_credentials.json",
+        _DASH / "gmail_credentials.json",
+    ] if p.exists()),
+    _BASE / "gdrive_credentials.json"  # default (ikke-eksisterende → vejledning)
+)
+TOKEN_FILE = _BASE / "gdrive_token.json"
 
 SCOPES = [
     "https://www.googleapis.com/auth/drive.readonly",

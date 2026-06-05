@@ -271,7 +271,31 @@ def main():
     parser.add_argument("--mappe",  default=None,        help="Google Drive mappe-ID")
     parser.add_argument("--vis",    action="store_true", help="Vis uden upload")
     parser.add_argument("--fil",    default=None,        help="Specifik fil-ID på Drive")
+    parser.add_argument("--lokal",  default=None,        help="Lokal Excel-fil (sti)")
     args = parser.parse_args()
+
+    # ── Lokal fil (ingen Drive-forbindelse nødvendig) ──────────────────────────
+    if args.lokal:
+        p = Path(args.lokal)
+        if not p.exists():
+            print(f"[FEJL] Fil ikke fundet: {p}")
+            sys.exit(1)
+        xlsx_bytes = p.read_bytes()
+        data = _parse_bestilling_xlsx(xlsx_bytes, p.name)
+        if args.uge and data:
+            data["uge"] = args.uge  # override uge fra argument
+        if not data or not data["linjer"]:
+            print("[FEJL] Ingen data i filen.")
+            sys.exit(1)
+        _vis(data)
+        if args.vis:
+            print("\n[VIS] Ingen upload (--vis flag)")
+            return
+        svar = input(f"\nUpload uge {data['uge']}/{data['aar']} ({len(data['linjer'])} linjer)? [J/n] ").strip().lower()
+        if svar not in ("", "j", "ja", "y", "yes"):
+            print("Afbrudt."); return
+        _upload(data)
+        return
 
     service = _drive_service()
 

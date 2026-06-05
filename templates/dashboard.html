@@ -318,6 +318,26 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-val.dn,.kpi-v.dn,.ov-combo-chg.dn{color:var(--danger);}
 .ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
 
+/* ── MORGENBRIEFING MOBIL ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mb-kpi-row { grid-template-columns: 1fr 1fr !important; }
+  .mb-kpi-row > *:first-child { grid-column: 1 / -1; }
+  #mb-hdr { padding: 14px 16px 12px !important; }
+  #p-morgenbriefing > div:last-child { padding: 14px 16px 80px !important; }
+}
+@media (max-width: 480px) {
+  .mb-kpi-row { grid-template-columns: 1fr !important; }
+  .mb-kpi-row > *:first-child { grid-column: 1 !important; }
+  #mb-briefing-boks { font-size: 13px !important; }
+  /* Ugens puls: 1 kolonne */
+  #p-morgenbriefing .aar2-mnd-stats { grid-template-columns: 1fr !important; }
+  /* Sparklines: stak */
+  #p-morgenbriefing .mb-spark-grid { grid-template-columns: 1fr !important; }
+  /* Smart alert kompakt */
+  #mb-smart-alert { padding: 10px 12px !important; font-size: 12px !important; }
+  /* Trafiklamper: min-width ned */
+  #mb-lamper > div { min-width: 140px !important; }
+}
 /* ── SENESTE DAG: STORE RINGE ───────────────────────────────────────────────── */
 .dag-kpi-row { grid-template-columns: repeat(4,1fr) !important; }
 .dag-kpi { background: var(--white) !important; border-color: rgba(30,58,30,.08) !important;
@@ -1089,7 +1109,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="mb-spild-chips" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;"></div>
 
           <!-- ZONE 5: SPARKLINES -->
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+          <div class="mb-spark-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
               <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Omsætning · 7 dage</div>
               <div style="position:relative;height:80px;"><canvas id="mb-spark-oms"></canvas></div>

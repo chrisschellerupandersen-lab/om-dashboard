@@ -189,16 +189,16 @@ def _parse_bestilling_xlsx(xlsx_bytes: bytes, filnavn: str) -> Optional[dict]:
             if not isinstance(varenummer, (int, float)):
                 continue
 
-            varenavn = row[2] or ""
-            kategori = row[3] if len(row) > 3 else ""
-            pris     = float(row[4] or 0) if len(row) > 4 else 0.0
+            varenavn = str(row[2] or "").strip()
+            pris     = float(row[3] or 0) if len(row) > 3 else 0.0
 
-            # Dag-værdier E-K (indeks 5-11)
+            # Dag-værdier E-K = indeks 4-10 (man=4, tir=5, ..., søn=10)
+            # Indeks 11 = Total — springes over
             dag_vals = {}
             for i, dk in enumerate(DAGE_KEYS):
-                col_idx = 5 + i
+                col_idx = 4 + i  # starter ved E (index 4)
                 val = row[col_idx] if len(row) > col_idx else None
-                dag_vals[dk] = int(float(val)) if val and val != '' else 0
+                dag_vals[dk] = int(float(val)) if val and val not in ('', None, '-') else 0
 
             total = sum(dag_vals.values())
             if total == 0:

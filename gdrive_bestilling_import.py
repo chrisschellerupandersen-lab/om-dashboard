@@ -207,7 +207,7 @@ def _parse_bestilling_xlsx(xlsx_bytes: bytes, filnavn: str) -> Optional[dict]:
             linjer.append({
                 "varenummer":   str(int(varenummer)),
                 "varenavn":     str(varenavn).strip(),
-                "kategori":     str(kategori).strip() if kategori else "",
+                "kategori":     "",
                 "pris_ex_moms": pris,
                 **dag_vals,
                 "total_antal":  total,

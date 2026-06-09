@@ -5267,7 +5267,7 @@ def generer_management_review(api_key: str, uge: int = None, aar: int = None) ->
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=4000,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -5520,7 +5520,7 @@ Graf-regler:
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=1200,
         system=system,
         messages=messages,

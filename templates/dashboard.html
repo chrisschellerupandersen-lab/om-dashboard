@@ -7922,11 +7922,15 @@ async function mbLoad(force = false) {
     const spBg  = d.spild_ok ? 'rgba(39,174,96,.08)' : (d.spild_pct < 22 ? 'rgba(230,126,34,.08)' : 'rgba(192,57,43,.08)');
     const mono  = "font-family:'DM Mono',monospace;";
     document.getElementById('mb-spild-chips').innerHTML = `
-      <div style="background:${spBg};border:1px solid ${spClr}44;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;">
+      <div onclick="showPanel('spild')" title="Klik for dag-for-dag spild-rapport"
+           onmouseover="this.style.boxShadow='0 2px 8px '+'${spClr}33';this.style.transform='translateY(-1px)';"
+           onmouseout="this.style.boxShadow='none';this.style.transform='none';"
+           style="background:${spBg};border:1px solid ${spClr}44;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:box-shadow .15s,transform .15s;">
         <span style="font-size:11px;color:var(--ash);">SPILD DENNE UGE</span>
         <span style="${mono}font-size:18px;font-weight:700;color:${spClr};">${d.spild_stk || 0} stk</span>
         <span style="${mono}font-size:15px;font-weight:600;color:${spClr};">${d.spild_pct != null ? d.spild_pct.toFixed(1)+'%' : '—'}</span>
         <span style="font-size:10px;color:var(--ash);">${d.spild_ok ? '✓ under 15%' : d.spild_pct < 22 ? '~ hold øje' : '⚠ over 22%'} · ${d.wtd_dage} dage</span>
+        <span style="font-size:11px;color:${spClr};font-weight:600;margin-left:auto;">Se detaljer →</span>
       </div>`;
   }
 

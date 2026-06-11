@@ -2732,6 +2732,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
 
 
+      <!-- RETUR & TGTG FORSLAG -->
+      <div class="panel" id="p-returtgtg">
+        <div class="page-hdr">
+          <h2>Retur &amp; TGTG forslag</h2>
+          <p>Hvad sendes retur til bageren, og hvilke poser kan I pakke — baseret på dagens bestilling og salg</p>
+          <button onclick="loadReturTgtg();" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+        <div id="rt-page-body"></div>
+      </div>
+
+
       <!-- SPILD-RAPPORT -->
       <div class="panel" id="p-spild">
         <div class="page-hdr">
@@ -3390,6 +3401,7 @@ const NAV_SVG = {
   retur:        '<path d="M3 8h8a4 4 0 010 8H6m-3-8l3-3m-3 3l3 3M11 4a4 4 0 014 4"/>',
   svind:        '<path d="M8 1l7 13H1L8 1zm0 3L3 12h10L8 4zm-.5 3h1v3h-1zm0 4h1v1h-1z"/>',
   spild:        '<path d="M8 2a6 6 0 100 12A6 6 0 008 2zm0 2v4l3 1.5-.7 1.3L7 9V4h1zm-5 6.5l1.4-1.4 1 1-1.4 1.4-1-1zm9-1.4l1.4 1.4-1 1-1.4-1.4 1-1z"/>',
+  returtgtg:    '<path d="M3 5h10l-1 9a1 1 0 01-1 1H5a1 1 0 01-1-1L3 5zm2-3h6v2H5V2zm1 5v6h1V7H6zm3 0v6h1V7H9z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
@@ -3418,6 +3430,7 @@ const NAV_DEFAULT = [
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',     hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',     hidden:false},
   {id:'tgtg',        label:'Too Good To Go',        group:'Bageri & indkøb',     hidden:false},
+  {id:'returtgtg',   label:'Retur & TGTG forslag',  group:'Bageri & indkøb',     hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Analyse & rapporter',  hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',       hidden:false},
@@ -7981,7 +7994,11 @@ async function mbReturTgtg() {
   if (!wrap) return;
   const d = await api('/api/dashboard/retur-tgtg');
   if (!d || !d.har_data || !d.varer.length) { wrap.style.display = 'none'; return; }
+  wrap.innerHTML = _returTgtgCardHtml(d);
+  wrap.style.display = '';
+}
 
+function _returTgtgCardHtml(d) {
   const mono = "font-family:'DM Mono',monospace;";
   const nu = new Date();
   const klStr = String(nu.getHours()).padStart(2,'0') + ':' + String(nu.getMinutes()).padStart(2,'0');
@@ -8028,7 +8045,7 @@ async function mbReturTgtg() {
     restHtml = `<div style="font-size:10px;color:var(--ash);margin-top:6px;">Ikke nok til en hel pose: <b>${restTxt}</b> (spild-risiko)</div>`;
   }
 
-  wrap.innerHTML = `
+  return `
     <div style="background:var(--cream);border:1px solid rgba(30,58,30,.1);border-radius:12px;padding:16px 18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px;">
         <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">📦 Retur &amp; TGTG · forslag</span>
@@ -8062,7 +8079,19 @@ async function mbReturTgtg() {
         Retur-loft: boller 10 %, wienerbrød 13,5 % af bestilt (bageren tager kun en del retur). Posevalg ud fra jeres faste opskrifter — maksimerer brugte varer. Mest relevant sidst på dagen · kager ekskluderet.
       </div>
     </div>`;
-  wrap.style.display = '';
+}
+
+// Dedikeret side
+async function loadReturTgtg() {
+  const body = document.getElementById('rt-page-body');
+  if (!body) return;
+  body.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--ash);">Indlæser…</div>';
+  const d = await api('/api/dashboard/retur-tgtg');
+  if (!d || !d.har_data || !d.varer || !d.varer.length) {
+    body.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:var(--ash);">Ingen rester at handle på lige nu — alt er enten solgt eller dagens data mangler.</div>';
+    return;
+  }
+  body.innerHTML = _returTgtgCardHtml(d);
 }
 
 async function mbLoadBriefing() {
@@ -9504,6 +9533,7 @@ window.showPanel = function(id, el) {
   if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();
   if (id === 'spild')        loadSpild();
+  if (id === 'returtgtg')    loadReturTgtg();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
   if (id === 'stamdata')   loadStamdata();

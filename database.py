@@ -2899,11 +2899,17 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
               AND b.varenummer != '' AND b.varenummer != '0'
         """, (dato, uge, aar)).fetchall()
 
-        # Gennemsnitlig posestørrelse til at estimere antal TGTG-poser
+        # Pose-definition: størrelse, navn og pris fra jeres TGTG-opsætning
         ep_row = conn.execute(
             "SELECT AVG(enheder_per_pose) FROM tgtg_poser WHERE enheder_per_pose > 0 AND aktiv = 1"
         ).fetchone()
         enheder_per_pose = round(ep_row[0]) if ep_row and ep_row[0] else None
+        pose_def = conn.execute(
+            "SELECT navn, enheder_per_pose, kreditpris FROM tgtg_poser "
+            "WHERE aktiv = 1 AND enheder_per_pose > 0 ORDER BY kreditpris DESC LIMIT 1"
+        ).fetchone()
+        pose_navn = pose_def['navn'] if pose_def else None
+        pose_pris = round(pose_def['kreditpris']) if (pose_def and pose_def['kreditpris']) else None
 
     varer = []
     total_retur = total_tgtg = total_rester = 0
@@ -2940,7 +2946,29 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
         })
 
     varer.sort(key=lambda x: -x['rester'])
-    poser_est = _math.ceil(total_tgtg / enheder_per_pose) if (enheder_per_pose and total_tgtg > 0) else None
+
+    # Retur-liste: præcis hvad der sendes tilbage til bageren, pr. vare
+    retur_varer = [{'varenavn': v['varenavn'], 'antal': v['retur']}
+                   for v in varer if v['retur'] > 0]
+
+    # Pose-sammensætning: fordel TGTG-varerne i konkrete poser (round-robin → blandet pose)
+    poser = []
+    if enheder_per_pose and total_tgtg > 0:
+        n_poser = max(1, round(total_tgtg / enheder_per_pose))
+        bins = [{} for _ in range(n_poser)]
+        seq = []
+        for v in varer:
+            seq.extend([v['varenavn']] * v['tgtg'])
+        for i, navn in enumerate(seq):
+            b = bins[i % n_poser]
+            b[navn] = b.get(navn, 0) + 1
+        poser = [
+            {'indhold': [{'varenavn': k, 'antal': n} for k, n in b.items()],
+             'antal':   sum(b.values())}
+            for b in bins if b
+        ]
+    poser_est = len(poser) if poser else (
+        _math.ceil(total_tgtg / enheder_per_pose) if (enheder_per_pose and total_tgtg > 0) else None)
 
     return {
         'dato':             dato,
@@ -2948,6 +2976,10 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
         'aar':              aar,
         'har_data':         len(varer) > 0,
         'varer':            varer,
+        'retur_varer':      retur_varer,
+        'poser':            poser,
+        'pose_navn':        pose_navn,
+        'pose_pris':        pose_pris,
         'total_rester':     total_rester,
         'total_retur':      total_retur,
         'total_tgtg':       total_tgtg,

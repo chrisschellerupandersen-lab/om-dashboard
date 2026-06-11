@@ -7998,6 +7998,30 @@ async function mbReturTgtg() {
     </tr>`).join('');
 
   const poserTxt = d.poser_est ? ` ≈ ${d.poser_est} ${d.poser_est === 1 ? 'pose' : 'poser'}` : '';
+
+  // Retur-liste (præcis pr. vare)
+  const returListe = (d.retur_varer && d.retur_varer.length)
+    ? d.retur_varer.map(v => `${v.varenavn} <b>${v.antal}</b>`).join(' · ')
+    : 'intet til retur';
+
+  // Konkrete poseforslag (indhold pr. pose)
+  let poserHtml = '';
+  if (d.poser && d.poser.length) {
+    const poseLabel = d.pose_navn ? d.pose_navn : 'TGTG-pose';
+    const prisTxt = d.pose_pris ? ` · ${d.pose_pris} kr` : '';
+    poserHtml = `
+      <div style="margin-top:14px;">
+        <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);margin-bottom:8px;">FORSLAG TIL POSER (${poseLabel}${prisTxt})</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          ${d.poser.map((p,i) => `
+            <div style="flex:1;min-width:150px;background:rgba(230,126,34,.06);border:1px solid ${TGTG_CLR}33;border-radius:8px;padding:8px 12px;">
+              <div style="${mono}font-size:9px;color:${TGTG_CLR};font-weight:600;margin-bottom:4px;">Pose ${i+1} · ${p.antal} stk</div>
+              ${p.indhold.map(it => `<div style="font-size:11px;color:var(--charcoal);">${it.antal}× ${it.varenavn}</div>`).join('')}
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
   wrap.innerHTML = `
     <div style="background:var(--cream);border:1px solid rgba(30,58,30,.1);border-radius:12px;padding:16px 18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px;">
@@ -8008,13 +8032,15 @@ async function mbReturTgtg() {
         <div style="flex:1;min-width:130px;background:rgba(107,158,107,.1);border:1px solid ${RETUR_CLR}44;border-radius:8px;padding:10px 14px;">
           <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);">SEND RETUR TIL BAGER</div>
           <div style="${mono}font-size:22px;font-weight:700;color:${RETUR_CLR};">${d.total_retur} stk</div>
+          <div style="font-size:11px;color:var(--charcoal);margin-top:4px;line-height:1.4;">${returListe}</div>
         </div>
         <div style="flex:1;min-width:130px;background:rgba(230,126,34,.1);border:1px solid ${TGTG_CLR}44;border-radius:8px;padding:10px 14px;">
           <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);">PAK I TGTG-POSER</div>
           <div style="${mono}font-size:22px;font-weight:700;color:${TGTG_CLR};">${d.total_tgtg} stk${poserTxt}</div>
         </div>
       </div>
-      <table style="width:100%;border-collapse:collapse;">
+      ${poserHtml}
+      <table style="width:100%;border-collapse:collapse;margin-top:14px;">
         <thead><tr style="border-bottom:1px solid rgba(30,58,30,.12);">
           <th style="padding:4px 8px;text-align:left;${mono}font-size:9px;color:var(--ash);font-weight:500;">VARE</th>
           <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:var(--ash);font-weight:500;">BESTILT</th>

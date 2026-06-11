@@ -383,8 +383,14 @@ def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str
     priser: Dict = defaultdict(list)
     navne:  Dict = {}
     for t in transaktioner:
-        vn   = str(t.get("varenummer", "") or "").strip()
-        if not vn or vn in ("0", ""):
+        vn_raw = t.get("varenummer", None)
+        if not vn_raw:
+            continue
+        try:
+            vn = int(vn_raw)
+        except (ValueError, TypeError):
+            continue
+        if vn <= 0:
             continue
         antal = float(t.get("antal", 0) or 0)
         kost  = float(t.get("kostpris", 0) or 0)

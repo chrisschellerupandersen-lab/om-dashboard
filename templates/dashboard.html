@@ -1114,9 +1114,6 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <!-- Spild mini-chips -->
           <div id="mb-spild-chips" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;"></div>
 
-          <!-- RETUR & TGTG FORSLAG -->
-          <div id="mb-retur-tgtg" style="display:none;margin-bottom:24px;"></div>
-
           <!-- ZONE 5: SPARKLINES -->
           <div class="mb-spark-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
@@ -7983,19 +7980,7 @@ async function mbLoad(force = false) {
     alertEl.style.display = '';
   }
 
-  // Retur & TGTG forslag (separat fetch — deterministisk beregning)
-  mbReturTgtg();
-
   // Briefing loader kun ved knap-klik, ikke automatisk
-}
-
-async function mbReturTgtg() {
-  const wrap = document.getElementById('mb-retur-tgtg');
-  if (!wrap) return;
-  const d = await api('/api/dashboard/retur-tgtg');
-  if (!d || !d.har_data || !d.varer.length) { wrap.style.display = 'none'; return; }
-  wrap.innerHTML = _returTgtgCardHtml(d);
-  wrap.style.display = '';
 }
 
 function _returTgtgCardHtml(d) {

@@ -2296,8 +2296,22 @@ async def api_morgenbriefing_ai(request: Request):
     except Exception:
         tgtg_kr = 0
 
-    # Forrige uge total + 4-ugers snit
-    prev_uge_oms = round((kpi.get("prev_uge") or {}).get("omsaetning", 0) / 1.25) if kpi.get("prev_uge") else 0
+    # Forrige uge SAMME PERIODE (time-capped fra hent_kpi) — fair WTD-sammenligning
+    prev_uge_samme = round((kpi.get("prev_uge") or {}).get("omsaetning", 0) / 1.25) if kpi.get("prev_uge") else 0
+    kpi_seneste_time = kpi.get("seneste_time")
+    kl_label = f"kl. {kpi_seneste_time:02d}" if kpi_seneste_time is not None else "samme tid"
+
+    # Forrige uge HELE ugen (man-søn) — reference for total + tracking
+    prev_uge_total = 0
+    try:
+        with database._conn() as conn:
+            pr = conn.execute("""
+                SELECT ROUND(SUM(omsætning)/1.25, 0) AS oms FROM transaktioner
+                WHERE dato >= date(?, '-7 days') AND dato <= date(?, '-7 days')
+            """, (man_dato.isoformat(), son_dato.isoformat())).fetchone()
+            prev_uge_total = int(pr["oms"] or 0) if pr else 0
+    except Exception:
+        pass
     snit_4u = 0
     try:
         with database._conn() as conn:
@@ -2394,8 +2408,8 @@ DATA:
 - Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
 - Kunder: {dag_kunder} · DB%: {dag_db_pct:.1f}%
 - Kaffesalg: {kaffe_idag} kopper{f' ({kaffe_pct:+}% vs. forrige uge samme dag)' if kaffe_pct is not None else ''}
-- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage){f' — forrige uge samme periode: {round(prev_uge_oms * spild_d.get("n_dage",0) / 7):,} kr' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
-- Forrige uge total: {prev_uge_oms:,} kr · 4-ugers snit: {snit_4u:,} kr/uge{f' (denne uge tracker {round((wtd_oms/(prev_uge_oms*spild_d.get("n_dage",1)/7)-1)*100):+}% vs. samme punkt forrige uge)' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
+- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage){f' — forrige uge SAMME periode (samme ugedage til {kl_label}): {prev_uge_samme:,} kr' if prev_uge_samme > 0 else ''}
+- Forrige uge total (hele ugen): {prev_uge_total:,} kr · 4-ugers snit: {snit_4u:,} kr/uge{f' (denne uge tracker {round((wtd_oms/prev_uge_samme-1)*100):+}% vs. samme punkt forrige uge)' if prev_uge_samme > 0 else ''}
 - Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
 {f'- Vejr i dag: {vejr_kontekst}' if vejr_kontekst else ''}
 {f'- Begivenhed uge {uge}: {evt["navn"]} — {evt_timing}' if evt else '- Ingen begivenhed denne uge'}

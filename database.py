@@ -500,6 +500,22 @@ def hent_seneste_snapshot_info() -> Optional[Dict]:
 
 # ── NYE ENDPOINTS ─────────────────────────────────────────────────────────────
 
+def _fair_periode_where(start: str, slut_dag: str, seneste_time) -> tuple:
+    """WHERE-fragment til fair sammenligning med en IGANGVÆRENDE periode.
+
+    Tæller fulde dage før slut_dag, men kun transaktioner op til samme tidspunkt
+    (time_start <= seneste_time) PÅ slut_dag. Så fx 'forrige uge' sammenlignes mod
+    samme ugedag OG samme tidspunkt på dagen — ikke en hel dag mod en halv.
+
+    Historiske rækker uden registreret time (time_start = -1) tælles altid med,
+    da -1 <= seneste_time. Returnerer (sql_fragment, params).
+    """
+    if seneste_time is None:
+        return "(dato >= ? AND dato <= ?)", (start, slut_dag)
+    return ("((dato >= ? AND dato < ?) OR (dato = ? AND time_start <= ?))",
+            (start, slut_dag, slut_dag, seneste_time))
+
+
 def hent_kpi(aar: int = None) -> Dict:
     with _conn() as conn:
         aar_filter = "WHERE strftime('%Y', dato) = ?" if aar else ""
@@ -534,6 +550,14 @@ def hent_kpi(aar: int = None) -> Dict:
         uge_mandag = _uge_man.isoformat()
         prev_uge_start = _prev_man.isoformat()
         prev_uge_end   = _prev_end.isoformat()
+
+        # Seneste registrerede time på seneste dag — markerer "hvor langt inde i dagen"
+        # vi er. Bruges til fair sammenligning: igangværende periode måles kun mod
+        # samme TIDSPUNKT i tidligere perioder, ikke mod hele dage/uger.
+        seneste_time = conn.execute("""
+            SELECT MAX(time_start) FROM transaktioner
+            WHERE dato = ? AND time_start >= 0
+        """, (seneste_dato,)).fetchone()[0]
 
         seneste_yw = conn.execute(
             "SELECT strftime('%Y-%W', ?)", (seneste_dato,)
@@ -580,8 +604,9 @@ def hent_kpi(aar: int = None) -> Dict:
         """).fetchone()
 
         # Forrige uge — SAMME periode som indeværende (mandag til samme ugedag)
-        # Fx tirsdag uge 21 → sammenlignes mod mandag+tirsdag uge 20
-        prev_uge_row = conn.execute("""
+        # Fx tirsdag uge 21 kl.14 → sammenlignes mod mandag(fuld)+tirsdag(til kl.14) uge 20
+        _pu_where, _pu_params = _fair_periode_where(prev_uge_start, prev_uge_end, seneste_time)
+        prev_uge_row = conn.execute(f"""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
                    COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
@@ -593,14 +618,8 @@ def hent_kpi(aar: int = None) -> Dict:
                    END                         AS transak,
                    COUNT(DISTINCT dato)        AS antal_dage
             FROM v_transaktioner
-            WHERE dato >= ? AND dato <= ?
-        """, (prev_uge_start, prev_uge_end)).fetchone()
-
-        # Seneste registrerede time i dag — bruges til fair sammenligning
-        seneste_time = conn.execute("""
-            SELECT MAX(time_start) FROM transaktioner
-            WHERE dato = ? AND time_start >= 0
-        """, (seneste_dato,)).fetchone()[0]
+            WHERE {_pu_where}
+        """, _pu_params).fetchone()
 
         # Samme dag forrige uge — kun op til samme time som i dag
         prev_dag_dato = conn.execute(
@@ -622,18 +641,18 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato = ? {time_filter}
         """, (prev_dag_dato,) + time_params).fetchone()
 
-        # Samme dag 2 uger siden (seneste_dato - 14 dage)
+        # Samme dag 2 uger siden (seneste_dato - 14 dage) — samme time-cutoff
         prev_prev_dag_dato = conn.execute(
             "SELECT date(?, '-7 days')", (prev_dag_dato,)
         ).fetchone()[0]
-        prev_prev_dag_row = conn.execute("""
+        prev_prev_dag_row = conn.execute(f"""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
                    COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                         ELSE 0 END             AS db_pct
-            FROM v_transaktioner WHERE dato = ?
-        """, (prev_prev_dag_dato,)).fetchone()
+            FROM v_transaktioner WHERE dato = ? {time_filter}
+        """, (prev_prev_dag_dato,) + time_params).fetchone()
 
         # 12-ugers snit — de 12 seneste samme ugedage, samme time-cutoff
         # Beregnes direkte som datoer (undgår ORDER BY LIMIT i subquery)
@@ -672,21 +691,22 @@ def hent_kpi(aar: int = None) -> Dict:
             FROM v_transaktioner WHERE dato >= ? AND dato <= ?
         """, (mtd_start, seneste_dato)).fetchone()
 
-        # Forrige måned – samme periode (1. til dato -1 måned)
+        # Forrige måned – samme periode (1. til dato -1 måned), sidste dag time-capped
         prev_mtd_start = conn.execute(
             "SELECT date(?, '-1 month')", (mtd_start,)
         ).fetchone()[0]
         prev_mtd_end = conn.execute(
             "SELECT date(?, '-1 month')", (seneste_dato,)
         ).fetchone()[0]
-        prev_mtd_row = conn.execute("""
+        _pm_where, _pm_params = _fair_periode_where(prev_mtd_start, prev_mtd_end, seneste_time)
+        prev_mtd_row = conn.execute(f"""
             SELECT COALESCE(SUM(omsætning),0)  AS omsaetning,
                    COALESCE(SUM(db_korrekt),0) AS db_kr,
                    CASE WHEN SUM(omsætning)>0
                         THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
                         ELSE 0 END             AS db_pct
-            FROM v_transaktioner WHERE dato >= ? AND dato <= ?
-        """, (prev_mtd_start, prev_mtd_end)).fetchone()
+            FROM v_transaktioner WHERE {_pm_where}
+        """, _pm_params).fetchone()
 
         # Retur boller + wienerbrød for indeværende ISO-uge
         iso = _sd.isocalendar()

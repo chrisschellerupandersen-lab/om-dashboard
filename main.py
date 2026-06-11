@@ -1669,6 +1669,13 @@ async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar:
     return database.hent_spild_dagsniveau(int(uge), int(aar))
 
 
+@app.get("/api/dashboard/retur-tgtg")
+async def api_retur_tgtg(request: Request, dato: Optional[str] = None):
+    """Anbefaling: hvad sendes retur til bageren, og hvad kan blive TGTG — i dag."""
+    _kræv_login(request)
+    return database.hent_retur_tgtg_anbefaling(dato)
+
+
 # ── VARESTAMDATA ──────────────────────────────────────────────────────────────
 
 @app.get("/api/stamdata")

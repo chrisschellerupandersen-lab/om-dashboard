@@ -2842,6 +2842,120 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     }
 
 
+def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
+    """Deterministisk anbefaling: hvad skal sendes RETUR til bageren, og hvad kan
+    blive til TGTG-poser — baseret på dagens bestilling og salg INDTIL NU.
+
+    Logik pr. vare (bagværk, ekskl. kager):
+      rester  = max(0, bestilt_i_dag − solgt_i_dag)
+      retur   = min(rester, retur-cap)   — bageren tager kun en del retur:
+                boller 10 %, wienerbrød 13,5 % af bestilt (etableret regel)
+      tgtg    = rester − retur           — resten kan pakkes i TGTG-poser
+
+    Ingen AI/gæt — kun aritmetik på faktiske tal. Mest relevant sidst på dagen.
+    """
+    import math as _math
+    from datetime import date as _d
+
+    RETUR_BOLLER_PCT = 0.10
+    RETUR_WIENER_PCT = 0.135
+    _BOLLE_KW = ('bolle', 'hveder', 'musli', 'teboller')
+    _WIENER_KW = ('wiener', 'croissant', 'crossaint', 'snegl', 'snurrer', 'tebirkes',
+                  'grovbirkes', 'fastelavns', 'spandauer', 'frøsnapper', 'kanelstang',
+                  'wienerstang', 'marcipan', 'birkes')
+    _KAGE_KW = ('kage', 'cookie', 'muffin', 'brownie', 'romkugl', 'kokostoppe',
+                'napoleonshat', 'studenterbr', 'snitter', 'stammer', 'honningbomb',
+                'honninghjerter')
+
+    def _kat(navn: str) -> str:
+        n = (navn or '').lower()
+        if any(k in n for k in _KAGE_KW):   return 'kage'
+        if any(k in n for k in _WIENER_KW): return 'wiener'
+        if any(k in n for k in _BOLLE_KW):  return 'boller'
+        return 'andet'
+
+    with _conn() as conn:
+        if not dato:
+            dato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        if not dato:
+            return {"dato": None, "har_data": False, "varer": []}
+
+        d = _d.fromisoformat(dato)
+        iso = d.isocalendar()
+        uge, aar = int(iso[1]), int(iso[0])
+        dag_kol = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'][d.weekday()]
+
+        # Bestilt i dag + solgt i dag, pr. vare (matcher varenummer som spild-rapporten)
+        rows = conn.execute(f"""
+            SELECT b.varenummer, b.varenavn, b.{dag_kol} AS bestilt,
+                   COALESCE((
+                       SELECT ROUND(SUM(t.antal), 0) FROM transaktioner t
+                       WHERE t.dato = ?
+                         AND CAST(CAST(t.varenummer AS REAL) AS INTEGER)
+                             = CAST(CAST(b.varenummer AS REAL) AS INTEGER)
+                   ), 0) AS solgt
+            FROM ugebestillinger b
+            WHERE b.uge = ? AND b.aar = ? AND b.{dag_kol} > 0
+              AND b.varenummer != '' AND b.varenummer != '0'
+        """, (dato, uge, aar)).fetchall()
+
+        # Gennemsnitlig posestørrelse til at estimere antal TGTG-poser
+        ep_row = conn.execute(
+            "SELECT AVG(enheder_per_pose) FROM tgtg_poser WHERE enheder_per_pose > 0 AND aktiv = 1"
+        ).fetchone()
+        enheder_per_pose = round(ep_row[0]) if ep_row and ep_row[0] else None
+
+    varer = []
+    total_retur = total_tgtg = total_rester = 0
+    for r in rows:
+        navn = r['varenavn'] or ''
+        kat = _kat(navn)
+        if kat == 'kage':
+            continue  # kager: lang holdbarhed — ikke retur/TGTG samme dag
+        bestilt = int(r['bestilt'] or 0)
+        solgt = int(r['solgt'] or 0)
+        rester = max(0, bestilt - solgt)
+        if rester <= 0:
+            continue
+        if kat == 'wiener':
+            retur_cap = _math.ceil(bestilt * RETUR_WIENER_PCT)
+        elif kat == 'boller':
+            retur_cap = _math.ceil(bestilt * RETUR_BOLLER_PCT)
+        else:
+            retur_cap = 0  # brød/andet: bageren tager ikke retur → alt til TGTG
+        retur = min(rester, retur_cap)
+        tgtg = rester - retur
+        total_retur += retur
+        total_tgtg += tgtg
+        total_rester += rester
+        varer.append({
+            'varenummer': r['varenummer'],
+            'varenavn':   navn,
+            'kategori':   kat,
+            'bestilt':    bestilt,
+            'solgt':      solgt,
+            'rester':     rester,
+            'retur':      retur,
+            'tgtg':       tgtg,
+        })
+
+    varer.sort(key=lambda x: -x['rester'])
+    poser_est = _math.ceil(total_tgtg / enheder_per_pose) if (enheder_per_pose and total_tgtg > 0) else None
+
+    return {
+        'dato':             dato,
+        'uge':              uge,
+        'aar':              aar,
+        'har_data':         len(varer) > 0,
+        'varer':            varer,
+        'total_rester':     total_rester,
+        'total_retur':      total_retur,
+        'total_tgtg':       total_tgtg,
+        'enheder_per_pose': enheder_per_pose,
+        'poser_est':        poser_est,
+    }
+
+
 # ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
 
 _SI_MAANED = {1:.88, 2:.83, 3:.87, 4:1.10, 5:1.12, 6:1.15,

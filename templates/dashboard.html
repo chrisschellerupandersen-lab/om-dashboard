@@ -1114,6 +1114,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <!-- Spild mini-chips -->
           <div id="mb-spild-chips" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;"></div>
 
+          <!-- RETUR & TGTG FORSLAG -->
+          <div id="mb-retur-tgtg" style="display:none;margin-bottom:24px;"></div>
+
           <!-- ZONE 5: SPARKLINES -->
           <div class="mb-spark-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
@@ -7967,7 +7970,66 @@ async function mbLoad(force = false) {
     alertEl.style.display = '';
   }
 
+  // Retur & TGTG forslag (separat fetch — deterministisk beregning)
+  mbReturTgtg();
+
   // Briefing loader kun ved knap-klik, ikke automatisk
+}
+
+async function mbReturTgtg() {
+  const wrap = document.getElementById('mb-retur-tgtg');
+  if (!wrap) return;
+  const d = await api('/api/dashboard/retur-tgtg');
+  if (!d || !d.har_data || !d.varer.length) { wrap.style.display = 'none'; return; }
+
+  const mono = "font-family:'DM Mono',monospace;";
+  const nu = new Date();
+  const klStr = String(nu.getHours()).padStart(2,'0') + ':' + String(nu.getMinutes()).padStart(2,'0');
+  const RETUR_CLR = '#6b9e6b', TGTG_CLR = '#e67e22';
+
+  const rows = d.varer.map(v => `
+    <tr style="border-bottom:1px solid rgba(30,58,30,.06);">
+      <td style="padding:6px 8px;font-size:12px;color:var(--charcoal);">${v.varenavn}</td>
+      <td style="padding:6px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${v.bestilt}</td>
+      <td style="padding:6px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${v.solgt}</td>
+      <td style="padding:6px 8px;text-align:right;${mono}font-size:13px;font-weight:700;color:var(--charcoal);">${v.rester}</td>
+      <td style="padding:6px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:${RETUR_CLR};">${v.retur > 0 ? v.retur : '–'}</td>
+      <td style="padding:6px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:${TGTG_CLR};">${v.tgtg > 0 ? v.tgtg : '–'}</td>
+    </tr>`).join('');
+
+  const poserTxt = d.poser_est ? ` ≈ ${d.poser_est} ${d.poser_est === 1 ? 'pose' : 'poser'}` : '';
+  wrap.innerHTML = `
+    <div style="background:var(--cream);border:1px solid rgba(30,58,30,.1);border-radius:12px;padding:16px 18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">📦 Retur &amp; TGTG · forslag</span>
+        <span style="font-size:10px;color:var(--ash);">opdateret kl. ${klStr} · baseret på dagens bestilling &amp; salg</span>
+      </div>
+      <div style="display:flex;gap:10px;margin:10px 0 14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:130px;background:rgba(107,158,107,.1);border:1px solid ${RETUR_CLR}44;border-radius:8px;padding:10px 14px;">
+          <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);">SEND RETUR TIL BAGER</div>
+          <div style="${mono}font-size:22px;font-weight:700;color:${RETUR_CLR};">${d.total_retur} stk</div>
+        </div>
+        <div style="flex:1;min-width:130px;background:rgba(230,126,34,.1);border:1px solid ${TGTG_CLR}44;border-radius:8px;padding:10px 14px;">
+          <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);">PAK I TGTG-POSER</div>
+          <div style="${mono}font-size:22px;font-weight:700;color:${TGTG_CLR};">${d.total_tgtg} stk${poserTxt}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="border-bottom:1px solid rgba(30,58,30,.12);">
+          <th style="padding:4px 8px;text-align:left;${mono}font-size:9px;color:var(--ash);font-weight:500;">VARE</th>
+          <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:var(--ash);font-weight:500;">BESTILT</th>
+          <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:var(--ash);font-weight:500;">SOLGT</th>
+          <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:var(--ash);font-weight:500;">TILBAGE</th>
+          <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:${RETUR_CLR};font-weight:500;">→ RETUR</th>
+          <th style="padding:4px 8px;text-align:right;${mono}font-size:9px;color:${TGTG_CLR};font-weight:500;">→ TGTG</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div style="font-size:10px;color:var(--ash);margin-top:8px;line-height:1.4;">
+        Retur-loft: boller 10 %, wienerbrød 13,5 % af bestilt (bageren tager kun en del retur). Resten kan blive TGTG. Mest relevant sidst på dagen · kager ekskluderet.
+      </div>
+    </div>`;
+  wrap.style.display = '';
 }
 
 async function mbLoadBriefing() {

@@ -133,7 +133,7 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 
         transaktioner.append({
             "dato":       dato,
-            "varenummer": str(row[col["varenummer"]]).strip(),
+            "varenummer": int(float(row[col["varenummer"]])),
             "varenavn":   varenavn,
             "kategori":   kategori,
             "antal":      _tal(row[col["antal"]]),

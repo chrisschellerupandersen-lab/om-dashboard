@@ -2376,7 +2376,8 @@ async def api_morgenbriefing_ai(request: Request):
         sidst = database.hent_sidst_solgt_moenster(uger=4)
         if sidst.get("udsolgt_tidligt"):
             top = sidst["udsolgt_tidligt"][0]
-            sidst_advarsel = f"{top['varenavn']} solgte ud kl. {top['snit_time']:02d}:00 i snit ({top['dage']} dage)."
+            sidst_advarsel = (f"{top['varenavn']}: sidste salg lå i snit kl. {top['snit_time']:02d}:00 "
+                              f"over 4 uger ({top['dage']} dage) — tegn på at varen TYPISK er udsolgt tidligt.")
     except Exception:
         pass
 
@@ -2413,12 +2414,15 @@ DATA:
 - Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
 {f'- Vejr i dag: {vejr_kontekst}' if vejr_kontekst else ''}
 {f'- Begivenhed uge {uge}: {evt["navn"]} — {evt_timing}' if evt else '- Ingen begivenhed denne uge'}
-{f'- Salgsdata: {sidst_advarsel}' if sidst_advarsel else ''}
+{f'- HISTORISK MØNSTER (4-ugers snit, IKKE dagens lager): {sidst_advarsel}' if sidst_advarsel else ''}
 
 Skriv en dagsbriefing på MAX 4 sætninger på dansk.
 - Start med "God [ugedag]" eller tilsvarende — ALDRIG med "Dagsbriefing"
 - VIGTIG KONTEKST: vi er kun {timer_siden_aabning} timer inde i dagen. Sammenlign KUN med samme TIDSPUNKT forrige dag, ikke hele dage
   fx: "Efter {timer_siden_aabning} timer er omsætningen 12% højere end samme tid i går"
+- KRITISK om lager: vi har INGEN realtids-lagertal. Påstå ALDRIG at en vare "er udsolgt" eller "er allerede udsolgt" i dag — det ved vi ikke.
+  'HISTORISK MØNSTER' er kun et 4-ugers gennemsnit. Skriv det som forventning, fx "croissanterne plejer typisk at være udsolgt omkring kl. 10",
+  ALDRIG som nutids-faktum om i dag.
 - Forklar hvad der sker og HVORFOR — brug de faktiske tal og den korrekte dato
 - Hvis begivenhed IKKE er i dag: nævn hvilken dag den er og hvad du forventer
 - Ingen anbefalinger — kun forklaring og kontekst

@@ -2354,9 +2354,14 @@ async def api_morgenbriefing_ai(request: Request):
         idag_evt = idag_key in dag_fak and dag_fak[idag_key] > 1.0
         evt_timing = "I DAG" if idag_evt else f"Ikke i dag — stærke dage: {evt_dag_info}"
 
+    from datetime import datetime as _dt
+    nu = _dt.now()
+    timer_siden_aabning = max(0, nu.hour - 6)
+
     prompt = f"""Du er daglig briefing-assistent for Organic Market Greve — ubemandet franchise-butik, åben 06-20.
 
-DATO I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}
+DATO & TID I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}, kl. {nu.hour:02d}:{nu.minute:02d}
+— dvs. {timer_siden_aabning} timer siden åbning
 
 DATA:
 - Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
@@ -2371,6 +2376,8 @@ DATA:
 
 Skriv en dagsbriefing på MAX 4 sætninger på dansk.
 - Start med "God [ugedag]" eller tilsvarende — ALDRIG med "Dagsbriefing"
+- VIGTIG KONTEKST: vi er kun {timer_siden_aabning} timer inde i dagen. Sammenlign KUN med samme TIDSPUNKT forrige dag, ikke hele dage
+  fx: "Efter {timer_siden_aabning} timer er omsætningen 12% højere end samme tid i går"
 - Forklar hvad der sker og HVORFOR — brug de faktiske tal og den korrekte dato
 - Hvis begivenhed IKKE er i dag: nævn hvilken dag den er og hvad du forventer
 - Ingen anbefalinger — kun forklaring og kontekst

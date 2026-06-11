@@ -1094,10 +1094,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
 
           <!-- ZONE 3: AI DAGSBRIEFING -->
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">AI dagsbriefing</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">AI dagsbriefing</div>
+            <button onclick="mbLoadBriefing()" id="mb-brief-btn"
+              style="background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">
+              🔄 Opdater
+            </button>
+          </div>
           <div id="mb-briefing-boks" style="background:rgba(30,58,30,.04);border:1px solid rgba(30,58,30,.10);border-radius:12px;padding:16px 18px;margin-bottom:24px;min-height:60px;">
             <div id="mb-briefing-tekst" style="font-size:14px;line-height:1.7;color:var(--charcoal);">
-              <span style="color:var(--ash);font-size:12px;">Henter dagsbriefing…</span>
+              <span style="color:var(--ash);font-size:12px;">Klik "Opdater" for at hente dagens AI-briefing</span>
             </div>
           </div>
 
@@ -7957,16 +7963,23 @@ async function mbLoad(force = false) {
     alertEl.style.display = '';
   }
 
-  // Zone 3: AI dagsbriefing hentes efter siden er vist (blokerer ikke loading)
-  setTimeout(async () => {
-    const br = await api('/api/dashboard/briefing');
-    const el = document.getElementById('mb-briefing-tekst');
-    if (br && br.ok && br.tekst) {
-      el.innerHTML = _mbFarveText(br.tekst);
-    } else {
-      el.innerHTML = '<span style="color:var(--ash);font-size:11px;">Briefing ikke tilgængelig</span>';
-    }
-  }, 100);
+  // Briefing loader kun ved knap-klik, ikke automatisk
+}
+
+async function mbLoadBriefing() {
+  const btn = document.getElementById('mb-brief-btn');
+  const el = document.getElementById('mb-briefing-tekst');
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  const br = await api('/api/dashboard/briefing');
+  if (br && br.ok && br.tekst) {
+    el.innerHTML = _mbFarveText(br.tekst);
+  } else {
+    el.innerHTML = '<span style="color:var(--danger);font-size:11px;">Kunne ikke hente briefing</span>';
+  }
+  btn.disabled = false;
+  btn.textContent = '🔄 Opdater';
+}
 }
 
 // ── VEJR ─────────────────────────────────────────────────────────────────────

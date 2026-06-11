@@ -231,10 +231,11 @@ async def lifespan(app: FastAPI):
     if os.environ.get("GMAIL_TOKEN_JSON"):
         _scheduler.add_job(_planlagt_gmail_sync, "cron", day_of_week="mon,thu", hour=8, minute=0)
         jobs.append("Gmail auto-sync: man+tor 08:00")
-    # TGTG sync kl. 16 og 19 hver dag
+    # TGTG sync kl. 16, 19 og 20 hver dag
     _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=16, minute=0)
     _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=19, minute=0)
-    jobs.append("TGTG auto-sync: dagligt 16:00 + 19:00")
+    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=20, minute=0)
+    jobs.append("TGTG auto-sync: dagligt 16:00 + 19:00 + 20:00")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")

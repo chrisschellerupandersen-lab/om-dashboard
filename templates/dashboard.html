@@ -10567,18 +10567,9 @@ async function mgmtIndlaes() {
     aarInput.value = new Date().getFullYear();
   }
 
-  try {
-    const res  = await fetch('/api/management/review');
-    const data = await res.json();
-    if (data.ok && data.review) {
-      mgmtVisReview(data.review);
-    } else {
-      document.getElementById('mgmt-ingen-data').style.display = '';
-      document.getElementById('mgmt-sektioner').style.display  = 'none';
-    }
-  } catch(e) {
-    document.getElementById('mgmt-ingen-data').style.display = '';
-  }
+  // Ikke auto-load — bruger klikker "Opdater analyse" knappen
+  document.getElementById('mgmt-ingen-data').style.display = '';
+  document.getElementById('mgmt-sektioner').style.display  = 'none';
 }
 
 async function mgmtOpdater() {

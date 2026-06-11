@@ -2867,12 +2867,24 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
                 'napoleonshat', 'studenterbr', 'snitter', 'stammer', 'honningbomb',
                 'honninghjerter')
 
+    _BROED_KW = ('brød', 'flute', 'rugbrød', 'franskbrød', 'grovbrød', 'surdej', 'spelt')
+
     def _kat(navn: str) -> str:
         n = (navn or '').lower()
         if any(k in n for k in _KAGE_KW):   return 'kage'
-        if any(k in n for k in _WIENER_KW): return 'wiener'
+        if any(k in n for k in _WIENER_KW): return 'wiener'   # før brød (wienerBRØD)
         if any(k in n for k in _BOLLE_KW):  return 'boller'
+        if any(k in n for k in _BROED_KW):  return 'brød'
         return 'andet'
+
+    # TGTG-pose-opskrifter (kategori → antal pr. pose). Kager udeladt bevidst.
+    # Matcher jeres faktiske poser; kreditpris hentes fra tgtg_poser-tabellen.
+    POSE_OPSKRIFT = [
+        ('wienerbrødspose', '🥐', {'wiener': 6}),
+        ('lykkepose',       '🌟', {'brød': 1, 'boller': 3, 'wiener': 2}),
+        ('brødpose',        '🍞', {'brød': 2, 'boller': 3}),
+    ]
+    _KAT_LABEL = {'brød': 'Brød', 'boller': 'Boller', 'wiener': 'Wienerbrød'}
 
     with _conn() as conn:
         if not dato:
@@ -2899,17 +2911,18 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
               AND b.varenummer != '' AND b.varenummer != '0'
         """, (dato, uge, aar)).fetchall()
 
-        # Pose-definition: størrelse, navn og pris fra jeres TGTG-opsætning
-        ep_row = conn.execute(
-            "SELECT AVG(enheder_per_pose) FROM tgtg_poser WHERE enheder_per_pose > 0 AND aktiv = 1"
-        ).fetchone()
-        enheder_per_pose = round(ep_row[0]) if ep_row and ep_row[0] else None
-        pose_def = conn.execute(
-            "SELECT navn, enheder_per_pose, kreditpris FROM tgtg_poser "
-            "WHERE aktiv = 1 AND enheder_per_pose > 0 ORDER BY kreditpris DESC LIMIT 1"
-        ).fetchone()
-        pose_navn = pose_def['navn'] if pose_def else None
-        pose_pris = round(pose_def['kreditpris']) if (pose_def and pose_def['kreditpris']) else None
+        # Pose-definitioner fra jeres TGTG-opsætning (navn + kreditpris)
+        db_poser = conn.execute(
+            "SELECT navn, kreditpris FROM tgtg_poser WHERE aktiv = 1"
+        ).fetchall()
+
+    def _find_pose(kw: str):
+        """Match opskrift-nøgleord mod faktisk pose-navn i DB → (navn, kreditpris)."""
+        for r in db_poser:
+            nn = (r['navn'] or '').lower().replace(' ', '')
+            if kw in nn:
+                return r['navn'], round(r['kreditpris'] or 0, 2)
+        return None, None
 
     varer = []
     total_retur = total_tgtg = total_rester = 0
@@ -2951,24 +2964,70 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
     retur_varer = [{'varenavn': v['varenavn'], 'antal': v['retur']}
                    for v in varer if v['retur'] > 0]
 
-    # Pose-sammensætning: fordel TGTG-varerne i konkrete poser (round-robin → blandet pose)
+    # TGTG-bare rester pr. kategori (kun brød/boller/wiener kan komme i poser)
+    avail = {'brød': 0, 'boller': 0, 'wiener': 0}
+    for v in varer:
+        if v['kategori'] in avail:
+            avail[v['kategori']] += v['tgtg']
+
+    # Match opskrifter mod faktiske poser i DB (navn + kreditpris)
+    recepter = []
+    for kw, emoji, opskrift in POSE_OPSKRIFT:
+        navn_db, pris = _find_pose(kw)
+        if navn_db is not None:
+            recepter.append({'navn': navn_db, 'emoji': emoji, 'opskrift': opskrift, 'pris': pris or 0})
+
+    # Optimering: find antal af hver posetype der bruger FLEST rester (mindst spild),
+    # tiebreak på samlet TGTG-kreditpris. Små tal → udtømmende søgning.
+    def _kapacitet(rec, av):
+        return min(av[k] // n for k, n in rec['opskrift'].items()) if rec['opskrift'] else 0
+
+    best = None  # (brugte_varer, kreditpris, antal_liste)
+    rng = []
+    for rec in recepter:
+        rng.append(range(_kapacitet(rec, avail) + 1))
+    import itertools as _it
+    for kombi in _it.product(*rng) if recepter else []:
+        bB = bBo = bW = 0
+        verdi = brugt = 0
+        for antal, rec in zip(kombi, recepter):
+            for k, n in rec['opskrift'].items():
+                if k == 'brød':   bB  += antal * n
+                if k == 'boller': bBo += antal * n
+                if k == 'wiener': bW  += antal * n
+            verdi += antal * rec['pris']
+            brugt += antal * sum(rec['opskrift'].values())
+        if bB <= avail['brød'] and bBo <= avail['boller'] and bW <= avail['wiener']:
+            score = (brugt, verdi)
+            if best is None or score > best[0]:
+                best = (score, kombi)
+
     poser = []
-    if enheder_per_pose and total_tgtg > 0:
-        n_poser = max(1, round(total_tgtg / enheder_per_pose))
-        bins = [{} for _ in range(n_poser)]
-        seq = []
-        for v in varer:
-            seq.extend([v['varenavn']] * v['tgtg'])
-        for i, navn in enumerate(seq):
-            b = bins[i % n_poser]
-            b[navn] = b.get(navn, 0) + 1
-        poser = [
-            {'indhold': [{'varenavn': k, 'antal': n} for k, n in b.items()],
-             'antal':   sum(b.values())}
-            for b in bins if b
-        ]
-    poser_est = len(poser) if poser else (
-        _math.ceil(total_tgtg / enheder_per_pose) if (enheder_per_pose and total_tgtg > 0) else None)
+    poser_kreditpris = 0
+    brugt_kat = {'brød': 0, 'boller': 0, 'wiener': 0}
+    if best:
+        for antal, rec in zip(best[1], recepter):
+            if antal <= 0:
+                continue
+            for k, n in rec['opskrift'].items():
+                brugt_kat[k] += antal * n
+            poser_kreditpris += antal * rec['pris']
+            poser.append({
+                'navn':       rec['navn'],
+                'emoji':      rec['emoji'],
+                'antal_poser': antal,
+                'kreditpris': rec['pris'],
+                'stk_pr_pose': sum(rec['opskrift'].values()),
+                'indhold':    [{'kategori': _KAT_LABEL[k], 'antal': n}
+                               for k, n in rec['opskrift'].items()],
+            })
+        poser.sort(key=lambda p: -p['antal_poser'])
+
+    # Rester der IKKE kunne pakkes i en hel pose (ægte spild-risiko)
+    pose_rest = [{'kategori': _KAT_LABEL[k], 'antal': avail[k] - brugt_kat[k]}
+                 for k in ('brød', 'boller', 'wiener') if avail[k] - brugt_kat[k] > 0]
+
+    total_poser = sum(p['antal_poser'] for p in poser)
 
     return {
         'dato':             dato,
@@ -2977,14 +3036,14 @@ def hent_retur_tgtg_anbefaling(dato: str = None) -> Dict:
         'har_data':         len(varer) > 0,
         'varer':            varer,
         'retur_varer':      retur_varer,
+        'tgtg_kat':         {_KAT_LABEL[k]: avail[k] for k in avail if avail[k] > 0},
         'poser':            poser,
-        'pose_navn':        pose_navn,
-        'pose_pris':        pose_pris,
+        'pose_rest':        pose_rest,
+        'poser_kreditpris': round(poser_kreditpris, 2),
+        'total_poser':      total_poser,
         'total_rester':     total_rester,
         'total_retur':      total_retur,
         'total_tgtg':       total_tgtg,
-        'enheder_per_pose': enheder_per_pose,
-        'poser_est':        poser_est,
     }
 
 

@@ -7997,29 +7997,35 @@ async function mbReturTgtg() {
       <td style="padding:6px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:${TGTG_CLR};">${v.tgtg > 0 ? v.tgtg : '–'}</td>
     </tr>`).join('');
 
-  const poserTxt = d.poser_est ? ` ≈ ${d.poser_est} ${d.poser_est === 1 ? 'pose' : 'poser'}` : '';
+  const poserTxt = d.total_poser ? ` · ${d.total_poser} ${d.total_poser === 1 ? 'pose' : 'poser'}` : '';
 
   // Retur-liste (præcis pr. vare)
   const returListe = (d.retur_varer && d.retur_varer.length)
     ? d.retur_varer.map(v => `${v.varenavn} <b>${v.antal}</b>`).join(' · ')
     : 'intet til retur';
 
-  // Konkrete poseforslag (indhold pr. pose)
+  // Konkrete poseforslag — antal af hver posetype med opskrift
   let poserHtml = '';
   if (d.poser && d.poser.length) {
-    const poseLabel = d.pose_navn ? d.pose_navn : 'TGTG-pose';
-    const prisTxt = d.pose_pris ? ` · ${d.pose_pris} kr` : '';
     poserHtml = `
       <div style="margin-top:14px;">
-        <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);margin-bottom:8px;">FORSLAG TIL POSER (${poseLabel}${prisTxt})</div>
+        <div style="${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);margin-bottom:8px;">DETTE KAN I PAKKE${d.poser_kreditpris ? ` · ${Math.round(d.poser_kreditpris)} kr i TGTG-kreditering` : ''}</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
-          ${d.poser.map((p,i) => `
-            <div style="flex:1;min-width:150px;background:rgba(230,126,34,.06);border:1px solid ${TGTG_CLR}33;border-radius:8px;padding:8px 12px;">
-              <div style="${mono}font-size:9px;color:${TGTG_CLR};font-weight:600;margin-bottom:4px;">Pose ${i+1} · ${p.antal} stk</div>
-              ${p.indhold.map(it => `<div style="font-size:11px;color:var(--charcoal);">${it.antal}× ${it.varenavn}</div>`).join('')}
+          ${d.poser.map(p => `
+            <div style="flex:1;min-width:160px;background:rgba(230,126,34,.06);border:1px solid ${TGTG_CLR}33;border-radius:8px;padding:10px 12px;">
+              <div style="font-size:13px;font-weight:700;color:var(--charcoal);margin-bottom:2px;">${p.emoji} ${p.antal_poser}× ${p.navn}</div>
+              <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">${p.kreditpris ? p.kreditpris.toFixed(2) + ' kr/pose' : ''}</div>
+              ${p.indhold.map(it => `<div style="font-size:11px;color:var(--charcoal);">${it.antal}× ${it.kategori}</div>`).join('')}
             </div>`).join('')}
         </div>
       </div>`;
+  }
+
+  // Rester der ikke kunne pakkes
+  let restHtml = '';
+  if (d.pose_rest && d.pose_rest.length) {
+    const restTxt = d.pose_rest.map(x => `${x.antal}× ${x.kategori}`).join(' · ');
+    restHtml = `<div style="font-size:10px;color:var(--ash);margin-top:6px;">Ikke nok til en hel pose: <b>${restTxt}</b> (spild-risiko)</div>`;
   }
 
   wrap.innerHTML = `
@@ -8040,6 +8046,7 @@ async function mbReturTgtg() {
         </div>
       </div>
       ${poserHtml}
+      ${restHtml}
       <table style="width:100%;border-collapse:collapse;margin-top:14px;">
         <thead><tr style="border-bottom:1px solid rgba(30,58,30,.12);">
           <th style="padding:4px 8px;text-align:left;${mono}font-size:9px;color:var(--ash);font-weight:500;">VARE</th>
@@ -8052,7 +8059,7 @@ async function mbReturTgtg() {
         <tbody>${rows}</tbody>
       </table>
       <div style="font-size:10px;color:var(--ash);margin-top:8px;line-height:1.4;">
-        Retur-loft: boller 10 %, wienerbrød 13,5 % af bestilt (bageren tager kun en del retur). Resten kan blive TGTG. Mest relevant sidst på dagen · kager ekskluderet.
+        Retur-loft: boller 10 %, wienerbrød 13,5 % af bestilt (bageren tager kun en del retur). Posevalg ud fra jeres faste opskrifter — maksimerer brugte varer. Mest relevant sidst på dagen · kager ekskluderet.
       </div>
     </div>`;
   wrap.style.display = '';

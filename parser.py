@@ -61,6 +61,15 @@ def _tal(val) -> float:
         return 0.0
 
 
+def _vn_norm(val) -> str:
+    """Normaliserer varenummer til ren tal-streng ('10078.0' → '10078'). Tomt → ''."""
+    s = str(val or "").strip()
+    try:
+        return str(int(float(s)))
+    except (ValueError, TypeError):
+        return s
+
+
 def _dato(val) -> str | None:
     if not val:
         return None
@@ -133,7 +142,7 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 
         transaktioner.append({
             "dato":       dato,
-            "varenummer": int(float(row[col["varenummer"]])),
+            "varenummer": _vn_norm(row[col["varenummer"]]),
             "varenavn":   varenavn,
             "kategori":   kategori,
             "antal":      _tal(row[col["antal"]]),
@@ -189,7 +198,7 @@ def _parse_rækker_generisk(alle_rækker: List[List]) -> List[Dict[str, Any]]:
 
         transaktioner.append({
             "dato":       dato,
-            "varenummer": str(get("varenummer", "")).strip(),
+            "varenummer": _vn_norm(get("varenummer", "")),
             "varenavn":   varenavn,
             "kategori":   str(get("kategori", "")).strip(),
             "antal":      _tal(get("antal")),

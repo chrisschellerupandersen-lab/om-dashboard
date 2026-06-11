@@ -9452,7 +9452,9 @@ function kpVis(varer) {
   }).join('');
 }
 
+let _kpModalNavn = '';
 function kpModalAaben(vn, navn, pris) {
+  _kpModalNavn = navn || '';
   document.getElementById('kp-modal-vn').value    = vn;
   document.getElementById('kp-modal-titel').textContent = 'Korriger: ' + navn;
   document.getElementById('kp-modal-pris').value  = pris;
@@ -9471,7 +9473,7 @@ async function kpGem() {
   if (!vn || !pris || !fra) return alert('Udfyld alle felter');
   const r = await fetch('/api/kostpris/korriger', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({varenummer:vn, kostpris_enhed:pris, gyldig_fra:fra})
+    body: JSON.stringify({varenummer:vn, varenavn:_kpModalNavn, kostpris_enhed:pris, gyldig_fra:fra})
   });
   if ((await r.json()).ok) { kpModalLuk(); kpLoad(true); }
 }

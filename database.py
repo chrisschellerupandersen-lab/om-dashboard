@@ -31,6 +31,32 @@ def _conn() -> sqlite3.Connection:
 
 def init_db():
     with _conn() as conn:
+        # Migration: varekostpris skal være unik per (varenummer, varenavn, gyldig_fra)
+        # — delte varenumre (fx "Romkugle" + "3 X Romkugler" begge på sku 10078)
+        # overskrev ellers hinandens kostpris ved hver import.
+        _vk = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='varekostpris'"
+        ).fetchone()
+        if _vk and "UNIQUE(varenummer, gyldig_fra)" in (_vk["sql"] or ""):
+            conn.executescript("""
+                DROP VIEW IF EXISTS v_transaktioner;
+                ALTER TABLE varekostpris RENAME TO varekostpris_gl;
+                CREATE TABLE varekostpris (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    varenummer     TEXT    NOT NULL,
+                    varenavn       TEXT    NOT NULL DEFAULT '',
+                    kostpris_enhed REAL    NOT NULL DEFAULT 0,
+                    gyldig_fra     TEXT    NOT NULL,
+                    gyldig_til     TEXT,
+                    kilde          TEXT    DEFAULT 'auto',
+                    opdateret      TEXT    DEFAULT (datetime('now','localtime')),
+                    UNIQUE(varenummer, varenavn, gyldig_fra) ON CONFLICT REPLACE
+                );
+                INSERT INTO varekostpris (id, varenummer, varenavn, kostpris_enhed, gyldig_fra, gyldig_til, kilde, opdateret)
+                    SELECT id, varenummer, varenavn, kostpris_enhed, gyldig_fra, gyldig_til, kilde, opdateret
+                    FROM varekostpris_gl;
+                DROP TABLE varekostpris_gl;
+            """)
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS uploads (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,7 +247,7 @@ def init_db():
                 gyldig_til     TEXT,
                 kilde          TEXT    DEFAULT 'auto',
                 opdateret      TEXT    DEFAULT (datetime('now','localtime')),
-                UNIQUE(varenummer, gyldig_fra) ON CONFLICT REPLACE
+                UNIQUE(varenummer, varenavn, gyldig_fra) ON CONFLICT REPLACE
             );
             CREATE INDEX IF NOT EXISTS idx_kp_vn ON varekostpris(varenummer, gyldig_fra);
 
@@ -275,6 +301,7 @@ def init_db():
             LEFT JOIN varekostpris kp
                 ON tc.varenummer != ''
                 AND tc.varenummer = kp.varenummer
+                AND LOWER(TRIM(kp.varenavn)) = LOWER(TRIM(tc.varenavn))
                 AND kp.gyldig_fra <= tc.dato
                 AND (kp.gyldig_til IS NULL OR kp.gyldig_til >= tc.dato);
         """)
@@ -378,42 +405,38 @@ def init_db():
 
 
 def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str) -> None:
-    """Sammenlign nye priser med gemt historik og opret poster automatisk ved ændringer."""
+    """Sammenlign nye priser med gemt historik og opret poster automatisk ved ændringer.
+    Nøglet på (varenummer, varenavn) — flere varer kan dele samme varenummer
+    (fx single-vare + multipak)."""
     from collections import defaultdict
     priser: Dict = defaultdict(list)
-    navne:  Dict = {}
     for t in transaktioner:
-        vn_raw = t.get("varenummer", None)
-        if not vn_raw:
-            continue
-        try:
-            vn = int(vn_raw)
-        except (ValueError, TypeError):
-            continue
-        if vn <= 0:
+        vn   = str(t.get("varenummer", "") or "").strip()
+        navn = str(t.get("varenavn", "") or "").strip()
+        if not vn or vn in ("0", ""):
             continue
         antal = float(t.get("antal", 0) or 0)
         kost  = float(t.get("kostpris", 0) or 0)
         if antal > 0 and kost > 0:
-            priser[vn].append(round(kost / antal, 6))
-            navne[vn] = t.get("varenavn", "") or ""
+            priser[(vn, navn)].append(round(kost / antal, 6))
 
-    for vn, pris_liste in priser.items():
+    for (vn, navn), pris_liste in priser.items():
         sorted_p  = sorted(pris_liste)
         median_p  = round(sorted_p[len(sorted_p) // 2], 4)
         if median_p <= 0:
             continue
 
         aktuel = conn.execute(
-            "SELECT id, kostpris_enhed FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
-            (vn,)
+            "SELECT id, kostpris_enhed FROM varekostpris "
+            "WHERE varenummer=? AND LOWER(TRIM(varenavn))=LOWER(TRIM(?)) AND gyldig_til IS NULL",
+            (vn, navn)
         ).fetchone()
 
         if aktuel is None:
             # Første gang — opret startpost
             conn.execute(
                 "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
-                (vn, navne.get(vn, ""), median_p, import_dato)
+                (vn, navn, median_p, import_dato)
             )
         else:
             gammel = float(aktuel["kostpris_enhed"] or 0)
@@ -426,7 +449,7 @@ def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str
                 )
                 conn.execute(
                     "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
-                    (vn, navne.get(vn, ""), median_p, import_dato)
+                    (vn, navn, median_p, import_dato)
                 )
 
 
@@ -5591,7 +5614,8 @@ def hent_varekostpris_oversigt() -> List[Dict]:
     with _conn() as conn:
         rows = conn.execute("""
             SELECT kp.varenummer, kp.varenavn, kp.kostpris_enhed, kp.gyldig_fra, kp.kilde,
-                   (SELECT COUNT(*) FROM varekostpris h WHERE h.varenummer = kp.varenummer) AS antal_ændringer
+                   (SELECT COUNT(*) FROM varekostpris h
+                    WHERE h.varenummer = kp.varenummer AND h.varenavn = kp.varenavn) AS antal_ændringer
             FROM varekostpris kp
             WHERE kp.gyldig_til IS NULL
             ORDER BY kp.varenavn
@@ -5609,21 +5633,30 @@ def hent_varekostpris_historik(varenummer: str) -> List[Dict]:
     return [dict(r) for r in rows]
 
 
-def korriger_varekostpris(varenummer: str, kostpris_enhed: float, gyldig_fra: str) -> None:
-    """Manuel korrektion — lukker aktuel post og opretter ny."""
+def korriger_varekostpris(varenummer: str, kostpris_enhed: float, gyldig_fra: str, varenavn: str = "") -> None:
+    """Manuel korrektion — lukker aktuel post og opretter ny.
+    varenavn skelner mellem varer der deler varenummer (fx single + multipak)."""
     with _conn() as conn:
-        aktuel = conn.execute(
-            "SELECT id FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
-            (varenummer,)
-        ).fetchone()
+        if varenavn:
+            aktuel = conn.execute(
+                "SELECT id, varenavn FROM varekostpris "
+                "WHERE varenummer=? AND LOWER(TRIM(varenavn))=LOWER(TRIM(?)) AND gyldig_til IS NULL",
+                (varenummer, varenavn)
+            ).fetchone()
+        else:
+            aktuel = conn.execute(
+                "SELECT id, varenavn FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
+                (varenummer,)
+            ).fetchone()
+        navn = varenavn or (aktuel["varenavn"] if aktuel else "")
         if aktuel:
             from datetime import date as _d, timedelta as _td
             til = (_d.fromisoformat(gyldig_fra) - _td(days=1)).isoformat()
             conn.execute("UPDATE varekostpris SET gyldig_til=? WHERE id=?", (til, aktuel["id"]))
         conn.execute(
             "INSERT OR REPLACE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) "
-            "SELECT varenummer, varenavn, ?, ?, 'manuel' FROM varekostpris WHERE varenummer=? LIMIT 1",
-            (round(kostpris_enhed, 4), gyldig_fra, varenummer)
+            "VALUES (?,?,?,?,'manuel')",
+            (varenummer, navn, round(kostpris_enhed, 4), gyldig_fra)
         )
 
 

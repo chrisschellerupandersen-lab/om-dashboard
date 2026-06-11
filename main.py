@@ -2017,9 +2017,10 @@ async def api_kostpris_korriger(request: Request):
     vn   = str(body.get("varenummer", ""))
     pris = float(body.get("kostpris_enhed", 0))
     fra  = str(body.get("gyldig_fra", ""))
+    navn = str(body.get("varenavn", ""))
     if not vn or pris <= 0 or not fra:
         raise HTTPException(status_code=400, detail="varenummer, kostpris_enhed og gyldig_fra er påkrævet")
-    database.korriger_varekostpris(vn, pris, fra)
+    database.korriger_varekostpris(vn, pris, fra, navn)
     return {"ok": True}
 
 

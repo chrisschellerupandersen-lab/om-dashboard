@@ -1,6 +1,9 @@
 import io
 import os
 import base64
+import re
+import json
+import tempfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -15,10 +18,230 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import database
 import parser as xlsx_parser
 
+# ── Gmail auto-import ─────────────────────────────────────────────────────────
+
+GMAIL_SENDER   = "rmk@organicmarket.dk"
+GMAIL_SCOPES   = ["https://www.googleapis.com/auth/gmail.readonly"]
+
+
+def _gmail_creds():
+    """Byg Gmail Credentials fra GMAIL_TOKEN_JSON env var."""
+    token_json = os.environ.get("GMAIL_TOKEN_JSON", "")
+    if not token_json:
+        raise RuntimeError("GMAIL_TOKEN_JSON env var ikke sat")
+    from google.oauth2.credentials import Credentials
+    from google.auth.transport.requests import Request as GRequest
+    info = json.loads(token_json)
+    creds = Credentials.from_authorized_user_info(info, GMAIL_SCOPES)
+    if not creds.valid and creds.expired and creds.refresh_token:
+        creds.refresh(GRequest())
+    return creds
+
+
+def _iter_parts(payload):
+    yield payload
+    for part in payload.get("parts", []):
+        yield from _iter_parts(part)
+
+
+def _tal(s) -> float:
+    if s is None: return 0.0
+    s = re.sub(r"[^\d,.\-]", "", str(s).strip())
+    if not s or s == "-": return 0.0
+    if "," in s:
+        s = s.replace(".", "").replace(",", ".")
+    else:
+        parts = s.lstrip("-").split(".")
+        if not (len(parts) == 2 and len(parts[1]) in (1, 2)):
+            s = s.replace(".", "")
+    try: return float(s)
+    except: return 0.0
+
+
+def _sidst_tal(linje: str) -> float:
+    tal = re.findall(r"-?[0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|-?[0-9]+(?:,[0-9]+)?", linje)
+    return abs(_tal(tal[-1])) if tal else 0.0
+
+
+def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
+    retur_wiener = retur_boller = tgtg = b_kvali = faktura = subtotal = 0.0
+    _next_levering = False
+    for linje in tekst.splitlines():
+        l = linje.strip(); ll = l.lower()
+        if _next_levering:
+            val = _sidst_tal(l)
+            if val > 100: faktura = val
+            _next_levering = False
+            continue
+        if re.search(r"retur\s+wien", ll):
+            retur_wiener = _sidst_tal(l)
+        elif re.search(r"retur\s+boller", ll):
+            retur_boller = _sidst_tal(l)
+        elif re.search(r"tgtg|too\s*good\s*to\s*go", ll):
+            tgtg = _sidst_tal(l)
+        elif re.search(r"kvali|b-?kredit|kvalitets", ll):
+            if not re.search(r"retur|wiener|boller|tgtg", ll):
+                b_kvali = _sidst_tal(l)
+        elif re.search(r"levering", ll):
+            val = _sidst_tal(l)
+            if val > 100: faktura = val
+            else: _next_levering = True
+        elif re.search(r"subtotal", ll):
+            subtotal = _sidst_tal(l)
+        elif not faktura and re.search(r"total\s+dkk\s*:", ll):
+            faktura = _sidst_tal(l)
+    retur_ialt = round(retur_wiener + retur_boller + tgtg + b_kvali, 2)
+    if not faktura and subtotal > 0:
+        faktura = round(subtotal + retur_ialt, 2)
+    return {
+        "uge": uge, "aar": aar,
+        "retur_wiener": round(retur_wiener, 2),
+        "retur_boller": round(retur_boller, 2),
+        "tgtg": round(tgtg, 2),
+        "b_kvali": round(b_kvali, 2),
+        "retur_ialt": retur_ialt,
+        "faktura": round(faktura, 2),
+    }
+
+
+def gmail_sync_run() -> dict:
+    """Hent nye bager-fakturaer fra Gmail og gem i databasen. Returnerer status-dict."""
+    try:
+        from googleapiclient.discovery import build
+        import pdfplumber
+    except ImportError as e:
+        msg = f"Mangler pakke: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+    try:
+        creds = _gmail_creds()
+    except Exception as e:
+        msg = f"Gmail credentials fejl: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+    try:
+        service  = build("gmail", "v1", credentials=creds)
+        allerede = database.hent_gmail_importerede()
+
+        query  = f"from:{GMAIL_SENDER} has:attachment filename:pdf"
+        result = service.users().messages().list(userId="me", q=query, maxResults=50).execute()
+        messages = result.get("messages", [])
+
+        nye = []
+        for msg in messages:
+            msg_id = msg["id"]
+            if msg_id in allerede:
+                continue
+            full    = service.users().messages().get(userId="me", id=msg_id, format="full").execute()
+            headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
+            subject = headers.get("Subject", "")
+            date_str= headers.get("Date", "")
+
+            m_uge = re.search(r"uge\s*(\d+)", subject, re.IGNORECASE)
+            if not m_uge:
+                continue
+            uge = int(m_uge.group(1))
+            m_aar = re.search(r"(202\d)", date_str)
+            aar = int(m_aar.group(1)) if m_aar else datetime.now().year
+
+            att_id = att_name = None
+            for part in _iter_parts(full["payload"]):
+                if part.get("mimeType") == "application/pdf":
+                    att_id   = part["body"].get("attachmentId")
+                    att_name = part.get("filename", "faktura.pdf")
+                    break
+            if not att_id:
+                continue
+
+            att   = service.users().messages().attachments().get(userId="me", messageId=msg_id, id=att_id).execute()
+            pdf_b = base64.urlsafe_b64decode(att.get("data", "") + "==")
+
+            tekst = ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(pdf_b); tmp_path = tmp.name
+            try:
+                with pdfplumber.open(tmp_path) as pdf:
+                    for page in pdf.pages:
+                        tekst += (page.extract_text() or "") + "\n"
+            finally:
+                os.unlink(tmp_path)
+
+            parsed = _parse_faktura_tekst(tekst, uge, aar)
+            nye.append({"msg_id": msg_id, "data": parsed})
+
+        if not nye:
+            database.log_gmail_sync("ingen_nye", "Ingen nye fakturaer fundet", 0)
+            return {"ok": True, "besked": "Ingen nye fakturaer", "antal": 0}
+
+        # Gem i database
+        database.gem_bager_regnskab([e["data"] for e in nye])
+        for entry in nye:
+            database.gem_gmail_importeret(entry["msg_id"], entry["data"]["uge"], entry["data"]["aar"])
+
+        besked = f"Importeret {len(nye)} faktura(er): " + ", ".join(f"uge {e['data']['uge']}/{e['data']['aar']}" for e in nye)
+        database.log_gmail_sync("ok", besked, len(nye))
+        return {"ok": True, "besked": besked, "antal": len(nye)}
+
+    except Exception as e:
+        msg = f"Sync fejl: {e}"
+        database.log_gmail_sync("fejl", msg)
+        return {"ok": False, "besked": msg}
+
+
+# ── APScheduler ───────────────────────────────────────────────────────────────
+
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+
+_scheduler = AsyncIOScheduler(timezone="Europe/Copenhagen")
+
+def _planlagt_gmail_sync():
+    import asyncio
+    loop = asyncio.new_event_loop()
+    try:
+        result = gmail_sync_run()
+        print(f"[Gmail auto-sync] {result.get('besked','?')}")
+    finally:
+        loop.close()
+
+def _planlagt_tgtg_sync():
+    import subprocess
+    from pathlib import Path
+    script = Path(__file__).parent / "tgtg_sync.py"
+    try:
+        result = subprocess.run(
+            ["python", str(script)],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if result.returncode == 0:
+            print(f"[TGTG auto-sync OK]")
+        else:
+            print(f"[TGTG auto-sync fejl] {result.stderr[:200]}")
+    except Exception as e:
+        print(f"[TGTG auto-sync exception] {str(e)[:100]}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
+    jobs = []
+    if os.environ.get("GMAIL_TOKEN_JSON"):
+        _scheduler.add_job(_planlagt_gmail_sync, "cron", day_of_week="mon,thu", hour=8, minute=0)
+        jobs.append("Gmail auto-sync: man+tor 08:00")
+    # TGTG sync kl. 16, 19 og 20 hver dag
+    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=16, minute=0)
+    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=19, minute=0)
+    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=20, minute=0)
+    jobs.append("TGTG auto-sync: dagligt 16:00 + 19:00 + 20:00")
+    if jobs:
+        _scheduler.start()
+        print(f"[Scheduler] {' · '.join(jobs)}")
     yield
+    if _scheduler.running:
+        _scheduler.shutdown()
 
 app = FastAPI(title="Organic Market Dashboard", lifespan=lifespan)
 
@@ -234,6 +457,24 @@ async def api_top(request: Request, n: int = 20, aar: Optional[int] = None):
     return database.hent_top_produkter(min(n, 100), aar)
 
 
+@app.get("/api/salg/margin-analyse")
+async def api_margin_analyse(request: Request, aar: Optional[int] = None, kategori: Optional[str] = None):
+    _kræv_login(request)
+    data = database.hent_margin_analyse(aar, kategori)
+    # DEBUG: hvis ingen data, returnér info om hvad der er i databasen
+    if not data:
+        import sqlite3
+        try:
+            conn = sqlite3.connect(database.DB_PATH)
+            trans_count = conn.execute("SELECT COUNT(*) FROM transaktioner").fetchone()[0]
+            v_trans_count = conn.execute("SELECT COUNT(*) FROM v_transaktioner").fetchone()[0]
+            conn.close()
+            return {"debug": f"transaktioner={trans_count}, v_transaktioner={v_trans_count}", "data": []}
+        except:
+            pass
+    return data
+
+
 @app.get("/api/salg/aarsdata")
 async def api_aarsdata(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
@@ -379,10 +620,16 @@ async def api_beregner_vurder(request: Request):
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
-        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
+        return {"ok": False, "fejl": "⚠️ AI-vurdering ikke tilgængelig — ANTHROPIC_API_KEY ikke sat på Railway"}
     try:
         body = await request.json()
         import anthropic as _ant, json as _json
+
+        # Debug: check hvis API-nøgle bliver læst
+        if not api_key or api_key.strip() == "":
+            print("[ERROR] ANTHROPIC_API_KEY er tom eller ikke sat!")
+            return {"ok": False, "fejl": "API-nøgle er tom. Kontakt administrator."}
+        print(f"[DEBUG] API-nøgle længde: {len(api_key)}, starter med: {api_key[:10]}...")
 
         # Validér at vi har de vigtigste felter
         required_fields = ['uge', 'aar', 'dag_totaler', 'produkter']
@@ -476,7 +723,7 @@ INSTRUKTIONER:
 
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=800,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -547,7 +794,8 @@ INSTRUKTIONER:
             parsed = parse_claude_json(raw)
         except Exception as je:
             print(f"[DEBUG] JSON parse fejl: {str(je)}")
-            return {"ok": False, "fejl": f"JSON invalidt. Prøv igen."}  # Simplificeret fejlbesked
+            print(f"[DEBUG] Raw Claude response: {raw[:500]}")
+            return {"ok": False, "fejl": f"JSON parse fejl: {str(je)[:100]}"}  # Simplificeret fejlbesked
 
         return {
             "ok": True,
@@ -569,18 +817,44 @@ async def api_sellthrough(request: Request, uger: int = 10):
     return database.hent_sellthrough_analyse(uger)
 
 
-@app.get("/api/bestilling/kontekst")
-async def api_beregner_kontekst(
-    request: Request,
-    uge: int,
-    aar: int,
-):
+@app.get("/api/bestilling/vejr-debug")
+async def api_vejr_debug(request: Request, uge: int, aar: int):
+    """Debug: vis præcis hvilke vejrdata der bruges til AI for en given uge."""
+    _kræv_login(request)
+    from datetime import date, timedelta
+    vejr = database.hent_vejr_forecast()
+    fc   = vejr.get("forecast", {})
+    mon  = date.fromisocalendar(aar, uge, 1)
+    DAG  = ["Man","Tir","Ons","Tor","Fre","Lør","Søn"]
+    result = []
+    for i in range(7):
+        dag = mon + timedelta(days=i)
+        ds  = dag.isoformat()
+        v   = fc.get(ds)
+        result.append({
+            "dag": DAG[i], "dato": ds,
+            "fundet": v is not None,
+            "data": v
+        })
+    return {"uge": uge, "aar": aar, "mandag": mon.isoformat(),
+            "forecast_keys_sample": list(fc.keys())[:5], "dage": result}
+
+
+@app.post("/api/bestilling/kontekst")
+async def api_beregner_kontekst(request: Request):
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
     try:
-        return database.generer_beregner_kontekst(int(uge), int(aar), api_key)
+        body = await request.json()
+        uge  = int(body.get("uge", 0))
+        aar  = int(body.get("aar", 0))
+        dag_totaler = body.get("dag_totaler", {})
+        produkter   = body.get("produkter", [])
+        # Brug altid JS vejr — det er hvad brugeren ser i strip'en
+        vejr = body.get("vejr", {})
+        return database.generer_beregner_kontekst(uge, aar, api_key, dag_totaler, produkter, vejr)
     except Exception as e:
         return {"ok": False, "fejl": str(e)}
 
@@ -617,38 +891,84 @@ async def api_bestillings_anbefaling(
         }
 
 
-@app.get("/api/bestilling/management-analyse")
+@app.post("/api/bestilling/management-analyse")
 async def api_management_analyse(
     request: Request,
     uge: int,
     aar: int,
 ):
+    """Management-analyse med AKTUELLE værdier fra frontend (ikke database)."""
     _kræv_login(request)
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
         return {"analyse": None, "fejl": "ANTHROPIC_API_KEY ikke konfigureret i Railway"}
 
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    # Hent basis-info fra database for sammenligning
     d = database.hent_bestillings_uge(int(uge), int(aar))
     if "fejl" in d or "error" in d:
         return {"analyse": None, "fejl": d.get("fejl") or d.get("error")}
 
-    # Byg kategori-opsummering
-    kat_map = {}
-    for p in d.get("produkter", []):
-        kat = p.get("kategori") or "Øvrige"
-        anbefalet = p.get("total_anbefalet", 0)
-        basis_total = sum((p.get("basis") or {}).values())
-        if kat not in kat_map:
-            kat_map[kat] = {"anbefalet": 0, "basis": 0}
-        kat_map[kat]["anbefalet"] += anbefalet
-        kat_map[kat]["basis"]     += basis_total
+    # Hvis frontend sender produkter, brug dem. Ellers fall back til database
+    produkter_data = body.get("produkter", [])
+
+    if produkter_data:
+        # Brug AKTUELLE værdier fra frontend
+        total_stk = sum(p.get("total", 0) for p in produkter_data)
+        # Estimat af pris baseret på basis-data (vi har ikke detaljerede priser fra frontend)
+        total_kr = total_stk * 12  # Approks gennemsnit
+
+        # Byg kategori-info fra basis for sammenligning
+        kat_map = {}
+        for p in d.get("produkter", []):
+            kat = p.get("kategori") or "Øvrige"
+            basis_total = sum((p.get("basis") or {}).values())
+            if kat not in kat_map:
+                kat_map[kat] = {"basis": 0}
+            kat_map[kat]["basis"] += basis_total
+
+        # Tilføj aktuelle værdier
+        for p_data in produkter_data:
+            navn = p_data.get("navn", "")
+            # Match kategori fra basis-data
+            kat = "Øvrige"
+            for p_basis in d.get("produkter", []):
+                if p_basis.get("varenavn", "").strip() == navn.strip():
+                    kat = p_basis.get("kategori", "Øvrige")
+                    break
+
+            if kat not in kat_map:
+                kat_map[kat] = {"basis": 0, "aktuel": 0}
+            if "aktuel" not in kat_map[kat]:
+                kat_map[kat]["aktuel"] = 0
+            kat_map[kat]["aktuel"] += p_data.get("total", 0)
+    else:
+        # Fall back til database værdier
+        total_stk = d.get("total_stk", 0)
+        total_kr = d.get("total_kr", 0)
+
+        kat_map = {}
+        for p in d.get("produkter", []):
+            kat = p.get("kategori") or "Øvrige"
+            anbefalet = p.get("total_anbefalet", 0)
+            basis_total = sum((p.get("basis") or {}).values())
+            if kat not in kat_map:
+                kat_map[kat] = {"aktuel": 0, "basis": 0}
+            kat_map[kat]["aktuel"] += anbefalet
+            kat_map[kat]["basis"] += basis_total
 
     kat_linjer = []
-    for kat, v in sorted(kat_map.items(), key=lambda x: -x[1]["anbefalet"]):
-        diff = v["anbefalet"] - v["basis"]
-        pct  = round(diff / v["basis"] * 100, 1) if v["basis"] > 0 else 0
+    for kat, v in sorted(kat_map.items(), key=lambda x: -x[1].get("aktuel", x[1].get("anbefalet", 0))):
+        aktuel = v.get("aktuel", v.get("anbefalet", 0))
+        basis = v.get("basis", 0)
+        diff = aktuel - basis
+        pct = round(diff / basis * 100, 1) if basis > 0 else 0
         kat_linjer.append(
-            f"  {kat}: {round(v['anbefalet'])} stk (basis: {round(v['basis'])} stk, "
+            f"  {kat}: {round(aktuel)} stk (basis: {round(basis)} stk, "
             f"ændring: {'+' if diff >= 0 else ''}{round(diff)} stk / {'+' if pct >= 0 else ''}{pct}%)"
         )
 
@@ -659,16 +979,16 @@ async def api_management_analyse(
 
 Gennemgå nedenstående bestillingsdata for uge {d['maal_uge']} {d['maal_aar']} og giv en kort, konkret management-vurdering på dansk.
 
-BESTILLINGSDATA:
+BESTILLINGSDATA (AKTUELLE VÆRDIER):
 - Måluge: {d['maal_uge']} {d['maal_aar']} ({d.get('dato_range','')})
 - Basisuge: {d['basis_uge']} {d['basis_aar']}
-- Anbefalet total: {round(d['total_stk'])} stk / {round(d['total_kr'])} kr ex moms
+- Forslået total: {round(total_stk)} stk / {round(total_kr)} kr ex moms
 - Sæsonindeks (SI): {d['si']:.2f} ({'+' if d['si'] >= 1 else ''}{round((d['si']-1)*100)}% ift. neutral)
 - Væksttrend: {'+' if d['vaekst_pct'] >= 0 else ''}{d['vaekst_pct']:.1f}%
 - Too Good To Go: {round(d['tgtg_kr'])} kr/uge {'⚠ FOR HØJ' if d.get('tgtg_advarsel') else '✓ OK' if d.get('tgtg_ok') else ''}
 {evt_txt}
 
-KATEGORI-FORDELING (anbefalet vs. basisuge):
+KATEGORI-FORDELING (aktuel vs. basis):
 {chr(10).join(kat_linjer)}
 
 Giv en management-vurdering med:
@@ -682,14 +1002,50 @@ Vær direkte og konkret. Brug tal. Maks 200 ord."""
         import anthropic as _ant
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}],
         )
         tekst = msg.content[0].text
         return {"analyse": tekst}
     except Exception as e:
+        print(f"[ERROR] management-analyse fejl: {e}")
+        import traceback
+        traceback.print_exc()
         return {"analyse": None, "fejl": str(e)}
+
+
+@app.post("/api/bestilling/eksport-dom")
+async def api_bestilling_eksport_dom(request: Request):
+    """Eksporter Excel med præcis de tal der vises i beregneren (inkl. vejr og rettelser)."""
+    _kræv_login(request)
+    body = await request.json()
+    uge  = int(body.get("uge", 0))
+    aar  = int(body.get("aar", 0))
+    dom_produkter = body.get("produkter", [])  # [{varenummer, man, tir, ...}]
+
+    # Hent basis-data for metadata (varenavn, pris, kategori osv.)
+    d = database.hent_bestillings_uge(uge, aar)
+    if "fejl" in d or "error" in d:
+        raise HTTPException(status_code=404, detail=str(d))
+
+    # Erstat anbefalet-værdier med DOM-værdier
+    DAGE = ['man','tir','ons','tor','fre','loe','son']
+    dom_map = {str(p.get("varenummer","")): p for p in dom_produkter}
+    for prod in d.get("produkter", []):
+        vn = str(prod.get("varenummer",""))
+        if vn in dom_map:
+            dom = dom_map[vn]
+            prod["anbefalet"] = {dag: int(dom.get(dag, 0) or 0) for dag in DAGE}
+            prod["total_anbefalet"] = sum(prod["anbefalet"].values())
+
+    xlsx_bytes = _byg_bestilling_xlsx(d)
+    filename = f"Bestilling uge {uge} {aar}.xlsx"
+    return StreamingResponse(
+        io.BytesIO(xlsx_bytes),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/api/bestilling/eksport")
@@ -897,7 +1253,7 @@ async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
         import anthropic as _ant
         client = _ant.Anthropic(api_key=api_key)
         msg = client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-4-6",
             max_tokens=512,
             messages=[{
                 "role": "user",
@@ -1159,8 +1515,15 @@ async def mobilepay_dagssalg(request: Request):
     linjer = body.get("linjer", [])
     if not linjer:
         return {"ok": True, "linjer": 0}
-    count = database.gem_mobilepay_dag(linjer)
-    return {"ok": True, "linjer": count}
+    try:
+        count = database.gem_mobilepay_dag(linjer)
+        return {"ok": True, "linjer": count}
+    except Exception as e:
+        import traceback
+        err = f"gem_mobilepay_dag fejl: {e}"
+        traceback.print_exc()
+        print(f"[ERROR] {err}")
+        raise HTTPException(status_code=500, detail=err)
 
 
 @app.get("/api/mobilepay/dag")
@@ -1185,6 +1548,9 @@ async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
         importlib.reload(_mp_csv)
         linjer = _mp_csv.parse_csv(tmp_path)
     except Exception as exc:
+        print(f"[ERROR] CSV parse fejl: {exc}")
+        import traceback
+        traceback.print_exc()
         return {"ok": False, "fejl": str(exc)}
     finally:
         if tmp_path:
@@ -1193,11 +1559,25 @@ async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
             except OSError:
                 pass
     if not linjer:
-        return {"ok": True, "linjer": 0, "dage": 0, "total": 0,
+        return {"ok": True, "linjer": 0, "dage": 0, "total": 0, "total_gebyr": 0,
                 "besked": "Ingen gyldige rækker fundet — tjek at filen er en Afregningsrapport eller Salgsoversigt fra portalen"}
-    count = database.gem_mobilepay_dag(linjer)
-    total = sum(l["omsaetning_inkl"] for l in linjer)
-    return {"ok": True, "linjer": count, "dage": len(linjer), "total": round(total, 2)}
+    try:
+        count = database.gem_mobilepay_dag(linjer)
+        total_netto = sum(l.get("omsaetning_netto", l.get("omsaetning_inkl", 0)) for l in linjer)
+        total_gebyr = sum(l.get("gebyr", 0) for l in linjer)
+        return {
+            "ok": True,
+            "linjer": count,
+            "dage": len(linjer),
+            "total_netto": round(total_netto, 2),
+            "total_gebyr": round(total_gebyr, 2),
+            "total": round(total_netto + total_gebyr, 2)
+        }
+    except Exception as e:
+        print(f"[ERROR] gem_mobilepay_dag fejl: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"ok": False, "fejl": f"Fejl ved gemning: {str(e)}"}
 
 
 @app.get("/api/salg/mangler-kostpris")
@@ -1227,6 +1607,18 @@ async def api_tgtg_dagssalg(request: Request):
     return {"ok": True, "linjer": n}
 
 
+@app.get("/api/tgtg/poser-liste")
+async def api_tgtg_poser_liste(request: Request):
+    """Returnerer aktive pose-typer til manuel registrering."""
+    _kræv_login(request)
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT item_id, navn, kreditpris, kostpris_pose, enheder_per_pose
+            FROM tgtg_poser WHERE aktiv=1 ORDER BY navn
+        """).fetchall()
+    return {"ok": True, "poser": [dict(r) for r in rows]}
+
+
 @app.post("/api/tgtg/poser")
 async def api_tgtg_poser(request: Request):
     """Opdater pose-definitioner (navn + kreditpris)."""
@@ -1251,6 +1643,20 @@ async def api_tgtg_nulstil(request: Request):
 
 
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
+
+@app.get("/api/spild/overblik")
+async def api_spild_overblik(request: Request):
+    """Spild-overblik for denne uge + forrige afsluttede uge til forside."""
+    _kræv_login(request)
+    from datetime import date
+    iso  = date.today().isocalendar()
+    uge, aar = iso[1], iso[0]
+    prev_uge = uge - 1 if uge > 1 else 52
+    prev_aar = aar if uge > 1 else aar - 1
+    denne  = database.hent_spild_uge_overblik(uge,      aar)
+    forrig = database.hent_spild_uge_overblik(prev_uge, prev_aar)
+    return {"denne_uge": denne, "forrige_uge": forrig}
+
 
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
@@ -1381,7 +1787,13 @@ async def api_debug_varer(request: Request, q: str = "", bon: str = ""):
 @app.get("/api/aarsplan/vf-detaljer")
 async def api_vf_detaljer(request: Request, aar: int, maaned: int):
     _kræv_login(request)
-    return database.hent_vf_detaljer(aar, maaned)
+    try:
+        return database.hent_vf_detaljer(aar, maaned)
+    except Exception as e:
+        import traceback
+        print(f"ERROR in vf_detaljer: {e}")
+        traceback.print_exc()
+        return {"error": str(e), "bager_vf": [], "andet_vf": []}
 
 
 @app.get("/api/bager/fordelingsnoegle")
@@ -1582,3 +1994,449 @@ async def management_spørg(request: Request):
         return {"ok": True, "svar": svar}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ── VAREKOSTPRIS ──────────────────────────────────────────────────────────────
+
+@app.get("/api/kostpris/oversigt")
+async def api_kostpris_oversigt(request: Request):
+    _kræv_login(request)
+    return {"ok": True, "varer": database.hent_varekostpris_oversigt()}
+
+
+@app.get("/api/kostpris/historik/{varenummer}")
+async def api_kostpris_historik(request: Request, varenummer: str):
+    _kræv_login(request)
+    return {"ok": True, "historik": database.hent_varekostpris_historik(varenummer)}
+
+
+@app.post("/api/kostpris/korriger")
+async def api_kostpris_korriger(request: Request):
+    _kræv_login(request)
+    body = await request.json()
+    vn   = str(body.get("varenummer", ""))
+    pris = float(body.get("kostpris_enhed", 0))
+    fra  = str(body.get("gyldig_fra", ""))
+    if not vn or pris <= 0 or not fra:
+        raise HTTPException(status_code=400, detail="varenummer, kostpris_enhed og gyldig_fra er påkrævet")
+    database.korriger_varekostpris(vn, pris, fra)
+    return {"ok": True}
+
+
+# ── GMAIL AUTO-SYNC ───────────────────────────────────────────────────────────
+
+@app.post("/api/bager/gmail-sync")
+async def api_gmail_sync(request: Request):
+    _kræv_login(request)
+    result = gmail_sync_run()
+    return result
+
+
+@app.get("/api/bager/gmail-status")
+async def api_gmail_status(request: Request):
+    _kræv_login(request)
+    status = database.hent_gmail_sync_status()
+    har_token = bool(os.environ.get("GMAIL_TOKEN_JSON"))
+    return {"ok": True, "status": status, "har_token": har_token}
+
+
+
+# ── MORGENBRIEFING ────────────────────────────────────────────────────────────
+
+@app.get("/api/dashboard/morgenbriefing")
+async def api_morgenbriefing(request: Request):
+    _kræv_login(request)
+    from datetime import date, timedelta, datetime as _dt
+    today      = date.today()
+    iso        = today.isocalendar()
+    uge, aar   = iso[1], iso[0]
+    ugedag     = today.weekday()  # 0=man ... 6=søn
+
+    # Dage til næste torsdag (bestillings-deadline)
+    if ugedag <= 3:   # man-tor: denne uges torsdag
+        dage_til_tor = 3 - ugedag
+    else:             # fre-søn: næste uges torsdag
+        dage_til_tor = 7 - ugedag + 3
+
+    # Indeværende uges bestilling (leveres denne uge)
+    try:
+        aktuel_d = database.hent_bestillings_uge(uge, aar)
+        aktuel_klar = aktuel_d.get("faktisk", False) or (aktuel_d.get("total_stk", 0) > 0)
+        aktuel_stk  = aktuel_d.get("total_stk", 0)
+    except Exception:
+        aktuel_klar = False; aktuel_stk = 0
+
+    # Næste uges bestilling (skal laves inden torsdag)
+    naeste_uge  = uge + 1 if uge < 52 else 1
+    naeste_aar  = aar if uge < 52 else aar + 1
+    try:
+        naeste_d = database.hent_bestillings_uge(naeste_uge, naeste_aar)
+        bestilling_klar = naeste_d.get("faktisk", False) or (naeste_d.get("total_stk", 0) > 0)
+    except Exception:
+        bestilling_klar = False
+
+    # KPI data (dag + uge)
+    try:
+        kpi = database.hent_kpi(aar=aar)
+    except Exception:
+        kpi = {}
+
+    dag      = kpi.get("dag")      or {}
+    prev_dag = kpi.get("prev_dag") or {}
+    uge_data = kpi.get("uge")      or {}
+    prev_uge = kpi.get("prev_uge") or {}
+    mtd      = kpi.get("mtd")      or {}
+
+    # WTD (week-to-date)
+    wtd_oms  = uge_data.get("omsaetning") or 0
+    wtd_db   = uge_data.get("db_kr")      or 0
+    wtd_dbpct= uge_data.get("db_pct")     or 0
+
+    # Spild denne uge
+    try:
+        spild_d = database.hent_spild_uge_overblik(uge, aar)
+    except Exception:
+        spild_d = {}
+
+    # TGTG denne uge
+    try:
+        man_dato = date.fromisocalendar(aar, uge, 1)
+        son_dato = man_dato + timedelta(days=6)
+        with database._conn() as conn:
+            tgtg_uge = conn.execute("""
+                SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
+                FROM tgtg_dagssalg
+                WHERE dato >= date(?, '+1 day') AND dato <= date(?, '+1 day')
+            """, (man_dato.isoformat(), son_dato.isoformat())).fetchone()
+        tgtg_kr    = round(tgtg_uge["kr"]    or 0) if tgtg_uge else 0
+        tgtg_poser = int(tgtg_uge["poser"] or 0)   if tgtg_uge else 0
+    except Exception:
+        tgtg_kr = tgtg_poser = 0
+
+    # Vejr
+    try:
+        vejr = database.hent_vejr_forecast()
+    except Exception:
+        vejr = {"forecast": {}}
+
+    # Næste event
+    try:
+        evt = database._get_event(naeste_uge, naeste_aar) or database._get_event(uge, aar)
+    except Exception:
+        evt = None
+
+    # Kaffe i dag + forrige uge + 7-dages trend
+    kaffe_idag = 0; kaffe_prev = 0; kaffe_trend = []
+    try:
+        _KAFFE = ("LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+                  "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+                  "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%'")
+        with database._conn() as conn:
+            k = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                             (today.isoformat(),)).fetchone()
+            kaffe_idag = int(k["antal"] or 0) if k else 0
+            kp = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                              ((today - timedelta(days=7)).isoformat(),)).fetchone()
+            kaffe_prev = int(kp["antal"] or 0) if kp else 0
+            kt = conn.execute(f"""
+                SELECT dato, ROUND(SUM(antal),0) AS antal FROM transaktioner
+                WHERE dato >= date(?,'-7 days') AND dato <= ? AND ({_KAFFE})
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+            kaffe_trend = [{"dato": r["dato"], "antal": int(r["antal"] or 0)} for r in kt]
+    except Exception:
+        pass
+    kaffe_pct = round((kaffe_idag / kaffe_prev - 1) * 100) if kaffe_prev > 0 else None
+
+    # Sparklines: seneste 7 dages omsætning + DB%
+    try:
+        with database._conn() as conn:
+            spark_rows = conn.execute("""
+                SELECT dato,
+                       ROUND(SUM(omsætning)/1.25, 0) AS oms_ex,
+                       ROUND(AVG(CASE WHEN omsætning > 0 THEN
+                           (omsætning/1.25 - COALESCE(vf_korrekt,0)) / (omsætning/1.25) * 100
+                           ELSE NULL END), 1) AS db_pct
+                FROM v_transaktioner
+                WHERE dato >= date(?, '-7 days') AND dato <= ?
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+        sparklines = [{"dato": r["dato"], "oms": int(r["oms_ex"] or 0), "db_pct": r["db_pct"]} for r in spark_rows]
+    except Exception:
+        sparklines = []
+
+    # Smart alert: find det vigtigste råd
+    smart_alert = None
+    try:
+        sidst = database.hent_sidst_solgt_moenster(uger=4)
+        if sidst.get("udsolgt_tidligt"):
+            top = sidst["udsolgt_tidligt"][0]
+            smart_alert = {"type": "udsolgt", "ikon": "🔴",
+                "tekst": f"{top['varenavn']} sælger ud kl. {top['snit_time']:02d}:00 — {top['tomme_timer']} tomme timer. Bestil mere."}
+        elif tgtg_kr > 1200:
+            smart_alert = {"type": "tgtg", "ikon": "🟡",
+                "tekst": f"TGTG {tgtg_kr:,} kr denne uge — over 1.200 kr. Reducer bestillingen på svage dage."}
+        elif (spild_d.get("svind_pct") or 0) > 22:
+            smart_alert = {"type": "spild", "ikon": "🔴",
+                "tekst": f"Spild {spild_d['svind_pct']:.1f}% — kritisk. Tjek hvilke dage der driver spildet."}
+        elif dag_db_pct > 0 and dag_db_pct < 30:
+            smart_alert = {"type": "db", "ikon": "🟡",
+                "tekst": f"DB% i dag kun {dag_db_pct:.1f}% — langt under mål. Tjek vareforbrug eller prisregistrering."}
+        elif dage_til_tor == 1 and not bestilling_klar:
+            smart_alert = {"type": "deadline", "ikon": "⚡",
+                "tekst": f"Bestil uge {naeste_uge} inden i morgen torsdag!"}
+    except Exception:
+        pass
+
+    # Vs. forrige uge
+    dag_oms      = dag.get("omsaetning")  or 0
+    prev_dag_oms = prev_dag.get("omsaetning") or 0
+    dag_pct      = round((dag_oms / prev_dag_oms - 1) * 100) if prev_dag_oms > 0 else None
+
+    dag_db_pct   = dag.get("db_pct") or 0
+    dag_kunder   = dag.get("transak") or 0
+    dag_kurv     = round(dag_oms / dag_kunder) if dag_kunder > 0 else 0
+
+    DAGE_DA = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"]
+    MND_DA  = ["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"]
+
+    return {
+        "ok":            True,
+        "dato":          today.isoformat(),
+        "dato_label":    f"{DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]}",
+        "uge":           uge, "aar": aar,
+        "ugedag":        ugedag,
+        "dage_til_tor":  dage_til_tor,
+        "aktuel_klar":   aktuel_klar,
+        "aktuel_stk":    aktuel_stk,
+        "bestilling_klar": bestilling_klar,
+        "naeste_uge":    naeste_uge,
+        # Dag
+        "dag_oms":       round(dag_oms / 1.25),  # ex moms
+        "dag_db_pct":    round(dag_db_pct, 1),
+        "dag_kunder":    dag_kunder,
+        "dag_kurv":      dag_kurv,
+        "dag_pct":       dag_pct,
+        "dag_dato":      dag.get("dato"),
+        # WTD
+        "wtd_oms":       round(wtd_oms / 1.25),
+        "wtd_db_pct":    round(wtd_dbpct, 1) if wtd_dbpct else None,
+        "wtd_dage":      spild_d.get("n_dage", 0),
+        # TGTG
+        "tgtg_kr":       tgtg_kr,
+        "tgtg_poser":    tgtg_poser,
+        "tgtg_ok":       tgtg_kr < 800,
+        "tgtg_advarsel": tgtg_kr > 1200,
+        # Spild
+        "spild_pct":     spild_d.get("svind_pct"),
+        "spild_stk":     spild_d.get("svind", 0),
+        "spild_ok":      (spild_d.get("svind_pct") or 0) < 15,
+        # Vejr
+        "vejr":          vejr,
+        # Event
+        "evt":           evt,
+        # Kaffe
+        "kaffe_idag":    kaffe_idag,
+        "kaffe_prev":    kaffe_prev,
+        "kaffe_pct":     kaffe_pct,
+        "kaffe_trend":   kaffe_trend,
+        # Sparklines
+        "sparklines":    sparklines,
+        # Smart alert
+        "smart_alert":   smart_alert,
+    }
+
+
+@app.get("/api/dashboard/briefing")
+async def api_morgenbriefing_ai(request: Request):
+    """AI-genereret dagsbriefing — forklarer hvad der sker i forretningen og hvorfor."""
+    _kræv_login(request)
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        return {"ok": False, "tekst": ""}
+
+    from datetime import date, timedelta
+    today   = date.today()
+    iso     = today.isocalendar()
+    uge, aar = iso[1], iso[0]
+    ugedag  = today.weekday()
+    DAGE_DA = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"]
+    MND_DA  = ["januar","februar","marts","april","maj","juni","juli","august","september","oktober","november","december"]
+
+    try:
+        kpi      = database.hent_kpi(aar=aar)
+        dag      = kpi.get("dag")      or {}
+        prev_dag = kpi.get("prev_dag") or {}
+        uge_data = kpi.get("uge")      or {}
+    except Exception:
+        dag = prev_dag = uge_data = {}
+
+    dag_oms      = round((dag.get("omsaetning") or 0) / 1.25)
+    prev_dag_oms = round((prev_dag.get("omsaetning") or 0) / 1.25)
+    dag_pct      = round((dag_oms / prev_dag_oms - 1) * 100) if prev_dag_oms > 0 else None
+    dag_kunder   = dag.get("transak") or 0
+    dag_db_pct   = dag.get("db_pct") or 0
+    wtd_oms      = round((uge_data.get("omsaetning") or 0) / 1.25)
+
+    try:
+        spild_d = database.hent_spild_uge_overblik(uge, aar)
+    except Exception:
+        spild_d = {}
+
+    try:
+        man_dato = date.fromisocalendar(aar, uge, 1)
+        son_dato = man_dato + timedelta(days=6)
+        with database._conn() as conn:
+            tgtg_uge = conn.execute("""
+                SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
+                FROM tgtg_dagssalg WHERE dato >= date(?,'+1 day') AND dato <= date(?,'+1 day')
+            """, (man_dato.isoformat(), son_dato.isoformat())).fetchone()
+        tgtg_kr = round(tgtg_uge["kr"] or 0) if tgtg_uge else 0
+    except Exception:
+        tgtg_kr = 0
+
+    # Forrige uge total + 4-ugers snit
+    prev_uge_oms = round((kpi.get("prev_uge") or {}).get("omsaetning", 0) / 1.25) if kpi.get("prev_uge") else 0
+    snit_4u = 0
+    try:
+        with database._conn() as conn:
+            snit_r = conn.execute("""
+                SELECT ROUND(AVG(uge_oms)/1.25, 0) AS snit FROM (
+                    SELECT strftime('%Y-%W', dato) AS yw, SUM(omsætning) AS uge_oms
+                    FROM transaktioner
+                    WHERE dato < date(?, 'weekday 1', '-7 days')
+                    GROUP BY yw ORDER BY yw DESC LIMIT 4
+                )
+            """, (today.isoformat(),)).fetchone()
+            snit_4u = int(snit_r["snit"] or 0) if snit_r else 0
+    except Exception:
+        pass
+
+    # Kaffe i dag + forrige uge + 7-dages trend
+    kaffe_idag = 0
+    kaffe_prev = 0
+    kaffe_trend = []
+    try:
+        _KAFFE = ("LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+                  "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+                  "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%'")
+        with database._conn() as conn:
+            k = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                             (today.isoformat(),)).fetchone()
+            kaffe_idag = int(k["antal"] or 0) if k else 0
+            prev_dato = (today - timedelta(days=7)).isoformat()
+            kp = conn.execute(f"SELECT ROUND(SUM(antal),0) AS antal FROM transaktioner WHERE dato=? AND ({_KAFFE})",
+                              (prev_dato,)).fetchone()
+            kaffe_prev = int(kp["antal"] or 0) if kp else 0
+            # 7-dages trend
+            kt = conn.execute(f"""
+                SELECT dato, ROUND(SUM(antal),0) AS antal FROM transaktioner
+                WHERE dato >= date(?,'-7 days') AND dato <= ? AND ({_KAFFE})
+                GROUP BY dato ORDER BY dato ASC
+            """, (today.isoformat(), today.isoformat())).fetchall()
+            kaffe_trend = [{"dato": r["dato"], "antal": int(r["antal"] or 0)} for r in kt]
+    except Exception:
+        pass
+    kaffe_pct = round((kaffe_idag / kaffe_prev - 1) * 100) if kaffe_prev > 0 else None
+
+    vejr_kontekst = ""
+    try:
+        vejr_d = database.hent_vejr_forecast()
+        fc = vejr_d.get("forecast", {})
+        dag_d = date.today()
+        v = fc.get(dag_d.isoformat())
+        if v and v.get("prec", 0) > 2:
+            vejr_kontekst = f"I dag: {v['ikon']} {v['prec']}mm nedbør ({v['juster']['label'] if v.get('juster') else 'regn'})."
+    except Exception:
+        pass
+
+    evt = None
+    try:
+        evt = database._get_event(uge, aar)
+    except Exception:
+        pass
+
+    sidst_advarsel = ""
+    try:
+        sidst = database.hent_sidst_solgt_moenster(uger=4)
+        if sidst.get("udsolgt_tidligt"):
+            top = sidst["udsolgt_tidligt"][0]
+            sidst_advarsel = f"{top['varenavn']} solgte ud kl. {top['snit_time']:02d}:00 i snit ({top['dage']} dage)."
+    except Exception:
+        pass
+
+    # Find om event er i dag eller en anden dag i ugen
+    evt_dag_info = ""
+    if evt:
+        dag_fak = evt.get("dag_fak", {})
+        DAG_KEYS_EVT = ["man","tir","ons","tor","fre","loe","son"]
+        DAGE_DA_KORT = ["mandag","tirsdag","onsdag","torsdag","fredag","lørdag","søndag"]
+        stærke = [(DAGE_DA_KORT[i], dag_fak.get(k, 1.0))
+                  for i, k in enumerate(DAG_KEYS_EVT)
+                  if dag_fak.get(k, 1.0) > 1.05]
+        if stærke:
+            evt_dag_info = ", ".join([f"{n} ×{f:.2f}" for n, f in stærke])
+        idag_key = DAG_KEYS_EVT[ugedag]
+        idag_evt = idag_key in dag_fak and dag_fak[idag_key] > 1.0
+        evt_timing = "I DAG" if idag_evt else f"Ikke i dag — stærke dage: {evt_dag_info}"
+
+    from datetime import datetime as _dt
+    nu = _dt.now()
+    timer_siden_aabning = max(0, nu.hour - 6)
+
+    prompt = f"""Du er daglig briefing-assistent for Organic Market Greve — ubemandet franchise-butik, åben 06-20.
+
+DATO & TID I DAG: {DAGE_DA[ugedag]} {today.day}. {MND_DA[today.month-1]} {today.year}, kl. {nu.hour:02d}:{nu.minute:02d}
+— dvs. {timer_siden_aabning} timer siden åbning
+
+DATA:
+- Omsætning: {dag_oms:,} kr ekskl. moms{f' ({dag_pct:+}% vs. forrige uge samme dag)' if dag_pct is not None else ''}
+- Kunder: {dag_kunder} · DB%: {dag_db_pct:.1f}%
+- Kaffesalg: {kaffe_idag} kopper{f' ({kaffe_pct:+}% vs. forrige uge samme dag)' if kaffe_pct is not None else ''}
+- WTD omsætning uge {uge}/{today.year}: {wtd_oms:,} kr ({spild_d.get('n_dage',0)} dage){f' — forrige uge samme periode: {round(prev_uge_oms * spild_d.get("n_dage",0) / 7):,} kr' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
+- Forrige uge total: {prev_uge_oms:,} kr · 4-ugers snit: {snit_4u:,} kr/uge{f' (denne uge tracker {round((wtd_oms/(prev_uge_oms*spild_d.get("n_dage",1)/7)-1)*100):+}% vs. samme punkt forrige uge)' if prev_uge_oms > 0 and spild_d.get('n_dage',0) > 0 else ''}
+- Spild denne uge: {spild_d.get('svind_pct') or '—'}% · TGTG: {tgtg_kr:,} kr (mål <800 kr)
+{f'- Vejr i dag: {vejr_kontekst}' if vejr_kontekst else ''}
+{f'- Begivenhed uge {uge}: {evt["navn"]} — {evt_timing}' if evt else '- Ingen begivenhed denne uge'}
+{f'- Salgsdata: {sidst_advarsel}' if sidst_advarsel else ''}
+
+Skriv en dagsbriefing på MAX 4 sætninger på dansk.
+- Start med "God [ugedag]" eller tilsvarende — ALDRIG med "Dagsbriefing"
+- VIGTIG KONTEKST: vi er kun {timer_siden_aabning} timer inde i dagen. Sammenlign KUN med samme TIDSPUNKT forrige dag, ikke hele dage
+  fx: "Efter {timer_siden_aabning} timer er omsætningen 12% højere end samme tid i går"
+- Forklar hvad der sker og HVORFOR — brug de faktiske tal og den korrekte dato
+- Hvis begivenhed IKKE er i dag: nævn hvilken dag den er og hvad du forventer
+- Ingen anbefalinger — kun forklaring og kontekst
+- VIGTIGT: skriv altid procentændringer med + eller - prefix, fx +26% eller -8%"""
+
+    try:
+        import anthropic as _ant
+        client = _ant.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=400,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return {"ok": True, "tekst": msg.content[0].text.strip()}
+    except Exception as e:
+        return {"ok": False, "tekst": str(e)}
+
+
+# ── SALGSMØNSTER ─────────────────────────────────────────────────────────────
+
+
+@app.get("/api/salg/sidst-solgt")
+async def api_sidst_solgt(request: Request, uger: int = 4):
+    _kræv_login(request)
+    return database.hent_sidst_solgt_moenster(uger)
+
+
+# ── VEJR ──────────────────────────────────────────────────────────────────────
+
+@app.get("/api/vejr/forecast")
+async def api_vejr_forecast(request: Request, force: bool = False):
+    """Vejr-forecast. force=true tvinger ny hentning fra Open-Meteo."""
+    _kræv_login(request)
+    if force:
+        database._vejr_cache["ts"] = 0  # nulstil server-cache
+    return database.hent_vejr_forecast()

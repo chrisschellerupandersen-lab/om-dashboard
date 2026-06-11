@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='15' fill='%231e3a1e'/><path d='M9 20 Q16 10 23 20' stroke='%23c8a84b' stroke-width='1.5' fill='none'/><circle cx='16' cy='14' r='2.5' fill='%23c8a84b'/></svg>">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="OM Dashboard">
 <meta name="theme-color" content="#1e3a1e">
@@ -313,9 +314,76 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .ov-cmp-row:last-child{border-bottom:none;}
 .ov-cmp-label{color:var(--charcoal);}
 .ov-cmp-val{font-family:'DM Mono',monospace;font-weight:400;color:var(--forest);}
-.ov-cmp-val.up{color:var(--moss);}
-.ov-cmp-val.dn{color:var(--danger);}
-.ov-cmp-val.neutral{color:var(--ash);}
+.ov-cmp-val.up,.kpi-v.up,.ov-combo-chg.up{color:var(--moss);}
+.ov-cmp-val.dn,.kpi-v.dn,.ov-combo-chg.dn{color:var(--danger);}
+.ov-cmp-val.neutral,.kpi-v.neutral,.ov-combo-chg.neutral{color:var(--ash);}
+
+/* ── MORGENBRIEFING MOBIL ───────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .mb-kpi-row { grid-template-columns: 1fr 1fr !important; }
+  .mb-kpi-row > *:first-child { grid-column: 1 / -1; }
+  #mb-hdr { padding: 14px 16px 12px !important; }
+  #p-morgenbriefing > div:last-child { padding: 14px 16px 80px !important; }
+}
+@media (max-width: 480px) {
+  .mb-kpi-row { grid-template-columns: 1fr !important; }
+  .mb-kpi-row > *:first-child { grid-column: 1 !important; }
+  #mb-briefing-boks { font-size: 13px !important; }
+  /* Ugens puls: 1 kolonne */
+  #p-morgenbriefing .aar2-mnd-stats { grid-template-columns: 1fr !important; }
+  /* Sparklines: stak */
+  #p-morgenbriefing .mb-spark-grid { grid-template-columns: 1fr !important; }
+  /* Smart alert kompakt */
+  #mb-smart-alert { padding: 10px 12px !important; font-size: 12px !important; }
+  /* Trafiklamper: min-width ned */
+  #mb-lamper > div { min-width: 140px !important; }
+}
+/* ── SENESTE DAG: STORE RINGE ───────────────────────────────────────────────── */
+.dag-kpi-row { grid-template-columns: repeat(4,1fr) !important; }
+.dag-kpi { background: var(--white) !important; border-color: rgba(30,58,30,.08) !important;
+           border-left-color: rgba(30,58,30,.08) !important; align-items: center; text-align: center; }
+.dag-kpi .kpi-l, .dag-kpi-lbl {
+  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase;
+  color:var(--ash); margin-bottom:12px; font-weight:500; line-height:1.4;
+}
+.dag-ring-wrap { position:relative; width:110px; height:110px; margin:0 auto 10px; }
+.dag-ring-svg  { width:100%; height:100%; }
+.dag-ring-inner { position:absolute; inset:0; display:flex; flex-direction:column;
+                  align-items:center; justify-content:center; gap:2px; }
+.dag-ring-val  { font-size:18px; font-weight:600; color:var(--charcoal); line-height:1; }
+.dag-ring-sub  { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); }
+.dag-kpi-ref   { font-size:11px; color:var(--ash); margin-top:4px; }
+.dag-ring-val.up { color: var(--moss); }
+.dag-ring-val.dn { color: var(--danger); }
+@media (max-width:768px) {
+  .dag-kpi-row { grid-template-columns: 1fr 1fr !important; }
+  .dag-ring-wrap { width:90px; height:90px; }
+  .dag-ring-val { font-size:15px; }
+}
+
+/* ── KOMBINEREDE OVERBLIK KPI-KORT ─────────────────────────────────────────── */
+.ov-combo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 14px 0 4px;
+}
+@media (max-width: 768px) { .ov-combo-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 480px) { .ov-combo-grid { grid-template-columns: 1fr 1fr; } }
+
+.ov-combo-kpi { gap: 0; }
+.ov-combo-lbl { font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);opacity:.65;letter-spacing:.04em;margin-bottom:10px; }
+.ov-combo-sep { height:1px;background:rgba(30,58,30,.08);margin:10px 0; }
+.ov-combo-row { display:flex;align-items:baseline;justify-content:space-between;gap:8px; }
+.ov-combo-val { font-family:'DM Mono',monospace;font-size:14px;font-weight:400;color:var(--charcoal); }
+.ov-combo-chg { font-family:'DM Mono',monospace;font-size:16px;font-weight:600; }
+.ov-combo-sub { font-size:9px;color:var(--ash);opacity:.65;white-space:nowrap; }
+
+/* Mobil: alle 4 kort samme bredde (ingen fuld-bredde første kort) */
+@media (max-width: 768px) {
+  .kpi-row-4:has(.ov-combo-kpi) > *:first-child { grid-column: auto !important; }
+  .kpi-row-4:has(.ov-combo-kpi) { grid-template-columns: 1fr 1fr !important; }
+}
 .aar-pill.warn{color:#9b3420;background:rgba(180,60,40,.07);border-color:rgba(180,60,40,.18);}
 .aar-kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px;}
 .aar-kpi-row .kpi-card:first-child{background:var(--forest);border-color:var(--forest);}
@@ -376,12 +444,6 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .aar2-tbl tr:hover td{background:var(--cream);}
 .aar2-minibar-bg{height:6px;background:rgba(30,58,30,.07);border-radius:1px;overflow:hidden;width:120px;}
 .aar2-minibar-fill{height:100%;border-radius:1px;}
-
-/* BASIS BESTILLING SPECIFIC */
-.basis-cell{cursor:text !important;}
-.basis-cell:focus{outline:2px solid var(--amber);outline-offset:-1px;background:rgba(200,168,75,.1);}
-.aar2-tbl th.basis-we{background:rgba(30,58,30,.95);}
-.aar2-tbl td.basis-we{background:rgba(45,74,45,.04);}
 
 /* TREND PANEL */
 .saeson-banner{display:flex;align-items:center;gap:12px;background:rgba(200,168,75,.08);border:1px solid rgba(200,168,75,.25);border-radius:3px;padding:12px 16px;margin-bottom:20px;font-size:13px;}
@@ -701,6 +763,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   .sc-card{padding:12px 10px 10px;}
 }
 
+@media (max-width: 768px) {
+  /* Dagsoverblik: legend badges på 2 rækker på tablet */
+  #p-dagsoverblik > div:first-of-type > div:last-child {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 480px) {
   .kpi-v{font-size:18px;}
   .ov-top>.kpi:first-child .kpi-v{font-size:24px;}
@@ -721,6 +793,172 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
   /* MobilePay inputfelter: fuld bredde */
   #p-mobilepay input[type="number"],#p-mobilepay select{width:100%;}
+
+  /* KPI rækker: en kolonne på meget små skærme */
+  .kpi-row,.kpi-row-2,.kpi-row-4,.kpi-row-5,.kpi-row-6,.kpi-row-8 {
+    grid-template-columns: 1fr !important;
+  }
+  .kpi-row > *:first-child,.kpi-row-4 > *:first-child,.kpi-row-5 > *:first-child,.kpi-row-6 > *:first-child,.kpi-row-8 > *:first-child {
+    grid-column: 1 !important;
+  }
+
+  /* Dagsoverblik mobile optimizations */
+  #p-dagsoverblik {
+    padding: 12px 8px calc(80px + env(safe-area-inset-bottom));
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:first-child {
+    gap: 6px;
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:first-child button {
+    width: 28px;
+    height: 28px;
+    font-size: 14px;
+  }
+
+  #dag-uge-label {
+    min-width: 60px;
+    font-size: 13px;
+  }
+
+  #dag-dato-range {
+    display: none;
+  }
+
+  /* Legend badges: stack on mobile */
+  #p-dagsoverblik > div:first-of-type > div:last-child {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-left: 0;
+    padding: 8px 0;
+  }
+
+  #p-dagsoverblik > div:first-of-type > div:last-child span {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  /* Dagsoverblik tabel: mindre min-width */
+  #dag-tbl {
+    min-width: 100%;
+    font-size: 11px;
+  }
+
+  #dag-tbl th,#dag-tbl td {
+    padding: 6px 4px;
+    font-size: 10px;
+  }
+
+  #dag-tbl th:first-child,#dag-tbl td:first-child {
+    min-width: 100px;
+    text-align: left;
+  }
+}
+
+/* ── MOBIL: BESTILLINGSBEREGNER ─────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Vejr-strip: scroll ved for lidt plads */
+  #bern-vejr-dage {
+    grid-template-columns: repeat(7, minmax(46px, 1fr));
+    gap: 3px;
+  }
+
+  /* Beregner: uge-navigationsknapper — store touch targets */
+  #p-beregner button[onclick*="bernPrev"],
+  #p-beregner button[onclick*="bernNext"] {
+    min-width: 48px; min-height: 48px; font-size: 20px;
+  }
+
+  /* Beregner tabel: sticky produktkolonne + scroll */
+  #p-beregner .aar2-tbl-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  #p-beregner .aar2-tbl { min-width: 0 !important; border-collapse: separate; border-spacing: 0; }
+  #p-beregner .aar2-tbl th:first-child,
+  #p-beregner .aar2-tbl td:first-child {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--white);
+    box-shadow: 2px 0 6px rgba(0,0,0,.07);
+    max-width: 130px; min-width: 100px;
+    font-size: 11px;
+  }
+  #p-beregner .aar2-tbl th:first-child { background: rgba(30,58,30,.97); }
+  #p-beregner .aar2-tbl tr:hover td:first-child { background: var(--cream); }
+  #p-beregner .aar2-tbl tr.indev td:first-child { background: rgba(200,168,75,.05); }
+  #p-beregner .aar2-tbl th.num,
+  #p-beregner .aar2-tbl td.num,
+  #p-beregner .aar2-tbl td.bern-cell { padding: 8px 6px; min-width: 38px; }
+
+  /* AI kontekst-kort: kompakt på tablet */
+  #bern-kontekst-kort { font-size: 12px; }
+  #bern-kontekst-tekst { font-size: 12px; line-height: 1.6; }
+
+  /* Bager regnskab tabel */
+  #p-bager .aar2-tbl-wrap,
+  #p-bager table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Margin analyse tabel */
+  #p-margin .aar2-tbl-wrap,
+  #p-margin table { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Faktorer-linje i beregner: wrap */
+  .bern-faktorer { font-size: 10px; white-space: normal; line-height: 1.6; }
+
+  /* Opdater analyse knap fuld bredde på tablet */
+  #bern-main-btn { flex: 1; justify-content: center; }
+
+  /* Topbar: år-vælger kompakt */
+  .tb-aar-pick { gap: 2px; }
+  .tb-aar-btn { width: 22px; font-size: 16px; }
+  .tb-aar-val { font-size: 11px; }
+}
+
+@media (max-width: 480px) {
+  /* Vejr-strip: horisontal scroll med flex på phone */
+  #bern-vejr-strip { padding: 8px 10px; }
+  #bern-vejr-dage {
+    display: flex; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    gap: 6px; padding-bottom: 4px; grid-template-columns: unset;
+  }
+  #bern-vejr-dage > div { min-width: 50px; flex-shrink: 0; }
+  #bern-vejr-advarsel { font-size: 10px; padding: 4px 8px; }
+
+  /* Side-titler: skjul undertekst for mere plads */
+  .page-hdr p { display: none; }
+  .page-hdr { margin-bottom: 10px; }
+  .page-hdr h2 { font-size: 17px; }
+
+  /* Beregner: ekstra kompakt tabel */
+  #p-beregner .aar2-tbl th,
+  #p-beregner .aar2-tbl td { padding: 7px 4px; font-size: 10px; }
+  #p-beregner .aar2-tbl td:first-child,
+  #p-beregner .aar2-tbl th:first-child { max-width: 100px; min-width: 80px; font-size: 10px; }
+
+  /* Opdater analyse: fuld bredde, større touch */
+  #bern-main-btn { width: 100%; padding: 14px; font-size: 14px; margin-left: 0 !important; }
+
+  /* Uge-label + dato på phone */
+  #bern-dato-label { display: none; }
+  #bern-uge-label { font-size: 18px; }
+
+  /* Basis-label: skjul på phone */
+  #bern-basis-label, #bern-event-note { font-size: 10px; }
+
+  /* Topbar: kompakt på phone */
+  .tb-brand strong { font-size: 13px; }
+  .tb-brand span { display: none; }
+  .tb-aar-pick { display: none; }
+
+  /* Bager: Gmail sync knap kompakt */
+  #gmail-sync-btn { padding: 5px 8px; font-size: 10px; }
+  #gmail-sync-status { display: none; }
+
+  /* Beregner: event badge kompakt */
+  #bern-event-badge { font-size: 10px; padding: 2px 8px; }
+
+  /* AI kontekst-kort: kompakt på phone */
+  #bern-kontekst-tekst { font-size: 11px; line-height: 1.55; }
+  #bern-kontekst-kort .card { padding: 12px 10px; }
 }
 </style>
 </head>
@@ -776,8 +1014,131 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
     <div class="content">
 
+      <!-- MORGENBRIEFING -->
+      <div class="panel active" id="p-morgenbriefing" style="padding:0;">
+        <!-- Header -->
+        <div id="mb-hdr" style="background:var(--forest);padding:20px 28px 16px;border-radius:0;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:rgba(200,168,75,.6);text-transform:uppercase;">Organic Market Greve</div>
+              <div style="font-size:22px;font-weight:500;color:#fff;margin-top:2px;" id="mb-dato-label">—</div>
+            </div>
+            <div id="mb-deadline-badge" style="display:none;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;padding:6px 16px;text-align:center;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(200,168,75,.7);letter-spacing:.08em;">BESTILLING UGE <span id="mb-naeste-uge">—</span></div>
+              <div style="font-size:13px;font-weight:600;color:var(--amber);" id="mb-deadline-txt">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:20px 28px 40px;">
+
+          <!-- ZONE 1: DAG STATUS -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Status i dag</div>
+          <div class="mb-kpi-row" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:10px;margin-bottom:24px;">
+
+            <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
+              <div class="kpi-l" style="color:rgba(200,168,75,.7);">Omsætning · ekskl. moms</div>
+              <div class="kpi-v" id="mb-dag-oms" style="color:var(--amber);font-size:28px;">—</div>
+              <div class="kpi-s" id="mb-dag-oms-sub" style="color:rgba(255,255,255,.5);">vs. forrige uge: —</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-l">Dækningsbidrag <span style="color:var(--ash);font-weight:400;">mål ≥35%</span></div>
+              <div class="kpi-v" id="mb-dag-db" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-dag-db-sub">—</div>
+            </div>
+
+            <div class="kpi">
+              <div class="kpi-l">Kunder i dag</div>
+              <div class="kpi-v" id="mb-dag-kunder" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-dag-kurv">— kr/kurv</div>
+            </div>
+
+            <div class="kpi" id="mb-spild-kpi">
+              <div class="kpi-l">Spild denne uge</div>
+              <div class="kpi-v" id="mb-spild" style="font-size:24px;">—</div>
+              <div class="kpi-s" id="mb-spild-sub">mål: under 15%</div>
+            </div>
+          </div>
+
+          <!-- ZONE 2: UGENS PULS -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Ugens puls · <span id="mb-uge-label">uge —</span></div>
+          <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 18px;margin-bottom:24px;">
+            <!-- Progress bar -->
+            <div style="margin-bottom:12px;">
+              <div style="display:flex;justify-content:space-between;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:5px;">
+                <span>Man</span><span>Tir</span><span>Ons</span><span>Tor</span><span>Fre</span><span>Lør</span><span>Søn</span>
+              </div>
+              <div style="height:6px;background:rgba(30,58,30,.1);border-radius:3px;overflow:hidden;">
+                <div id="mb-uge-progress" style="height:100%;background:var(--forest);border-radius:3px;transition:width .5s;width:0%;"></div>
+              </div>
+            </div>
+            <!-- Uge KPI'er -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">WTD OMSÆTNING</div>
+                <div style="font-size:18px;font-weight:500;color:var(--charcoal);" id="mb-wtd-oms">—</div>
+                <div style="font-size:10px;color:var(--ash);" id="mb-wtd-dage">— dage</div>
+              </div>
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">TGTG DENNE UGE</div>
+                <div style="font-size:18px;font-weight:500;" id="mb-tgtg-kr">—</div>
+                <div style="font-size:10px;" id="mb-tgtg-sub">mål: under 800 kr</div>
+              </div>
+              <div>
+                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">DB% DENNE UGE</div>
+                <div style="font-size:18px;font-weight:500;" id="mb-wtd-db">—</div>
+                <div style="font-size:10px;color:var(--ash);">dækningsbidrag</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ZONE 3: AI DAGSBRIEFING -->
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">AI dagsbriefing</div>
+            <button onclick="mbLoadBriefing()" id="mb-brief-btn"
+              style="background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">
+              🔄 Opdater
+            </button>
+          </div>
+          <div id="mb-briefing-boks" style="background:rgba(30,58,30,.04);border:1px solid rgba(30,58,30,.10);border-radius:12px;padding:16px 18px;margin-bottom:24px;min-height:60px;">
+            <div id="mb-briefing-tekst" style="font-size:14px;line-height:1.7;color:var(--charcoal);">
+              <span style="color:var(--ash);font-size:12px;">Klik "Opdater" for at hente dagens AI-briefing</span>
+            </div>
+          </div>
+
+          <!-- ZONE 4: TRAFIKLAMPER -->
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Status · trafiklamper</div>
+          <div id="mb-lamper" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;"></div>
+
+          <!-- Spild mini-chips -->
+          <div id="mb-spild-chips" style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap;"></div>
+
+          <!-- ZONE 5: SPARKLINES -->
+          <div class="mb-spark-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
+            <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Omsætning · 7 dage</div>
+              <div style="position:relative;height:80px;"><canvas id="mb-spark-oms"></canvas></div>
+            </div>
+            <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">☕ Kaffe · 7 dage</div>
+              <div style="position:relative;height:80px;"><canvas id="mb-spark-kaffe"></canvas></div>
+            </div>
+          </div>
+
+          <!-- ZONE 6: SMART ALERT -->
+          <div id="mb-smart-alert" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:20px;border-left:4px solid var(--gold);">
+            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">💡 Vigtigst lige nu</div>
+            <div id="mb-alert-tekst" style="font-size:13px;font-weight:500;color:var(--charcoal);"></div>
+          </div>
+
+          <!-- Opdater knap -->
+          <button onclick="mbLoad(true)" style="background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:6px;padding:5px 14px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+      </div>
+
       <!-- FORSIDE -->
-      <div class="panel active" id="p-forside">
+      <div class="panel" id="p-forside">
         <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <div>
             <h2>Overblik</h2>
@@ -823,71 +1184,81 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
           <!-- Sammenligninger vs. forrige uge (samme time) -->
           <div class="ov-banner-cmp" id="new-ov-vs-forrige-uge">
-            <div>vs. forrige uge (KL —): OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>
+            <div>vs. forrige uge (KL <span id="new-ov-cmp-kl">—</span>): OMS <span id="new-ov-cmp-oms">—</span> | DB <span id="new-ov-cmp-db">—</span> | Kunder <span id="new-ov-cmp-kunder">—</span> | Kurv <span id="new-ov-cmp-kurv">—</span></div>
           </div>
         </div>
 
-        <!-- 3 sammenligning kort -->
-        <div class="ov-comparison">
-          <div class="ov-cmp-card">
-            <div class="ov-cmp-title">Uge til dato</div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Omsætning</span>
-              <span class="ov-cmp-val" id="new-ov-wtd-oms">—</span>
+        <!-- 4 kombinerede KPI-kort: uge / måned / vs forrige -->
+        <div class="ov-combo-grid">
+
+          <!-- Omsætning -->
+          <div class="kpi ov-combo-kpi">
+            <div class="kpi-l">Omsætning</div>
+            <div class="kpi-v" id="new-ov-wtd-oms" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-oms" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
             </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">DB</span>
-              <span class="ov-cmp-val" id="new-ov-wtd-db">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kunder</span>
-              <span class="ov-cmp-val" id="new-ov-wtd-kunder">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kurv</span>
-              <span class="ov-cmp-val" id="new-ov-wtd-kurv">—</span>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-oms" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
             </div>
           </div>
 
-          <div class="ov-cmp-card">
-            <div class="ov-cmp-title">Måned til dato</div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Omsætning</span>
-              <span class="ov-cmp-val" id="new-ov-mtd-oms">—</span>
+          <!-- Dækningsbidrag -->
+          <div class="kpi ov-combo-kpi">
+            <div class="kpi-l">Dækningsbidrag</div>
+            <div class="kpi-v" id="new-ov-wtd-db" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-db" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
             </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">DB</span>
-              <span class="ov-cmp-val" id="new-ov-mtd-db">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kunder</span>
-              <span class="ov-cmp-val" id="new-ov-mtd-kunder">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kurv</span>
-              <span class="ov-cmp-val" id="new-ov-mtd-kurv">—</span>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-db" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
             </div>
           </div>
 
-          <div class="ov-cmp-card">
-            <div class="ov-cmp-title">vs forrige uge</div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Omsætning</span>
-              <span class="ov-cmp-val" id="new-ov-prev-oms">—</span>
+          <!-- Kunder -->
+          <div class="kpi ov-combo-kpi">
+            <div class="kpi-l">Kunder</div>
+            <div class="kpi-v" id="new-ov-wtd-kunder" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-kunder" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
             </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">DB</span>
-              <span class="ov-cmp-val" id="new-ov-prev-db">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kunder</span>
-              <span class="ov-cmp-val" id="new-ov-prev-kunder">—</span>
-            </div>
-            <div class="ov-cmp-row">
-              <span class="ov-cmp-label">Kurv</span>
-              <span class="ov-cmp-val" id="new-ov-prev-kurv">—</span>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-kunder" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
             </div>
           </div>
+
+          <!-- Gns. kurv -->
+          <div class="kpi ov-combo-kpi">
+            <div class="kpi-l">Gns. kurv</div>
+            <div class="kpi-v" id="new-ov-wtd-kurv" style="font-size:22px;margin-bottom:2px;">—</div>
+            <div class="ov-combo-lbl">uge til dato</div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-mtd-kurv" class="ov-combo-val">—</span>
+              <span class="ov-combo-sub">måned til dato</span>
+            </div>
+            <div class="ov-combo-sep"></div>
+            <div class="ov-combo-row">
+              <span id="new-ov-prev-kurv" class="ov-combo-chg">—</span>
+              <span class="ov-combo-sub">vs. forrige uge</span>
+            </div>
+          </div>
+
         </div>
 
         <!-- Overblik sammenligning kort -->
@@ -1090,30 +1461,77 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <!-- SENESTE DAG -->
       <div class="panel" id="p-dag">
         <div class="page-hdr">
-          <h2>Seneste dag</h2>
-          <p id="hdr-dag-sub">Timeopdelt salg</p>
+          <h2>Seneste dag · <span id="hdr-dag-dato" style="font-weight:400;color:var(--ash);">—</span></h2>
+          <p id="hdr-dag-sub">Omsætning, kunder og avance for dagen · sammenligning med samme dag forrige uge</p>
         </div>
-        <div class="kpi-row">
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-omsat">—</div></div></div>
-            <div class="kpi-l">Omsætning</div>
-            <div class="kpi-s">ekskl. moms</div>
+        <div class="kpi-row dag-kpi-row">
+
+          <!-- Omsætning -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Omsætning</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-omsat" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-omsat">—</div>
+                <div class="dag-ring-sub" id="dag-omsat-moms">inkl. moms</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-omsat-ref">forrige uge: —</div>
           </div>
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-transak" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-transak">—</div></div></div>
-            <div class="kpi-l">Kunder</div>
-            <div class="kpi-s" id="dag-snit-kurv">—</div>
+
+          <!-- Kunder -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Kunder</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-transak" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-transak">—</div>
+                <div class="dag-ring-sub">kunder</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-snit-kurv" style="font-size:12px;color:var(--charcoal);font-weight:500;">—</div>
+            <div class="dag-kpi-ref" id="dag-transak-ref">forrige uge: —</div>
           </div>
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-sendag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-db">—</div></div></div>
-            <div class="kpi-l">Bruttoavance</div>
-            <div class="kpi-s" id="dag-db-pct">—</div>
+
+          <!-- DB% -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">Dækningsbidrag <span style="color:var(--ash);font-size:10px;font-weight:400;">mål ≥35%</span></div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-sendag-db" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-db">—</div>
+                <div class="dag-ring-sub">DB %</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-db-pct" style="font-size:12px;color:var(--charcoal);font-weight:500;">—</div>
+            <div class="dag-kpi-ref" id="dag-db-maal">—</div>
           </div>
-          <div class="kpi">
-            <div class="kpi-ring-wrap"><svg class="kpi-ring-svg" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.1)" stroke-width="2.5"/><circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)"/></svg><div class="kpi-ring-inner"><div class="kpi-v" id="dag-vs-snit">—</div></div></div>
-            <div class="kpi-l">vs. sidste uge</div>
-            <div class="kpi-s" id="dag-vs-sub">samme dag</div>
+
+          <!-- vs forrige uge -->
+          <div class="kpi dag-kpi">
+            <div class="dag-kpi-lbl">vs. samme dag forrige uge</div>
+            <div class="dag-ring-wrap">
+              <svg viewBox="0 0 36 36" class="dag-ring-svg">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(30,58,30,.12)" stroke-width="3"/>
+                <circle id="ring-dag-vssnit" cx="18" cy="18" r="15.9" fill="none" stroke="var(--forest)" stroke-width="3" stroke-linecap="round" stroke-dasharray="0 100" transform="rotate(-90 18 18)" style="transition:stroke-dasharray .5s ease,stroke .3s;"/>
+              </svg>
+              <div class="dag-ring-inner">
+                <div class="dag-ring-val" id="dag-vs-snit">—</div>
+                <div class="dag-ring-sub">omsætning</div>
+              </div>
+            </div>
+            <div class="dag-kpi-ref" id="dag-vs-sub">forrige uge: — kr</div>
           </div>
+
         </div>
         <div class="card">
           <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Salg per time</span></div>
@@ -1222,6 +1640,61 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- MARGIN ANALYSE -->
+      <div class="panel" id="p-margin">
+        <div class="page-hdr">
+          <h2>Margin Analyse</h2>
+          <p>Produktprofitabilitet efter omsætning, vareforbrug og bruttoavance</p>
+        </div>
+
+        <!-- Filter og sortering -->
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;">
+          <select id="margin-aar-select" onchange="loadMarginAnalyse()"
+            style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-size:13px;">
+            <option value="">Alle år</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+          </select>
+          <select id="margin-kat-select" onchange="loadMarginAnalyse()"
+            style="padding:8px 10px;background:var(--bg);border:1px solid var(--border);color:var(--charcoal);border-radius:4px;font-size:13px;">
+            <option value="">Alle kategorier</option>
+            <option value="Brød">Brød</option>
+            <option value="Boller">Boller</option>
+            <option value="Wienerbrød">Wienerbrød</option>
+            <option value="Kager">Kager</option>
+            <option value="Diverse">Diverse</option>
+          </select>
+          <button onclick="loadMarginAnalyse()" style="margin-left:auto;background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+
+        <!-- Tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Alle produkter sorteret efter DB%</span>
+            <span class="aar2-tbl-hdr-r" id="margin-tbl-lbl"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="min-width:900px;">
+              <thead>
+                <tr style="background:rgba(30,58,30,.04);">
+                  <th style="text-align:left;padding:8px 12px;">Produkt</th>
+                  <th style="text-align:center;padding:8px 4px;color:var(--ash);font-size:11px;width:80px;">Kategori</th>
+                  <th class="num">Omsætning (ex)</th>
+                  <th class="num">Vareforbrug</th>
+                  <th class="num">DB kr</th>
+                  <th class="num">DB%</th>
+                  <th class="num">Antal</th>
+                  <th class="num" style="font-size:11px;">Seneste</th>
+                </tr>
+              </thead>
+              <tbody id="margin-tbody">
+                <tr><td colspan="8" class="empty">Indlæser…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- DAGE · PRODUKTER -->
       <div class="panel" id="p-dagedetaljer">
         <div class="dage-hdr">
@@ -1301,7 +1774,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="card" style="margin-bottom:0;">
               <div class="aar2-chart-hdr">
                 <span class="aar2-chart-ttl">Månedligt resultat</span>
-                <span class="aar2-chart-sub">Grøn = faktisk · Amber = estimat</span>
+                <span class="aar2-chart-sub">Mørkgrøn = faktisk · Lysgrøn = indeværende (projekteret) · Amber = estimat</span>
               </div>
               <div style="position:relative;height:200px;"><canvas id="c-aar-res"></canvas></div>
             </div>
@@ -1321,10 +1794,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Måned</th>
-                <th class="num" title="Shopbox omsætning inkl. moms">Omsat</th>
+                <th class="num" title="Shopbox omsætning inkl. moms">Omsætning inkl. moms</th>
+                <th class="num" title="Total omsætning ex-moms (÷1.25)">Omsætning ex-moms</th>
                 <th class="num" title="MobilePay omsætning ex-moms (÷1.25) — indgår i Netto omsat" style="color:rgba(100,200,100,.8);">MP ex-moms</th>
                 <th class="num" title="Total netto ex-moms = (Shopbox + MobilePay) ÷ 1.25">Netto omsat</th>
-                <th class="num">Bageri VF</th>
+                <th class="num" title="Bager faktura efter retur-kreditering (ex-moms)">Bager Faktura</th>
                 <th class="num">Andet VF</th>
                 <th class="num">VF i alt</th>
                 <th class="num">DB</th>
@@ -1605,8 +2079,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="basis-save-status" style="font-size:11px;color:var(--ash);margin-left:auto;">—</span>
         </div>
 
-        <div id="basis-tabel-wrap">
-          <div style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Indlæser…</div>
+        <div style="overflow-x:auto;border:1px solid var(--border);border-radius:6px;margin-bottom:16px;">
+          <table id="basis-tabel" style="width:100%;border-collapse:collapse;background:var(--white);">
+            <thead>
+              <tr style="background:var(--forest);color:var(--amber);">
+                <th style="padding:12px;text-align:left;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;">Produkt (Kategori)</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Man</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tir</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Ons</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Tor</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);font-size:12px;width:50px;">Fre</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Lør</th>
+                <th style="padding:12px;text-align:center;font-weight:500;border-right:1px solid rgba(30,58,30,.15);background:var(--moss);font-size:12px;width:50px;">Søn</th>
+                <th style="padding:12px;text-align:center;font-weight:500;font-size:12px;width:40px;">Ret</th>
+              </tr>
+            </thead>
+            <tbody id="basis-tbody">
+              <tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Indlæser…</td></tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -1615,6 +2106,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="page-hdr">
           <h2>Too Good To Go</h2>
           <p>Dagligt salg · kreditering til bager · <span style="color:var(--ash);">dato = produktionsdato (salgsdag −1)</span></p>
+        </div>
+
+        <!-- Manuel registrering -->
+        <div class="card" style="margin-bottom:20px;border-left:3px solid var(--gold);">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <div>
+              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--gold);">REGISTRER TGTG SALG</div>
+              <div style="font-size:11px;color:var(--ash);margin-top:2px;">Bruges indtil auto-sync kører · overskrives af nøjagtige TGTG-tal</div>
+            </div>
+            <input type="date" id="tgtg-reg-dato" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--charcoal);">
+          </div>
+          <div id="tgtg-reg-poser" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:12px;"></div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <button onclick="tgtgGemManuel()" id="tgtg-reg-btn"
+              style="background:var(--forest);color:var(--amber);border:none;border-radius:6px;padding:8px 18px;font-weight:500;font-size:13px;cursor:pointer;">
+              💾 Gem salg
+            </button>
+            <span id="tgtg-reg-status" style="font-size:12px;color:var(--ash);"></span>
+          </div>
         </div>
 
         <!-- KPI-kort -->
@@ -1861,7 +2371,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="page-hdr">
           <h2>Bager regnskab</h2>
           <p>Alle uger &mdash; faktura, retur &amp; svind oversigt</p>
-          <button onclick="_bagerLoaded=false;loadBager();" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">&#8635; Opdater</button>
+          <button onclick="gmailSynkNu()" id="gmail-sync-btn" style="background:rgba(30,58,30,.15);border:1px solid rgba(255,215,0,.3);color:var(--gold);border-radius:6px;padding:4px 12px;font-size:11px;cursor:pointer;font-weight:500;margin-left:auto;">↓ Synk Gmail</button>
+          <span id="gmail-sync-status" style="font-size:10px;color:var(--ash);margin-left:8px;"></span>
         </div>
 
         <!-- KPI-r&aelig;kke -->
@@ -2217,6 +2728,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+
       <!-- SPILD-RAPPORT -->
       <div class="panel" id="p-spild">
         <div class="page-hdr">
@@ -2279,16 +2791,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Wienerbrød kombo">KW</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="Kaffe + Bolle med Ost kombo">KBMO</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:#e67e22;" title="Rester ved lukketid inden TGTG sælger næste dag">RESTER</th>
-                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">TGTG</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);" title="TGTG poser solgt (D+1 offset)">TGTG<br><span style="font-size:8px;opacity:.6;">poser / stk</span></th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">EFFEKTIVT</th>
-                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:#6b9e6b;" title="Kan returneres til bageren (boller 10%, wienerbrød 13,5%)">RETUR</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:#6b9e6b;" title="Estimeret retur (boller 10%, wienerbrød 13,5%)">RETUR EST.</th>
+                <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--moss);" title="Faktisk registreret retur sendt til bageren">RETUR REG.</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD STK</th>
                 <th style="text-align:left;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD %</th>
                 <th style="text-align:right;padding:8px 10px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">4U SNIT %</th>
               </tr>
             </thead>
             <tbody id="spild-dag-tbody">
-              <tr><td colspan="12" class="empty">Vælg en uge…</td></tr>
+              <tr><td colspan="13" class="empty">Vælg en uge…</td></tr>
             </tbody>
           </table>
         </div>
@@ -2337,21 +2850,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <button onclick="bernHentKontekst()" id="bern-kontekst-btn"
               style="font-size:10px;background:none;border:1px solid var(--border);color:var(--ash);border-radius:3px;padding:3px 8px;cursor:pointer;">↻ Opdater</button>
           </div>
-          <div id="bern-kontekst-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;"></div>
+          <div id="bern-kontekst-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);"></div>
           <div id="bern-kontekst-spinner" style="display:none;font-size:12px;color:var(--ash);padding:8px 0;">⏳ Analyserer data…</div>
-        </div>
-
-        <!-- Sell-through kort -->
-        <div id="bern-st-kort" class="card" style="margin-bottom:14px;display:none;padding:0;overflow:hidden;">
-          <div style="padding:10px 14px;display:flex;align-items:center;justify-content:space-between;background:rgba(30,58,30,.04);border-bottom:1px solid var(--border);">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--charcoal);">📊 SELL-THROUGH PR. DAG (snit <span id="bern-st-uger">—</span> uger)</div>
-            <div style="font-size:10px;color:var(--ash);">
-              <span style="display:inline-block;width:10px;height:10px;background:#2d5a2d;border-radius:2px;margin-right:3px;"></span>>95% udsolgt risk
-              <span style="display:inline-block;width:10px;height:10px;background:#c8a84b;border-radius:2px;margin:0 3px 0 8px;"></span>75-95% ok
-              <span style="display:inline-block;width:10px;height:10px;background:#c0392b;border-radius:2px;margin:0 3px 0 8px;"></span><75% spild
-            </div>
-          </div>
-          <div id="bern-st-tabel" style="overflow-x:auto;padding:0 0 4px;"></div>
         </div>
 
         <!-- Uge-vælger + Opdater analyse knap -->
@@ -2368,82 +2868,33 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="bern-event-note" style="display:none;font-size:11px;color:var(--ash);margin-left:8px;font-style:italic;"></span>
         </div>
 
-        <!-- KPI-række -->
-        <div class="kpi-row-4" style="margin-bottom:12px;">
-          <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
-            <div class="kpi-l" style="color:rgba(200,168,75,.7);">Anbefalet total</div>
-            <div class="kpi-v" id="bern-total" style="color:var(--amber);font-size:28px;">—</div>
-            <div class="kpi-s" style="color:rgba(255,255,255,.45);" id="bern-total-sub">stk · kr ex moms</div>
+        <!-- Vejr-strip -->
+        <div id="bern-vejr-strip" style="display:none;margin-bottom:16px;background:rgba(30,58,30,.08);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <span style="font-size:10px;font-weight:600;letter-spacing:.08em;color:var(--ash);">VEJRUDSIGT · GREVE</span>
+            <span id="bern-vejr-opdateret" style="font-size:10px;color:var(--ash);opacity:.6;"></span>
           </div>
-          <div class="kpi">
-            <div class="kpi-l">Sæsonindeks</div>
-            <div class="kpi-v" id="bern-si">—</div>
-            <div class="kpi-s" id="bern-si-sub"></div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">TGTG seneste uge</div>
-            <div class="kpi-v" id="bern-tgtg">—</div>
-            <div class="kpi-s" id="bern-tgtg-sub">mål: under 800 kr</div>
-          </div>
-          <div class="kpi">
-            <div class="kpi-l">Væksttrend</div>
-            <div class="kpi-v" id="bern-vaekst">—</div>
-            <div class="kpi-s" id="bern-vaekst-sub"></div>
-          </div>
-        </div>
-
-        <!-- Retur KPI-kort -->
-        <div class="kpi-row-2" style="margin-bottom:16px;">
-          <div class="kpi" style="background:#f0f7f0;border-color:var(--moss);">
-            <div class="kpi-l" style="color:var(--forest);letter-spacing:.08em;">RETUR BOLLER · DENNE UGE</div>
-            <div class="kpi-v" id="bern-retur-boller" style="color:var(--forest);font-size:32px;">—</div>
-            <div class="kpi-s" id="bern-retur-boller-sub" style="color:var(--moss);">10% af bestilt</div>
-          </div>
-          <div class="kpi" style="background:#f0f7f0;border-color:var(--moss);">
-            <div class="kpi-l" style="color:var(--forest);letter-spacing:.08em;">RETUR WIENERBRØD · DENNE UGE</div>
-            <div class="kpi-v" id="bern-retur-wiener" style="color:var(--forest);font-size:32px;">—</div>
-            <div class="kpi-s" id="bern-retur-wiener-sub" style="color:var(--moss);">13,5% af bestilt</div>
-          </div>
+          <div id="bern-vejr-dage" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;"></div>
+          <div id="bern-vejr-advarsel" style="display:none;margin-top:8px;font-size:11px;padding:5px 10px;border-radius:4px;"></div>
         </div>
 
         <div id="beregner-tabel"><div style="padding:20px;color:var(--ash);">Indlæser…</div></div>
 
-        <!-- Bestillingsvurdering -->
-        <div id="bern-vurder-kort" class="card" style="margin-top:14px;display:none;border-left:3px solid var(--gold);">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--gold);">✅ BESTILLINGSVURDERING</div>
-            <button onclick="bernVurderBestilling()" id="bern-vurder-btn"
-              style="font-size:11px;background:var(--forest);color:var(--amber);border:none;border-radius:4px;padding:5px 12px;cursor:pointer;font-weight:500;">
-              Vurder min bestilling →
-            </button>
+        <!-- Salgsmønster: sidst-solgt -->
+        <div id="bern-sidst-solgt" style="display:none;margin-top:20px;border-top:1px solid rgba(30,58,30,.08);padding-top:16px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">
+            SALGSMØNSTER · SENESTE 4 UGER · hvornår sælger vi ud?
           </div>
-          <div id="bern-vurder-tekst" style="font-size:13px;line-height:1.7;color:var(--charcoal);white-space:pre-wrap;display:none;"></div>
-          <div id="bern-vurder-spinner" style="display:none;font-size:12px;color:var(--ash);padding:4px 0;">⏳ AI gennemgår bestillingen…</div>
-        </div>
-
-        <!-- Management analyse -->
-        <div class="card" id="bern-analyse-kort" style="margin-top:16px;display:none;">
-          <div class="aar2-chart-hdr">
-            <span class="aar2-chart-ttl">📋 Management vurdering</span>
-            <div style="display:flex;gap:8px;align-items:center;">
-              <div style="display:flex;gap:4px;align-items:center;font-size:12px;">
-                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">Uge</label>
-                <input id="bern-analyse-uge" type="number" min="1" max="52" value="23"
-                  style="width:50px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
-                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
-                <label style="color:var(--ash);font-family:'DM Mono',monospace;font-size:9px;">År</label>
-                <input id="bern-analyse-aar" type="number" min="2020" max="2099" value="2026"
-                  style="width:60px;padding:4px 6px;font-family:'DM Mono',monospace;font-size:11px;
-                         border:1px solid rgba(30,58,30,.2);border-radius:2px;"/>
-              </div>
-              <button id="bern-analyse-btn" onclick="bernGenererAnalyse()"
-                style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 12px;
-                       background:var(--forest);color:var(--amber);border:none;border-radius:2px;cursor:pointer;">
-                Generer ny ↻
-              </button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--danger);margin-bottom:8px;">🔴 Sælger ud for tidligt — tomme hylder</div>
+              <div id="bern-udsolgt-liste" style="font-size:12px;"></div>
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:var(--gold);margin-bottom:8px;">🟡 Til stede ved lukketid — overskud</div>
+              <div id="bern-overskud-liste" style="font-size:12px;"></div>
             </div>
           </div>
-          <div id="bern-analyse-tekst" style="margin-top:12px;font-size:14px;line-height:1.7;color:var(--forest);white-space:pre-wrap;"></div>
         </div>
       </div>
 
@@ -2531,11 +2982,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl">
               <thead><tr>
                 <th>Dato</th>
-                <th class="num">Beløb inkl. moms</th>
-                <th class="num">Netto ex-moms</th>
+                <th class="num">Omsætning (netto)</th>
+                <th class="num" style="color:var(--ash);">Gebyr</th>
+                <th class="num" style="color:var(--ash);">Brutto</th>
                 <th style="font-size:10px;color:var(--ash);">Kilde</th>
               </tr></thead>
-              <tbody id="mp-dag-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
+              <tbody id="mp-dag-tbody"><tr><td colspan="5" class="empty">Indlæser…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -2582,6 +3034,66 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <tr><td colspan="6" class="empty">Indlæser…</td></tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <!-- KOSTPRIS HISTORIK -->
+      <div class="panel" id="p-kp-historik">
+        <div class="page-hdr">
+          <h2>Kostpris historik</h2>
+          <p>Automatisk registrerede prisændringer · systemet opdager ændringer ved hvert Shopbox-upload</p>
+          <button onclick="kpLoad(true)" style="margin-left:auto;background:none;border:1px solid rgba(255,255,255,.15);color:var(--ash);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;">↻ Opdater</button>
+        </div>
+
+        <!-- Søg -->
+        <div style="margin-bottom:14px;">
+          <input id="kp-soeg" type="text" placeholder="Søg varenavn eller nummer…"
+            oninput="kpFilter()"
+            style="width:100%;max-width:360px;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--charcoal);">
+        </div>
+
+        <!-- Tabel -->
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr">
+            <span class="aar2-tbl-hdr-l">Aktuelle kostpriser med ændringshistorik</span>
+            <span class="aar2-tbl-hdr-r" id="kp-tbl-lbl"></span>
+          </div>
+          <table class="aar2-tbl" id="kp-tbl">
+            <thead><tr>
+              <th style="width:35%;">Varenavn</th>
+              <th style="width:12%;">Varenr.</th>
+              <th class="num">Aktuel pris/stk</th>
+              <th class="num">Gyldig fra</th>
+              <th class="num">Ændringer</th>
+              <th class="num">Kilde</th>
+              <th style="width:10%;"></th>
+            </tr></thead>
+            <tbody id="kp-tbody">
+              <tr><td colspan="7" class="empty">Indlæser…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Korriger modal -->
+        <div id="kp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:none;align-items:center;justify-content:center;">
+          <div style="background:var(--bg);border-radius:12px;padding:24px;width:360px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+            <h3 style="margin:0 0 16px;font-size:16px;" id="kp-modal-titel">Korriger kostpris</h3>
+            <input type="hidden" id="kp-modal-vn">
+            <div style="margin-bottom:12px;">
+              <label style="font-size:12px;color:var(--ash);display:block;margin-bottom:4px;">Ny kostpris per stk (kr excl. moms)</label>
+              <input id="kp-modal-pris" type="number" step="0.01" min="0"
+                style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+            </div>
+            <div style="margin-bottom:20px;">
+              <label style="font-size:12px;color:var(--ash);display:block;margin-bottom:4px;">Gyldig fra dato</label>
+              <input id="kp-modal-fra" type="date"
+                style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;">
+            </div>
+            <div style="display:flex;gap:10px;justify-content:flex-end;">
+              <button onclick="kpModalLuk()" style="padding:8px 16px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;">Annuller</button>
+              <button onclick="kpGem()" style="padding:8px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-weight:500;cursor:pointer;">Gem ændring</button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2837,7 +3349,7 @@ function closeSidebar() {
   document.getElementById('sidebar-backdrop').classList.remove('open');
 }
 
-let _navCurrentId = 'forside';
+let _navCurrentId = 'morgenbriefing';
 function showPanel(id, el) {
   _navCurrentId = id;
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
@@ -2864,6 +3376,7 @@ const NAV_SVG = {
   time:         '<path d="M1 12l4-5 3 2 4-6 3 4H1z"/>',
   kategori:     '<path d="M8 1L1 5v6l7 4 7-4V5L8 1zm0 2l5 3-5 3-5-3 5-3zM3 9.5l4 2.3v2.7l-4-2.3V9.5zm6 2.3l4-2.3v2.7l-4 2.3v-2.7z"/>',
   top:          '<path d="M2 2h12v2H2zm0 3h9v2H2zm0 3h6v2H2zm0 3h8v2H2z"/>',
+  margin:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm-.5 9.5h1v1h-1zm0-4h1v3h-1zm2-2h1v5h-1zm-4 2h1v3h-1z"/>',
   dagedetaljer: '<path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/>',
   aar:          '<path d="M2 14V5l6-4 6 4v9H2zm5-1h2V9H7v4zm-3 0h2v-3H4v3zm6 0h2v-3h-2v3z"/>',
   kaffe:        '<path d="M2 3h10v1h2a2 2 0 010 4h-2v1H2V3zm9 5V4H3v5h8zm2-4h-1v3h1a1 1 0 000-2V4zm-9 7h6l1 2H3l1-2z"/>',
@@ -2881,6 +3394,7 @@ const NAV_SVG = {
   hjaelp:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm.25-3.2c0 .4-.3.7-.7.7H7.7a.7.7 0 01-.7-.7v-.3c0-1 .6-1.7 1.3-2.1.4-.2.7-.6.7-1 0-.6-.4-1-1-1s-1 .4-1 1H5.5C5.5 4 6.6 3 8 3s2.5 1 2.5 2.3c0 .9-.5 1.7-1.3 2.1-.3.2-.5.5-.5.9h.3v.02z"/>',
 };
 const NAV_DEFAULT = [
+  {id:'morgenbriefing', label:'Morgenbriefing',        group:'Dagsoverblik',        hidden:false},
   {id:'forside',     label:'Overblik',              group:'Dagsoverblik',        hidden:false},
   {id:'management',  label:'Management Review',     group:'Dagsoverblik',        hidden:false},
   {id:'dag',         label:'Seneste dag',           group:'Dagsoverblik',        hidden:false},
@@ -2889,11 +3403,12 @@ const NAV_DEFAULT = [
   {id:'uge',         label:'Ugeoversigt',           group:'Salg & økonomi',      hidden:false},
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
+  {id:'margin',      label:'Margin Analyse',        group:'Salg & økonomi',      hidden:false},
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
-  {id:'beregner',    label:'Bestillingsberegner',   group:'Bestilling',          hidden:false},
-  {id:'bestilling',  label:'Ugebestilling',         group:'Bestilling',          hidden:false},
-  {id:'basis',       label:'Basis Bestilling',      group:'Bestilling',          hidden:false},
+  {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
+  {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
+  {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
   {id:'retur',       label:'Retur registrering',    group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
@@ -2903,6 +3418,7 @@ const NAV_DEFAULT = [
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Analyse & rapporter',  hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',       hidden:false},
+  {id:'kp-historik', label:'Kostpris historik',     group:'Administration',       hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',       hidden:false},
   {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Administration',       hidden:false},
 ];
@@ -2910,7 +3426,6 @@ const NAV_DEFAULT = [
 const NAV_GRP_IKON = {
   'Dagsoverblik':       '🏠',
   'Salg & økonomi':     '📈',
-  'Bestilling':        '📋',
   'Bageri & indkøb':   '🥐',
   'Analyse & rapporter':'📊',
   'Administration':     '⚙️',
@@ -3159,9 +3674,17 @@ async function api(path, opts) {
   try {
     const r = await fetch(path, opts);
     if (r.status === 401) { window.location.href = '/login'; return null; }
-    if (!r.ok) return null;
-    return r.json();
-  } catch { return null; }
+    if (!r.ok) {
+      console.error(`API error for ${path}: status ${r.status}`, r);
+      return null;
+    }
+    const json = await r.json();
+    console.debug(`API success for ${path}:`, json);
+    return json;
+  } catch(e) {
+    console.error(`API fetch error for ${path}:`, e);
+    return null;
+  }
 }
 
 // ── MOMS-TOGGLE ──────────────────────────────────────────────────────────────
@@ -3270,6 +3793,8 @@ async function loadAll() {
 
   if (kpi) setSyncNow();
   loadReturStatus();
+  mbLoad();
+  loadSpildOverblik();
 
   // Sæt date picker til dagens dato
   const today = new Date().toISOString().split('T')[0];
@@ -3413,6 +3938,13 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         el8.textContent = Math.round(dag.omsaetning / dag.transak).toLocaleString('da-DK') + ' kr';
       }
 
+      // Sæt aktuel tid i KL-feltet
+      const klEl = document.getElementById('new-ov-cmp-kl');
+      if (klEl) {
+        const nu = new Date();
+        klEl.textContent = String(nu.getHours()).padStart(2,'0') + ':' + String(nu.getMinutes()).padStart(2,'0');
+      }
+
       // Sammenligninger (spans som allerede eksisterer i HTML)
       const cmp1 = document.getElementById('new-ov-cmp-oms');
       if (cmp1 && dag.omsaetning != null && prevDag.omsaetning > 0) {
@@ -3456,46 +3988,37 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         wtd4.textContent = Math.round(uge.omsaetning / uge.transak).toLocaleString('da-DK') + ' kr';
       }
 
-      // MTD kort
-      const mtd1 = document.getElementById('new-ov-mtd-oms');
-      if (mtd1 && mtd.omsaetning != null) mtd1.textContent = kr(mtd.omsaetning);
-      const mtd2 = document.getElementById('new-ov-mtd-db');
-      if (mtd2 && mtd.db_kr != null) {
-        mtd2.textContent = kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : '');
-      }
-      const mtd3 = document.getElementById('new-ov-mtd-kunder');
-      if (mtd3 && mtd.transak != null) mtd3.textContent = mtd.transak.toLocaleString('da-DK');
-      const mtd4 = document.getElementById('new-ov-mtd-kurv');
-      if (mtd4 && mtd.omsaetning != null && mtd.transak > 0) {
-        mtd4.textContent = Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr';
-      }
+      // MTD (måned til dato)
+      const _setMtd = (id, txt) => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.className = 'ov-combo-val'; } };
+      if (mtd.omsaetning != null) _setMtd('new-ov-mtd-oms', kr(mtd.omsaetning));
+      if (mtd.db_kr != null) _setMtd('new-ov-mtd-db', kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : ''));
+      if (mtd.transak != null) _setMtd('new-ov-mtd-kunder', mtd.transak.toLocaleString('da-DK'));
+      if (mtd.omsaetning != null && mtd.transak > 0) _setMtd('new-ov-mtd-kurv', Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr');
 
       // vs forrige uge kort
-      const prev1 = document.getElementById('new-ov-prev-oms');
-      if (prev1 && uge.omsaetning != null && prevUge.omsaetning > 0) {
+      const _setPrev = (id, pct, tekst) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = tekst;
+        el.className = 'ov-combo-chg ' + (pct >= 2 ? 'up' : pct <= -2 ? 'dn' : 'neutral');
+      };
+      if (uge.omsaetning != null && prevUge.omsaetning > 0) {
         const pct = ((uge.omsaetning / prevUge.omsaetning) - 1) * 100;
-        prev1.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-        prev1.className = pct >= 0 ? 'up' : 'dn';
+        _setPrev('new-ov-prev-oms', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev2 = document.getElementById('new-ov-prev-db');
-      if (prev2 && uge.db_kr != null && prevUge.db_kr > 0) {
+      if (uge.db_kr != null && prevUge.db_kr > 0) {
         const pct = ((uge.db_kr / prevUge.db_kr) - 1) * 100;
-        prev2.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-        prev2.className = pct >= 0 ? 'up' : 'dn';
+        _setPrev('new-ov-prev-db', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev3 = document.getElementById('new-ov-prev-kunder');
-      if (prev3 && typeof uge.transak === 'number' && prevUge.transak > 0) {
+      if (typeof uge.transak === 'number' && prevUge.transak > 0) {
         const pct = ((uge.transak / prevUge.transak) - 1) * 100;
-        prev3.textContent = uge.transak.toLocaleString('da-DK') + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
-        prev3.className = pct >= 0 ? 'up' : 'dn';
+        _setPrev('new-ov-prev-kunder', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
-      const prev4 = document.getElementById('new-ov-prev-kurv');
-      if (prev4 && uge.transak > 0 && prevUge.transak > 0) {
-        const kurvDag = Math.round(uge.omsaetning / uge.transak);
+      if (uge.transak > 0 && prevUge.transak > 0) {
+        const kurvNu   = Math.round(uge.omsaetning / uge.transak);
         const kurvPrev = Math.round(prevUge.omsaetning / prevUge.transak);
-        const pct = (kurvDag / kurvPrev - 1) * 100;
-        prev4.textContent = kurvDag.toLocaleString('da-DK') + ' kr (' + (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%)';
-        prev4.className = pct >= 0 ? 'up' : 'dn';
+        const pct = (kurvNu / kurvPrev - 1) * 100;
+        _setPrev('new-ov-prev-kurv', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
     } catch (e) {
       console.log('Nyt Overblik fejl:', e);
@@ -3768,18 +4291,43 @@ function buildAlerts(kpi) {
   strip.style.display = '';
 }
 
-// Tilføj svind-alert (kaldes fra loadSvind)
+// Tilføj svind-alert (kaldes fra loadSvind — historisk snit)
 function addSvindAlert(gnsSvind, uge) {
-  const chips = document.getElementById('alert-chips');
-  if (!chips || gnsSvind === '—') return;
-  const g   = parseFloat(gnsSvind);
+  // Historisk snit vises ikke mere på forsiden — erstattet af aktuelle uger
+}
+
+function _spildAlertTxt(d, label) {
+  if (!d || !d.har_data || d.svind_pct == null) return null;
+  const g   = d.svind_pct;
   const sev = g >= 22 ? 'red' : g >= 15 ? 'amber' : 'green';
   const ico = g >= 22 ? '⚠️' : g >= 15 ? '⚠️' : '✓';
-  const txt = g >= 22 ? `Svind snit ${g.toFixed(1)}% — kritisk (over 22%)` :
-              g >= 15 ? `Svind snit ${g.toFixed(1)}% — hold øje (15–22%)` :
-                        `Svind snit ${g.toFixed(1)}% — godt (under 15%)`;
-  chips.innerHTML += `<div class="alert-chip ${sev}"><span class="alert-icon">${ico}</span><span>${txt}</span></div>`;
-  document.getElementById('alert-strip').style.display = '';
+  const dage = d.n_dage > 0 ? ` · ${d.n_dage} dage` : '';
+  const txt = `Spild ${label}: ${g.toFixed(1)}%${dage} — ` +
+              (g >= 22 ? 'kritisk' : g >= 15 ? 'hold øje' : 'godt');
+  return { sev, ico, txt };
+}
+
+async function loadSpildOverblik() {
+  try {
+    const d = await api('/api/spild/overblik');
+    if (!d) return;
+    const chips = document.getElementById('alert-chips');
+    if (!chips) return;
+    let changed = false;
+    // Forrige (afsluttede) uge
+    const a = _spildAlertTxt(d.forrige_uge, `uge ${d.forrige_uge?.uge}`);
+    if (a) {
+      chips.innerHTML += `<div class="alert-chip ${a.sev}"><span class="alert-icon">${a.ico}</span><span>${a.txt}</span></div>`;
+      changed = true;
+    }
+    // Denne uge (igangværende)
+    const b = _spildAlertTxt(d.denne_uge, `uge ${d.denne_uge?.uge} (nu)`);
+    if (b) {
+      chips.innerHTML += `<div class="alert-chip ${b.sev}"><span class="alert-icon">${b.ico}</span><span>${b.txt}</span></div>`;
+      changed = true;
+    }
+    if (changed) document.getElementById('alert-strip').style.display = '';
+  } catch(e) {}
 }
 
 // ── DAGSOVERBLIK PROGRESS ─────────────────────────────────────────────────────
@@ -3933,46 +4481,97 @@ function buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, nUger) {
 
 function buildDag(kpi, timer, timerForrige, timerSnit) {
   if (kpi && kpi.dag) {
-    const dag = kpi.dag;
-    document.getElementById('dag-omsat').textContent   = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
-    document.getElementById('dag-transak').textContent = dag.transak != null ? dag.transak : '—';
-    document.getElementById('dag-db').textContent      = dag.db_kr != null ? kr(dag.db_kr) : '—';
-    document.getElementById('dag-db-pct').textContent  = dag.db_pct != null ? dag.db_pct.toFixed(1) + '% DB' : '—';
-    if (dag.transak > 0 && dag.omsaetning > 0) {
-      const kurv = Math.round(dag.omsaetning / dag.transak);
-      document.getElementById('dag-snit-kurv').textContent = kurv + ' kr/kurv';
+    const dag     = kpi.dag;
+    const prevDag = kpi.prev_dag || {};
+
+    // Sæt dato i header
+    const dagDato = dag.dato || kpi.dag_dato;
+    if (dagDato) {
+      const d = new Date(dagDato);
+      const DAGE = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
+      const MND  = ['jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+      const klTxt = kpi.seneste_time != null ? ' · kl. ' + String(kpi.seneste_time).padStart(2,'0') + ':00' : '';
+      document.getElementById('hdr-dag-dato').textContent =
+        DAGE[d.getUTCDay()] + ' ' + d.getUTCDate() + '. ' + MND[d.getUTCMonth()] + klTxt;
     }
-    const prevDagOmsat = kpi.prev_dag ? kpi.prev_dag.omsaetning : null;
+
+    // Omsætning
+    document.getElementById('dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    const momsEl = document.getElementById('dag-omsat-moms');
+    if (momsEl) momsEl.textContent = MOMS_EX ? 'ekskl. moms' : 'inkl. moms';
+    if (prevDag.omsaetning > 0) {
+      const pct = ((dag.omsaetning / prevDag.omsaetning) - 1) * 100;
+      document.getElementById('dag-omsat-ref').textContent =
+        'forrige uge: ' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr · ' +
+        (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+    }
+
+    // Kunder
+    document.getElementById('dag-transak').textContent = dag.transak != null ? dag.transak : '—';
+    if (dag.transak > 0 && dag.omsaetning > 0) {
+      document.getElementById('dag-snit-kurv').textContent =
+        Math.round(dag.omsaetning / dag.transak).toLocaleString('da-DK') + ' kr / gns. kurv';
+    }
+    if (prevDag.transak > 0) {
+      document.getElementById('dag-transak-ref').textContent =
+        'forrige uge: ' + prevDag.transak + ' kunder';
+    }
+
+    // DB % med mål
+    document.getElementById('dag-db').textContent = dag.db_pct != null ? dag.db_pct.toFixed(1) + '%' : '—';
+    if (dag.db_pct != null) {
+      document.getElementById('dag-db-pct').textContent =
+        dag.db_kr != null ? Math.round(dag.db_kr).toLocaleString('da-DK') + ' kr DB' : '— kr DB';
+      const maalEl = document.getElementById('dag-db-maal');
+      maalEl.textContent = dag.db_pct >= 35
+        ? '✓ Over mål (≥35%)' : dag.db_pct >= 28
+        ? '~ Tæt på mål (≥35%)' : '✗ Under mål (≥35%)';
+      maalEl.style.color = dag.db_pct >= 35 ? 'var(--moss)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)';
+    }
+
+    // vs. forrige uge
+    const prevDagOmsat = prevDag.omsaetning;
     if (prevDagOmsat > 0 && dag.omsaetning) {
       const pct = ((dag.omsaetning / prevDagOmsat) - 1) * 100;
       const el  = document.getElementById('dag-vs-snit');
       el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-      el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
-      // Vis ugedag + kr for samme dag sidste uge
+      el.className = 'dag-ring-val ' + (pct >= 0 ? 'up' : 'dn');
       const DAG_NAVN = ['søn','man','tir','ons','tor','fre','lør'];
       const prevDato = kpi.prev_dag_dato ? new Date(kpi.prev_dag_dato) : null;
       const dagNavn  = prevDato ? DAG_NAVN[prevDato.getUTCDay()] : 'samme dag';
       document.getElementById('dag-vs-sub').textContent =
-        dagNavn + ' · ' + Math.round(prevDagOmsat).toLocaleString('da-DK') + ' kr';
-      setRing('ring-dag-omsat', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
-      setRing('ring-dag-vssnit', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
-    } else if (dag.omsaetning > 0) {
-      setRing('ring-dag-omsat', 60, 'var(--forest)');
-      // Fallback til dagssnit hvis ingen data fra samme dag sidste uge
-      if (kpi.snit_dag) {
-        const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
-        const el  = document.getElementById('dag-vs-snit');
-        el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-        el.className = 'kpi-v ' + (pct >= 0 ? 'up' : 'dn');
-        document.getElementById('dag-vs-sub').textContent =
-          'snit ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
-        setRing('ring-dag-vssnit', Math.max(0, Math.min(100, 50 + pct / 2)), pct >= 0 ? 'var(--moss)' : 'var(--danger)');
-      }
+        'forrige uge (' + dagNavn + '): ' + Math.round(prevDagOmsat).toLocaleString('da-DK') + ' kr';
+      // Fast 75% + grøn/rød farve
+      setRing('ring-dag-vssnit', 75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+      setRing('ring-dag-omsat',  75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+    } else if (dag.omsaetning > 0 && kpi.snit_dag) {
+      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
+      const el  = document.getElementById('dag-vs-snit');
+      el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+      el.className = 'dag-ring-val ' + (pct >= 0 ? 'up' : 'dn');
+      document.getElementById('dag-vs-sub').textContent =
+        '12u snit: ' + Math.round(kpi.snit_dag).toLocaleString('da-DK') + ' kr/dag';
+      setRing('ring-dag-vssnit', 75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+      setRing('ring-dag-omsat',  75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
+    } else {
+      setRing('ring-dag-omsat',  75, 'var(--forest)');
+      setRing('ring-dag-vssnit', 75, 'var(--ash)');
     }
-    if (dag.db_pct != null)
-      setRing('ring-sendag-db', dag.db_pct, dag.db_pct >= 35 ? 'var(--forest)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)');
-    if (dag.transak > 0)
-      setRing('ring-dag-transak', Math.min(100, dag.transak / 60 * 100), 'var(--forest)');
+
+    // DB%: fast 75% + grøn/guld/rød
+    if (dag.db_pct != null) {
+      const dbClr = dag.db_pct >= 35 ? 'var(--moss)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)';
+      setRing('ring-sendag-db', 75, dbClr);
+      document.getElementById('dag-db').style.color = dbClr;
+    }
+
+    // Kunder: fast 75% + grøn/rød vs forrige uge
+    if (dag.transak > 0) {
+      const kClr = prevDag.transak > 0
+        ? (dag.transak >= prevDag.transak ? 'var(--moss)' : 'var(--danger)')
+        : 'var(--forest)';
+      setRing('ring-dag-transak', 75, kClr);
+    }
   }
 
   if (timer && timer.length > 0) {
@@ -4309,6 +4908,49 @@ function topToggle(gid, hdr) {
   const open = rows.length > 0 && rows[0].style.display === 'none';
   rows.forEach(r => r.style.display = open ? '' : 'none');
   if (arr) arr.textContent = open ? '▼' : '▶';
+}
+
+// ── MARGIN ANALYSE ────────────────────────────────────────────────────────────
+async function loadMarginAnalyse() {
+  const aar = document.getElementById('margin-aar-select').value;
+  const katSel = document.getElementById('margin-kat-select');
+  const kat = katSel.value;
+  const url = `/api/salg/margin-analyse${aar ? '?aar=' + aar : ''}`;
+
+  const alleData = await api(url);
+  if (!alleData) return;
+
+  // Byg dropdown fra faktiske kategorier i data (første gang eller ved årsfilter)
+  const kategorier = [...new Set(alleData.map(r => r.kategori).filter(Boolean))].sort();
+  const gammelVal = katSel.value;
+  katSel.innerHTML = '<option value="">Alle kategorier</option>' +
+    kategorier.map(k => `<option value="${k}"${k === gammelVal ? ' selected' : ''}>${k}</option>`).join('');
+
+  // Filtrer lokalt på kategori (undgår ekstra API-kald)
+  const data = kat ? alleData.filter(r => r.kategori === kat) : alleData;
+
+  const tbody = document.getElementById('margin-tbody');
+  const mono = "font-family:'DM Mono',monospace;";
+
+  tbody.innerHTML = data.map((r, i) => {
+    const db    = r.db_pct ?? 0;
+    const dbColor = db >= 35 ? '#2d5a2d' : db >= 20 ? '#7a5c00' : '#9b3420';
+    const dbBg    = db >= 35 ? 'rgba(74,124,74,.1)' : db >= 20 ? 'rgba(200,168,75,.15)' : 'rgba(155,52,32,.1)';
+    const datoStr = r.seneste_salg ? r.seneste_salg.substring(5) : '—';
+
+    return `<tr style="background:rgba(30,58,30,.01);">
+      <td style="padding:8px 12px;color:var(--charcoal);">${r.varenavn}</td>
+      <td style="text-align:center;padding:8px 4px;color:var(--ash);font-size:12px;">${r.kategori || '—'}</td>
+      <td class="num" style="font-size:12px;">${Math.round(r.omsat_ex_moms || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}color:var(--ash);">${Math.round(r.vareforbrug || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="font-size:12px;${mono}">${Math.round(r.db_kr || 0).toLocaleString('da-DK')} kr</td>
+      <td class="num"><span style="${mono}font-size:12px;font-weight:500;padding:3px 8px;border-radius:2px;background:${dbBg};color:${dbColor};">${db.toFixed(1)}%</span></td>
+      <td class="num" style="font-size:12px;">${Math.round(r.antal_solgt || 0).toLocaleString('da-DK')} stk</td>
+      <td class="num" style="font-size:11px;color:var(--ash);${mono}">${datoStr}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('margin-tbl-lbl').textContent = data.length + ' produkter';
 }
 
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────
@@ -4701,11 +5343,13 @@ function buildAar() {
     const entry = maaneder.find(r => r.m === thisMonth);
     if (entry) {
       if (entry.type === 'faktisk' && entry.faktDage < entry.dage) {
-        const snit = entry.omsat / entry.faktDage;
+        const faktSnit = Math.round(entry.omsat / entry.faktDage);
         const restDage = entry.dage - entry.faktDage;
-        const estRest = Math.round(snit * restDage);
+        // Brug årsplan-konfigurationens forventede dagsnit for resten (sæson × vækst)
+        const planSnit = Math.round(c.base * (1 + c.vaekst / 100) * (c.saeson[entry.m - 1] || 1));
+        const estRest  = Math.round(planSnit * restDage);
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:estRest,
-                  totalProj:entry.omsat+estRest, dagSnit:Math.round(snit), restDage, isLive:true };
+                  totalProj:entry.omsat+estRest, dagSnit:faktSnit, restDage, isLive:true };
       } else if (entry.type === 'faktisk') {
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:0,
                   totalProj:entry.omsat, dagSnit:Math.round(entry.omsat/entry.faktDage), restDage:0, isLive:false };
@@ -4757,27 +5401,44 @@ function buildAar() {
     const estPct  = 100 - factPct;
     const badge   = indev.isLive ? '<span class="aar2-badge live">LIVE + ESTIMAT</span>'
                                  : (indev.type==='faktisk' ? '<span class="aar2-badge live">FAKTISK</span>' : '<span class="aar2-badge prog">ESTIMAT</span>');
+    const faktDage  = indev.faktDage || 0;
+    const restDage  = indev.restDage || 0;
+    const faktBarPct = indev.dage > 0 ? Math.max(2, Math.round(faktDage / indev.dage * 100)) : 2;
+    const estBarPct  = 100 - faktBarPct;
     document.getElementById('aar2-month-card').innerHTML = `
       <div class="aar2-mnd-hdr">
         <span class="aar2-mnd-label">Indeværende måned — ${AAR_MND_NAVNE[indev.m-1].toUpperCase()} ${aar}</span>
         ${badge}
       </div>
-      <div class="aar2-proj-omsat">${dk(indev.totalProj)} kr <span style="font-size:13px;color:var(--ash);font-weight:300;">projekteret</span></div>
-      <div class="aar2-proj-sub">${indev.dage} dage total · ${indev.faktDage||0} faktiske dage</div>
-      <div class="aar2-progbar">
-        <div class="aar2-progbar-faktisk" style="width:${factPct}%;">
-          <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--amber);white-space:nowrap;">${indev.dage} dage</span>
-        </div>
-        ${estPct>2 ? `<div class="aar2-progbar-estimat" style="width:${estPct}%;"><span style="font-family:'DM Mono',monospace;font-size:7px;color:var(--forest);white-space:nowrap;">+${indev.restDage}</span></div>` : ''}
+
+      <!-- Hvad forventer vi hele måneden -->
+      <div style="margin-bottom:4px;">
+        <span style="font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">Forventet omsætning hele måneden</span>
       </div>
-      <div class="aar2-legend">
-        ${indev.faktiskOmsat>0 ? `<span><span class="aar2-legend-dot" style="background:var(--forest);"></span>Faktisk ${dk(indev.faktiskOmsat)} kr</span>` : ''}
-        ${indev.estimatOmsat>0 ? `<span><span class="aar2-legend-dot" style="background:var(--amber);"></span>Estimat ${dk(indev.estimatOmsat)} kr</span>` : ''}
+      <div class="aar2-proj-omsat">${dk(indev.totalProj)} kr</div>
+      <div class="aar2-proj-sub" style="margin-bottom:14px;">
+        ${dk(indev.faktiskOmsat)} kr opnået på ${faktDage} dage
+        ${restDage > 0 ? ` · estimat ${dk(indev.estimatOmsat)} kr for ${restDage} resterende dage` : ''}
       </div>
+
+      <!-- Månedsprogress: faktisk vs estimeret -->
+      <div style="font-size:10px;font-family:'DM Mono',monospace;color:var(--ash);margin-bottom:4px;display:flex;justify-content:space-between;">
+        <span>${faktDage} dage faktisk</span>
+        <span>${restDage} dage estimeret</span>
+      </div>
+      <div class="aar2-progbar" style="margin-bottom:8px;">
+        <div class="aar2-progbar-faktisk" style="width:${faktBarPct}%;"></div>
+        ${estBarPct > 2 ? `<div class="aar2-progbar-estimat" style="width:${estBarPct}%;"></div>` : ''}
+      </div>
+      <div class="aar2-legend" style="margin-bottom:14px;">
+        ${indev.faktiskOmsat > 0 ? `<span><span class="aar2-legend-dot" style="background:var(--forest);"></span>Faktisk ${dk(indev.faktiskOmsat)} kr</span>` : ''}
+        ${indev.estimatOmsat > 0 ? `<span><span class="aar2-legend-dot" style="background:var(--amber);"></span>Estimeret ${dk(indev.estimatOmsat)} kr</span>` : ''}
+      </div>
+
       <div class="aar2-mnd-stats">
-        <div><div class="aar2-stat-l">DB Faktisk</div><div class="aar2-stat-v">${indev.faktiskOmsat>0 ? dk(indev.avance)+' kr' : '—'}</div></div>
-        <div><div class="aar2-stat-l">Resultat</div><div class="aar2-stat-v">${dk(indev.res)} kr</div></div>
-        <div><div class="aar2-stat-l">Dag-snit</div><div class="aar2-stat-v">${dk(indev.dagSnit)} kr</div></div>
+        <div><div class="aar2-stat-l">DB · faktiske dage</div><div class="aar2-stat-v">${indev.faktiskOmsat > 0 ? dk(indev.avance)+' kr' : '—'}</div></div>
+        <div><div class="aar2-stat-l">Resultat (est.)</div><div class="aar2-stat-v">${dk(indev.res)} kr</div></div>
+        <div><div class="aar2-stat-l">Dag-snit · faktisk</div><div class="aar2-stat-v">${dk(indev.dagSnit)} kr</div></div>
       </div>`;
   }
 
@@ -4822,20 +5483,39 @@ function buildAar() {
   }, 50);
 
   // ── Charts ─────────────────────────────────────────────────────────────────
+  const cBgF  = 'rgba(30,58,30,.75)';   // faktisk (afsluttet)
+  const cBgE  = 'rgba(200,168,75,.55)'; // estimat (fremtidig)
+  const cBgI  = 'rgba(74,124,74,.55)';  // indeværende (delvis faktisk + estimat) — lysere grøn
+  const cBgFd = 'rgba(30,58,30,.65)';
+  const cBgEd = 'rgba(200,168,75,.45)';
+  const cBgId = 'rgba(74,124,74,.50)';
+
+  // Byg chart-data — brug projekterede værdier for indeværende måned
   const chartData = [];
-  maaneder.forEach(r => chartData.push({ label:AAR_MND_KORT[r.m-1], type:r.type, res:r.res, avance:r.avance }));
-  const cBgF = 'rgba(30,58,30,.75)', cBgE = 'rgba(200,168,75,.55)';
-  const cBgFd = 'rgba(30,58,30,.65)', cBgEd = 'rgba(200,168,75,.45)';
+  maaneder.forEach(r => {
+    const isIndev = aar === thisYear && r.m === thisMonth && indev && indev.isLive;
+    let res = r.res, avance = r.avance;
+    if (isIndev && indev) {
+      // Skaler avance proportionalt med projektion
+      const projFaktor = indev.totalProj > 0 && r.omsat > 0 ? indev.totalProj / r.omsat : 1;
+      avance = Math.round((r.avance || 0) * projFaktor);
+      res    = Math.round(avance - (r.faste || 0));
+    }
+    chartData.push({ label: AAR_MND_KORT[r.m-1], type: r.type, isIndev, res, avance });
+  });
+
+  const barClr  = r => r.isIndev ? cBgI  : r.type==='faktisk' ? cBgF  : cBgE;
+  const barClrD = r => r.isIndev ? cBgId : r.type==='faktisk' ? cBgFd : cBgEd;
 
   mk('c-aar-res','bar', chartData.map(r=>r.label),
     [{ label:'Resultat', data:chartData.map(r=>+(r.res/1000).toFixed(1)),
-       backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgF:cBgE), borderWidth:0, borderRadius:2 }],
+       backgroundColor:chartData.map(barClr), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
       plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
   mk('c-aar-db','bar', chartData.map(r=>r.label),
     [{ label:'DB', data:chartData.map(r=>+(r.avance/1000).toFixed(1)),
-       backgroundColor:chartData.map(r=>r.type==='faktisk'?cBgFd:cBgEd), borderWidth:0, borderRadius:2 }],
+       backgroundColor:chartData.map(barClrD), borderWidth:0, borderRadius:2 }],
     { scales:{ x:{ticks:{font:{size:9}}}, y:{ticks:{font:{size:9},callback:v=>v+'t'}} },
       plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>ctx.raw+'t kr'}}} });
 
@@ -4872,6 +5552,7 @@ function buildAar() {
     return `<tr class="${r.isIndev?'indev':''}">
       <td><strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
       <td class="num">${dk(r.omsat)}</td>
+      <td class="num">${dk(r.omsat/1.25)}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mpNetto > 0 ? dk(r.mpNetto) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
       <td class="num" style="${ash}">${r.netto!=null?dk(r.netto):'—'}</td>
       <td class="num" style="${ash}${r.bagerVF>0?clk:''}" title="${r.bagerVF>0?'Klik for ugeoversigt':''}"
@@ -5403,9 +6084,7 @@ async function loadBestilling(force = false) {
 // ── BASIS BESTILLING: DAGLIG SKABELON ────────────────────────────────────────
 
 let _basisData = [];
-const DAGE = ['man','tir','ons','tor','fre','loe','son'];
-const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
-const WEEKEND = new Set(['loe','son']);
+const DAGE_BASIS = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son'];
 
 async function loadBasis() {
   try {
@@ -5426,12 +6105,11 @@ async function loadBasis() {
 
 function buildBasisTable() {
   const filter = document.getElementById('basis-filter-input').value.toLowerCase();
-  const wrap = document.getElementById('basis-tabel-wrap');
+  const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+  const DAGE = DAGE_BASIS;
+  const mono = 'font-family:monospace;';
 
-  // Debug: log constants
-  console.log('buildBasisTable START - DAGE:', DAGE, 'DAG_LBL:', DAG_LBL, 'WEEKEND:', WEEKEND, '_basisData:', _basisData);
-
-  // Group by product
+  // Group by product first
   const produkter = {};
   _basisData.forEach(row => {
     if (!produkter[row.varenummer]) {
@@ -5444,166 +6122,179 @@ function buildBasisTable() {
     produkter[row.varenummer].data[row.dag] = row.anbefalet_antal;
   });
 
-  // Group by category
-  const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+  // Group by kategori
   const groups = {};
-  Object.entries(produkter).forEach(([vn, prod]) => {
-    // Use kategori from product, default to 'Øvrige' if empty
-    let kat = (prod.kategori || '').trim();
-    if (!kat) kat = 'Øvrige';
+  for (const [vn, prod] of Object.entries(produkter)) {
+    const kat = prod.kategori;
     if (!groups[kat]) groups[kat] = [];
     groups[kat].push({varenummer: vn, ...prod});
-  });
+  }
 
-  const mono = "font-family:'DM Mono',monospace;";
-
-  // Build header row with days (same as beregner)
-  const thDage = DAGE.map(dag =>
-    `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
-  ).join('');
-  console.log('thDage HTML:', thDage, 'thDage length:', thDage.length);
-
-  // Build body rows grouped by category
+  const tbody = document.getElementById('basis-tbody');
   let bodyRows = '';
-  // Sort categories: predefined order first, then others alphabetically, then Øvrige last
-  const otherKats = Object.keys(groups).filter(k => !KAT_ORD.includes(k) && k !== 'Øvrige').sort();
-  const katOrder = [...KAT_ORD.filter(k => groups[k]), ...otherKats, ...(groups['Øvrige'] ? ['Øvrige'] : [])];
+  const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
 
   for (const kat of katOrder) {
     const prods = groups[kat];
     if (!prods || prods.length === 0) continue;
 
-    // Filter products by search
-    const filteredProds = prods.filter(p => {
-      if (!filter) return true;
-      return `${p.varenavn} ${p.kategori}`.toLowerCase().includes(filter);
-    });
+    // Filtrer produkter
+    const filteredProds = prods.filter(p =>
+      !filter || p.varenavn.toLowerCase().includes(filter)
+    );
     if (filteredProds.length === 0) continue;
 
-    // Category header
+    // Kategori-header
     bodyRows += `<tr style="background:rgba(45,74,45,.07);">
-      <td colspan="10" style="font-weight:600;font-size:11px;color:var(--forest);padding:5px 8px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
+      <td colspan="8" style="font-weight:600;font-size:11px;color:var(--forest);padding:5px 8px;letter-spacing:.04em;">${kat.toUpperCase()}</td>
+      <td></td>
     </tr>`;
 
-    // Product rows (same as beregner)
-    for (const p of filteredProds) {
-      const dagCells = DAGE.map(dag => {
-        const v = p.data[dag] || 0;
-        const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
-        return `<td class="num" ${mono}contenteditable="true"
-          data-vn="${p.varenummer}" data-dag="${dag}"
-          onblur="basisCellSave(this)"
-          onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
-          onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
-          style="${wkBg}${v===0?'color:var(--ash);':''} cursor:text;min-width:28px;padding:8px 4px;">${v||0}</td>`;
+    // Produkt-rækker
+    for (const prod of filteredProds) {
+      const dayCells = DAGE.map(dag => {
+        const val = prod.data[dag] || 0;
+        const wkBg = ['loe','son'].includes(dag) ? 'background:rgba(45,74,45,.04);' : '';
+        return `<td class="num" style="${mono}${wkBg}padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);cursor:pointer;"
+           onclick="basisEditCell('${prod.varenummer}', '${dag}')"
+           data-vn="${prod.varenummer}" data-dag="${dag}">
+          <span class="basis-val">${val || '—'}</span>
+        </td>`;
       }).join('');
 
-      const total = DAGE.reduce((s,d) => s + (p.data[d]||0), 0);
-      bodyRows += `<tr data-vn="${p.varenummer}">
-        <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
-        ${dagCells}
-        <td class="num" style="${mono}font-weight:600;">${total}</td>
-        <td style="padding:8px 4px;text-align:center;">
-          <button onclick="basisDeleteProduct('${p.varenummer}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;">×</button>
+      const total = DAGE.reduce((s, d) => s + (prod.data[d] || 0), 0);
+      bodyRows += `<tr style="border-bottom:1px solid rgba(30,58,30,.08);">
+        <td style="padding:8px 12px;text-align:left;border-right:1px solid rgba(30,58,30,.08);font-size:12px;font-weight:500;">${prod.varenavn}</td>
+        ${dayCells}
+        <td class="num" style="${mono}padding:8px;text-align:center;font-weight:600;color:var(--forest);">${total}</td>
+        <td style="padding:8px;text-align:center;">
+          <button onclick="basisDeleteProduct('${prod.varenummer}')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;">×</button>
         </td>
       </tr>`;
     }
 
-    // Category subtotal (same as beregner)
+    // Kategori-subtotal
     const katDagCells = DAGE.map(dag => {
       const t = filteredProds.reduce((s,p) => s + (p.data[dag]||0), 0);
-      return `<td class="num" style="${mono}font-weight:600;color:var(--forest);${WEEKEND.has(dag)?'background:rgba(45,74,45,.08);':''}">${t}</td>`;
+      return `<td class="num" style="${mono}font-weight:600;color:var(--forest);background:rgba(45,74,45,.08);padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);">${t}</td>`;
     }).join('');
     const katTotal = filteredProds.reduce((s,p) => s + DAGE.reduce((sd,d) => sd + (p.data[d]||0), 0), 0);
     bodyRows += `<tr style="background:rgba(45,74,45,.04);border-top:1px solid rgba(45,74,45,.15);">
       <td style="font-size:11px;font-weight:600;color:var(--forest);padding-left:16px;">${kat} i alt</td>
       ${katDagCells}
-      <td class="num" style="${mono}font-weight:700;color:var(--forest);">${katTotal}</td>
+      <td class="num" style="${mono}font-weight:700;color:var(--forest);padding:8px;text-align:center;">${katTotal}</td>
       <td></td>
     </tr>`;
   }
 
-  if (bodyRows === '') {
-    wrap.innerHTML = `<div style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Ingen produkter. Klik "+Tilføj produkt" for at begynde.</div>`;
-    return;
-  }
-
-  // Calculate totals (same as beregner)
-  const footDage = DAGE.map(dag => {
+  // Totals row
+  const totalDagCells = DAGE.map(dag => {
     const t = Object.values(produkter).reduce((s,p) => s + (p.data[dag]||0), 0);
-    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}</td>`;
+    return `<td class="num" style="${mono}font-weight:700;color:var(--forest);background:rgba(45,74,45,.12);padding:8px;text-align:center;border-right:1px solid rgba(30,58,30,.08);">${t}</td>`;
   }).join('');
-  const totalAlmindeligt = Object.values(produkter).reduce((s,p) => s + DAGE.reduce((sd,d) => sd + (p.data[d]||0), 0), 0);
+  const totalAll = Object.values(produkter).reduce((s,p) => s + DAGE.reduce((sd,d) => sd + (p.data[d]||0), 0), 0);
+  bodyRows += `<tr style="background:rgba(45,74,45,.12);border-top:2px solid var(--forest);">
+    <td style="font-size:11px;font-weight:700;color:var(--forest);padding-left:16px;">TOTAL</td>
+    ${totalDagCells}
+    <td class="num" style="${mono}font-weight:700;color:var(--forest);padding:8px;text-align:center;border-top:2px solid var(--forest);">${totalAll}</td>
+    <td></td>
+  </tr>`;
 
-  // Render table (same as beregner)
-  wrap.innerHTML = `
-    <div class="aar2-tbl-wrap">
-      <div class="aar2-tbl-hdr">
-        <span class="aar2-tbl-hdr-l">Din basis bestilling — daglig skabelon</span>
-        <span class="aar2-tbl-hdr-r">${totalAlmindeligt} stk · i alt</span>
-      </div>
-      <div style="overflow-x:auto;">
-        <table class="aar2-tbl" style="min-width:600px;">
-          <thead><tr>
-            <th style="min-width:180px;">Produkt</th>${thDage}
-            <th class="num">Total</th>
-            <th class="num" style="min-width:40px;">Ret</th>
-          </tr></thead>
-          <tbody>${bodyRows}</tbody>
-          <tfoot><tr><td>I alt</td>${footDage}
-            <td class="num" style="font-weight:700;">${totalAlmindeligt}</td>
-            <td></td>
-          </tr></tfoot>
-        </table>
-      </div>
-    </div>`;
+  if (bodyRows === '') {
+    tbody.innerHTML = `<tr><td colspan="9" style="padding:20px;text-align:center;color:var(--ash);font-size:12px;">Ingen produkter. Klik "+Tilføj produkt" for at begynde.</td></tr>`;
+  } else {
+    tbody.innerHTML = bodyRows;
+  }
 }
 
-async function basisCellSave(cell) {
-  const varenummer = cell.dataset.vn;
-  const dag = cell.dataset.dag;
-  const newValue = parseInt(cell.textContent) || 0;
-  const prodInfo = _basisData.find(r => r.varenummer === varenummer);
+function basisEditCell(varenummer, dag) {
+  const cell = event.target.closest('td');
+  const currentValue = _basisData.find(r => r.varenummer === varenummer && r.dag === dag)?.anbefalet_antal || 0;
 
-  try {
-    const res = await fetch('/api/basis-bestilling/gem', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        varenummer,
-        varenavn: prodInfo?.varenavn || '',
-        dag,
-        anbefalet_antal: newValue,
-        kategori: prodInfo?.kategori || ''
-      })
-    });
-    const resp = await res.json();
-    if (resp.ok) {
-      // Update local data
-      let found = _basisData.find(r => r.varenummer === varenummer && r.dag === dag);
-      if (!found) {
-        found = {varenummer, varenavn: prodInfo?.varenavn || '', dag, kategori: prodInfo?.kategori || ''};
-        _basisData.push(found);
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.min = '0';
+  input.value = currentValue;
+  input.style.cssText = 'width:100%;padding:4px;border:1px solid var(--gold);border-radius:2px;font-size:12px;';
+
+  const originalHtml = cell.innerHTML;
+  cell.innerHTML = '';
+  cell.appendChild(input);
+  input.focus();
+  input.select();
+
+  const save = async () => {
+    const newValue = parseInt(input.value) || 0;
+    const prodInfo = _basisData.find(r => r.varenummer === varenummer);
+
+    try {
+      // Vis loading-state hvis cell stadig eksisterer
+      try {
+        if (cell.parentElement) {
+          cell.innerHTML = '<span style="opacity:0.5;">…</span>';
+        }
+      } catch (e) {
+        // Ignorer fejl ved innerHTML
       }
-      found.anbefalet_antal = newValue;
-      cell.textContent = newValue || 0;
-      updateBasisSaveTime();
-      buildBasisTable();  // Rebuild to update subtotals
-    } else {
-      alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
-      buildBasisTable();  // Rebuild to reset
+
+      const res = await fetch('/api/basis-bestilling/gem', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          varenummer,
+          varenavn: prodInfo?.varenavn || '',
+          dag,
+          anbefalet_antal: newValue,
+          kategori: prodInfo?.kategori || ''
+        })
+      });
+      const resp = await res.json();
+      if (resp.ok) {
+        // Update local data
+        let found = _basisData.find(r => r.varenummer === varenummer && r.dag === dag);
+        if (!found) {
+          found = {varenummer, varenavn: prodInfo?.varenavn || '', dag, kategori: prodInfo?.kategori || ''};
+          _basisData.push(found);
+        }
+        found.anbefalet_antal = newValue;
+
+        // Rebuild tabel for at vise nye totaler
+        buildBasisTable();
+        updateBasisSaveTime();
+      } else {
+        try {
+          if (cell.parentElement) {
+            cell.innerHTML = originalHtml;
+          }
+        } catch (e) {
+          // Ignorer fejl
+        }
+        alert('Fejl: ' + (resp.fejl || 'Ukendt fejl'));
+      }
+    } catch (e) {
+      try {
+        if (cell.parentElement) {
+          cell.innerHTML = originalHtml;
+        }
+      } catch (e2) {
+        // Ignorer fejl
+      }
+      alert('Fejl: ' + e.message);
     }
-  } catch (e) {
-    alert('Fejl: ' + e.message);
-    buildBasisTable();  // Rebuild to reset
-  }
+  };
+
+  input.onblur = save;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') save();
+    if (e.key === 'Escape') cell.innerHTML = originalHtml;
+  };
 }
 
 async function basisDeleteProduct(varenummer) {
   if (!confirm('Slet dette produkt fra basis-bestillingen?')) return;
 
   // Get all days for this product
-  const daysToDelete = DAGE.filter(dag =>
+  const daysToDelete = DAGE_BASIS.filter(dag =>
     _basisData.some(r => r.varenummer === varenummer && r.dag === dag)
   );
 
@@ -5637,9 +6328,9 @@ async function basisAddProduct() {
     const resp = await res.json();
     const allProducts = resp.data || [];
 
-    // Get products already in basis (check by varenavn for simplicity)
-    const inBasis = new Set(_basisData.map(r => r.varenavn?.toLowerCase()));
-    const available = allProducts.filter(p => !inBasis.has((p.varenavn || '').toLowerCase()));
+    // Get products already in basis
+    const inBasis = new Set(_basisData.map(r => r.varenummer));
+    const available = allProducts.filter(p => !inBasis.has(p.varenavn));
 
     if (available.length === 0) {
       alert('Alle produkter er allerede i basis-bestillingen.');
@@ -5657,29 +6348,13 @@ async function basisAddProduct() {
       return;
     }
 
-    // Use varenavn as varenummer (product identifier in basis_bestilling)
-    const varenummer = prod.varenavn;
-
     // Add default quantity of 5 to all days
-    // Map product type to standard category names for consistency
-    let kategori = prod.type || 'Øvrige';
-    // Normalize category names
-    const katMap = {
-      'Rugbrød': 'Rugbrød',
-      'Flute': 'Flute',
-      'Brød': 'Brød',
-      'Boller': 'Boller',
-      'Wiener': 'Wiener',
-      'Kage': 'Kage'
-    };
-    kategori = katMap[kategori] || kategori;
-
-    const updates = DAGE.map(dag => ({
-      varenummer,
+    const updates = DAGE_BASIS.map(dag => ({
+      varenummer: prod.varenavn,
       varenavn: prod.varenavn,
       dag,
       anbefalet_antal: 5,
-      kategori
+      kategori: prod.type || ''
     }));
 
     const saveRes = await fetch('/api/basis-bestilling/bulk-gem', {
@@ -5793,15 +6468,49 @@ async function basisInitFromHistory() {
       }
     };
 
-    // Hent varestamdata først for at få korrekte kategorier
-    const stamRes = await fetch('/api/stamdata');
-    const stamData = await stamRes.json();
-    const stamMap = {};
-    if (Array.isArray(stamData.data)) {
-      stamData.data.forEach(s => {
-        stamMap[s.varenavn?.toLowerCase()] = s.type || 'Øvrige';
-      });
-    }
+    // Funktion til at bestemme kategori — kopieret fra database._kat()
+    // Deploy force: 2026-05-26
+    const bestemKategori = (varenavn) => {
+      const n = (varenavn || '').toLowerCase();
+
+      // Rugbrød
+      if (n.includes('rugbrød') || n.includes('rugbrod')) return 'Rugbrød';
+
+      // Flute
+      if (n.includes('flute') || n.includes('flûte')) return 'Flute';
+
+      // Boller
+      if (n.includes('bolle')) return 'Boller';
+
+      // Wienerbrød — tjekkes FØR brød/kage så croissant/snegl ikke lander forkert
+      if (['wiener', 'spandauer', 'croissant', 'snegl', 'snurrer', 'tebirkes',
+           'grovbirkes', 'fastelavns', 'wienerstang', 'kanelstang', 'frøsnapper',
+           'marcipan', 'romsnegl'].some(k => n.includes(k))) {
+        return 'Wiener';
+      }
+
+      // Brød (men ikke studenterbrød som er kage)
+      if ((n.includes('brød') || n.includes('brod')) && !n.includes('studenter')) {
+        return 'Brød';
+      }
+
+      // Brød-varer uden 'brød' i varenavn (focaccia, formbrød mv.)
+      if (['focaccia', 'foccacia', 'formbrød', 'franskbrød'].some(k => n.includes(k))) {
+        return 'Brød';
+      }
+
+      // Kager
+      if (['kage', 'cookie', 'muffin', 'brownie', 'romkugl', 'kokostoppe',
+           'napoleonshat', 'studenterbr', 'snitter', 'stammer', 'honningbomb',
+           'honninghjerter'].some(k => n.includes(k))) {
+        return 'Kage';
+      }
+
+      // Fallback — hvis intet andet passer, antagværselsesmængde er det "Kage" eller "Øvrige"
+      return 'Øvrige';
+    };
+
+    console.log('bestemKategori funktion klar');
 
     // Hent data fra hver uge og aggreger (ekskl. helligdage)
     const produktAggregate = {};
@@ -5821,11 +6530,11 @@ async function basisInitFromHistory() {
         data.forEach(prod => {
           const vn = prod.varenavn;
           if (!produktAggregate[vn]) {
-            // Hent kategori fra varestamdata, fallback til prod.type
-            let kategori = stamMap[vn?.toLowerCase()] || prod.type || 'Øvrige';
+            // Bestem kategori på samme måde som database._kat()
+            let kategori = bestemKategori(vn);
             produktAggregate[vn] = {
               varenavn: prod.varenavn,
-              kategori,
+              kategori: kategori,
               dage: {man: [], tir: [], ons: [], tor: [], fre: [], loe: [], son: []}
             };
           }
@@ -5849,10 +6558,6 @@ async function basisInitFromHistory() {
     // Beregn gennemsnit og forbered bulk-update
     const updates = [];
     for (const [vn, prod] of Object.entries(produktAggregate)) {
-      // Normaliser kategorinavn
-      let kategori = prod.kategori || 'Øvrige';
-      if (kategori.trim() === '') kategori = 'Øvrige';
-
       DAGE.forEach(dag => {
         const vals = prod.dage[dag];
         if (vals.length > 0) {
@@ -5863,12 +6568,20 @@ async function basisInitFromHistory() {
               varenavn: vn,
               dag,
               anbefalet_antal: avg,
-              kategori
+              kategori: prod.kategori
             });
           }
         }
       });
     }
+
+    console.log('Updates to save (first 5):', updates.slice(0, 5));
+    console.log('Kategori distribution:',
+      Object.values(produktAggregate).reduce((acc, p) => {
+        acc[p.kategori] = (acc[p.kategori] || 0) + 1;
+        return acc;
+      }, {})
+    );
 
     if (updates.length === 0) {
       alert('Ingen data fundet i historikken (eller alle dage var helligdage)');
@@ -6119,9 +6832,68 @@ async function visBestillingDetalje(uge, aar) {
 // ── TOO GOOD TO GO ────────────────────────────────────────────────────────────
 let _tgtgLoaded = false;
 
+async function tgtgBygRegistrering() {
+  // Sæt dato til i dag
+  document.getElementById('tgtg-reg-dato').value = new Date().toISOString().slice(0,10);
+
+  // Hent pose-typer fra server
+  const poser = await api('/api/tgtg/poser-liste');
+  if (!poser || !poser.poser) return;
+
+  const grid = document.getElementById('tgtg-reg-poser');
+  grid.innerHTML = poser.poser.map(p => `
+    <div style="background:rgba(30,58,30,.04);border:1px solid rgba(30,58,30,.1);border-radius:8px;padding:10px 12px;">
+      <div style="font-size:12px;font-weight:500;color:var(--charcoal);margin-bottom:6px;">${p.navn}</div>
+      <div style="font-size:10px;color:var(--ash);margin-bottom:6px;">${p.kreditpris.toFixed(2)} kr/pose · ${p.enheder_per_pose} stk/pose</div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <button onclick="this.nextElementSibling.value=Math.max(0,parseInt(this.nextElementSibling.value||0)-1)"
+          style="width:28px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;font-size:16px;">−</button>
+        <input type="number" min="0" max="50" value="0" data-item-id="${p.item_id}" data-navn="${p.navn.replace(/"/g,'&quot;')}"
+          style="width:50px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:4px;font-size:14px;font-weight:600;">
+        <button onclick="this.previousElementSibling.value=parseInt(this.previousElementSibling.value||0)+1"
+          style="width:28px;height:28px;border:1px solid var(--border);border-radius:4px;background:none;cursor:pointer;font-size:16px;">+</button>
+      </div>
+    </div>`).join('');
+}
+
+async function tgtgGemManuel() {
+  const dato   = document.getElementById('tgtg-reg-dato').value;
+  const btn    = document.getElementById('tgtg-reg-btn');
+  const status = document.getElementById('tgtg-reg-status');
+  if (!dato) { status.textContent = 'Vælg dato'; return; }
+
+  const linjer = [];
+  document.querySelectorAll('#tgtg-reg-poser input[data-item-id]').forEach(inp => {
+    const antal = parseInt(inp.value) || 0;
+    if (antal > 0) linjer.push({
+      dato, item_id: inp.dataset.itemId || inp.getAttribute('data-item-id'),
+      pose_navn: inp.getAttribute('data-navn'), antal
+    });
+  });
+
+  if (!linjer.length) { status.textContent = 'Ingen poser at gemme (alle er 0)'; return; }
+
+  btn.disabled = true; btn.textContent = '⏳ Gemmer…';
+  const r = await fetch('/api/tgtg/dagssalg', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ secret: 'OM-Greve-2026-Hemlig', linjer })
+  });
+  const res = await r.json();
+  btn.disabled = false; btn.textContent = '💾 Gem salg';
+  if (res.ok) {
+    status.style.color = 'var(--moss)';
+    status.textContent = `✓ Gemt ${linjer.length} pose-type(r) for ${dato}`;
+    _tgtgLoaded = false; loadTgtg(); // genindlæs tabel
+  } else {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Fejl ved gem';
+  }
+}
+
 async function loadTgtg() {
   if (_tgtgLoaded) return;
   _tgtgLoaded = true;
+  tgtgBygRegistrering(); // byg manuel registrering
 
   const d = await api(`/api/tgtg/overblik?aar=${VALGT_AAR}`);
   if (!d) { _tgtgLoaded = false; return; }
@@ -6303,6 +7075,56 @@ async function loadTgtg() {
 // ── SVIND & ØKONOMI ───────────────────────────────────────────────────────────
 // ── BAGER REGNSKAB ───────────────────────────────────────────────────────────
 let _bagerLoaded = false;
+
+async function gmailSynkNu() {
+  const btn    = document.getElementById('gmail-sync-btn');
+  const status = document.getElementById('gmail-sync-status');
+  btn.disabled = true;
+  btn.textContent = '↓ Synkroniserer…';
+  status.textContent = '';
+  try {
+    const r = await fetch('/api/bager/gmail-sync', { method: 'POST' });
+    const d = await r.json();
+    if (d.ok) {
+      const nu = new Date();
+      const dd = String(nu.getDate()).padStart(2,'0');
+      const mm = String(nu.getMonth()+1).padStart(2,'0');
+      const hh = String(nu.getHours()).padStart(2,'0');
+      const mi = String(nu.getMinutes()).padStart(2,'0');
+      status.style.color = d.antal > 0 ? 'var(--moss)' : 'var(--ash)';
+      status.textContent = `Opdateret ${dd}/${mm} ${hh}:${mi}`;
+      if (d.antal > 0) { _bagerLoaded = false; loadBager(); }
+    } else {
+      status.style.color = 'var(--danger)';
+      status.textContent = d.besked || 'Fejl';
+    }
+  } catch(e) {
+    status.style.color = 'var(--danger)';
+    status.textContent = 'Netværksfejl';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↓ Synk Gmail';
+  }
+}
+
+async function gmailStatusLoad() {
+  try {
+    const d = await api('/api/bager/gmail-status');
+    if (!d || !d.har_token) return;
+    const status = document.getElementById('gmail-sync-status');
+    if (d.status) {
+      const raw = d.status.tidspunkt || '';
+      // Format: "02/06 16:23"
+      const dato = raw.slice(8,10) + '/' + raw.slice(5,7);
+      const tid  = raw.slice(11,16);
+      const ok   = d.status.status === 'ok';
+      status.style.color = ok ? 'var(--moss)' : d.status.status === 'fejl' ? 'var(--danger)' : 'var(--ash)';
+      status.textContent = `Opdateret ${dato} ${tid}`;
+    } else {
+      document.getElementById('gmail-sync-status').textContent = 'Aldrig synkroniseret';
+    }
+  } catch(e) {}
+}
 
 function bagerUploadToggle(hdr) {
   const wrap = document.getElementById('bager-upload-wrap');
@@ -6693,14 +7515,14 @@ async function _spildHent(uge, aar) {
   _spildUge = uge; _spildAar = aar;
   const MONO = "font-family:'DM Mono',monospace;";
   document.getElementById('spild-uge-lbl').textContent = `Uge ${uge} · ${aar}`;
-  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="12" class="empty">Henter…</td></tr>';
+  document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="13" class="empty">Henter…</td></tr>';
 
   let d;
   try {
     const r = await fetch(`/api/spild/dagsniveau?uge=${uge}&aar=${aar}`);
     d = await r.json();
   } catch(e) {
-    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="12" class="empty">Fejl ved hentning</td></tr>';
+    document.getElementById('spild-dag-tbody').innerHTML = '<tr><td colspan="13" class="empty">Fejl ved hentning</td></tr>';
     return;
   }
 
@@ -6754,7 +7576,7 @@ async function _spildHent(uge, aar) {
 
   const tbody = document.getElementById('spild-dag-tbody');
   if (!d.dage || !d.dage.length) {
-    tbody.innerHTML = '<tr><td colspan="12" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" class="empty">Ingen bestillingsdata for denne uge</td></tr>';
   } else {
     let rows = '';
     for (const dag of d.dage) {
@@ -6793,9 +7615,18 @@ async function _spildHent(uge, aar) {
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kwTxt}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kbmoTxt}</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${dag.rester > 0 ? '#e67e22' : 'var(--ash)'};" title="Rester ved lukketid: ${dag.rester_pct != null ? dag.rester_pct+'%' : '—'}">${dag.rester > 0 ? dag.rester : '<span style="color:var(--ash);">0</span>'}</td>
-        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${dag.tgtg > 0 ? `${dag.tgtg}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${dag.tgtg_poser}p)</span>` : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--moss);">${
+          (dag.tgtg_poser > 0 || dag.tgtg > 0)
+            ? `<span style="font-weight:600;">${dag.tgtg_poser} poser</span><br><span style="font-size:10px;color:var(--ash);">${dag.tgtg} stk</span>`
+            : '<span style="color:var(--ash);">0</span>'
+        }</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
-        <td class="num" style="${MONO}font-size:12px;padding:10px;color:#6b9e6b;" title="Kan returneres til bageren">${dag.retur_mulig > 0 ? dag.retur_mulig : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:12px;padding:10px;color:#6b9e6b;" title="Estimeret retur til bageren">${dag.retur_mulig > 0 ? dag.retur_mulig : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--moss);">${
+          dag.retur_reg_total > 0
+            ? `<span style="font-weight:600;">${dag.retur_reg_total}</span><br><span style="font-size:9px;color:var(--ash);">${dag.retur_reg_boller}b·${dag.retur_reg_wiener}w</span>`
+            : '<span style="color:var(--ash);">—</span>'
+        }</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
         <td style="padding:10px;">${bar}${deltaIcon}</td>
         <td class="num" style="padding:10px;">${avgTxt}</td>
@@ -6810,10 +7641,15 @@ async function _spildHent(uge, aar) {
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kw||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kbmo||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:#e67e22;">${d.total_rester||0}</td>
-      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);">${d.total_tgtg||0}<span style="font-size:10px;color:var(--ash);margin-left:2px;">(${d.total_tgtg_poser||0}p)</span></td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--moss);"><span style="font-weight:700;">${d.total_tgtg_poser||0} poser</span><br><span style="font-size:10px;color:var(--ash);">${d.total_tgtg||0} stk</span></td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_effektivt||0}</td>
-      <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:#6b9e6b;">${d.total_retur||0}</td>
-      <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:${spildClr};">${d.total_svind||0}</td>
+      <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:#6b9e6b;" title="Estimeret">${d.total_retur||0}</td>
+      <td class="num" style="${MONO}font-size:12px;font-weight:700;padding:8px 10px;color:var(--moss);">${
+        d.retur_registreret_total > 0
+          ? `<span style="font-weight:700;">${d.retur_registreret_total} stk</span><br><span style="font-size:9px;color:var(--ash);">${d.retur_boller_reg}b · ${d.retur_wiener_reg}w</span>`
+          : '<span style="color:var(--ash);font-size:11px;">ingen reg.</span>'
+      }</td>
+      <td class="num" style="${MONO}font-size:13px;font-weight:700;padding:8px 10px;color:${spildClr};">${d.total_svind||0}${d.retur_registreret_total > 0 ? '<br><span style="font-size:9px;color:var(--ash);">inkl. faktisk retur</span>' : ''}</td>
       <td style="padding:8px 10px;">
         <span style="${MONO}font-size:13px;font-weight:700;color:${spildClr};">${spildPct != null ? spildPct.toFixed(1)+' %' : '—'}</span>
       </td>
@@ -6923,6 +7759,309 @@ function _spildNav(retning) {
   _spildHent(uge, aar);
 }
 
+// Timezone-safe dato-string (undgår UTC-offset problem med toISOString i DK)
+function _datoStr(d) {
+  const y  = d.getFullYear();
+  const m  = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+}
+
+// Farv AI-briefing tekst med pile og farver
+function _mbFarveText(tekst) {
+  const G = '#27ae60', R = '#c0392b', Y = '#e67e22'; // eksplicitte farver (ikke CSS-vars)
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let t = esc(tekst);
+
+  // +X% → grøn pil op
+  t = t.replace(/\+(\d+[\.,]?\d*)\s*%/g,
+    `<span style="color:${G};font-weight:700;">↑ +$1%</span>`);
+
+  // -X% → rød pil ned
+  t = t.replace(/(^|[\s(])-(\d+[\.,]?\d*)\s*%/g,
+    `$1<span style="color:${R};font-weight:700;">↓ -$2%</span>`);
+
+  // "X% over/foran/bedre" → grøn ↑
+  t = t.replace(/(\d+[\.,]?\d*)\s*%\s+(over|foran|bedre|højere)/gi,
+    `<span style="color:${G};font-weight:700;">↑ $1%</span> $2`);
+
+  // "X% under/lavere/dårligere" (komparativt) → rød ↓
+  t = t.replace(/(\d+[\.,]?\d*)\s*%\s+(under|lavere|dårligere)/gi,
+    `<span style="color:${R};font-weight:700;">↓ $1%</span> $2`);
+
+  // ×1.xx faktor
+  t = t.replace(/×\s*(\d+[,\.]\d+)/g, (m, v) => {
+    const n = parseFloat(v.replace(',','.'));
+    const clr = n > 1.1 ? G : n > 1.0 ? Y : R;
+    return `<span style="color:${clr};font-weight:700;">${m}</span>`;
+  });
+
+  // Positive nøgleord
+  t = t.replace(/\b(under målet?|godt under|godt niveau|på rette spor)\b/gi,
+    `<span style="color:${G};font-weight:500;">$1</span>`);
+  // Negative nøgleord
+  t = t.replace(/\b(over målet?|for højt?|bekymrende)\b/gi,
+    `<span style="color:${R};font-weight:500;">$1</span>`);
+
+  t = t.replace(/\n/g, '<br>');
+  return t;
+}
+
+// ── MORGENBRIEFING ───────────────────────────────────────────────────────────
+let _mbLoaded = false;
+
+async function mbLoad(force = false) {
+  if (_mbLoaded && !force) return;
+  const d = await api('/api/dashboard/morgenbriefing');
+  if (!d || !d.ok) return;
+  _mbLoaded = true;
+
+  const dk  = v => Math.round(v).toLocaleString('da-DK') + ' kr';
+  const pct = (v, plus=true) => v == null ? '—' : (plus && v >= 0 ? '+' : '') + v.toFixed(0) + '%';
+  const clr = (ok, warn) => ok ? 'var(--moss)' : warn ? 'var(--danger)' : 'var(--gold)';
+
+  // Header
+  document.getElementById('mb-dato-label').textContent = d.dato_label;
+
+  // Bestillings-status badges
+  const badge = document.getElementById('mb-deadline-badge');
+  document.getElementById('mb-naeste-uge').textContent = d.naeste_uge;
+
+  // Indeværende uge bekræftelse
+  const aktuelTxt = d.aktuel_klar
+    ? `✓ Uge ${d.uge} bestilt · ${d.aktuel_stk.toLocaleString('da-DK')} stk`
+    : `⚠ Uge ${d.uge} mangler bestilling`;
+  document.getElementById('mb-deadline-txt').parentElement.insertAdjacentHTML('beforebegin',
+    `<div style="font-family:'DM Mono',monospace;font-size:10px;color:${d.aktuel_klar?'rgba(200,168,75,.8)':'rgba(255,100,100,.8)'};margin-bottom:4px;">${aktuelTxt}</div>`
+  );
+
+  // Vis altid badge — tjek bestilling FØR deadline
+  if (d.bestilling_klar) {
+    document.getElementById('mb-deadline-txt').textContent = `✓ Uge ${d.naeste_uge} bestilt`;
+    document.getElementById('mb-deadline-txt').style.color = 'rgba(200,168,75,.9)';
+  } else if (d.dage_til_tor === 0) {
+    document.getElementById('mb-deadline-txt').textContent = `⚡ Bestil uge ${d.naeste_uge} I DAG!`;
+    document.getElementById('mb-deadline-txt').style.color = 'var(--danger)';
+  } else {
+    document.getElementById('mb-deadline-txt').textContent = `Bestil uge ${d.naeste_uge} · ${d.dage_til_tor} dage til torsdag`;
+    document.getElementById('mb-deadline-txt').style.color = d.dage_til_tor <= 1 ? 'var(--danger)' : 'var(--amber)';
+  }
+  badge.style.display = '';
+
+  // Zone 1: Dag
+  document.getElementById('mb-dag-oms').textContent = d.dag_oms > 0 ? dk(d.dag_oms) : '—';
+  if (d.dag_pct != null) {
+    const el = document.getElementById('mb-dag-oms-sub');
+    el.textContent = `vs. forrige uge: ${pct(d.dag_pct)}`;
+    el.style.color = d.dag_pct >= 0 ? 'rgba(200,168,75,.7)' : 'rgba(255,100,100,.7)';
+  }
+
+  const dbEl = document.getElementById('mb-dag-db');
+  dbEl.textContent = d.dag_db_pct > 0 ? d.dag_db_pct.toFixed(1) + '%' : '—';
+  dbEl.style.color = d.dag_db_pct >= 35 ? 'var(--moss)' : d.dag_db_pct >= 28 ? 'var(--gold)' : d.dag_db_pct > 0 ? 'var(--danger)' : 'var(--charcoal)';
+  document.getElementById('mb-dag-db-sub').textContent = d.dag_db_pct >= 35 ? '✓ Over mål' : d.dag_db_pct >= 28 ? '~ Tæt på mål' : d.dag_db_pct > 0 ? '✗ Under mål' : '';
+
+  document.getElementById('mb-dag-kunder').textContent = d.dag_kunder || '—';
+  document.getElementById('mb-dag-kurv').textContent = d.dag_kurv > 0 ? d.dag_kurv.toLocaleString('da-DK') + ' kr/kurv' : '— kr/kurv';
+
+  const spEl = document.getElementById('mb-spild');
+  spEl.textContent = d.spild_pct != null ? d.spild_pct.toFixed(1) + '%' : '—';
+  spEl.style.color = d.spild_ok ? 'var(--moss)' : d.spild_pct < 22 ? 'var(--gold)' : 'var(--danger)';
+  document.getElementById('mb-spild-sub').textContent = d.spild_ok ? '✓ Godt (under 15%)' : d.spild_pct < 22 ? '~ Hold øje' : '⚠ For højt';
+
+  // Zone 2: Uge
+  document.getElementById('mb-uge-label').textContent = `uge ${d.uge}/${d.aar}`;
+  const progress = Math.min(100, Math.round((d.wtd_dage / 7) * 100));
+  document.getElementById('mb-uge-progress').style.width = progress + '%';
+  document.getElementById('mb-wtd-oms').textContent = d.wtd_oms > 0 ? dk(d.wtd_oms) : '—';
+  document.getElementById('mb-wtd-dage').textContent = `${d.wtd_dage} dage med data`;
+
+  const tgtgEl = document.getElementById('mb-tgtg-kr');
+  tgtgEl.textContent = d.tgtg_kr > 0 ? dk(d.tgtg_kr) : '0 kr';
+  tgtgEl.style.color = d.tgtg_ok ? 'var(--moss)' : d.tgtg_advarsel ? 'var(--danger)' : 'var(--gold)';
+  document.getElementById('mb-tgtg-sub').textContent = d.tgtg_ok ? `✓ ${d.tgtg_poser} poser · under mål` : `⚠ ${d.tgtg_poser} poser · over mål`;
+  document.getElementById('mb-tgtg-sub').style.color = d.tgtg_ok ? 'var(--moss)' : 'var(--danger)';
+
+  const dbUgeEl = document.getElementById('mb-wtd-db');
+  dbUgeEl.textContent = d.wtd_db_pct != null ? d.wtd_db_pct.toFixed(1) + '%' : '—';
+  dbUgeEl.style.color = (d.wtd_db_pct || 0) >= 35 ? 'var(--moss)' : (d.wtd_db_pct || 0) >= 28 ? 'var(--gold)' : 'var(--charcoal)';
+
+  // Zone 4: Trafiklamper
+  const lamper = [
+    { lbl: 'Omsætning', val: d.dag_pct != null ? (d.dag_pct >= 0 ? '+'+d.dag_pct+'%' : d.dag_pct+'%') : '—',
+      sub: 'vs. forrige uge',
+      status: d.dag_pct == null ? 'neutral' : d.dag_pct >= 0 ? 'green' : d.dag_pct >= -15 ? 'amber' : 'red' },
+    { lbl: 'DB%', val: d.dag_db_pct > 0 ? d.dag_db_pct.toFixed(1)+'%' : '—',
+      sub: 'mål ≥35%',
+      status: d.dag_db_pct >= 35 ? 'green' : d.dag_db_pct >= 28 ? 'amber' : d.dag_db_pct > 0 ? 'red' : 'neutral' },
+    { lbl: 'TGTG', val: d.tgtg_kr > 0 ? Math.round(d.tgtg_kr).toLocaleString('da-DK')+' kr' : '0 kr',
+      sub: 'mål under 800 kr',
+      status: d.tgtg_ok ? 'green' : d.tgtg_advarsel ? 'red' : 'amber' },
+    { lbl: 'Spild', val: d.spild_pct != null ? d.spild_pct.toFixed(1)+'%' : '—',
+      sub: 'mål under 15%',
+      status: d.spild_pct == null ? 'neutral' : d.spild_ok ? 'green' : d.spild_pct < 22 ? 'amber' : 'red' },
+    { lbl: '☕ Kaffe', val: d.kaffe_idag > 0 ? d.kaffe_idag + ' kopper' : '—',
+      sub: d.kaffe_pct != null ? (d.kaffe_pct >= 0 ? '+' : '') + d.kaffe_pct + '% vs. forrige uge' : 'vs. forrige uge',
+      status: d.kaffe_pct == null ? 'neutral' : d.kaffe_pct >= 0 ? 'green' : d.kaffe_pct >= -10 ? 'amber' : 'red' },
+  ];
+  const LAMP_CLR = { green:'#27ae60', amber:'#e67e22', red:'#c0392b', neutral:'#aaa' };
+  const LAMP_BG  = { green:'rgba(39,174,96,.08)', amber:'rgba(230,126,34,.08)', red:'rgba(192,57,43,.08)', neutral:'rgba(0,0,0,.04)' };
+  document.getElementById('mb-lamper').innerHTML = lamper.map(l => `
+    <div style="flex:1;min-width:130px;background:${LAMP_BG[l.status]};border:1px solid ${LAMP_CLR[l.status]}33;border-radius:10px;padding:12px 14px;display:flex;gap:10px;align-items:center;">
+      <div style="width:12px;height:12px;border-radius:50%;background:${LAMP_CLR[l.status]};flex-shrink:0;box-shadow:0 0 6px ${LAMP_CLR[l.status]}88;"></div>
+      <div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);letter-spacing:.06em;">${l.lbl}</div>
+        <div style="font-size:16px;font-weight:600;color:${LAMP_CLR[l.status]};line-height:1.2;">${l.val}</div>
+        <div style="font-size:10px;color:var(--ash);">${l.sub}</div>
+      </div>
+    </div>`).join('');
+
+  // Spild mini-chips
+  if (d.spild_pct != null || d.spild_stk > 0) {
+    const spClr = d.spild_ok ? '#27ae60' : (d.spild_pct < 22 ? '#e67e22' : '#c0392b');
+    const spBg  = d.spild_ok ? 'rgba(39,174,96,.08)' : (d.spild_pct < 22 ? 'rgba(230,126,34,.08)' : 'rgba(192,57,43,.08)');
+    const mono  = "font-family:'DM Mono',monospace;";
+    document.getElementById('mb-spild-chips').innerHTML = `
+      <div style="background:${spBg};border:1px solid ${spClr}44;border-radius:8px;padding:8px 14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:11px;color:var(--ash);">SPILD DENNE UGE</span>
+        <span style="${mono}font-size:18px;font-weight:700;color:${spClr};">${d.spild_stk || 0} stk</span>
+        <span style="${mono}font-size:15px;font-weight:600;color:${spClr};">${d.spild_pct != null ? d.spild_pct.toFixed(1)+'%' : '—'}</span>
+        <span style="font-size:10px;color:var(--ash);">${d.spild_ok ? '✓ under 15%' : d.spild_pct < 22 ? '~ hold øje' : '⚠ over 22%'} · ${d.wtd_dage} dage</span>
+      </div>`;
+  }
+
+  // Zone 5: Sparklines
+  const spOpts = (cb, unit) => ({ responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${Math.round(c.raw).toLocaleString('da-DK')} ${unit}`}}},
+    scales:{ x:{ticks:{font:{size:9},color:'rgba(30,58,30,.5)'},grid:{display:false}},
+             y:{ticks:{font:{size:9},color:'rgba(30,58,30,.4)',callback:cb},grid:{color:'rgba(0,0,0,.05)'}} } });
+
+  if (d.sparklines && d.sparklines.length) {
+    const ctx = document.getElementById('mb-spark-oms')?.getContext('2d');
+    if (ctx) new Chart(ctx, { type:'bar',
+      data:{ labels:d.sparklines.map(r=>r.dato.slice(5)),
+             datasets:[{data:d.sparklines.map(r=>r.oms), backgroundColor:'rgba(30,58,30,.55)', borderRadius:3, borderWidth:0}]},
+      options: spOpts(v=>Math.round(v/1000)+'k', 'kr') });
+  }
+
+  if (d.kaffe_trend && d.kaffe_trend.length) {
+    const ctx2 = document.getElementById('mb-spark-kaffe')?.getContext('2d');
+    if (ctx2) new Chart(ctx2, { type:'bar',
+      data:{ labels:d.kaffe_trend.map(r=>r.dato.slice(5)),
+             datasets:[{data:d.kaffe_trend.map(r=>r.antal), backgroundColor:'rgba(139,90,43,.55)', borderRadius:3, borderWidth:0}]},
+      options: spOpts(v=>v, 'kopper') });
+  }
+
+  // Zone 6: Smart alert
+  if (d.smart_alert) {
+    const alertEl = document.getElementById('mb-smart-alert');
+    const ALERT_BG = { udsolgt:'rgba(39,174,96,.08)', tgtg:'rgba(230,126,34,.08)', spild:'rgba(192,57,43,.08)', db:'rgba(230,126,34,.08)', deadline:'rgba(200,168,75,.12)' };
+    const ALERT_BRD = { udsolgt:'var(--moss)', tgtg:'#e67e22', spild:'var(--danger)', db:'#e67e22', deadline:'var(--gold)' };
+    alertEl.style.background   = ALERT_BG[d.smart_alert.type]  || 'rgba(200,168,75,.1)';
+    alertEl.style.borderColor  = ALERT_BRD[d.smart_alert.type] || 'var(--gold)';
+    document.getElementById('mb-alert-tekst').textContent = d.smart_alert.ikon + '  ' + d.smart_alert.tekst;
+    alertEl.style.display = '';
+  }
+
+  // Briefing loader kun ved knap-klik, ikke automatisk
+}
+
+async function mbLoadBriefing() {
+  const btn = document.getElementById('mb-brief-btn');
+  const el = document.getElementById('mb-briefing-tekst');
+  btn.disabled = true;
+  btn.textContent = '⏳';
+  const br = await api('/api/dashboard/briefing');
+  if (br && br.ok && br.tekst) {
+    el.innerHTML = _mbFarveText(br.tekst);
+  } else {
+    el.innerHTML = '<span style="color:var(--danger);font-size:11px;">Kunne ikke hente briefing</span>';
+  }
+  btn.disabled = false;
+  btn.textContent = '🔄 Opdater';
+}
+
+// ── VEJR ─────────────────────────────────────────────────────────────────────
+let _vejrData = null;
+let _vejrTs   = 0;
+const _VEJR_TTL = 30 * 60 * 1000; // 30 minutter
+
+async function vejrLoad() {
+  const nu = Date.now();
+  // Brug cache kun hvis den er frisk (< 30 min) og har data
+  if (_vejrData && _vejrData.forecast && Object.keys(_vejrData.forecast).length > 0
+      && (nu - _vejrTs) < _VEJR_TTL) return _vejrData;
+  try {
+    _vejrData = await api('/api/vejr/forecast');
+    _vejrTs   = nu;
+  } catch(e) { _vejrData = { forecast: {} }; }
+  return _vejrData;
+}
+
+function vejrVisUge(uge, aar) {
+  if (!_vejrData || !_vejrData.forecast) return;
+  const fc = _vejrData.forecast;
+
+  // Find mandag i den valgte uge
+  const jan4 = new Date(aar, 0, 4);
+  const mandag = new Date(jan4);
+  mandag.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7) + (uge - 1) * 7);
+
+  const DAGNAVN = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const dagEl   = document.getElementById('bern-vejr-dage');
+  const strip   = document.getElementById('bern-vejr-strip');
+  const adv     = document.getElementById('bern-vejr-advarsel');
+  const opdEl   = document.getElementById('bern-vejr-opdateret');
+
+  let html = '', harVejr = false, slemDage = [];
+  const idagStr = _datoStr(new Date());
+
+  for (let i = 0; i < 7; i++) {
+    const dag = new Date(mandag);
+    dag.setDate(mandag.getDate() + i);
+    const ds  = _datoStr(dag);
+    const v   = fc[ds];
+    const erIdag = ds === idagStr;
+
+    if (v) {
+      harVejr = true;
+      const fv  = v.juster.farve;
+      const clr = fv === 'green' ? 'var(--moss)' : fv === 'red' ? 'var(--danger)' : fv === 'orange' ? 'var(--gold)' : 'var(--ash)';
+      const bg  = erIdag ? 'rgba(30,58,30,.25)' : 'transparent';
+      const brd = erIdag ? '1px solid rgba(255,255,255,.2)' : '1px solid transparent';
+      html += `<div style="padding:5px 2px;border-radius:5px;background:${bg};border:${brd};">
+        <div style="font-size:10px;color:var(--ash);margin-bottom:2px;">${DAGNAVN[i]}</div>
+        <div style="font-size:16px;line-height:1;">${v.ikon}</div>
+        <div style="font-size:11px;font-weight:600;margin-top:2px;">${v.tmax !== null ? v.tmax + '°' : '—'}</div>
+        <div style="font-size:10px;color:${v.prec > 0 ? clr : 'var(--ash)'};">${v.prec > 0 ? v.prec + 'mm' : '—'}</div>
+      </div>`;
+      if (fv === 'red' || fv === 'orange') slemDage.push({ navn: DAGNAVN[i], label: v.juster.label });
+    } else {
+      html += `<div style="padding:5px 2px;opacity:.3;">
+        <div style="font-size:10px;color:var(--ash);">${DAGNAVN[i]}</div>
+        <div style="font-size:16px;">—</div>
+      </div>`;
+    }
+  }
+
+  if (!harVejr) { strip.style.display = 'none'; return; }
+
+  dagEl.innerHTML = html;
+  strip.style.display = '';
+  if (_vejrData.opdateret) opdEl.textContent = 'opdateret ' + _vejrData.opdateret.slice(11,16);
+
+  if (slemDage.length) {
+    const txt = slemDage.map(d => `${d.navn}: ${d.label}`).join(' · ');
+    adv.textContent = '⚠ Vejrjustering: ' + txt;
+    adv.style.display = '';
+    adv.style.background = 'rgba(200,60,60,.12)';
+    adv.style.color = 'var(--danger)';
+    adv.style.border = '1px solid rgba(200,60,60,.25)';
+  } else {
+    adv.style.display = 'none';
+  }
+}
+
 // ── BESTILLINGSBEREGNER ───────────────────────────────────────────────────────
 let _bernUge = null, _bernAar = null, _bernBusy = false;
 
@@ -6941,6 +8080,9 @@ async function loadBernUge(uge, aar) {
   document.getElementById('beregner-tabel').innerHTML =
     '<div style="padding:20px;color:var(--ash);">Indlæser…</div>';
 
+  // Hent vejr parallelt med bestillingsdata
+  vejrLoad().then(() => vejrVisUge(uge, aar));
+
   const d = await api('/api/bestilling/anbefaling?uge=' + uge + '&aar=' + aar);
 
   // Load basis bestilling hvis den findes
@@ -6955,31 +8097,68 @@ async function loadBernUge(uge, aar) {
     console.warn('Kunne ikke indlæse basis bestilling:', e);
   }
 
-  _bernBusy = false;
-  if (!d) return;
+  if (!d) { _bernBusy = false; return; }
+  // Opdater vejr-strip (vejr kan nu være hentet færdigt)
+  vejrVisUge(uge, aar);
   if (d.error) {
     document.getElementById('beregner-tabel').innerHTML =
       '<div style="padding:20px;color:var(--danger);">' + d.error + '</div>';
+    _bernBusy = false;
     return;
   }
 
-  // Hvis basis_bestilling findes, brug den som basis i stedet for beregnet
-  if (basisData.length > 0) {
+  // Kun anvend basis-justering for fremtidige/aktuelle uger — faktiske bestillinger holdes urørte
+  if (basisData.length > 0 && !d.faktisk) {
     const basisMap = {};
     basisData.forEach(row => {
       if (!basisMap[row.varenavn]) basisMap[row.varenavn] = {};
       basisMap[row.varenavn][row.dag] = row.anbefalet_antal;
     });
 
-    // Opdater produktlisten med basis-værdier
+    // Hent SI, vækst OG event-faktorer fra d
+    const SI = d.si || 1.0;
+    const vaekstFaktor = 1 + ((d.vaekst_pct || 0) / 100);
+    const eventDagFak = (d.event && d.event.dag_fak) ? d.event.dag_fak : {};
+
+    // Markér produkter der ikke er i basis med advarsel
+    d.produkter.forEach(prod => { prod._ikkeIBasis = !basisMap[prod.varenavn]; });
+
+    // Byg vejr-faktor per dag (fra strip-data)
+    const vejrFc   = (_vejrData && _vejrData.forecast) ? _vejrData.forecast : {};
+    const vejrDagFak = {};
+    const DAGE_IDX2  = {man:0,tir:1,ons:2,tor:3,fre:4,loe:5,son:6};
+    // Beregn mandag for mål-ugen lokalt (kan ikke bruge _mandag der defineres senere)
+    const _jan4v = new Date(d.maal_aar, 0, 4);
+    const _mandagV = new Date(_jan4v);
+    _mandagV.setDate(_jan4v.getDate() - ((_jan4v.getDay() + 6) % 7) + (d.maal_uge - 1) * 7);
+    Object.entries(DAGE_IDX2).forEach(([dk, i]) => {
+      const dagD2 = new Date(_mandagV); dagD2.setDate(_mandagV.getDate() + i);
+      const v2 = vejrFc[_datoStr(dagD2)];
+      vejrDagFak[dk] = (v2 && v2.juster && v2.juster.faktor) ? v2.juster.faktor : 1.0;
+    });
+
+    // Opdater produktlisten med basis × SI × vækst × event × VEJR
+    // Kager: neutralt fra basis (holder 3-4 dage, fast leverance — ingen justering)
     d.produkter.forEach(prod => {
       if (basisMap[prod.varenavn]) {
-        // Hvis basis findes, brug den som basis i stedet
         prod.basis = basisMap[prod.varenavn];
-        prod.anbefalet = basisMap[prod.varenavn];
-        prod.total_basis = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
-        prod.total_anbefalet = prod.total_basis;
-        prod.total_pris = prod.total_anbefalet * prod.pris_ex_moms;
+        prod.anbefalet = {};
+        const erKage = (prod.kategori || '').toLowerCase().includes('kage');
+        const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+        DAGE.forEach(dag => {
+          const basisVal = basisMap[prod.varenavn][dag] || 0;
+          if (erKage) {
+            prod.anbefalet[dag] = basisVal; // kager: direkte fra basis
+          } else {
+            const dagFak  = eventDagFak[dag] || 1.0;
+            const vejrFak = vejrDagFak[dag]  || 1.0;
+            prod.anbefalet[dag] = Math.round(basisVal * SI * vaekstFaktor * dagFak * vejrFak);
+          }
+        });
+
+        prod.total_basis    = Object.values(basisMap[prod.varenavn]).reduce((s, v) => s + v, 0);
+        prod.total_anbefalet = Object.values(prod.anbefalet).reduce((s, v) => s + v, 0);
+        prod.total_pris      = prod.total_anbefalet * prod.pris_ex_moms;
       }
     });
 
@@ -6994,10 +8173,23 @@ async function loadBernUge(uge, aar) {
   // Header
   document.getElementById('bern-uge-label').textContent  = 'Uge ' + d.maal_uge;
   document.getElementById('bern-dato-label').textContent = d.dato_range + ' · ' + d.maal_aar;
-  document.getElementById('bern-basis-label').textContent = d.faktisk
-    ? '✓ Faktisk bestilling — indlæst fra Excel'
-    : 'Basis: snit af ' + (d.basis_uger_snit || 1) + ' seneste bestillingsuger (seneste: uge ' + d.basis_uge + '/' + d.basis_aar + ')';
-  document.getElementById('bern-basis-label').style.color = d.faktisk ? 'var(--moss)' : '';
+  // Basis-label: vis hvad der faktisk bruges som udgangspunkt
+  let basisLbl = '';
+  if (d.faktisk) {
+    basisLbl = '✓ Faktisk bestilling — indlæst fra Excel';
+    document.getElementById('bern-basis-label').style.color = 'var(--moss)';
+  } else if (basisData && basisData.length > 0) {
+    // Basis bestilling (daglig skabelon) er aktiv — det er det der bruges
+    const si   = d.si ? ' · SI ×' + d.si.toFixed(2) : '';
+    const vaek = d.vaekst_pct ? ' · vækst ' + (d.vaekst_pct >= 0 ? '+' : '') + d.vaekst_pct + '%' : '';
+    basisLbl = '📋 Basis: din daglige skabelon justeret med sæson' + si + vaek;
+    document.getElementById('bern-basis-label').style.color = 'var(--forest)';
+  } else {
+    // Historisk snit fra ugebestillinger
+    basisLbl = 'Basis: historisk snit af ' + (d.basis_uger_snit || 1) + ' bestillingsuger (seneste: uge ' + d.basis_uge + '/' + d.basis_aar + ')';
+    document.getElementById('bern-basis-label').style.color = '';
+  }
+  document.getElementById('bern-basis-label').textContent = basisLbl;
 
   // Event-badge (header)
   const evtBadgeEl = document.getElementById('bern-event-badge');
@@ -7012,55 +8204,40 @@ async function loadBernUge(uge, aar) {
     evtNoteEl.style.display  = 'none';
   }
 
-  // KPI-række: skjul beregner-felter ved faktisk bestilling
-  const kpiCols = document.querySelectorAll('#p-beregner .kpi-row-4 .kpi:not(:first-child)');
-  kpiCols.forEach(el => el.style.opacity = d.faktisk ? '.25' : '');
-
-  // KPI
-  document.getElementById('bern-total').textContent     = d.total_stk.toLocaleString('da-DK') + ' stk';
-  document.getElementById('bern-total-sub').textContent = Math.round(d.total_kr).toLocaleString('da-DK') + ' kr ex moms';
-
-  const siEl = document.getElementById('bern-si');
-  siEl.textContent = 'x' + d.si.toFixed(2);
-  siEl.style.color = d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'inherit';
-  siEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-si-sub').textContent =
-    MND[d.maaned] + (d.si >= 1 ? ' (+' : ' (') + Math.round((d.si - 1) * 100) + '%)' +
-    (d.faktisk ? ' · info' : '');
-
-  const tEl = document.getElementById('bern-tgtg');
-  tEl.textContent = d.tgtg_kr.toLocaleString('da-DK') + ' kr';
-  tEl.style.color = d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)';
-  tEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-tgtg-sub').textContent = d.faktisk
-    ? (d.tgtg_advarsel ? '⚠ For høj' : d.tgtg_ok ? '✓ Under 800 kr' : 'Hold øje') + ' · info'
-    : d.tgtg_advarsel ? '⚠ For høj — -5% auto' : d.tgtg_ok ? '✓ Sundt (under 800 kr)' : 'Hold øje';
-
-  const vp = d.vaekst_pct;
-  const vEl = document.getElementById('bern-vaekst');
-  vEl.textContent = (vp >= 0 ? '+' : '') + vp.toFixed(1) + '%';
-  vEl.style.color = vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'inherit';
-  vEl.style.opacity = d.faktisk ? '0.5' : '1';
-  document.getElementById('bern-vaekst-sub').textContent =
-    (vp > 3 ? 'Salget stiger' : vp < -3 ? 'Salget falder' : 'Stabilt') +
-    (d.faktisk ? ' · info' : '');
-
-  // ── Rings (top 4) ────────────────────────────────────────────────────
-  setRing('ring-bern-total', Math.min(100, d.total_stk / 1000 * 100), 'var(--amber)');
-  setRing('ring-bern-si', Math.min(100, d.si / 1.5 * 100), d.si > 1.05 ? 'var(--moss)' : d.si < 0.95 ? 'var(--danger)' : 'var(--forest)');
-  setRing('ring-bern-tgtg', Math.min(100, d.tgtg_kr / 1600 * 100), d.tgtg_advarsel ? 'var(--danger)' : d.tgtg_ok ? 'var(--moss)' : 'var(--gold)');
-  setRing('ring-bern-vaekst', Math.max(0, Math.min(100, 50 + vp * 5)), vp > 3 ? 'var(--moss)' : vp < -3 ? 'var(--danger)' : 'var(--forest)');
 
   // Produkt-tabel — grupperet efter kategori
+  const vp = d.vaekst_pct || 0;
   const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
   const DAG_LBL = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
   const WEEKEND = new Set(['fre','loe','son']);
   const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
   window._bernData = d;
 
-  const thDage = DAGE.map(dag =>
-    `<th class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.12);':''}">${DAG_LBL[dag]}</th>`
-  ).join('');
+  // Byg vejr-lookup for ugens dage
+  const _vejrFc = (_vejrData && _vejrData.forecast) ? _vejrData.forecast : {};
+  const _jan4 = new Date(d.maal_aar, 0, 4);
+  const _mandag = new Date(_jan4);
+  _mandag.setDate(_jan4.getDate() - ((_jan4.getDay() + 6) % 7) + (d.maal_uge - 1) * 7);
+
+  const DAG_IDX = {man:0,tir:1,ons:2,tor:3,fre:4,loe:5,son:6};
+
+  const thDage = DAGE.map(dag => {
+    const wkBg = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.12);' : '';
+    const dagD  = new Date(_mandag);
+    dagD.setDate(_mandag.getDate() + DAG_IDX[dag]);
+    const ds    = _datoStr(dagD);
+    const vDag  = _vejrFc[ds];
+    let vejrHtml = '';
+    if (vDag) {
+      const j    = vDag.juster || {};
+      const fv   = j.farve;
+      const ikon = vDag.ikon || '';
+      const pct  = j.faktor ? Math.round((j.faktor - 1) * 100) : 0;
+      const clr  = fv === 'red' ? 'color:#c0392b;' : fv === 'orange' ? 'color:#e67e22;' : fv === 'green' ? 'color:var(--moss);' : '';
+      vejrHtml = `<br><span style="font-size:9px;${clr}font-weight:400;" title="${vDag.tmax}° · ${vDag.prec}mm · ${j.label||''}">${ikon}${pct !== 0 ? (pct>0?'+':'')+pct+'%' : ''}</span>`;
+    }
+    return `<th class="num" style="${wkBg}">${DAG_LBL[dag]}${vejrHtml}</th>`;
+  }).join('');
 
   // Gruppér produkter efter kategori
   const groups = {};
@@ -7095,19 +8272,46 @@ async function loadBernUge(uge, aar) {
       const vnSafe = (p.varenummer || '').replace(/[^a-zA-Z0-9_-]/g, '_');
       const dagCells = DAGE.map(dag => {
         const v         = p.anbefalet[dag] || 0;
+        const b         = p.basis[dag] || 0;
+        const diff      = v - b;
         const isManuel  = p.manuel && p.manuel[dag];
         const isMinAnb  = (p.min_anb_dage || []).includes(dag);
         const wkBg      = WEEKEND.has(dag) ? 'background:rgba(45,74,45,.04);' : '';
         const manStyle  = isManuel ? 'border-bottom:2px solid var(--gold);' : '';
         const minStyle  = isMinAnb ? 'border-bottom:2px dashed var(--amber);color:var(--amber);' : '';
         const tipAttr   = isMinAnb ? ' title="Normalt 0 — minimum-anbefaling pga. begivenhed"' : '';
+        const diffHtml  = diff !== 0
+          ? `<br><span style="font-size:9px;color:${diff>0?'var(--moss)':'var(--danger)'};line-height:1;">${diff>0?'+':''}${diff}</span>`
+          : '';
+
+        // Vejr-indikator: vis hvad vejr HAR ændret (kun bagværk — ikke kager)
+        const dagDato = new Date(_mandag); dagDato.setDate(_mandag.getDate() + DAG_IDX[dag]);
+        const dagDs   = _datoStr(dagDato);
+        const vDagKp  = _vejrFc[dagDs];
+        const erPKage = (p.kategori || '').toLowerCase().includes('kage');
+        let vejrCellHtml = '';
+        if (!erPKage && vDagKp && v > 0) {
+          const faktor = (vDagKp.juster || {}).faktor;
+          if (faktor && Math.abs(faktor - 1) >= 0.05) {
+            // Beregn hvad der ville have været UDEN vejr
+            const udenVejr = Math.round(v / faktor);
+            const vejrDiff = v - udenVejr;
+            if (vejrDiff !== 0) {
+              const fv  = (vDagKp.juster || {}).farve;
+              const clr = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
+              const ikon = vDagKp.ikon || '🌡️';
+              vejrCellHtml = `<br><span style="font-size:9px;color:${clr};line-height:1;" title="${ikon} Vejr indregnet: ${vejrDiff>0?'+':''}${vejrDiff} stk">${ikon}${vejrDiff>0?'+':''}${vejrDiff}</span>`;
+            }
+          }
+        }
+
         return `<td class="num bern-cell" contenteditable="true"
           data-vn="${p.varenummer || ''}" data-dag="${dag}"
           onblur="bernCellSave(this)"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
           style="${mono}${wkBg}${v===0&&!isMinAnb?'color:var(--ash);':''}${manStyle}${minStyle}cursor:text;min-width:28px;"${tipAttr}
-        >${v}</td>`;
+        >${v}${diffHtml}${vejrCellHtml}</td>`;
       }).join('');
 
       const diffTotal   = p.total_anbefalet - p.total_basis;
@@ -7115,10 +8319,18 @@ async function loadBernUge(uge, aar) {
         ? `<br><span style="font-size:9px;color:${diffTotal>0?'var(--moss)':'var(--danger)'};">${diffTotal>0?'+':''}${diffTotal}</span>`
         : '';
 
+      const saHtml = p.sidst_aar != null
+        ? `<br><span style="font-size:9px;color:var(--ash);opacity:.7;">${p.sidst_aar_aar}: ${p.sidst_aar} stk</span>`
+        : '';
+
+      const ikkeIBasisHtml = p._ikkeIBasis
+        ? `<br><span style="font-size:9px;color:var(--gold);font-weight:500;" title="Mangler i din daglige skabelon — tilføj i Basis Bestilling hvis du stadig bestiller dette">⚠ Mangler i basis</span>`
+        : '';
+
       bodyRows += `<tr data-vn="${p.varenummer || ''}">
-        <td style="font-size:12px;max-width:180px;padding-left:16px;">${p.varenavn}</td>
+        <td style="font-size:12px;max-width:180px;padding-left:16px;${p._ikkeIBasis?'color:var(--ash);':''}">${p.varenavn}${ikkeIBasisHtml}</td>
         ${dagCells}
-        <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}</td>
+        <td class="num bern-row-tot" style="${mono}font-weight:600;">${p.total_anbefalet}${diffTotHtml}${saHtml}</td>
         <td class="num" style="${mono}font-size:11px;color:var(--ash);">${p.pris_ex_moms > 0 ? p.pris_ex_moms.toFixed(2) : '—'}</td>
         <td class="num bern-row-kr" style="${mono}">${p.total_pris > 0 ? Math.round(p.total_pris).toLocaleString('da-DK') : '—'}</td>
       </tr>`;
@@ -7146,7 +8358,27 @@ async function loadBernUge(uge, aar) {
     const diff = t - base;
     const diffHtml = diff !== 0
       ? `<br><span style="font-size:9px;opacity:.7;">${diff>0?'+':''}${diff}</span>` : '';
-    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}</td>`;
+
+    // Vejr-justering total for denne dag
+    const dagDato2 = new Date(_mandag); dagDato2.setDate(_mandag.getDate() + DAG_IDX[dag]);
+    const dagDs2   = _datoStr(dagDato2);
+    const vFoot    = _vejrFc[dagDs2];
+    let vejrFootHtml = '';
+    if (vFoot && t > 0) {
+      const faktor = (vFoot.juster || {}).faktor;
+      if (faktor && Math.abs(faktor - 1) >= 0.05) {
+        const vJust = Math.round(t * faktor);
+        const vDiff = vJust - t;
+        const fv    = (vFoot.juster || {}).farve;
+        const clr   = fv === 'red' ? '#c0392b' : fv === 'orange' ? '#e67e22' : 'var(--moss)';
+        const udenVejrFoot = Math.round(t / faktor);
+        const vejrDiffFoot = t - udenVejrFoot;
+        if (vejrDiffFoot !== 0)
+          vejrFootHtml = `<br><span style="font-size:9px;color:${clr};font-weight:600;" title="Vejr indregnet: ${vejrDiffFoot>0?'+':''}${vejrDiffFoot} stk">${vFoot.ikon||'🌡️'}${vejrDiffFoot>0?'+':''}${vejrDiffFoot}</span>`;
+      }
+    }
+
+    return `<td class="num" style="${WEEKEND.has(dag)?'background:rgba(45,74,45,.2);':''}">${t}${diffHtml}${vejrFootHtml}</td>`;
   }).join('');
 
   console.log('TABLE DEBUG:', {
@@ -7205,27 +8437,78 @@ async function loadBernUge(uge, aar) {
     setRing('ring-bern-retur-w', Math.min(100, returWiener / 40 * 100), 'var(--forest)');
   } catch(e) { console.warn('retur beregning fejl:', e); }
 
-  // Vis analyse-kort kun for fremtidige/aktuelle uger
+  // Vis AI-kort klar til analyse (manuel trigger)
   if (!d.faktisk) {
-    document.getElementById('bern-analyse-kort').style.display = '';
-    // BEMÆRK: bernGenererAnalyse() FJERNET - brugeren skal klikke knappen
-    // Vis vurderingskortet klar til brug
-    document.getElementById('bern-vurder-kort').style.display = '';
-    document.getElementById('bern-vurder-tekst').style.display = 'none';
-    document.getElementById('bern-vurder-tekst').textContent = '';
-  } else {
-    document.getElementById('bern-analyse-kort').style.display = 'none';
-    document.getElementById('bern-vurder-kort').style.display = 'none';
+    const kort  = document.getElementById('bern-kontekst-kort');
+    const tekst = document.getElementById('bern-kontekst-tekst');
+    if (kort && !tekst.textContent) {
+      kort.style.display = '';
+      tekst.textContent  = 'Klik "🔄 Opdater analyse" for at få AI-vurdering af dagsmængder, vejr og begivenheder.';
+      tekst.style.color  = 'var(--ash)';
+    }
   }
 
+  // Byg Basis vs Forslag sammenligning - SIMPEL VERSION
+  let basisSammenligning = '';
+  if (d.produkter && d.produkter.length > 0) {
+    const KAT_ORD = ['Rugbrød','Flute','Brød','Boller','Wiener','Kage'];
+
+    // Gruppér efter kategori
+    const groups = {};
+    d.produkter.forEach(prod => {
+      const kat = prod.kategori || 'Andet';
+      if (!groups[kat]) groups[kat] = {basis: 0, forslag: 0, count: 0};
+      groups[kat].basis += prod.total_basis || 0;
+      groups[kat].forslag += prod.total_anbefalet || 0;
+      groups[kat].count += 1;
+    });
+
+    let katRows = '';
+    const katOrder = [...KAT_ORD, ...Object.keys(groups).filter(k => !KAT_ORD.includes(k))];
+
+    for (const kat of katOrder) {
+      const g = groups[kat];
+      if (!g) continue;
+      const diff = g.forslag - g.basis;
+      const pct = g.basis > 0 ? Math.round((diff / g.basis) * 100) : 0;
+      const color = diff > 0 ? 'var(--moss)' : diff < 0 ? 'var(--danger)' : 'inherit';
+
+      katRows += `<tr style="border-bottom:1px solid rgba(30,58,30,.08);">
+        <td style="padding:8px;text-align:left;font-weight:500;">${kat}</td>
+        <td style="padding:8px;text-align:center;">${g.basis}</td>
+        <td style="padding:8px;text-align:center;">${g.forslag}</td>
+        <td style="padding:8px;text-align:center;color:${color};font-weight:600;">${diff > 0 ? '+' : ''}${diff} (${pct > 0 ? '+' : ''}${pct}%)</td>
+      </tr>`;
+    }
+
+    const totalBasis = d.produkter.reduce((s,p) => s + (p.total_basis || 0), 0);
+    const totalForslag = d.total_stk;
+    const totalDiff = totalForslag - totalBasis;
+    const totalPct = totalBasis > 0 ? Math.round((totalDiff / totalBasis) * 100) : 0;
+
+    basisSammenligning = `
+    <div style="background:rgba(45,74,45,.04);border:1px solid rgba(45,74,45,.15);border-radius:6px;padding:16px;margin-bottom:20px;">
+      <h3 style="margin:0 0 12px 0;color:var(--forest);font-size:14px;">📊 DIN BESTILLING VS BASIS</h3>
+      <div style="background:white;border-radius:4px;padding:12px;margin-bottom:12px;font-size:12px;line-height:1.6;color:#333;">
+        <strong style="color:var(--forest);">Beregning pr. dag:</strong> Basis × SI ${d.si.toFixed(2)} (sæson) × ${(1 + (d.vaekst_pct||0)/100).toFixed(2)} (trend) ${d.event ? '× Event-faktor ('+d.event.navn+')' : 'uden event'} = Forslag
+        ${d.event && d.event.dag_fak ? '<br><small style="color:var(--ash);">⚠ Events har DAG-specifikke boosts (fx Grundlovsdag Fre: ×1.60) — ikke hele ugen</small>' : ''}
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:rgba(45,74,45,.08);"><th style="padding:8px;text-align:left;font-weight:600;color:var(--forest);">Kategori</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Basis</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Forslag</th><th style="padding:8px;text-align:center;font-weight:600;color:var(--forest);">Ændring</th></tr></thead>
+        <tbody>${katRows}</tbody>
+        <tfoot><tr style="background:rgba(45,74,45,.12);font-weight:700;border-top:2px solid var(--forest);"><td style="padding:8px;text-align:left;color:var(--forest);">TOTAL</td><td style="padding:8px;text-align:center;color:var(--forest);">${totalBasis}</td><td style="padding:8px;text-align:center;color:var(--forest);">${totalForslag}</td><td style="padding:8px;text-align:center;color:${totalDiff > 0 ? 'var(--moss)' : totalDiff < 0 ? 'var(--danger)' : 'inherit'};font-weight:700;">${totalDiff > 0 ? '+' : ''}${totalDiff} (${totalPct > 0 ? '+' : ''}${totalPct}%)</td></tr></tfoot>
+      </table>
+    </div>`;
+  }
   document.getElementById('beregner-tabel').innerHTML = `
+    ${basisSammenligning}
     ${evtNote}
     <div class="aar2-tbl-wrap">
       <div class="aar2-tbl-hdr">
         <span class="aar2-tbl-hdr-l">Baseret på uge ${d.basis_uge} · grøn/rød = forskel vs. udgangspunkt</span>
         <span class="aar2-tbl-hdr-r">
           ${d.total_stk.toLocaleString('da-DK')} stk · ${Math.round(d.total_kr).toLocaleString('da-DK')} kr
-          &nbsp;<a href="${eksportUrl}" download style="margin-left:10px;padding:3px 10px;background:var(--forest);color:#fff;border-radius:4px;font-size:11px;text-decoration:none;font-weight:600;">↓ Excel</a>
+          &nbsp;<button onclick="bernEksporter()" style="margin-left:10px;padding:3px 10px;background:var(--forest);color:#fff;border-radius:4px;font-size:11px;border:none;cursor:pointer;font-weight:600;">↓ Excel</button>
         </span>
       </div>
       <div style="overflow-x:auto;">
@@ -7246,6 +8529,38 @@ async function loadBernUge(uge, aar) {
       </div>
     </div>
     <div class="bern-faktorer" style="margin-top:8px;">${faktorer}</div>`;
+
+  _bernBusy = false;
+}
+
+async function bernEksporter() {
+  // Læs præcis hvad der vises i tabellen (inkl. vejr og manuelle rettelser)
+  const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+  const produkter = [];
+  document.querySelectorAll('#beregner-tabel tr[data-vn]').forEach(row => {
+    const vn = row.dataset.vn;
+    const dagVals = {};
+    row.querySelectorAll('.bern-cell').forEach(cell => {
+      const dag = cell.dataset.dag;
+      const txt = [...cell.childNodes].find(n => n.nodeType === 3)?.textContent || '0';
+      dagVals[dag] = parseInt(txt.trim()) || 0;
+    });
+    if (vn) produkter.push({ varenummer: vn, ...dagVals });
+  });
+
+  const res = await fetch('/api/bestilling/eksport-dom', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uge: _bernUge, aar: _bernAar, produkter })
+  });
+  if (!res.ok) { alert('Eksport fejlede'); return; }
+  const blob = await res.blob();
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `Bestilling uge ${_bernUge} ${_bernAar}.xlsx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function loadBeregner() {
@@ -7253,9 +8568,44 @@ async function loadBeregner() {
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
   await loadBernUge(uge, aar);
-  // Bemærk: auto-analyse FJERNET - brugeren skal klikke "Opdater analyse"
-  bernHentSellthrough();  // hent sell-through data
+  bernLoadSidstSolgt();
 }
+
+async function bernLoadSidstSolgt() {
+  const d = await api('/api/salg/sidst-solgt?uger=4');
+  if (!d) return;
+  const wrap = document.getElementById('bern-sidst-solgt');
+  const mono = "font-family:'DM Mono',monospace;";
+
+  const udsolgt  = d.udsolgt_tidligt || [];
+  const overskud = d.overskud_sent   || [];
+  if (!udsolgt.length && !overskud.length) return;
+
+  const fmtRad = (item, farve) =>
+    `<div style="padding:4px 0;border-bottom:1px solid rgba(30,58,30,.05);">
+      <span style="font-size:12px;">${item.varenavn}</span>
+      <span style="${mono}font-size:11px;color:${farve};float:right;">
+        kl. ${item.snit_time < 10 ? '0' : ''}${item.snit_time}:00
+        <span style="color:var(--ash);font-size:10px;"> · ${item.tomme_timer}t tomme hylder</span>
+      </span>
+    </div>`;
+
+  const fmtOvr = (item) =>
+    `<div style="padding:4px 0;border-bottom:1px solid rgba(30,58,30,.05);">
+      <span style="font-size:12px;">${item.varenavn}</span>
+      <span style="${mono}font-size:11px;color:var(--gold);float:right;">
+        kl. ${item.snit_time < 10 ? '0' : ''}${item.snit_time}:00
+      </span>
+    </div>`;
+
+  document.getElementById('bern-udsolgt-liste').innerHTML =
+    udsolgt.length ? udsolgt.map(r => fmtRad(r, 'var(--danger)')).join('') : '<div style="color:var(--ash);font-size:11px;">Ingen</div>';
+  document.getElementById('bern-overskud-liste').innerHTML =
+    overskud.length ? overskud.map(fmtOvr).join('') : '<div style="color:var(--ash);font-size:11px;">Ingen</div>';
+
+  wrap.style.display = '';
+}
+
 
 // ── SELL-THROUGH ─────────────────────────────────────────────────────────────
 let _bernST = null;  // cachet sell-through data
@@ -7319,11 +8669,7 @@ function bernVisSellthrough(data) {
         ${hdrCells}
       </tr></thead>
       <tbody>${rows}</tbody>
-    </table>
-    <div style="padding:6px 14px;font-size:10px;color:var(--ash);line-height:1.6;border-top:1px solid var(--border);margin-top:2px;">
-      🔴 = sidst salg tidligt = sandsynligvis udsolgt &nbsp;·&nbsp; Hover for snit-tal<br>
-      <span style="color:var(--ash);opacity:.85;">⚠ Shopbox er manuelt tastet — stk-tal er estimater.${data.mp_andel_pct > 0 ? ` MobilePay ~${data.mp_andel_pct}% af omsætningen er ikke varekoblet — reelt salg er tilsvarende højere.` : ''}</span>
-    </div>`;
+    </table>`;
 }
 
 function _bernStTilTekst(data) {
@@ -7344,33 +8690,107 @@ function _bernStTilTekst(data) {
   return lines.join('\n');
 }
 
+function _mdTilHtml(tekst) {
+  // Simpel markdown → HTML: headers, fed, punktliste, linjeskift
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return tekst
+    .split('\n')
+    .map(l => {
+      if (/^###\s+/.test(l)) return `<h5 style="margin:12px 0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--forest);text-transform:uppercase;">${esc(l.replace(/^###\s+/,''))}</h5>`;
+      if (/^##\s+/.test(l))  return `<h4 style="margin:14px 0 5px;font-size:13px;font-weight:600;color:var(--forest);">${esc(l.replace(/^##\s+/,''))}</h4>`;
+      if (/^#\s+/.test(l))   return `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--forest);">${esc(l.replace(/^#\s+/,''))}</h3>`;
+      if (/^[-*]\s+/.test(l)) return `<div style="padding:2px 0 2px 14px;position:relative;"><span style="position:absolute;left:0;color:var(--moss);">•</span>${_inlineMd(esc(l.replace(/^[-*]\s+/,'').trim()))}</div>`;
+      if (l.trim() === '')    return '<div style="height:6px;"></div>';
+      return `<div style="padding:2px 0;">${_inlineMd(esc(l))}</div>`;
+    })
+    .join('');
+}
+
+function _inlineMd(s) {
+  // **fed** og *kursiv*
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em style="color:var(--forest);">$1</em>');
+}
+
 let _bernKontekstUge = null;
+
+function _bernLaesTabelData() {
+  // Læs aktuelle dagsmængder og produkt-detaljer fra DOM
+  const DAGE    = ['man','tir','ons','tor','fre','loe','son'];
+  const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const dagTotaler = {}, produktByVN = {};
+
+  document.querySelectorAll('.bern-cell').forEach(cell => {
+    const vn  = cell.getAttribute('data-vn');
+    const dag = cell.getAttribute('data-dag');
+    const val = parseInt(cell.textContent) || 0;
+    if (!produktByVN[vn]) {
+      const prod = (window._bernData?.produkter || []).find(p => String(p.varenummer) === vn);
+      produktByVN[vn] = { varenavn: prod?.varenavn || `Vare ${vn}`, kategori: prod?.kategori || '', dag_val: {} };
+    }
+    produktByVN[vn].dag_val[dag] = val;
+    const idx = DAGE.indexOf(dag);
+    if (idx >= 0) dagTotaler[DAGE_DA[idx]] = (dagTotaler[DAGE_DA[idx]] || 0) + val;
+  });
+
+  const produkter = Object.values(produktByVN).map(p => {
+    const dagObj = {};
+    DAGE.forEach(dk => { if (p.dag_val[dk]) dagObj[dk] = p.dag_val[dk]; });
+    return { varenavn: p.varenavn, kategori: p.kategori, ...dagObj };
+  });
+
+  return { dag_totaler: dagTotaler, produkter };
+}
+
 async function bernHentKontekst() {
   if (!_bernUge || !_bernAar) return;
   const kort    = document.getElementById('bern-kontekst-kort');
   const tekst   = document.getElementById('bern-kontekst-tekst');
   const spinner = document.getElementById('bern-kontekst-spinner');
   const btn     = document.getElementById('bern-kontekst-btn');
+  const mainBtn = document.getElementById('bern-main-btn');
   if (!kort) return;
 
   kort.style.display    = '';
   tekst.textContent     = '';
+  tekst.style.color     = '';
   spinner.style.display = '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  if (mainBtn) { mainBtn.disabled = true; mainBtn.textContent = '⏳ Analyserer…'; }
+
+  const { dag_totaler, produkter } = _bernLaesTabelData();
+
+  // Sørg for vejr er indlæst — brug det der vises i strip'en (AI og strip skal matche)
+  await vejrLoad();
+  vejrVisUge(_bernUge, _bernAar);
 
   try {
-    const res = await api('/api/bestilling/kontekst?uge=' + _bernUge + '&aar=' + _bernAar);
+    const res = await fetch('/api/bestilling/kontekst', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        uge: _bernUge,
+        aar: _bernAar,
+        dag_totaler,
+        produkter,
+        vejr: _vejrData || {}
+      })
+    });
+    const data = await res.json();
     spinner.style.display = 'none';
     if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
-    if (!res || !res.ok) {
-      tekst.textContent = '⚠ ' + (res?.fejl || 'Fejl ved analyse');
+    if (mainBtn) { mainBtn.disabled = false; mainBtn.textContent = '🔄 Opdater analyse'; }
+    if (!data || !data.ok) {
+      tekst.textContent = '⚠ ' + (data?.fejl || 'Fejl ved analyse');
       return;
     }
-    tekst.textContent = res.tekst;
+    tekst.innerHTML = _mdTilHtml(data.tekst);
     _bernKontekstUge = _bernUge;
   } catch(e) {
     spinner.style.display = 'none';
     if (btn) { btn.disabled = false; btn.textContent = '↻ Opdater'; }
+    if (mainBtn) { mainBtn.disabled = false; mainBtn.textContent = '🔄 Opdater analyse'; }
     tekst.textContent = '⚠ Netværksfejl';
   }
 }
@@ -7390,21 +8810,78 @@ async function bernVurderBestilling() {
   const DAGE = ['man','tir','ons','tor','fre','loe','son'];
   const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
 
-  // Læs aktuelle værdier direkte fra DOM-cellerne
+  // Læs aktuelle værdier direkte fra DOM-cellerne (ikke cached data)
   const dagTotaler = {};
   DAGE.forEach((dag, i) => { dagTotaler[DAGE_DA[i]] = 0; });
 
-  // Byg produkt-oversigt med varenavn til AI-matching
-  const produktListe = (d.produkter || []).map(p => {
-    const anb = p.anbefalet || {};
-    const total = DAGE.reduce((s,dag) => s + (anb[dag]||0), 0);
-    DAGE.forEach((dag,i) => { dagTotaler[DAGE_DA[i]] += (anb[dag]||0); });
-    return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => dag+':' + (anb[dag]||0)).join(' ')} = ${total} stk`;
-  }).join('\n');
+  // Byg produkt-oversigt ved at læse tabellen
+  const cells = document.querySelectorAll('.bern-cell');
+  const produktByVN = {};
+
+  cells.forEach(cell => {
+    const vn = cell.getAttribute('data-vn');
+    const dag = cell.getAttribute('data-dag');
+    const val = parseInt(cell.textContent) || 0;
+
+    if (!produktByVN[vn]) {
+      const prod = (d.produkter || []).find(p => (p.varenummer || '').toString() === vn);
+      produktByVN[vn] = {
+        vn: vn,
+        varenavn: prod?.varenavn || `Vare ${vn}`,
+        kategori: prod?.kategori || 'Øvrige',
+        dag_val: {}
+      };
+    }
+    produktByVN[vn].dag_val[dag] = val;
+
+    // Akkumulator dagTotaler
+    const dagIdx = DAGE.indexOf(dag);
+    if (dagIdx >= 0) {
+      dagTotaler[DAGE_DA[dagIdx]] += val;
+    }
+  });
+
+  // Byg produkt-oversigt fra DOM-læst data
+  const produktListe = Object.values(produktByVN)
+    .sort((a, b) => a.varenavn.localeCompare(b.varenavn))
+    .map(p => {
+      const total = DAGE.reduce((s, dag) => s + (p.dag_val[dag] || 0), 0);
+      return `${p.varenavn} (${p.kategori}): ${DAGE.map((dag,i) => dag+':' + (p.dag_val[dag]||0)).join(' ')} = ${total} stk`;
+    })
+    .join('\n');
 
   const dagStr   = Object.entries(dagTotaler).map(([d,v]) => `${d}: ${v} stk`).join(', ');
   const totalStk = Object.values(dagTotaler).reduce((s,v)=>s+v,0);
-  const evt    = d.event ? d.event.navn + ' — ' + (d.event.note||'') : 'ingen';
+
+  // DEBUG: Log hvad vi sender til API
+  console.log('[VURDER] DOM-læste værdier:', {
+    totalStk: totalStk,
+    dagTotaler: dagTotaler,
+    cellCount: document.querySelectorAll('.bern-cell').length,
+    produktCount: Object.keys(produktByVN).length,
+  });
+
+  // Forbedret event-info med dag-specifikke faktorer
+  let evt = 'ingen';
+  if (d.event) {
+    const DAGE_DA = ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+    const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+    evt = d.event.navn + ' — ' + (d.event.note||'');
+
+    // Tilføj dag-specifikke faktorer hvis tilgængelige
+    if (d.event.dag_fak) {
+      const starkDage = [];
+      DAGE.forEach((dag, idx) => {
+        const fak = d.event.dag_fak[dag] || 1.0;
+        if (fak > 1.05) {
+          starkDage.push(`${DAGE_DA[idx]}×${fak.toFixed(2)}`);
+        }
+      });
+      if (starkDage.length > 0) {
+        evt += ` [Boost: ${starkDage.join(', ')}]`;
+      }
+    }
+  }
   const vaekst = d.vaekst_pct != null ? d.vaekst_pct + '%' : 'ukendt';
   const tgtg   = d.tgtg_kr ? d.tgtg_kr + ' kr seneste uge (mål: under 800 kr)' : 'ingen data';
 
@@ -7585,9 +9062,38 @@ async function bernGenererAnalyse() {
   btn.textContent = 'Analyserer…';
   btn.disabled    = true;
   tekst.style.color = 'var(--ash)';
-  tekst.textContent = '🤔 Henter bestillingsdata og vurderer…';
+  tekst.textContent = '🤔 Læser dine aktuelle tal og vurderer…';
 
-  const res = await api(`/api/bestilling/management-analyse?uge=${uge}&aar=${aar}`);
+  // Saml AKTUELLE værdier fra tabellen (som bernVurderBestilling gør)
+  const produkter = [];
+  const rows = document.querySelectorAll('#bern-table tbody tr');
+  for (const row of rows) {
+    const cells = row.querySelectorAll('.bern-cell');
+    if (!cells.length) continue;
+
+    const vn = row.dataset.vn;
+    const navn = row.querySelector('td:first-child')?.textContent?.trim() || '';
+
+    let total = 0;
+    const dag_values = [];
+    for (const cell of cells) {
+      const val = parseInt(cell.textContent.replace(/\D/g, '') || '0', 10);
+      total += val;
+      dag_values.push(val);
+    }
+
+    if (total > 0) {
+      produkter.push({
+        vn, navn, total, dag_values
+      });
+    }
+  }
+
+  const res = await api(`/api/bestilling/management-analyse?uge=${uge}&aar=${aar}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ produkter })
+  });
 
   btn.textContent = 'Generer ny ↻';
   btn.disabled    = false;
@@ -7602,9 +9108,12 @@ async function bernGenererAnalyse() {
 }
 
 async function bernCellSave(td) {
-  const raw  = td.textContent.trim().replace(/\D/g, '');
+  // Læs kun første tekstnode (ikke +/- diff eller 🌧️ vejr-spans)
+  const firstTxt = [...td.childNodes].find(n => n.nodeType === 3)?.textContent || '';
+  const raw  = firstTxt.trim().replace(/\D/g, '');
   const val  = raw === '' ? 0 : parseInt(raw, 10);
   if (isNaN(val) || val < 0) { td.textContent = '0'; return; }
+  // Bevar kun tallet — fjern de visuelle indikatorer fra cellen ved redigering
   td.textContent = val;
 
   const vn  = td.dataset.vn;
@@ -7776,7 +9285,9 @@ async function mpUploadCsv() {
     if (data.ok === false) throw new Error(data.fejl || 'Ukendt fejl');
     statusEl.style.color = 'var(--moss)';
     if (data.dage > 0) {
-      statusEl.textContent = `✓ ${data.dage} dage importeret · total ${Math.round(data.total).toLocaleString('da-DK')} kr`;
+      const netto = Math.round(data.total_netto || data.total || 0).toLocaleString('da-DK');
+      const gebyr = Math.round(data.total_gebyr || 0).toLocaleString('da-DK');
+      statusEl.textContent = `✓ ${data.dage} dage importeret · netto ${netto} kr (gebyr: ${gebyr} kr)`;
     } else {
       statusEl.textContent = data.besked || '✓ Ingen nye dage (data allerede importeret)';
     }
@@ -7808,10 +9319,10 @@ function mpToggleDag(hdr) {
 async function loadMobilepayDag() {
   _mpDagLoaded = true;
   const tbody = document.getElementById('mp-dag-tbody');
-  tbody.innerHTML = '<tr><td colspan="4" class="empty" style="padding:16px;">Indlæser…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty" style="padding:16px;">Indlæser…</td></tr>';
   const data = await api('/api/mobilepay/dag');
   if (!data || !data.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="empty">Ingen daglige transaktioner endnu — upload en CSV-fil ovenfor</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Ingen daglige transaktioner endnu — upload en CSV-fil ovenfor</td></tr>';
     document.getElementById('mp-dag-lbl').textContent = '0 transaktioner';
     return;
   }
@@ -7821,14 +9332,16 @@ async function loadMobilepayDag() {
                         : k === 'api'        ? '<span style="color:var(--ash);">API</span>'
                         : k === 'api-feed'   ? '<span style="color:var(--ash);">Feed</span>'
                         : `<span style="color:var(--ash);">${k||'—'}</span>`;
-  // Grupper per måned med subtotaler
-  let html = '', prevMaaned = null, maanedSum = 0;
+  // Grupper per måned med subtotaler (netto + gebyr)
+  let html = '', prevMaaned = null, maanedNetto = 0, maanedGebyr = 0;
   const flush = (m) => {
     if (m == null) return '';
+    const brutto = maanedNetto + maanedGebyr;
     return `<tr style="background:rgba(30,58,30,.04);border-top:1px solid rgba(30,58,30,.1);">
       <td style="${mono}font-size:10px;color:var(--ash);padding:4px 16px;">${m}</td>
-      <td class="num" style="${mono}font-size:11px;font-weight:500;color:var(--forest);">${Math.round(maanedSum).toLocaleString('da-DK')} kr</td>
-      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(maanedSum/1.25).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:11px;font-weight:500;color:var(--forest);">${Math.round(maanedNetto).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(maanedGebyr).toLocaleString('da-DK')} kr</td>
+      <td class="num" style="${mono}font-size:10px;color:var(--ash);">${Math.round(brutto).toLocaleString('da-DK')} kr</td>
       <td></td>
     </tr>`;
   };
@@ -7837,14 +9350,20 @@ async function loadMobilepayDag() {
     const mKey = `${AAR_MND_NAVNE[d.getMonth()]} ${d.getFullYear()}`;
     if (prevMaaned && mKey !== prevMaaned) {
       html += flush(prevMaaned);
-      maanedSum = 0;
+      maanedNetto = 0;
+      maanedGebyr = 0;
     }
     prevMaaned = mKey;
-    maanedSum += r.omsaetning_inkl;
+    const netto = r.omsaetning_netto || r.omsaetning_inkl || 0;
+    const gebyr = r.gebyr || 0;
+    const brutto = netto + gebyr;
+    maanedNetto += netto;
+    maanedGebyr += gebyr;
     html += `<tr>
       <td style="${mono}font-size:13px;">${fmtDato(r.dato)}</td>
-      <td class="num" style="${mono}">${r.omsaetning_inkl.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
-      <td class="num" style="${mono}color:var(--ash);">${(r.omsaetning_inkl/1.25).toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}">${netto.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}color:var(--ash);">${gebyr.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}color:var(--ash);">${brutto.toLocaleString('da-DK', {minimumFractionDigits:2})} kr</td>
       <td>${kildeLabel(r.kilde)}</td>
     </tr>`;
   }
@@ -7875,10 +9394,13 @@ window.showPanel = function(id, el) {
   if (id === 'trend'       && !_trendLoaded) loadTrend(_trendDage);
   if (id === 'aar'         && !_aarLoaded)   loadAar();
   if (id === 'kostpris')   loadKostpris();
+  if (id === 'kp-historik') kpLoad();
+  if (id === 'margin')     loadMarginAnalyse();
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'tgtg')         loadTgtg();
-  if (id === 'bager')        loadBager();
+  if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
+  if (id === 'morgenbriefing') mbLoad();
   if (id === 'forside')      loadReturStatus();
   if (id === 'retur')        retInit();
   if (id === 'svind')        loadSvind();
@@ -7888,6 +9410,71 @@ window.showPanel = function(id, el) {
   if (id === 'stamdata')   loadStamdata();
   if (id === 'management') { mgmtIndlaes(); mgmtInitForslag(); }
 };
+
+// ── KOSTPRIS HISTORIK ────────────────────────────────────────────────────────
+let _kpData = null, _kpLoaded = false;
+
+async function kpLoad(force = false) {
+  if (_kpLoaded && !force) return;
+  const d = await api('/api/kostpris/oversigt');
+  if (!d || !d.varer) return;
+  _kpData   = d.varer;
+  _kpLoaded = true;
+  kpVis(_kpData);
+}
+
+function kpFilter() {
+  if (!_kpData) return;
+  const q = document.getElementById('kp-soeg').value.toLowerCase();
+  kpVis(q ? _kpData.filter(r => (r.varenavn||'').toLowerCase().includes(q) || (r.varenummer||'').includes(q)) : _kpData);
+}
+
+function kpVis(varer) {
+  const tbody = document.getElementById('kp-tbody');
+  const mono  = "font-family:'DM Mono',monospace;";
+  document.getElementById('kp-tbl-lbl').textContent = varer.length + ' varer';
+  if (!varer.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">Ingen kostpriser registreret endnu — upload Shopbox-data for at starte</td></tr>'; return; }
+  tbody.innerHTML = varer.map(r => {
+    const kildeIkon = r.kilde === 'manuel' ? '✏️' : '🤖';
+    const aendring  = r.antal_ændringer > 1
+      ? `<span style="color:var(--gold);">${r.antal_ændringer}×</span>`
+      : `<span style="color:var(--ash);">1×</span>`;
+    return `<tr>
+      <td style="font-size:12px;">${r.varenavn || '—'}</td>
+      <td style="${mono}font-size:11px;color:var(--ash);">${r.varenummer}</td>
+      <td class="num" style="${mono}font-weight:600;">${(r.kostpris_enhed||0).toLocaleString('da-DK',{minimumFractionDigits:2,maximumFractionDigits:2})} kr</td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${(r.gyldig_fra||'').slice(0,10)}</td>
+      <td class="num">${aendring}</td>
+      <td class="num" style="font-size:12px;" title="${r.kilde==='manuel'?'Manuelt korrigeret':'Automatisk opdaget'}">${kildeIkon} ${r.kilde}</td>
+      <td class="num"><button onclick="kpModalAaben('${r.varenummer}','${(r.varenavn||'').replace(/'/g,"\\'")}',${r.kostpris_enhed})"
+        style="font-size:11px;padding:3px 8px;background:none;border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--ash);">Korriger</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function kpModalAaben(vn, navn, pris) {
+  document.getElementById('kp-modal-vn').value    = vn;
+  document.getElementById('kp-modal-titel').textContent = 'Korriger: ' + navn;
+  document.getElementById('kp-modal-pris').value  = pris;
+  document.getElementById('kp-modal-fra').value   = new Date().toISOString().slice(0,10);
+  document.getElementById('kp-modal').style.display = 'flex';
+}
+
+function kpModalLuk() {
+  document.getElementById('kp-modal').style.display = 'none';
+}
+
+async function kpGem() {
+  const vn   = document.getElementById('kp-modal-vn').value;
+  const pris = parseFloat(document.getElementById('kp-modal-pris').value);
+  const fra  = document.getElementById('kp-modal-fra').value;
+  if (!vn || !pris || !fra) return alert('Udfyld alle felter');
+  const r = await fetch('/api/kostpris/korriger', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({varenummer:vn, kostpris_enhed:pris, gyldig_fra:fra})
+  });
+  if ((await r.json()).ok) { kpModalLuk(); kpLoad(true); }
+}
 
 // ── VARESTAMDATA ─────────────────────────────────────────────────────────────
 const SD_TYPER = ['Brød','Flute','Rugbrød','Boller','Wienerbrød','Kage','Jul'];
@@ -8170,7 +9757,8 @@ async function vfDrillDown(aar, maaned, type) {
   modal.style.display   = 'flex';
 
   const d = await api(`/api/aarsplan/vf-detaljer?aar=${aar}&maaned=${maaned}`);
-  if (!d) { body.innerHTML = `<p style="color:var(--danger);">Fejl ved hentning</p>`; return; }
+  console.log('vfDrillDown API response:', d);
+  if (!d) { body.innerHTML = `<p style="color:var(--danger);">Fejl ved hentning (API returnerede null)</p>`; return; }
 
   if (type === 'bager') {
     if (!d.bager_vf || !d.bager_vf.length) {
@@ -8179,10 +9767,12 @@ async function vfDrillDown(aar, maaned, type) {
     }
     const rows = d.bager_vf.map(r => ({
       ...r,
-      netto: r.netto ?? ((r.faktura||0) - (r.retur_ialt||0)),
-      diff:  (r.netto ?? ((r.faktura||0) - (r.retur_ialt||0))) - (r.bestilt_kr||0),
+      bagerFaktura: r.netto || 0,
+      vf_netto: r.vf_maaned || 0,
+      diff: (r.vf_maaned || 0) - (r.netto || 0),  // negativ = sparede, positiv = tabte
     }));
     const totalBestilt = rows.reduce((s,r) => s + (r.bestilt_kr||0), 0);
+    const totalFaktura = rows.reduce((s,r) => s + (r.bagerFaktura||0), 0);
     const totalNetto = rows.reduce((s,r) => s + r.netto, 0);
     const totalDiff  = rows.reduce((s,r) => s + r.diff,  0);
     const diffClr = v => v > 0 ? 'color:var(--danger)' : v < 0 ? 'color:var(--moss)' : 'color:var(--ash)';
@@ -8193,23 +9783,29 @@ async function vfDrillDown(aar, maaned, type) {
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;letter-spacing:.08em;color:var(--ash);">UGE</th>
           <th style="text-align:left;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">ÅR</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BESTILT KR</th>
+          <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">BAGER FAKTURA</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">VF (NETTO)</th>
           <th style="text-align:right;padding:6px 8px;${mono}font-size:9px;color:var(--ash);">DIFF</th>
         </tr></thead>
         <tbody>
-          ${rows.map(r => `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
+          ${rows.map(r => {
+            const diffClr = r.diff > 0 ? 'color:var(--danger)' : r.diff < 0 ? 'color:var(--moss)' : 'color:var(--ash)';
+            const dkDiff = (r.diff >= 0 ? '+' : '') + dk(r.diff) + ' kr';
+            return `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
             <td style="padding:8px 8px;font-weight:500;">Uge ${r.uge}</td>
             <td style="padding:8px 8px;${mono}font-size:11px;color:var(--ash);">${r.aar}</td>
             <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--ash);">${r.bestilt_kr>0?dk(r.bestilt_kr)+' kr':'—'}</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${dk(r.netto)} kr</td>
-            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr(r.diff)}">${dkDiff(r.diff)}</td>
-          </tr>`).join('')}
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;color:var(--forest);font-weight:500;">${r.bagerFaktura>0?dk(r.bagerFaktura)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:13px;font-weight:500;color:var(--forest);">${r.vf_netto>0?dk(r.vf_netto)+' kr':'—'}</td>
+            <td style="padding:8px 8px;text-align:right;${mono}font-size:12px;${diffClr}">${dkDiff}</td>
+          </tr>`;}).join('')}
         </tbody>
         <tfoot><tr style="border-top:2px solid rgba(30,58,30,.15);background:var(--parchment);">
           <td colspan="2" style="padding:10px 8px;${mono}font-size:10px;letter-spacing:.06em;color:var(--ash);">I ALT</td>
           <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalBestilt)} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:14px;font-weight:600;color:var(--forest);">${dk(totalNetto)} kr</td>
-          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${diffClr(totalDiff)}">${dkDiff(totalDiff)}</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(totalFaktura)} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;color:var(--forest);">${dk(rows.reduce((s,r)=>s+r.vf_netto,0))} kr</td>
+          <td style="padding:10px 8px;text-align:right;${mono}font-size:13px;font-weight:600;${rows.reduce((s,r)=>s+r.diff,0)>0?'color:var(--danger)':'color:var(--moss)'};">${(rows.reduce((s,r)=>s+r.diff,0)>=0?'+':'')+dk(rows.reduce((s,r)=>s+r.diff,0))} kr</td>
         </tr></tfoot>
       </table>`;
   } else {
@@ -8258,7 +9854,7 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') vfModalLuk(); 
 <!-- BOTTOM NAVIGATION -->
 <nav class="bnav" id="bnav">
   <div class="bnav-inner">
-    <button class="bnav-item active" id="bn-forside" onclick="_bnavGo('forside',this)">
+    <button class="bnav-item" id="bn-forside" onclick="_bnavGo('forside',this)">
       <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L1.5 7v8h4.5v-4.5h4V15h4.5V7L8 1.5z"/></svg>
       <span class="bnav-lbl">Forside</span>
     </button>
@@ -8970,18 +10566,9 @@ async function mgmtIndlaes() {
     aarInput.value = new Date().getFullYear();
   }
 
-  try {
-    const res  = await fetch('/api/management/review');
-    const data = await res.json();
-    if (data.ok && data.review) {
-      mgmtVisReview(data.review);
-    } else {
-      document.getElementById('mgmt-ingen-data').style.display = '';
-      document.getElementById('mgmt-sektioner').style.display  = 'none';
-    }
-  } catch(e) {
-    document.getElementById('mgmt-ingen-data').style.display = '';
-  }
+  // Ikke auto-load — bruger klikker "Opdater analyse" knappen
+  document.getElementById('mgmt-ingen-data').style.display = '';
+  document.getElementById('mgmt-sektioner').style.display  = 'none';
 }
 
 async function mgmtOpdater() {

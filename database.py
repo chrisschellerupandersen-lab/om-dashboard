@@ -145,10 +145,12 @@ def init_db():
             );
 
             CREATE TABLE IF NOT EXISTS mobilepay_dag (
-                dato            TEXT    PRIMARY KEY,
-                omsaetning_inkl REAL    NOT NULL DEFAULT 0,
-                kilde           TEXT    DEFAULT 'api',
-                indlæst         TEXT    DEFAULT (datetime('now','localtime'))
+                dato              TEXT    PRIMARY KEY,
+                omsaetning_netto  REAL    NOT NULL DEFAULT 0,
+                gebyr             REAL    NOT NULL DEFAULT 0,
+                omsaetning_inkl   REAL    NOT NULL DEFAULT 0,
+                kilde             TEXT    DEFAULT 'api',
+                indlæst           TEXT    DEFAULT (datetime('now','localtime'))
             );
 
             CREATE TABLE IF NOT EXISTS retur_detaljer (
@@ -195,10 +197,37 @@ def init_db():
                 type     TEXT    DEFAULT 'normal'
             );
 
+            CREATE TABLE IF NOT EXISTS gmail_importerede (
+                msg_id     TEXT PRIMARY KEY,
+                uge        INTEGER,
+                aar        INTEGER,
+                importeret TEXT DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE IF NOT EXISTS gmail_sync_log (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                tidspunkt TEXT DEFAULT (datetime('now','localtime')),
+                status    TEXT,
+                besked    TEXT,
+                antal     INTEGER DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS varekostpris (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                varenummer     TEXT    NOT NULL,
+                varenavn       TEXT    NOT NULL DEFAULT '',
+                kostpris_enhed REAL    NOT NULL DEFAULT 0,
+                gyldig_fra     TEXT    NOT NULL,
+                gyldig_til     TEXT,
+                kilde          TEXT    DEFAULT 'auto',
+                opdateret      TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(varenummer, gyldig_fra) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_kp_vn ON varekostpris(varenummer, gyldig_fra);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
-                -- Boner hvor mindst én vare har omsætning<=0 men kostpris>0 (menu-split eller rabatlinje)
                 SELECT dato, bon_nr
                 FROM transaktioner
                 WHERE bon_nr != '' AND omsætning <= 0 AND kostpris > 0
@@ -213,12 +242,9 @@ def init_db():
                 GROUP BY t.dato, t.bon_nr
             ),
             t_korr AS (
-                -- Fordel bon-omsætning proportionalt efter kostpris for menu-boner
                 SELECT t.*,
                        CASE
-                           WHEN bt.bon_nr IS NOT NULL
-                                AND bt.bon_kost > 0
-                                AND bt.bon_oms  > 0
+                           WHEN bt.bon_nr IS NOT NULL AND bt.bon_kost > 0 AND bt.bon_oms > 0
                            THEN bt.bon_oms * t.kostpris / bt.bon_kost
                            ELSE t.omsætning
                        END AS omsætning_korr
@@ -227,17 +253,30 @@ def init_db():
             )
             SELECT tc.*,
                    tc.omsætning_korr / 1.25 AS omsaetning_ex_moms,
-                   CASE WHEN s.pris_ex_moms > 0
-                        THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                        ELSE tc.kostpris END AS vf_korrekt,
+                   CASE
+                       WHEN s.pris_ex_moms > 0
+                           THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                       WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
+                           THEN ROUND(tc.antal * kp.kostpris_enhed, 4)
+                       ELSE tc.kostpris
+                   END AS vf_korrekt,
                    tc.omsætning_korr / 1.25
-                       - CASE WHEN s.pris_ex_moms > 0
-                              THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
-                              ELSE tc.kostpris END AS db_korrekt
+                       - CASE
+                             WHEN s.pris_ex_moms > 0
+                                 THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
+                             WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
+                                 THEN ROUND(tc.antal * kp.kostpris_enhed, 4)
+                             ELSE tc.kostpris
+                         END AS db_korrekt
             FROM t_korr tc
             LEFT JOIN varestamdata s
                 ON (tc.varenummer != '' AND tc.varenummer IS NOT NULL AND tc.varenummer = s.sku)
-                OR (COALESCE(tc.varenummer,'') = '' AND LOWER(TRIM(tc.varenavn)) = LOWER(TRIM(s.varenavn)));
+                OR (COALESCE(tc.varenummer,'') = '' AND LOWER(TRIM(tc.varenavn)) = LOWER(TRIM(s.varenavn)))
+            LEFT JOIN varekostpris kp
+                ON tc.varenummer != ''
+                AND tc.varenummer = kp.varenummer
+                AND kp.gyldig_fra <= tc.dato
+                AND (kp.gyldig_til IS NULL OR kp.gyldig_til >= tc.dato);
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -248,11 +287,26 @@ def init_db():
             "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
             "ALTER TABLE tgtg_poser ADD COLUMN enheder_per_pose INTEGER DEFAULT 1",
             "ALTER TABLE bager_regnskab ADD COLUMN faktura REAL DEFAULT 0",
+            "ALTER TABLE mobilepay_dag ADD COLUMN omsaetning_netto REAL DEFAULT 0",
+            "ALTER TABLE mobilepay_dag ADD COLUMN gebyr REAL DEFAULT 0",
         ]:
             try:
                 conn.execute(sql)
             except Exception:
                 pass  # kolonnen eksisterer allerede
+        # Oprydning MobilePay: tøm gammel data med forkert struktur
+        # (før migration til omsaetning_netto + gebyr)
+        # Tjek om tabellen har nogle rækker uden omsaetning_netto sat (gammelt format)
+        try:
+            result = conn.execute(
+                "SELECT COUNT(*) FROM mobilepay_dag WHERE omsaetning_netto = 0 AND omsaetning_inkl > 0"
+            ).fetchone()
+            if result and result[0] > 0:
+                # Nogle rækker har gammelt format → slet alt og start fresh
+                conn.execute("DELETE FROM mobilepay_dag")
+        except Exception:
+            pass  # Hvis noget går galt, fortsæt uden at slette
+
         # Oprydning: slet alle "ØKO - " stamdata-rækker importeret fra bestilling
         # LOWER() i SQLite håndterer ikke Ø → brug UPPER() i stedet
         conn.execute("DELETE FROM varestamdata WHERE UPPER(SUBSTR(varenavn,1,6)) = 'ØKO - '")
@@ -323,8 +377,57 @@ def init_db():
             )
 
 
+def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str) -> None:
+    """Sammenlign nye priser med gemt historik og opret poster automatisk ved ændringer."""
+    from collections import defaultdict
+    priser: Dict = defaultdict(list)
+    navne:  Dict = {}
+    for t in transaktioner:
+        vn   = str(t.get("varenummer", "") or "").strip()
+        if not vn or vn in ("0", ""):
+            continue
+        antal = float(t.get("antal", 0) or 0)
+        kost  = float(t.get("kostpris", 0) or 0)
+        if antal > 0 and kost > 0:
+            priser[vn].append(round(kost / antal, 6))
+            navne[vn] = t.get("varenavn", "") or ""
+
+    for vn, pris_liste in priser.items():
+        sorted_p  = sorted(pris_liste)
+        median_p  = round(sorted_p[len(sorted_p) // 2], 4)
+        if median_p <= 0:
+            continue
+
+        aktuel = conn.execute(
+            "SELECT id, kostpris_enhed FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
+            (vn,)
+        ).fetchone()
+
+        if aktuel is None:
+            # Første gang — opret startpost
+            conn.execute(
+                "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
+                (vn, navne.get(vn, ""), median_p, import_dato)
+            )
+        else:
+            gammel = float(aktuel["kostpris_enhed"] or 0)
+            if gammel > 0 and abs(median_p - gammel) / gammel > 0.02:  # >2% ændring
+                from datetime import date as _d, timedelta as _td
+                gaeldende_til = (_d.fromisoformat(import_dato) - _td(days=1)).isoformat()
+                conn.execute(
+                    "UPDATE varekostpris SET gyldig_til=? WHERE id=?",
+                    (gaeldende_til, aktuel["id"])
+                )
+                conn.execute(
+                    "INSERT OR IGNORE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) VALUES (?,?,?,?,'auto')",
+                    (vn, navne.get(vn, ""), median_p, import_dato)
+                )
+
+
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
     with _conn() as conn:
+        # Opdater kostpris-historik FØR sletning — bevar historisk korrekthed
+        _opdater_kostpris_historik(conn, transaktioner, rapport_dato)
         conn.execute("DELETE FROM transaktioner")
         conn.execute("DELETE FROM uploads")
 
@@ -843,18 +946,30 @@ def _mp_uge_netto(iso_aar: int, iso_uge: int) -> float:
 
 
 def gem_mobilepay_dag(linjer: list) -> int:
-    """Gem/opdater daglig MobilePay-omsætning. linjer = [{dato, omsaetning_inkl, kilde?}]"""
+    """Gem/opdater daglig MobilePay-omsætning.
+    linjer = [{dato, omsaetning_netto, gebyr?, omsaetning_inkl?, kilde?}]
+
+    Hvis kun omsaetning_inkl er givet (fra gammel API), bruges det som netto.
+    """
     with _conn() as conn:
         count = 0
         for l in linjer:
+            dato = l["dato"]
+            omsaetning_netto = l.get("omsaetning_netto") or l.get("omsaetning_inkl", 0)
+            gebyr = l.get("gebyr", 0)
+            omsaetning_inkl = l.get("omsaetning_inkl", omsaetning_netto + gebyr)
+            kilde = l.get("kilde", "api")
+
             conn.execute("""
-                INSERT INTO mobilepay_dag (dato, omsaetning_inkl, kilde)
-                VALUES (?, ?, ?)
+                INSERT INTO mobilepay_dag (dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde)
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(dato) DO UPDATE SET
-                    omsaetning_inkl = excluded.omsaetning_inkl,
-                    kilde           = excluded.kilde,
-                    indlæst         = datetime('now','localtime')
-            """, (l["dato"], l["omsaetning_inkl"], l.get("kilde", "api")))
+                    omsaetning_netto = excluded.omsaetning_netto,
+                    gebyr            = excluded.gebyr,
+                    omsaetning_inkl  = excluded.omsaetning_inkl,
+                    kilde            = excluded.kilde,
+                    indlæst          = datetime('now','localtime')
+            """, (dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde))
             count += 1
     return count
 
@@ -863,12 +978,12 @@ def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]
     with _conn() as conn:
         if fra_dato and til_dato:
             rows = conn.execute(
-                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag WHERE dato BETWEEN ? AND ? ORDER BY dato DESC",
+                "SELECT dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde FROM mobilepay_dag WHERE dato BETWEEN ? AND ? ORDER BY dato DESC",
                 (fra_dato, til_dato)
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag ORDER BY dato DESC LIMIT 90"
+                "SELECT dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde FROM mobilepay_dag ORDER BY dato DESC LIMIT 90"
             ).fetchall()
     return [dict(r) for r in rows]
 
@@ -1096,7 +1211,10 @@ def hent_aarsdata(aar: int = None) -> Dict:
                 CAST(strftime('%m', dato) AS INTEGER) AS maaned,
                 COUNT(DISTINCT dato)                   AS faktiske_dage,
                 ROUND(SUM(omsætning), 2)               AS omsaetning,
-                ROUND(SUM(kostpris),  2)               AS kostpris,
+                ROUND(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                    SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                    FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                ) THEN kostpris ELSE 0 END), 2) AS kostpris,
                 ROUND(SUM(avance)-SUM(omsætning)*0.2, 2) AS avance,
                 ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner
@@ -1108,7 +1226,10 @@ def hent_aarsdata(aar: int = None) -> Dict:
         prev_dec = conn.execute("""
             SELECT COUNT(DISTINCT dato) AS faktiske_dage,
                    ROUND(SUM(omsætning), 2) AS omsaetning,
-                   ROUND(SUM(kostpris),  2) AS kostpris,
+                   ROUND(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                       SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                       FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                   ) THEN kostpris ELSE 0 END), 2) AS kostpris,
                    ROUND(SUM(avance),    2) AS avance,
                    ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS gpm
             FROM transaktioner WHERE strftime('%Y-%m', dato) = ?
@@ -1150,22 +1271,54 @@ def hent_aarsdata(aar: int = None) -> Dict:
         _DAG_NAVNE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
         bestil_map = {(int(r["aar"]), int(r["uge"])): r for r in bestil_rows}
 
-        # Fordel ugens netto-faktura per dag vægtet efter historisk salgsfordeling.
-        nøgle = _dag_fordeling_nøgle()
+        # Sum baker-fakturaer per måned — fordeles efter salget ved månedsskift
         faktura_maaned: Dict = {}
         for br in bager_rows:
             try:
-                fakt = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
-                if fakt <= 0:
+                fakt_netto = round((br["faktura"] or 0) - (br["retur_ialt"] or 0), 2)
+                if fakt_netto <= 0:
                     continue
-                mon = _date.fromisocalendar(int(br["aar"]), int(br["uge"]), 1)
-                for i in range(7):
-                    dag = mon + _td(days=i)
-                    if dag.year != aar:
-                        continue
-                    faktura_maaned[dag.month] = round(
-                        faktura_maaned.get(dag.month, 0.0) + fakt * nøgle[i], 2
+                y, w = int(br["aar"]), int(br["uge"])
+                mon = _date.fromisocalendar(y, w, 1)
+                son = mon + _td(days=6)
+
+                if y != aar:
+                    continue
+
+                # Hvis ugen ligger helt i én måned: simpel sum
+                if mon.month == son.month:
+                    faktura_maaned[mon.month] = round(
+                        faktura_maaned.get(mon.month, 0.0) + fakt_netto, 2
                     )
+                else:
+                    # Uge går over månedsskift: fordel efter salget på dagene
+                    # Hent dagligt salg for ugen
+                    mon_dato = _date.fromisocalendar(y, w, 1)
+                    son_dato = mon_dato + _td(days=6)
+                    dag_data = conn.execute("""
+                        SELECT dato,
+                               ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_ex_dag
+                        FROM v_transaktioner
+                        WHERE dato >= ? AND dato <= ?
+                        GROUP BY dato ORDER BY dato
+                    """, (mon_dato.isoformat(), son_dato.isoformat())).fetchall()
+
+                    # Beregn salg per måned
+                    salg_maaned = {}
+                    total_salg = 0.0
+                    for dag_row in dag_data:
+                        dag_dato = _date.fromisoformat(dag_row["dato"])
+                        omsat = dag_row["omsat_ex_dag"] or 0
+                        salg_maaned[dag_dato.month] = salg_maaned.get(dag_dato.month, 0.0) + omsat
+                        total_salg += omsat
+
+                    # Fordel faktura efter salget
+                    if total_salg > 0:
+                        for m, salg in salg_maaned.items():
+                            andel = salg / total_salg
+                            faktura_maaned[m] = round(
+                                faktura_maaned.get(m, 0.0) + fakt_netto * andel, 2
+                            )
             except Exception:
                 pass
 
@@ -1371,6 +1524,41 @@ def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
             ORDER BY omsaetning DESC
             LIMIT ?
         """, params).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_margin_analyse(aar: int = None, kategori: str = None) -> List[Dict]:
+    """Margin-analyse per produkt med detaljer."""
+    with _conn() as conn:
+        where_clauses = ["varenavn != ''"]
+        params = []
+
+        if aar:
+            where_clauses.append("strftime('%Y', dato) = ?")
+            params.append(str(aar))
+
+        if kategori:
+            where_clauses.append("kategori = ?")
+            params.append(kategori)
+
+        where_sql = " AND ".join(where_clauses)
+
+        rows = conn.execute(f"""
+            SELECT
+                varenavn,
+                MAX(kategori) AS kategori,
+                ROUND(SUM(omsætning)/1.25, 2) AS omsat_ex_moms,
+                ROUND(COALESCE(SUM(vf_korrekt), 0), 2) AS vareforbrug,
+                ROUND(SUM(antal), 0) AS antal_solgt,
+                ROUND(COALESCE(SUM(db_korrekt), 0), 2) AS db_kr,
+                ROUND(COALESCE(SUM(db_korrekt), 0)*1.25/NULLIF(SUM(omsætning),0)*100, 1) AS db_pct,
+                MAX(dato) AS seneste_salg
+            FROM v_transaktioner
+            WHERE {where_sql}
+            GROUP BY varenavn
+            ORDER BY COALESCE(db_pct, 0) DESC, omsat_ex_moms DESC
+        """, params).fetchall()
+
     return [dict(r) for r in rows]
 
 
@@ -1978,6 +2166,39 @@ def hent_mangler_kostpris() -> Dict:
 
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
+def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
+    """Spild-overblik for én uge — bruger samme beregning som spild-rapporten.
+    Ekskluderer dags dato (uafsluttet dag) fra beregningen.
+    """
+    from datetime import date as _d, timedelta as _td
+    idag = _d.today().isoformat()
+    try:
+        d = hent_spild_dagsniveau(uge, aar)
+        if "error" in d:
+            return {"uge": uge, "aar": aar, "har_data": False}
+
+        # Filtrer kun afsluttede dage (ekskl. i dag)
+        dage = [dag for dag in d.get("dage", []) if dag["har_data"] and dag["dato"] < idag]
+        if not dage:
+            return {"uge": uge, "aar": aar, "har_data": False}
+
+        bestilt   = sum(dag["bestilt"]   for dag in dage)
+        kassesalg = sum(dag["kassesalg"] for dag in dage)
+        tgtg      = sum(dag["tgtg"]      for dag in dage)
+        svind_stk = sum(dag["svind"] or 0 for dag in dage)
+        svind_pct = round(svind_stk / bestilt * 100, 1) if bestilt > 0 else None
+        n_dage    = len(dage)
+
+        return {
+            "uge": uge, "aar": aar, "har_data": True,
+            "bestilt": bestilt, "kassesalg": kassesalg, "tgtg": tgtg,
+            "svind": svind_stk, "svind_pct": svind_pct,
+            "n_dage": n_dage, "er_komplet": n_dage >= 6,
+        }
+    except Exception as e:
+        return {"uge": uge, "aar": aar, "har_data": False, "fejl": str(e)}
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 
@@ -2131,21 +2352,24 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             """, dato_liste).fetchall()
             kasse_map = {r['dato']: int(r['antal'] or 0) for r in kasse_rows}
 
-            # ── TGTG per dato (D+1 offset) — i stk (antal × enheder_per_pose) ──
-            # Produktionsdag D → tgtg_dagssalg.dato = D+1
-            tgtg_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
+            # ── TGTG per produktionsdag (D+1 offset) ─────────────────────────
+            # Produktionsdag D → TGTG afhentes af kunder dagen efter (D+1)
+            # Eksempel: mandag rester listes aften → tirsdag morgen afhentes → tgtg_dagssalg.dato = tirsdag
+            # Derfor: for at finde mandags TGTG, slår vi op på tirsdagens salg
+            tgtg_salgs_datoer = [(d + timedelta(days=1)).isoformat() for d in datoer]
+            ph_tgtg = ','.join('?' * len(tgtg_salgs_datoer))
             tgtg_rows = conn.execute(f"""
                 SELECT ds.dato,
                        SUM(ds.antal) AS poser,
                        SUM(ds.antal * COALESCE(tp.enheder_per_pose, 1)) AS stk
                 FROM tgtg_dagssalg ds
                 LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
-                WHERE ds.dato IN ({placeholders})
+                WHERE ds.dato IN ({ph_tgtg})
                 GROUP BY ds.dato
-            """, tgtg_datoer).fetchall()
-            # Map: produktionsdato → {poser, stk}
-            tgtg_map  = {}  # stk (til spildberegning)
-            tgtg_poser_map = {}  # antal poser (til visning)
+            """, tgtg_salgs_datoer).fetchall()
+            # Map: produktionsdato → {poser, stk}  (salgsdag - 1 dag = produktionsdag)
+            tgtg_map  = {}
+            tgtg_poser_map = {}
             for r in tgtg_rows:
                 prod_dato = (_date.fromisoformat(r['dato']) - timedelta(days=1)).isoformat()
                 tgtg_map[prod_dato]       = int(r['stk']   or 0)
@@ -2299,6 +2523,34 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                 'varer':     kage_varer,
             }
 
+            # ── Registrerede returneringer per dag ────────────────────────────
+            retur_reg_dag_rows = conn.execute("""
+                SELECT registreret_dato,
+                       SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
+                       SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener,
+                       SUM(antal) AS total
+                FROM retur_detaljer
+                WHERE uge = ? AND aar = ?
+                GROUP BY registreret_dato
+            """, (uge, aar)).fetchall()
+            # Map: dato → {boller, wiener, total}
+            retur_dag_map = {
+                r['registreret_dato']: {
+                    'boller': int(r['boller'] or 0),
+                    'wiener': int(r['wiener'] or 0),
+                    'total':  int(r['total']  or 0),
+                }
+                for r in retur_reg_dag_rows
+            }
+            retur_registreret_total = sum(v['total'] for v in retur_dag_map.values())
+            retur_boller_reg = sum(v['boller'] for v in retur_dag_map.values())
+            retur_wiener_reg = sum(v['wiener'] for v in retur_dag_map.values())
+            retur_registreret = [dict(r) for r in conn.execute("""
+                SELECT produkt, SUM(antal) AS antal, kategori
+                FROM retur_detaljer WHERE uge=? AND aar=?
+                GROUP BY produkt, kategori ORDER BY antal DESC
+            """, (uge, aar)).fetchall()]
+
             # ── Historiske snit: seneste 4 uger per ugedag ────────────────────
             # Beregn de 4 foregående uger (ekskl. indeværende)
             hist_bestil: Dict[str, list] = {d: [] for d in dag_navne}
@@ -2389,15 +2641,20 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         kbmo        = kbmo_map.get(dato_str, 0)
         retur_mulig = retur_per_dag.get(dag, 0)
         tgtg_poser_dag = tgtg_poser_map.get(dato_str, 0)
+        retur_dag  = retur_dag_map.get(dato_str, {})
 
-        # Rester = hvad der er tilovers ved lukketid inden TGTG sælger næste dag
-        # KW tælles ikke fra — wienerbrød er allerede i kassesalg
+        # Rester = hvad der er tilovers ved lukketid
         rester = max(0, bestilt - kassesalg - kbmo) if bestilt > 0 else 0
 
         effektivt   = kassesalg + tgtg + kbmo
-        # Retur kan højst være det der faktisk er til overs efter salg
-        retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
-        svind       = max(0, bestilt - effektivt - retur_mulig) if bestilt > 0 else None
+        # Brug faktisk registreret retur hvis tilgængeligt, ellers estimat
+        retur_faktisk = retur_dag.get('total', 0)
+        if retur_faktisk > 0:
+            retur_anvendt = retur_faktisk
+        else:
+            retur_mulig = min(retur_mulig, max(0, bestilt - effektivt)) if bestilt > 0 else 0
+            retur_anvendt = retur_mulig
+        svind       = max(0, bestilt - effektivt - retur_anvendt) if bestilt > 0 else None
         svind_pct   = round(svind / bestilt * 100, 1) if (svind is not None and bestilt > 0) else None
         rester_pct  = round(rester / bestilt * 100, 1) if bestilt > 0 else None
 
@@ -2432,6 +2689,9 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'tgtg':             tgtg,
             'tgtg_poser':       tgtg_poser_dag,
             'retur_mulig':      retur_mulig,
+            'retur_reg_boller': retur_dag.get('boller', 0),
+            'retur_reg_wiener': retur_dag.get('wiener', 0),
+            'retur_reg_total':  retur_dag.get('total', 0),
             'effektivt':        effektivt,
             'svind':            svind,
             'svind_pct':        svind_pct,
@@ -2439,6 +2699,10 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'avg_bestilt_4u':   avg_bestilt,
             'avg_svind_pct_4u': avg_svind_pct,
         })
+
+    # Brug faktisk registreret retur i total-spild hvis tilgængeligt
+    if retur_registreret_total > 0:
+        total_svind = max(0, total_bestilt - total_kassesalg - total_tgtg - total_kbmo - retur_registreret_total)
 
     total_svind_pct  = round(total_svind  / total_bestilt * 100, 1) if total_bestilt > 0 else None
     total_rester_pct = round(total_rester / total_bestilt * 100, 1) if total_bestilt > 0 else None
@@ -2514,10 +2778,14 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         'total_kw':         total_kw,
         'total_kbmo':       total_kbmo,
         'total_effektivt':  total_effektivt,
-        'total_retur':      total_retur,
-        'total_svind':      total_svind,
-        'total_svind_pct':  total_svind_pct,
-        'anbefalinger':     anbefalinger,
+        'total_retur':              total_retur,
+        'retur_registreret':        retur_registreret,
+        'retur_registreret_total':  retur_registreret_total,
+        'retur_boller_reg':         retur_boller_reg,
+        'retur_wiener_reg':         retur_wiener_reg,
+        'total_svind':              total_svind,
+        'total_svind_pct':          total_svind_pct,
+        'anbefalinger':             anbefalinger,
         'prev_uge':         prev_uge,
         'prev_aar':         prev_aar,
         'next_uge':         next_uge,
@@ -2708,42 +2976,29 @@ def _events_for_aar(aar: int) -> Dict:
             "dag_fak": {"man":1.25,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.0,"loe":1.0,"son":1.0},
         }
 
-    # ── Grundlovsdag (5. juni — oftest fredag) ───────────────────────────
+    # ── Grundlovsdag + Fars dag (5. juni — i Danmark fejres Fars dag på Grundlovsdag) ──
     grundlov = _date(aar, 6, 5)
     gw, gy = _yw(grundlov)
+    # Grundlovsdag er typisk en fredag — stærk dag. Fars dag løfter lørdagen yderligere.
+    dag_fak_gf = {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.30,"son":1.10}
     if (gw, gy) not in ev:
         ev[(gw, gy)] = {
-            "factor": 1.25,
-            "navn": f"Grundlovsdag ({_dname(grundlov)}. jun.)",
-            "note": "Fredag fridag — årets bedste bagværksdag",
-            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.60,"loe":1.20,"son":1.0},
+            "factor": 1.30,
+            "navn": f"Grundlovsdag + Fars dag (5. jun.)",
+            "note": "Fredag fridag + Fars dag — ekstra kage og brød fredag og lørdag",
+            "dag_fak": dag_fak_gf,
         }
     else:
         existing = dict(ev[(gw, gy)])
         existing["dag_fak"] = dict(existing["dag_fak"])
-        existing["dag_fak"]["fre"] = max(existing["dag_fak"].get("fre", 1.0), 1.50)
-        existing["factor"] = max(existing["factor"], 1.15)
-        existing["navn"] = existing["navn"] + " + Grundlovsdag"
-        ev[(gw, gy)] = existing
-
-    # ── Fars dag (anden søndag i juni — dansk tradition) ─────────────────
-    fars = _anden_soendag_i_maaned(aar, 6)
-    fw, fy = _yw(fars)
-    if (fw, fy) not in ev:
-        ev[(fw, fy)] = {
-            "factor": 1.10,
-            "navn": f"Fars dag ({_dname(fars)}. jun.)",
-            "note": "Ekstra søndag — kage og brød",
-            "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.05,"loe":1.10,"son":1.30},
-        }
-    else:
-        existing = dict(ev[(fw, fy)])
-        existing["dag_fak"] = dict(existing["dag_fak"])
-        existing["dag_fak"]["son"] = max(existing["dag_fak"].get("son", 1.0), 1.25)
-        existing["factor"] = max(existing["factor"], 1.10)
-        if "Fars dag" not in existing.get("navn", ""):
+        existing["dag_fak"]["fre"] = max(existing["dag_fak"].get("fre", 1.0), 1.60)
+        existing["dag_fak"]["loe"] = max(existing["dag_fak"].get("loe", 1.0), 1.30)
+        existing["factor"] = max(existing["factor"], 1.25)
+        if "Grundlovsdag" not in existing.get("navn", ""):
+            existing["navn"] = existing["navn"] + " + Grundlovsdag + Fars dag"
+        elif "Fars dag" not in existing.get("navn", ""):
             existing["navn"] = existing["navn"] + " + Fars dag"
-        ev[(fw, fy)] = existing
+        ev[(gw, gy)] = existing
 
     # ── Juleugen (uge med juledag 25. dec.) ─────────────────────────────
     juledag = _date(aar, 12, 25)
@@ -3272,6 +3527,13 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         if not basis_rows:
             return {"error": "Ingen ugebestillinger indlæst endnu"}
 
+        # Samme uge sidste år (til reference i tabellen)
+        sidst_aar_rows = conn.execute("""
+            SELECT varenummer, total_antal, man, tir, ons, tor, fre, loe, son
+            FROM ugebestillinger WHERE uge=? AND aar=?
+        """, (maal_uge, maal_aar - 1)).fetchall()
+        sidst_aar_map = {r["varenummer"]: dict(r) for r in sidst_aar_rows}
+
         # Primær basis: seneste uge (til produkt-liste og rækkefølge)
         basis_uge = basis_rows[0]["uge"]
         basis_aar = basis_rows[0]["aar"]
@@ -3408,6 +3670,10 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         total_anb   = sum(anb_dag[d]   for d in DAGE)
         pris = float(r["pris_ex_moms"] or 0)
 
+        # Samme uge sidste år for dette produkt
+        sa = sidst_aar_map.get(vn, {})
+        sidst_aar_total = int(sa.get("total_antal") or 0) if sa else None
+
         produkter.append({
             "varenummer":      vn,
             "varenavn":        r["varenavn"],
@@ -3420,6 +3686,8 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             "total_basis":     int(total_basis),
             "total_anbefalet": total_anb,
             "total_pris":      round(total_anb * pris, 2),
+            "sidst_aar":       sidst_aar_total,
+            "sidst_aar_aar":   maal_aar - 1,
         })
 
     total_stk = sum(p["total_anbefalet"] for p in produkter)
@@ -3579,7 +3847,9 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
         dag = first
         while dag <= last:
             mandag = dag - _td(days=dag.weekday())  # mandag i ugen
-            if first <= mandag <= last:
+            sondag = mandag + _td(days=6)  # søndag i ugen
+            # Inkluder uge hvis nogen dag fra ugen ligger i denne måned
+            if not (sondag < first or mandag > last):
                 uger_i_maaned.add((dag.isocalendar()[0], dag.isocalendar()[1]))
             dag += _td(days=1)
 
@@ -3599,23 +3869,60 @@ def hent_vf_detaljer(aar: int, maaned: int) -> Dict:
             """, (w, y)).fetchone()
             if not row or (row["faktura"] or 0) <= 0:
                 continue
+
             fakt_netto = round((row["faktura"] or 0) - (row["retur_ialt"] or 0), 2)
             mon_dato = _date.fromisocalendar(y, w, 1)
-            # Beregn andel der falder i denne måned via fordelingsnøglen
+
+            # Hent faktisk omsætning og VF per dag fra transaktioner
+            # Bruges til at fordele ugens faktura efter salgsfordeling
+            # ISO-uge: beregn dato-interval for ugen (mandag-søndag)
+            mandag_dato = _date.fromisocalendar(y, w, 1)
+            sondag_dato = mandag_dato + _td(days=6)
+
+            dag_data = conn.execute("""
+                SELECT dato,
+                       ROUND(COALESCE(SUM(omsætning), 0), 2) AS omsat_inkl_dag,
+                       ROUND(COALESCE(SUM(omsætning)/1.25, 0), 2) AS omsat_ex_dag,
+                       ROUND(COALESCE(SUM(CASE WHEN CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                           SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                           FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0'
+                       ) THEN vf_korrekt ELSE 0 END), 0), 2) AS vf_dag
+                FROM v_transaktioner
+                WHERE dato >= ? AND dato <= ?
+                GROUP BY dato ORDER BY dato
+            """, (mandag_dato.isoformat(), sondag_dato.isoformat())).fetchall()
+
+            # Byg map: dato → (omsætning inkl, omsætning ex, vf)
+            dag_map = {r["dato"]: (r["omsat_inkl_dag"], r["omsat_ex_dag"], r["vf_dag"]) for r in dag_data}
+
+            # Fordel faktura og VF efter FAKTISK SALG hver dag
             netto_maaned = 0.0
-            vaegt_maaned = 0.0
+            vf_maaned = 0.0
+            omsat_total = sum(v[1] for v in dag_map.values())  # ex-moms — hele ugen
+            omsat_total_inkl = sum(v[0] for v in dag_map.values())  # inkl-moms — hele ugen
+
             for i in range(7):
                 dag = mon_dato + _td(days=i)
-                if dag.month == maaned and dag.year == aar:
-                    netto_maaned += fakt_netto * nøgle_vf[i]
-                    vaegt_maaned += nøgle_vf[i]
-            if netto_maaned > 0:
-                bestilt_andel = round((row["bestilt_kr_uge"] or 0) * vaegt_maaned, 2)
+                dag_str = dag.isoformat()
+                omsat_inkl_dag, omsat_ex_dag, vf_dag = dag_map.get(dag_str, (0, 0, 0))
+
+                if dag.month == maaned and dag.year == aar and omsat_total > 0:
+                    # Fordel efter andel af samlet uge-salg
+                    andel = omsat_ex_dag / omsat_total
+                    netto_maaned += fakt_netto * andel
+                    vf_maaned += vf_dag  # VF allerede fordelt per dag
+
+            if netto_maaned > 0 or vf_maaned > 0:
+                bestilt_andel = round((row["bestilt_kr_uge"] or 0) / 7 * sum(1 for i in range(7)
+                    if (mon_dato + _td(days=i)).month == maaned and (mon_dato + _td(days=i)).year == aar), 2)
                 bager_rækker.append({
                     "uge": w, "aar": y,
+                    "omsat_inkl_uge": round(omsat_total_inkl, 2),
+                    "omsat_ex_uge":   round(omsat_total, 2),
                     "faktura":    round(row["faktura"] or 0, 2),
                     "retur_ialt": round(row["retur_ialt"] or 0, 2),
                     "netto":      round(netto_maaned, 2),
+                    "vf_maaned":  round(vf_maaned, 2),
                     "bestilt_kr": bestilt_andel,
                 })
 
@@ -4116,7 +4423,9 @@ def hent_sellthrough_analyse(uger: int = 10) -> dict:
 
 # ── BESTILLINGSBEREGNER AI-KONTEKST ──────────────────────────────────────────
 
-def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dict:
+def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
+                               dag_totaler: dict = None, produkter: list = None,
+                               vejr: dict = None) -> dict:
     """Genererer AI-hjælpetekst til bestillingsberegneren for den kommende uge."""
     from datetime import date as _d, timedelta as _td
     import anthropic as _ant
@@ -4166,10 +4475,12 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
             ) GROUP BY yw ORDER BY yw DESC LIMIT 4
         """, (mon.isoformat(), prev_sun.isoformat())).fetchall()
 
-        # TGTG fra tgtg_dagssalg tabellen (mere præcis)
+        # TGTG fra tgtg_dagssalg (D+1 offset: poser afhentes dagen efter produktion)
+        # Forrige uges produktioner → TGTG solgt man-søn = tirsdag (uge start+1) til mandag (næste uge)
         tgtg_dag = conn.execute("""
             SELECT SUM(antal) AS poser, SUM(kreditering) AS kr
-            FROM tgtg_dagssalg WHERE dato>=? AND dato<=?
+            FROM tgtg_dagssalg
+            WHERE dato >= date(?, '+1 day') AND dato <= date(?, '+1 day')
         """, (prev_mon.isoformat(), prev_sun.isoformat())).fetchone()
 
         # Retur forrige uge pr. produkt
@@ -4195,6 +4506,75 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
             SELECT varenavn, total_antal FROM ugebestillinger
             WHERE uge=? AND aar=? ORDER BY total_antal DESC LIMIT 12
         """, (prev_uge, prev_aar)).fetchall()
+
+        # Dag×time heatmap — trafik-profil over seneste 8 uger
+        _DAG_NAVNE_KORT = {0:'søn',1:'man',2:'tir',3:'ons',4:'tor',5:'fre',6:'lør'}
+        heatmap_rows = conn.execute("""
+            SELECT CAST(strftime('%w', dato) AS INTEGER) AS ugedag,
+                   time_start AS time,
+                   ROUND(AVG(dag_time_oms),0) AS snit_oms
+            FROM (
+                SELECT dato, time_start,
+                       SUM(omsætning) AS dag_time_oms
+                FROM transaktioner
+                WHERE dato >= date(?, '-56 days') AND dato < ?
+                  AND time_start BETWEEN 6 AND 19
+                GROUP BY dato, time_start
+            )
+            GROUP BY ugedag, time_start
+            ORDER BY ugedag, time_start
+        """, (mon.isoformat(), mon.isoformat())).fetchall()
+
+        # Byg komprimeret profil: top-tider per dag + relativt styrke-indeks
+        from collections import defaultdict
+        dag_time_map = defaultdict(dict)
+        for r in heatmap_rows:
+            dag_time_map[r['ugedag']][r['time']] = float(r['snit_oms'] or 0)
+
+        dag_profil_str = ""
+        if dag_time_map:
+            dag_linjer = []
+            # Beregn total per dag (0=søn..6=lør → konverter til man=1..søn=7)
+            dag_totaler_hm = {}
+            for wd in range(7):
+                dag_totaler_hm[wd] = sum(dag_time_map[wd].values())
+            max_dag = max(dag_totaler_hm.values()) if dag_totaler_hm else 1
+            DAG_ISO = [1,2,3,4,5,6,0]  # man,tir,ons,tor,fre,lør,søn i ISO ordre
+            DAG_NAVN_ISO = ['Man','Tir','Ons','Tor','Fre','Lør','Søn']
+            for iso_i, (wd, dn) in enumerate(zip(DAG_ISO, DAG_NAVN_ISO)):
+                if not dag_time_map[wd]:
+                    continue
+                dag_tot = dag_totaler_hm[wd]
+                styrke = round(dag_tot / max_dag * 100)
+                bar = '█' * (styrke // 10) + '░' * (10 - styrke // 10)
+                # Top 3 timer
+                top_timer = sorted(dag_time_map[wd].items(), key=lambda x: -x[1])[:3]
+                top_str = ', '.join([f"kl.{t:02d}" for t,_ in top_timer])
+                dag_linjer.append(f"  {dn}: {bar} {styrke:3d}%  (top: {top_str})")
+            dag_profil_str = '\n'.join(dag_linjer)
+
+        # Sidst-solgt tidspunkt per vare (seneste 4 uger) — indikator for udsolgt vs. overskud
+        # Lukketid er typisk kl. 18. Sidst solgt kl. 11 = sandsynligvis udsolgt tidligt.
+        sidst_solgt_rows = conn.execute("""
+            SELECT varenavn,
+                   ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
+                   COUNT(DISTINCT dato) AS dage_med_salg
+            FROM (
+                SELECT dato, varenavn, MAX(time_start) AS sidst_time
+                FROM transaktioner
+                WHERE dato >= date(?, '-28 days') AND dato < ?
+                  AND time_start BETWEEN 6 AND 19
+                  AND antal > 0
+                GROUP BY dato, varenavn
+            )
+            GROUP BY varenavn
+            HAVING dage_med_salg >= 3
+            ORDER BY snit_sidst_time ASC
+        """, (mon.isoformat(), mon.isoformat())).fetchall()
+        # Butik lukker kl. 20 — ubemandet.
+        # Sidst solgt < 14 = udsolgt tidligt (tabt salg 14-20). > 18 = overskud tæt på lukketid.
+        udsolgt_tidligt = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] < 14]
+        overskud_sent   = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] > 18]
 
         # Trend 8 uger
         trend_rows = conn.execute("""
@@ -4238,75 +4618,249 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str) -> dic
 
     evt_info = ''
     if evt:
-        dag_fak = evt.get('dag_fak', {})
-        dag_str = ', '.join([f"{d}: ×{v}" for d,v in dag_fak.items() if v != 1.0])
-        evt_info = f"{evt['navn']} — faktor {evt['factor']} ({evt.get('note','')}). Dag-faktorer: {dag_str}"
+        dag_fak  = evt.get('dag_fak', {})
+        # Beregn faktiske datoer for ugedagene så AI kan nævne dem eksplicit
+        _DAG_KEYS2 = ['man','tir','ons','tor','fre','loe','son']
+        _DAG_DA2   = ['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag']
+        dag_str_list = []
+        for dk, dn in zip(_DAG_KEYS2, _DAG_DA2):
+            fak = dag_fak.get(dk, 1.0)
+            if fak != 1.0:
+                dag_dato_str = (mon + _td(days=_DAG_KEYS2.index(dk))).strftime('%-d/%-m')
+                dag_str_list.append(f"{dn} {dag_dato_str}: ×{fak}")
+        dag_str  = ', '.join(dag_str_list)
+        evt_info = f"{evt['navn']} — faktor ×{evt['factor']} ({evt.get('note','')}).\nDag-faktorer med dato: {dag_str}"
     else:
         evt_info = 'Ingen kendte begivenheder'
 
     evt_prev_info = f" (BEMÆRK: forrige uge havde {evt_prev['navn']} — tallene kan være atypiske)" if evt_prev else ''
 
-    prompt = f"""Du er bestillingsrådgiver for Organic Market Greve — specialbutik med eget bageri i Greve, Danmark.
+    # Byg dagsmængde-sektion
+    DAG_NAVNE_DA = ["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"]
+    DAG_KEYS     = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
 
-═══ FORRETNINGSLOGIK ═══
-To LIGE STORE risici — begge er direkte tab:
-① FOR MEGET på svage dage → TGTG/retur → tab af kostpris + arbejdstid
-② FOR LIDT på stærke dage → tomme hylder → tabt salg og skuffede kunder
+    # Filtrer kager fra - konstant leverance, intet spild, irrelevant for AI-vurdering
+    _KAGE_KAT = {"kage", "kager"}
+    produkter_uden_kage = [
+        p for p in (produkter or [])
+        if p.get("kategori", "").lower() not in _KAGE_KAT
+    ]
 
-Fokus er DAG-PRÆCISION. Lørdage/fredage er typisk stærke. Mandage/tirsdage svage.
-Begivenheder kan vende mønstret. TGTG-mål: under 800 kr/uge.
+    # Dag-totaler uden kager (genberegn fra produktlisten)
+    dag_maengde_str = ""
+    if dag_totaler and produkter_uden_kage:
+        # Træk kage-mængder fra dag-totalerne
+        kage_dag: Dict = {dk: 0 for dk in DAG_KEYS}
+        for p in (produkter or []):
+            if p.get("kategori", "").lower() in _KAGE_KAT:
+                for dk in DAG_KEYS:
+                    kage_dag[dk] += p.get(dk, 0)
+        linjer = []
+        for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+            total = dag_totaler.get(dn, dag_totaler.get(dk, 0))
+            total_uden = total - kage_dag.get(dk, 0)
+            if total_uden > 0:
+                linjer.append(f"  {dn}: {total_uden} stk")
+        dag_maengde_str = "\n".join(linjer) if linjer else "  (ingen data)"
+    elif dag_totaler:
+        linjer = []
+        for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+            total = dag_totaler.get(dn, dag_totaler.get(dk, 0))
+            if total:
+                linjer.append(f"  {dn}: {total} stk")
+        dag_maengde_str = "\n".join(linjer) if linjer else "  (ingen data)"
 
-⚠ DATAKVALITET — husk disse forbehold:
-• Shopbox-data er manuelt tastet af personale — varenavn og antal kan indeholde fejl.
-  Sell-through kan UNDERVURDERE reelt salg pga. forkert registrering.
-• MobilePay-omsætning er IKKE varekoblet — en del af bagværkssalget (typisk kontant/MobilePay
-  ved bagerbordet) fremgår ikke i produkt-tallene. Reelt salg er højere end Shopbox viser.
-• Konsekvens: vær forsigtig med at anbefale store reduktioner baseret på lav sell-through alene.
-  Kombiner altid med TGTG-data og retur-data som er mere præcise.
+    produkt_str = ""
+    if produkter_uden_kage:
+        linjer = []
+        for p in produkter_uden_kage[:20]:
+            navn = p.get("varenavn", p.get("navn", "?"))
+            kat  = p.get("kategori", "")
+            dage = []
+            for dk, dn in zip(DAG_KEYS, DAG_NAVNE_DA):
+                v = p.get(dk, p.get("dag_val", {}).get(dk, 0))
+                if v: dage.append(f"{dn}:{v}")
+            total = p.get("total", sum(p.get(dk, 0) for dk in DAG_KEYS))
+            linjer.append(f"  {navn} ({kat}): {' '.join(dage)} = {total} stk")
+        produkt_str = "\n".join(linjer)
+
+    vejr_str = ""
+    if vejr and vejr.get("forecast"):
+        fc = vejr["forecast"]
+        linjer = []
+        for i in range(7):
+            dag = mon + _td(days=i)
+            ds  = dag.isoformat()
+            dn  = DAG_NAVNE_DA[i]
+            dato_kort = dag.strftime('%-d/%-m')
+            v   = fc.get(ds)
+            if v:
+                j    = v.get("juster", {})
+                prec = v.get('prec', 0)
+                tmax = v.get('tmax', '?')
+                ikon = v.get('ikon', '')
+                linje = f"  {dn} ({dato_kort}): {ikon} {tmax}°C, nedbør {prec}mm"
+                if j.get("farve") == "red":
+                    linje += f"  ← DÅRLIGT VEJR: {j.get('label','')} (reducer bestilling)"
+                elif j.get("farve") == "orange":
+                    linje += f"  ← REGN: {j.get('label','')} (overvej reduktion)"
+                elif j.get("farve") == "green":
+                    linje += f"  ← GODT VEJR: {j.get('label','')} (overvej ekstra)"
+                else:
+                    linje += "  (normalt)"
+                linjer.append(linje)
+            else:
+                linjer.append(f"  {dn} ({dato_kort}): ingen vejrdata")
+        # Tilføj eksplicit opsummering så AI ikke forveksler dage
+        regn_dage = [l.split(':')[0].strip() for l in linjer if '← REGN' in l or '← DÅRLIGT VEJR' in l]
+        godt_dage = [l.split(':')[0].strip() for l in linjer if '← GODT VEJR' in l]
+        opsummering = "\n  VEJR-OPSUMMERING:"
+        if regn_dage:
+            opsummering += f"\n  • REGN/DÅRLIGT VEJR (reducer bestilling): {', '.join(regn_dage)}"
+        if godt_dage:
+            opsummering += f"\n  • GODT VEJR (overvej ekstra): {', '.join(godt_dage)}"
+        if not regn_dage and not godt_dage:
+            opsummering += "\n  • Normalt vejr hele ugen"
+        vejr_str = "\n".join(linjer) + opsummering if linjer else "  Ingen vejrdata"
+    else:
+        vejr_str = "  Ikke tilgængelig — vejrdata ikke indlæst"
+
+    # Sæsonindeks fra evt
+    si_info = ""
+    if evt:
+        si_info = f"Sæsonindeks: ×{evt.get('factor', 1.0):.2f}"
+
+    # Find ugedag for torsdag i mål-ugen (bestillingsdeadline er FORRIGE torsdag)
+    tor_deadline = (mon - _td(days=4)).strftime('%-d. %B')  # torsdagen ugen før
+
+    prompt = f"""Du er indkøbsrådgiver for Organic Market Greve — en franchise-butik i Greve, Danmark.
+
+═══ FORRETNINGSMODEL ═══
+Organic Market er FRANCHISE-TAGER og driver IKKE eget bageri.
+Bagværk bestilles hos franchise-bageriet og leveres HVER MORGEN KL. 05:00.
+
+BUTIK:
+• Organic Market Greve er UBEMANDET og SELVBETJENING
+• Åbningstid: kl. 06:00 – 20:00 (åbner/lukker automatisk)
+• Ingen personale → ingen manuel justering eller fjernelse af varer i åbningstiden
+• Friske produkter leveres kl. 05:00 og skal holde fra 06:00 til 20:00
+
+BESTILLINGSPROCES:
+• Deadline: senest TORSDAG for HELE den efterfølgende uge (man–søn)
+• Du angiver mængde per dag i bestillingen
+• Levering sker dagligt kl. 05:00 baseret på din fordeling
+• Du kan IKKE ændre bestillingen midt i ugen
+
+ØKONOMI:
+• For meget → noget sælges via TGTG (Too Good To Go) som pose → delvis dækning
+• Overskud sendes retur til bageriet → krediteres på næste faktura (boller 10%, wienerbrød 13,5%)
+• For lidt → tomme hylder → tabt salg + skuffede kunder → direkte tab
+• Kager: leveres fast 2×/uge i aftalt mængde — analyser dem ikke medmindre begivenhed tilsiger extra.
+
+MÅL: Bestil præcis nok per dag — minimér både tomme hylder OG overskud.
+TGTG-mål: under 800 kr/uge (= acceptabelt overskudsniveau).
+
+PRODUKTREGLER — VIGTIGT FOR BESTILLINGEN:
+┌─────────────────────────────────────────────────────────────────┐
+│ RUGBRØD         → kan stå til næste dag. Lav spildrisiko.       │
+│                   Kan bestilles med lidt margin.                 │
+│                                                                  │
+│ BOLLER          → skal sælges samme dag. Retur til bageriet     │
+│                   (10% krediteres) ELLER TGTG.                  │
+│                   OBS: I ender TYPISK med for mange boller.     │
+│                   Vær konservativ, særligt svage dage.          │
+│                                                                  │
+│ BRØD (surdej,   → KAN IKKE returneres til bageriet.             │
+│  flute, focac.) → Kun TGTG eller kasseres = fuldt tab.          │
+│                   Vær EKSTRA konservativ. Hellere lidt for lidt. │
+│                   OBS: I ender TYPISK med for meget brød.       │
+│                                                                  │
+│ GROV TEBIRKES   → KAN IKKE returneres til bageriet.             │
+│ FRØSNAPPER      → Kun TGTG eller kasseres = fuldt tab.          │
+│ HØJ KANELSNEGL  → KAN IKKE returneres (med creme).              │
+│ ROSINBOLLER     → KAN IKKE returneres.                          │
+│                   Alle fire: bestil kun hvad du er sikker på.   │
+│                                                                  │
+│ WIENERBRØD      → Retur til bageriet (13,5% krediteres)         │
+│  (øvrige)         ELLER TGTG. Normal spildhåndtering.           │
+└─────────────────────────────────────────────────────────────────┘
+
+⚠ DATAKVALITET:
+• Shopbox undervurderer reelt salg (MobilePay ikke varekoblet — typisk bagværk ved bordet).
+• TGTG og retur er de mest præcise spild-indikatorer.
+• UGEBESTILLINGER tastes MANUELT af personale — kan indeholde tastefejl.
+  Hvis en dags bestilling ser urealistisk ud (fx 200 boller en mandag eller 0 fredag),
+  er det sandsynligvis en tastefejl — ikke et reelt mønster. Brug historisk snit til korrektion.
 ═══════════════════════
 
 ─── BESTILLINGSUGE {maal_uge}/{maal_aar}: {mon.strftime('%-d. %B')} – {sun.strftime('%-d. %B %Y')} ───
+Bestillingsdeadline: torsdag {tor_deadline} (bestil for hele denne uge)
+{si_info}
 
+BEGIVENHED: {evt_info}
+
+VEJR UGE {maal_uge} (alle 7 dage du bestiller til):
+{vejr_str}
+
+─── FORESLÅEDE DAGSMÆNGDER (systemets beregning til din torsdags-bestilling) ───
+Dagstotaler (excl. kager):
+{dag_maengde_str if dag_maengde_str else '  (ikke tilgængelig — klik Opdater analyse efter tabellen er indlæst)'}
+
+Pr. produkt:
+{produkt_str if produkt_str else '  (ikke tilgængelig)'}
+
+─── HISTORIK (basis for din vurdering) ───
 FORRIGE UGE ({prev_uge}/{prev_aar}, {prev_mon.strftime('%-d. %b')}–{prev_sun.strftime('%-d. %b')}){evt_prev_info}:
-{'⚠ IGANGVÆRENDE UGE — kun ' + str(prev_dage) + ' dage med data (til og med ' + (prev_seneste_dagsnavn or '?') + '). Ugen er IKKE AFSLUTTET. Sammenlign KUN dag-for-dag, IKKE mod fuld uge fra andre perioder.' if prev_er_igangvaerende else f'Afsluttet uge — {prev_dage} dage med salgsdata.'}
-  Omsætning så langt: {prev_oms:,} kr ({prev_kunder} kunder){' — ⚠ DELVIS UGE, ikke sammenlignelig med fuld uge' if prev_er_igangvaerende else ''}
-  Samme periode 4 uger siden ({prev4_mon.strftime('%-d. %b')}–{(_d.fromisoformat(prev_salg['dato']) if prev_salg and prev_salg.get('dato') else prev_sun).strftime('%-d. %b') if not prev_er_igangvaerende else (prev4_mon + _td(days=prev_dage-1)).strftime('%-d. %b')}): {oms_4u_ago:,} kr
-  Bestilling: {best_str}
+{'⚠ IGANGVÆRENDE — kun ' + str(prev_dage) + ' dage (til ' + (prev_seneste_dagsnavn or '?') + ')' if prev_er_igangvaerende else f'{prev_dage} dage med data'}
+  Omsætning: {prev_oms:,} kr · Bestilling: {best_str}
 
-RETUR FORRIGE UGE:
-  Boller: {retur_b} stk · Wienerbrød: {retur_w} stk (pr. vare: {retur_varer_str})
-  Snit seneste 4 uger: {snit_b} boller + {snit_w} wienerbrød
+RETUR TIL BAGERIET FORRIGE UGE: {retur_b} boller + {retur_w} wienerbrød ({retur_varer_str})
+Snit 4 uger: {snit_b} boller + {snit_w} wienerbrød returneret
 
-TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (snit 4 uger: {tgtg_snit:,} kr · mål: <800 kr)
+TGTG FORRIGE UGE: {tgtg_poser} poser · {tgtg_kr:,} kr (4-ugers snit: {tgtg_snit:,} kr · mål: <800 kr)
 
-TREND: {trend_str}
+SALGSTREND: {trend_str}
 
-BEGIVENHED UGE {maal_uge}: {evt_info}
+─── TRAFIK-PROFIL: DAG × KLOKKETIME (seneste 8 uger, butik 06-20) ───
+{dag_profil_str if dag_profil_str else '  (ingen data)'}
 
-─── VEJLEDNING (5 afsnit, ren tekst) ───
+─── SALGSMØNSTER: HVORNÅR STOPPER VI MED AT SÆLGE? (seneste 4 uger) ───
+{'SÆLGER UD TIDLIGT — tomme hylder i timevis (sidst solgt FØR kl. 14, butik åben til 20):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 → {20-int(r["snit_sidst_time"])} timers tomme hylder ({r["dage_med_salg"]} dage)' for r in udsolgt_tidligt[:8]) if udsolgt_tidligt else '  Ingen varer der konsekvent sælger ud for tidligt'}
 
-1. UGE — hvilken uge, datoer, overordnet situation
+{'TYPISK OVERSKUD VED LUKKETID (sidst solgt EFTER kl. 18 — varer tæt på lukketid kl. 20):' + chr(10) + chr(10).join(f'  {r["varenavn"]}: sidst solgt kl. {int(r["snit_sidst_time"]):02d}:00 ({r["dage_med_salg"]} dage)' for r in overskud_sent[:8]) if overskud_sent else '  Ingen varer med konsekvent overskud ved lukketid'}
 
-2. FORRIGE UGE — {'⚠ IKKE AFSLUTTET (' + str(prev_dage) + ' dage til og med ' + (prev_seneste_dagsnavn or '?') + '). Skriv KUN om de dage der er data for. Ingen konklusioner om hele ugen. Sammenlign KUN mod tilsvarende dage fra 4 uger siden — ikke mod en fuld uge.' if prev_er_igangvaerende else 'Afsluttet uge — hvad viser tallene?'}{' Begivenhed kan have påvirket.' if evt_prev else ''}
-   Peg på om vi mistede salg (for lidt) eller havde spild (for meget) på specifikke dage.
+─── DIN BESTILLINGSOPGAVE (4 afsnit) ───
+Du skal hjælpe med at beslutte TORSDAGENS bestilling for hele næste uge.
 
-3. BEGIVENHED & DAG-FORDELING — hvilke dage bliver stærke/svage næste uge?
-   Beregn risiko begge veje: hvilke dage risikerer vi tomme hylder vs. spild?
+1. DAGSVURDERING — er de foreslåede dagsmængder rigtige?
+   VIGTIGT: For HVER dag der har vejrjustering (se VEJR-sektionen ovenfor), SKAL du nævne:
+   - Nedbørsmængden (mm)
+   - Den anbefalede % justering
+   - Det konkrete justerede antal stk
+   Skriv ALDRIG "normalt vejr" på en dag der har nedbør >1mm — brug de faktiske vejrtal.
+   Format: "Man {dag_totaler.get('Man', dag_totaler.get('man','?')) if dag_totaler else '?'} stk — [vurdering inkl. vejrtal hvis regn]"
 
-4. TGTG-ANALYSE — {tgtg_kr:,} kr vs. 800 kr mål.
-   Er TGTG pga. for høj bestilling på svage dage, eller forkert dag-fordeling?
-   Hvad konkret skal ned? Hvad må IKKE sænkes (risiko for tabt salg)?
+2. VEJR & BEGIVENHED — hvilke dage i den kommende uge kræver særlig opmærksomhed?
+   Regn reducerer kundeflow. Begivenheder kan løfte markant. Vær specifik.
 
-5. ANBEFALING — specifikke dag-justeringer med tal.
-   Format: "Fredag: +10% wienerbrød (stærk dag, risiko for udsolgt)"
-            "Mandag: -15% boller (svag dag, TGTG-risiko)"
+3. RETUR & TGTG — brug produktreglerne aktivt:
+   • Brød / grov tebirkes / frøsnapper / høj kanelsnegl (creme) / rosinboller: KAN IKKE returneres → overskud = fuldt tab.
+     Hvis disse ender i TGTG konsekvent → reducer bestillingen næste uge.
+   • Boller: retur-mulighed, men 10% kreditering er ikke gratis.
+   • Rugbrød: kan stå til næste dag — lav spildrisiko.
 
-Skriv i du-form. Vær KONKRET — brug tal og dagenavne. Ingen generelle råd."""
+4. BESTILLINGSANBEFALING — hvad justeres inden torsdagens bestilling?
+   Prioritér produkter UDEN retur-mulighed højest (brød, grov tebirkes, frøsnapper).
+   Format: "Fre brød: -3 stk (ingen retur — ender som fuldt tab ved TGTG)"
+            "Man boller: -8 stk (svag dag, historisk for mange)"
+            "Lør surdejsboller: +5 stk (stærk dag + godt vejr — risiko for udsolgt)"
+
+Skriv på dansk. Vær KONKRET med tal og dagenavne. Husk: én bestilling, hele ugen. Max 400 ord."""
 
     client = _ant.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=800,
+        model="claude-sonnet-4-6",
+        max_tokens=900,
         messages=[{"role": "user", "content": prompt}]
     )
     tekst = msg.content[0].text.strip()
@@ -4459,10 +5013,13 @@ def hent_management_data(uge: int = None, aar: int = None) -> dict:
 
         # TGTG omkring den valgte uge (+-5 uger kontekst)
         tgtg_uger = conn.execute("""
-            SELECT strftime('%Y-%W', dato) AS yw, MIN(dato) AS fra,
-                   SUM(antal) AS poser, ROUND(SUM(kreditering),0) AS kr
-            FROM tgtg_dagssalg
-            WHERE dato >= ? AND dato <= ?
+            SELECT strftime('%Y-%W', ds.dato) AS yw, MIN(ds.dato) AS fra,
+                   SUM(ds.antal) AS poser,
+                   ROUND(SUM(ds.antal * COALESCE(tp.kreditpris,
+                       CASE WHEN ds.kreditering > 0 THEN ds.kreditering / ds.antal ELSE 0 END, 0)), 0) AS kr
+            FROM tgtg_dagssalg ds
+            LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id OR ds.pose_navn = tp.navn
+            WHERE ds.dato >= ? AND ds.dato <= ?
             GROUP BY yw ORDER BY yw DESC LIMIT 8
         """, (start_context.isoformat(), end_context.isoformat())).fetchall()
 
@@ -4710,7 +5267,7 @@ def generer_management_review(api_key: str, uge: int = None, aar: int = None) ->
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=4000,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -4963,7 +5520,7 @@ Graf-regler:
 
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
-        model="claude-opus-4-5",
+        model="claude-sonnet-4-6",
         max_tokens=1200,
         system=system,
         messages=messages,
@@ -4975,3 +5532,236 @@ Graf-regler:
     raw = raw.strip()
 
     return json.loads(raw)
+
+
+# ── VEJR (Open-Meteo, Greve DK) ───────────────────────────────────────────────
+
+import time as _time_mod
+_vejr_cache: Dict = {"ts": 0, "data": None}
+_VEJR_LAT = 55.5906
+_VEJR_LON = 12.2985
+
+
+def _vejr_ikon(kode: int) -> str:
+    if kode == 0:              return "☀️"
+    if kode in (1, 2):         return "🌤️"
+    if kode == 3:              return "☁️"
+    if kode in (45, 48):       return "🌫️"
+    if kode in (51, 53, 55):   return "🌦️"
+    if kode in (61, 63, 65):   return "🌧️"
+    if kode in (71, 73, 75):   return "🌨️"
+    if kode in (80, 81, 82):   return "🌦️"
+    if kode in (95, 96, 99):   return "⛈️"
+    return "🌡️"
+
+
+def _vejr_justering(kode: int, prec: float, tmax: float) -> Dict:
+    """Beregn justerings-faktor for bageriet baseret på vejr."""
+    faktor = 1.0
+    if prec >= 10:
+        faktor -= 0.20
+    elif prec >= 5:
+        faktor -= 0.12
+    elif prec >= 2:
+        faktor -= 0.06
+    if kode in (95, 96, 99):
+        faktor -= 0.15
+    if tmax < 2:
+        faktor -= 0.05
+    if prec < 1 and kode in (0, 1) and 15 <= tmax <= 25:
+        faktor += 0.05
+    faktor = round(max(0.6, min(1.2, faktor)), 2)
+    if faktor >= 1.03:
+        return {"faktor": faktor, "farve": "green",   "label": f"Godt vejr +{int((faktor-1)*100)}%"}
+    if faktor <= 0.88:
+        return {"faktor": faktor, "farve": "red",     "label": f"Dårligt vejr {int((faktor-1)*100)}%"}
+    if faktor <= 0.95:
+        return {"faktor": faktor, "farve": "orange",  "label": f"Regn {int((faktor-1)*100)}%"}
+    return {"faktor": faktor, "farve": "neutral", "label": "Normalt vejr"}
+
+
+def hent_varekostpris_oversigt() -> List[Dict]:
+    """Alle varer med aktuel kostpris og antal historiske ændringer."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT kp.varenummer, kp.varenavn, kp.kostpris_enhed, kp.gyldig_fra, kp.kilde,
+                   (SELECT COUNT(*) FROM varekostpris h WHERE h.varenummer = kp.varenummer) AS antal_ændringer
+            FROM varekostpris kp
+            WHERE kp.gyldig_til IS NULL
+            ORDER BY kp.varenavn
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_varekostpris_historik(varenummer: str) -> List[Dict]:
+    """Fuld prishistorik for én vare."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT * FROM varekostpris WHERE varenummer=?
+            ORDER BY gyldig_fra DESC
+        """, (varenummer,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def korriger_varekostpris(varenummer: str, kostpris_enhed: float, gyldig_fra: str) -> None:
+    """Manuel korrektion — lukker aktuel post og opretter ny."""
+    with _conn() as conn:
+        aktuel = conn.execute(
+            "SELECT id FROM varekostpris WHERE varenummer=? AND gyldig_til IS NULL",
+            (varenummer,)
+        ).fetchone()
+        if aktuel:
+            from datetime import date as _d, timedelta as _td
+            til = (_d.fromisoformat(gyldig_fra) - _td(days=1)).isoformat()
+            conn.execute("UPDATE varekostpris SET gyldig_til=? WHERE id=?", (til, aktuel["id"]))
+        conn.execute(
+            "INSERT OR REPLACE INTO varekostpris (varenummer, varenavn, kostpris_enhed, gyldig_fra, kilde) "
+            "SELECT varenummer, varenavn, ?, ?, 'manuel' FROM varekostpris WHERE varenummer=? LIMIT 1",
+            (round(kostpris_enhed, 4), gyldig_fra, varenummer)
+        )
+
+
+def hent_gmail_importerede() -> set:
+    with _conn() as conn:
+        rows = conn.execute("SELECT msg_id FROM gmail_importerede").fetchall()
+    return {r["msg_id"] for r in rows}
+
+
+def gem_gmail_importeret(msg_id: str, uge: int, aar: int) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO gmail_importerede (msg_id, uge, aar) VALUES (?,?,?)",
+            (msg_id, uge, aar)
+        )
+
+
+def log_gmail_sync(status: str, besked: str, antal: int = 0) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO gmail_sync_log (status, besked, antal) VALUES (?,?,?)",
+            (status, besked, antal)
+        )
+
+
+def hent_gmail_sync_status() -> Optional[Dict]:
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM gmail_sync_log ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
+    """Beregn gennemsnitlig sidst-solgt tid per vare over de seneste N uger.
+    Butik åbner 06:00, lukker 20:00.
+    < 14:00 = sandsynligvis udsolgt (tomme hylder)
+    > 18:00 = overskud ved lukketid
+    """
+    from datetime import date as _d, timedelta as _td
+    fra = (_d.today() - _td(weeks=uger)).isoformat()
+    _KAGE_EXCL = (
+        "LOWER(t.varenavn) LIKE '%kage%' OR LOWER(t.varenavn) LIKE '%cookie%' "
+        "OR LOWER(t.varenavn) LIKE '%muffin%' OR LOWER(t.varenavn) LIKE '%brownie%' "
+        "OR LOWER(t.varenavn) LIKE '%romkugl%' OR LOWER(t.varenavn) LIKE '%napoleon%' "
+        "OR LOWER(t.varenavn) LIKE '%studenterbr%'"
+    )
+    with _conn() as conn:
+        rows = conn.execute(f"""
+            SELECT t.varenavn,
+                   ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
+                   COUNT(DISTINCT dato)       AS dage_med_salg,
+                   MIN(sidst_time)            AS min_tid,
+                   MAX(sidst_time)            AS max_tid
+            FROM (
+                SELECT t.dato, t.varenavn, MAX(t.time_start) AS sidst_time
+                FROM transaktioner t
+                WHERE t.dato >= ?
+                  AND t.time_start BETWEEN 6 AND 19
+                  AND t.antal > 0
+                  -- Kun bagværk fra ugebestillinger (ekskl. kager)
+                  AND CAST(CAST(t.varenummer AS REAL) AS INTEGER) IN (
+                      SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                      FROM ugebestillinger
+                      WHERE varenummer != '' AND varenummer != '0'
+                        AND NOT ({_KAGE_EXCL.replace('t.varenavn','varenavn')})
+                  )
+                GROUP BY t.dato, t.varenavn
+            ) t
+            GROUP BY t.varenavn
+            HAVING dage_med_salg >= 3
+            ORDER BY snit_sidst_time ASC
+        """, (fra,)).fetchall()
+
+    udsolgt = []
+    overskud = []
+    for r in rows:
+        t = int(r['snit_sidst_time'] or 0)
+        item = {
+            "varenavn":     r['varenavn'],
+            "snit_time":    t,
+            "dage":         int(r['dage_med_salg']),
+            "tomme_timer":  20 - t,
+        }
+        if t < 14:
+            udsolgt.append(item)
+        elif t > 18:
+            overskud.append(item)
+
+    return {
+        "udsolgt_tidligt": sorted(udsolgt,  key=lambda x: x['snit_time']),
+        "overskud_sent":   sorted(overskud, key=lambda x: -x['snit_time']),
+        "periode_uger":    uger,
+    }
+
+
+def hent_vejr_forecast() -> Dict:
+    """Hent 14-dages vejrudsigt for Greve fra Open-Meteo. Cache 3 timer."""
+    import urllib.request as _urlreq
+    import json as _json2
+    from datetime import datetime as _dt
+
+    now = _time_mod.time()
+    if _vejr_cache["data"] and (now - _vejr_cache["ts"]) < 10800:
+        return _vejr_cache["data"]
+
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={_VEJR_LAT}&longitude={_VEJR_LON}"
+        f"&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,weathercode"
+        f"&timezone=Europe%2FCopenhagen"
+        f"&forecast_days=14"
+    )
+    try:
+        with _urlreq.urlopen(url, timeout=6) as resp:
+            raw = _json2.loads(resp.read())
+        daily  = raw.get("daily", {})
+        dates  = daily.get("time", [])
+        tmax   = daily.get("temperature_2m_max", [])
+        tmin   = daily.get("temperature_2m_min", [])
+        prec   = daily.get("precipitation_sum", [])
+        codes  = daily.get("weathercode", [])
+
+        forecast = {}
+        for i, dato in enumerate(dates):
+            tx = round(tmax[i] or 0, 1) if i < len(tmax) else None
+            pr = round(prec[i] or 0, 1) if i < len(prec) else 0.0
+            kd = int(codes[i]) if i < len(codes) else 0
+            forecast[dato] = {
+                "dato":   dato,
+                "tmax":   tx,
+                "tmin":   round(tmin[i] or 0, 1) if i < len(tmin) else None,
+                "prec":   pr,
+                "kode":   kd,
+                "ikon":   _vejr_ikon(kd),
+                "juster": _vejr_justering(kd, pr, tx or 15),
+            }
+        result = {
+            "opdateret": _dt.now().isoformat(timespec="minutes"),
+            "forecast":  forecast,
+        }
+    except Exception as e:
+        result = {"opdateret": None, "forecast": {}, "fejl": str(e)}
+
+    _vejr_cache["ts"]   = now
+    _vejr_cache["data"] = result
+    return result

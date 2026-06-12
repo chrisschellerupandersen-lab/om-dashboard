@@ -147,7 +147,7 @@
   </div>
 
   <!-- Kategorier -->
-  <div class="sektion-titel">Sammenligning af kategorier</div>
+  <div class="sektion-titel">Sammenligning af kategorier <span style="text-transform:none;font-weight:500;color:var(--svagere);letter-spacing:0">· klik en kategori for at filtrere hele dashboardet</span></div>
   <div class="grid g3">
     <div class="card"><h3>Omsætning pr. kategori</h3><div class="chart-box"><canvas id="c_kat_donut"></canvas></div></div>
     <div class="card" style="grid-column:span 2"><h3>Kategorier over tid <span class="h-sub">pr. uge</span></h3><div class="chart-box"><canvas id="c_kat_tid"></canvas></div></div>
@@ -244,6 +244,18 @@ function opdaterKatLabel(){
     ? 'Alle kategorier ' : `${valgteKategorier.length} kategorier valgt `;
 }
 
+// Klik på et kategori-element i en graf → filtrér dashboardet til den kategori.
+// Klik på den kategori der allerede er enefiltreret → nulstil til alle.
+function filtrerTilKategori(navn){
+  if(!navn || navn==='Øvrige') return;
+  const bokse=[...katPop.querySelectorAll('input')];
+  if(!bokse.length) return;
+  const alleredeAlene = valgteKategorier.length===1 && valgteKategorier[0]===navn;
+  bokse.forEach(b=> b.checked = alleredeAlene ? true : (b.value===navn));
+  opdaterKatLabel();
+  hent();
+}
+
 // ── Hent + render ────────────────────────────────────────────────────────
 async function hent(){
   const fra=document.getElementById('fra').value, til=document.getElementById('til').value;
@@ -306,7 +318,7 @@ function render(d){
   linje('c_oms', t.map(x=>x.dato), [{label:'Omsætning',data:t.map(x=>x.oms),farve:PALET[0],fyld:true}]);
   linje('c_avance', t.map(x=>x.dato), [{label:'Avancegrad %',data:t.map(x=>x.avance_pct),farve:PALET[3],fyld:false}], {pct:true});
 
-  donut('c_kat_donut', d.kategori.map(x=>x.kategori), d.kategori.map(x=>x.oms));
+  donut('c_kat_donut', d.kategori.map(x=>x.kategori), d.kategori.map(x=>x.oms), {klikbar:true});
   stacked('c_kat_tid', d.kategori_tid);
   matrix('c_kat_matrix', d.kategori);
 
@@ -354,10 +366,12 @@ function hbar(id,labels,data,farve){
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.x)}}},
       scales:{x:aksePenge(),y:{grid:{display:false}}}}});
 }
-function donut(id,labels,data){
+function donut(id,labels,data,opt={}){
   nyChart(id,{type:'doughnut',data:{labels,datasets:[{data,
       backgroundColor:labels.map((_,i)=>PALET[i%PALET.length]),borderWidth:2,borderColor:'#fff'}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      onClick:opt.klikbar?(e,els,ch)=>{ if(els.length) filtrerTilKategori(ch.data.labels[els[0].index]); }:undefined,
+      onHover:opt.klikbar?(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }:undefined,
       plugins:{legend:{position:'right',labels:{boxWidth:12,padding:10,font:{size:11}}},
         tooltip:{callbacks:{label:c=>{const tot=c.dataset.data.reduce((a,b)=>a+b,0)||1;
           return ` ${c.label}: ${kr(c.parsed)} (${nf1.format(c.parsed/tot*100)}%)`;}}}}}});
@@ -367,6 +381,8 @@ function stacked(id,kt){
      backgroundColor:PALET[i%PALET.length],borderRadius:3,stack:'a'}));
   nyChart(id,{type:'bar',data:{labels:kt.uger||[],datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els,ch)=>{ if(els.length) filtrerTilKategori(ch.data.datasets[els[0].datasetIndex].label); },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; },
       plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:8,font:{size:11}}},
         tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${kr(c.parsed.y)}`}}},
       scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,...aksePenge()}}}});
@@ -377,6 +393,8 @@ function matrix(id,kat){
       {type:'line',label:'Avancegrad %',data:kat.map(x=>x.avance_pct),borderColor:PALET[4],backgroundColor:PALET[4],
        yAxisID:'y2',order:1,tension:.3,borderWidth:2,pointRadius:3}]},
     options:{responsive:true,maintainAspectRatio:false,
+      onClick:(e,els,ch)=>{ if(els.length) filtrerTilKategori(ch.data.labels[els[0].index]); },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; },
       plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:10}},
         tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${nf1.format(c.parsed.y)}%`:' '+kr(c.parsed.y)}}},
       scales:{x:{grid:{display:false},ticks:{maxRotation:40,minRotation:0}},

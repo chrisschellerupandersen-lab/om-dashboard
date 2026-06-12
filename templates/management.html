@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Management Dashboard · Organic Market</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root{
+    --gron:#2e7d4f; --gron-lys:#e8f3ec; --gron-mork:#1f5a38;
+    --bg:#f5f7f6; --kort:#ffffff; --linje:#e6ebe8;
+    --tekst:#1c2a23; --svag:#6b7d74; --svagere:#9aa8a1;
+    --pos:#2e9e5b; --neg:#d24c4c; --neutral:#5a7d92;
+    --skygge:0 1px 2px rgba(16,40,28,.04), 0 4px 16px rgba(16,40,28,.06);
+    --radius:16px;
+    --c1:#2e7d4f; --c2:#5cb88a; --c3:#8fd0ad; --c4:#f0a843; --c5:#e0744b; --c6:#5a7d92; --c7:#b8c2bc;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+       background:var(--bg);color:var(--tekst);font-size:14px;line-height:1.45}
+  a{color:inherit}
+  .wrap{max-width:1320px;margin:0 auto;padding:24px 20px 64px}
+
+  /* Topbar */
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:20px}
+  .titel h1{margin:0;font-size:22px;font-weight:700;letter-spacing:-.3px}
+  .titel p{margin:2px 0 0;color:var(--svag);font-size:13px}
+  .top-links{display:flex;gap:8px}
+  .top-links a{font-size:13px;color:var(--svag);text-decoration:none;padding:8px 12px;border-radius:10px}
+  .top-links a:hover{background:var(--gron-lys);color:var(--gron-mork)}
+
+  /* Filterbar */
+  .filtre{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--kort);
+          border:1px solid var(--linje);border-radius:var(--radius);padding:12px 14px;box-shadow:var(--skygge);margin-bottom:22px}
+  .seg{display:flex;background:var(--bg);border-radius:12px;padding:3px;gap:2px;flex-wrap:wrap}
+  .seg button{border:0;background:transparent;color:var(--svag);padding:8px 13px;border-radius:9px;
+              font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .seg button.aktiv{background:var(--gron);color:#fff;box-shadow:0 1px 3px rgba(46,125,79,.35)}
+  .dato-felt{display:none;align-items:center;gap:6px;color:var(--svag);font-size:13px}
+  .dato-felt.vis{display:flex}
+  .dato-felt input{border:1px solid var(--linje);border-radius:9px;padding:7px 9px;font-size:13px;color:var(--tekst);background:#fff}
+  .spacer{flex:1}
+
+  /* Kategori-dropdown */
+  .kat{position:relative}
+  .kat-knap{display:flex;align-items:center;gap:8px;border:1px solid var(--linje);background:#fff;border-radius:10px;
+            padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer;color:var(--tekst)}
+  .kat-knap .pil{color:var(--svagere);font-size:11px}
+  .kat-pop{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--linje);
+           border-radius:12px;box-shadow:var(--skygge);padding:8px;min-width:230px;max-height:320px;overflow:auto;display:none;z-index:30}
+  .kat-pop.vis{display:block}
+  .kat-pop label{display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:8px;cursor:pointer;font-size:13px}
+  .kat-pop label:hover{background:var(--gron-lys)}
+  .kat-pop input{accent-color:var(--gron);width:15px;height:15px}
+  .kat-pop .top-row{display:flex;justify-content:space-between;padding:4px 9px 8px;border-bottom:1px solid var(--linje);margin-bottom:6px}
+  .kat-pop .top-row button{border:0;background:none;color:var(--gron);font-weight:600;font-size:12px;cursor:pointer}
+
+  /* KPI-kort */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px}
+  .kpi{background:var(--kort);border:1px solid var(--linje);border-radius:var(--radius);padding:16px 17px;box-shadow:var(--skygge)}
+  .kpi .lab{color:var(--svag);font-size:12.5px;font-weight:600;letter-spacing:.2px}
+  .kpi .val{font-size:25px;font-weight:750;margin:6px 0 4px;letter-spacing:-.5px}
+  .kpi .sub{font-size:12px;color:var(--svagere)}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:700;padding:2px 7px;border-radius:20px}
+  .delta.pos{color:var(--pos);background:rgba(46,158,91,.10)}
+  .delta.neg{color:var(--neg);background:rgba(210,76,76,.10)}
+  .delta.flat{color:var(--svag);background:var(--bg)}
+
+  /* Sektioner */
+  .sektion-titel{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--svag);
+                 margin:30px 2px 12px}
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:900px){.g2,.g3{grid-template-columns:1fr}}
+  .card{background:var(--kort);border:1px solid var(--linje);border-radius:var(--radius);padding:18px 18px 14px;box-shadow:var(--skygge)}
+  .card h3{margin:0 0 14px;font-size:14.5px;font-weight:700}
+  .card .h-sub{font-weight:500;color:var(--svagere);font-size:12px;margin-left:6px}
+  .chart-box{position:relative;height:280px}
+  .chart-box.h-lav{height:240px}
+  .chart-box.h-hoj{height:340px}
+
+  /* Indsigter */
+  .indsigter{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+  .ind{display:flex;gap:11px;background:var(--kort);border:1px solid var(--linje);border-left-width:4px;
+       border-radius:12px;padding:13px 15px;box-shadow:var(--skygge);font-size:13.5px;align-items:flex-start}
+  .ind.positiv{border-left-color:var(--pos)} .ind.negativ{border-left-color:var(--neg)} .ind.neutral{border-left-color:var(--neutral)}
+  .ind .dot{width:9px;height:9px;border-radius:50%;margin-top:5px;flex:0 0 auto}
+  .ind.positiv .dot{background:var(--pos)} .ind.negativ .dot{background:var(--neg)} .ind.neutral .dot{background:var(--neutral)}
+
+  /* Tilstande */
+  .tom{color:var(--svagere);text-align:center;padding:40px 0;font-size:13px}
+  #fejl{display:none;background:#fdecec;border:1px solid #f5c2c2;color:#a13030;padding:12px 16px;border-radius:12px;margin-bottom:18px;font-size:13px}
+  .loader{position:fixed;inset:0;background:rgba(245,247,246,.6);display:none;align-items:center;justify-content:center;z-index:50}
+  .loader.vis{display:flex}
+  .spin{width:34px;height:34px;border:3px solid var(--gron-lys);border-top-color:var(--gron);border-radius:50%;animation:sp .8s linear infinite}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="loader" id="loader"><div class="spin"></div></div>
+<div class="wrap">
+
+  <header class="top">
+    <div class="titel">
+      <h1>Management Dashboard</h1>
+      <p id="periode-tekst">Indlæser…</p>
+    </div>
+    <div class="top-links">
+      <a href="/dashboard">← Drift-dashboard</a>
+      <a href="/logout">Log ud</a>
+    </div>
+  </header>
+
+  <div class="filtre">
+    <div class="seg" id="periode-seg">
+      <button data-p="idag">I dag</button>
+      <button data-p="uge">Denne uge</button>
+      <button data-p="maaned">Denne måned</button>
+      <button data-p="30" class="aktiv">Sidste 30 dage</button>
+      <button data-p="custom">Brugerdefineret</button>
+    </div>
+    <div class="dato-felt" id="dato-felt">
+      <input type="date" id="fra"> <span>→</span> <input type="date" id="til">
+      <button class="kat-knap" id="anvend-dato">Anvend</button>
+    </div>
+    <div class="spacer"></div>
+    <div class="kat">
+      <button class="kat-knap" id="kat-knap">Alle kategorier <span class="pil">▾</span></button>
+      <div class="kat-pop" id="kat-pop">
+        <div class="top-row"><button id="kat-alle">Vælg alle</button><button id="kat-ingen">Ryd</button></div>
+        <div id="kat-liste"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="fejl"></div>
+
+  <!-- KPI -->
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <!-- Trends -->
+  <div class="sektion-titel">Udvikling over tid</div>
+  <div class="grid g2">
+    <div class="card"><h3>Omsætning pr. dag <span class="h-sub">inkl. moms</span></h3><div class="chart-box"><canvas id="c_oms"></canvas></div></div>
+    <div class="card"><h3>Avancegrad-trend <span class="h-sub">% ekskl. moms</span></h3><div class="chart-box"><canvas id="c_avance"></canvas></div></div>
+  </div>
+
+  <!-- Kategorier -->
+  <div class="sektion-titel">Sammenligning af kategorier</div>
+  <div class="grid g3">
+    <div class="card"><h3>Omsætning pr. kategori</h3><div class="chart-box"><canvas id="c_kat_donut"></canvas></div></div>
+    <div class="card" style="grid-column:span 2"><h3>Kategorier over tid <span class="h-sub">pr. uge</span></h3><div class="chart-box"><canvas id="c_kat_tid"></canvas></div></div>
+  </div>
+  <div class="grid" style="margin-top:16px">
+    <div class="card"><h3>Kategori-matrix <span class="h-sub">omsætning vs. avancegrad</span></h3><div class="chart-box h-hoj"><canvas id="c_kat_matrix"></canvas></div></div>
+  </div>
+
+  <!-- Varer & tid -->
+  <div class="sektion-titel">Varer &amp; tidsmønstre</div>
+  <div class="grid g2">
+    <div class="card"><h3>Top 10 varer · omsætning</h3><div class="chart-box h-hoj"><canvas id="c_top_oms"></canvas></div></div>
+    <div class="card"><h3>Top 10 varer · dækningsbidrag</h3><div class="chart-box h-hoj"><canvas id="c_top_db"></canvas></div></div>
+  </div>
+  <div class="grid g2" style="margin-top:16px">
+    <div class="card"><h3>Salg pr. time</h3><div class="chart-box h-lav"><canvas id="c_timer"></canvas></div></div>
+    <div class="card"><h3>Salg pr. ugedag</h3><div class="chart-box h-lav"><canvas id="c_ugedag"></canvas></div></div>
+  </div>
+
+  <!-- Betaling, TGTG, omkostninger -->
+  <div class="sektion-titel">Betaling, madspild &amp; omkostninger</div>
+  <div class="grid g3">
+    <div class="card"><h3>MobilePay vs. samlet salg</h3><div class="chart-box"><canvas id="c_betaling"></canvas></div></div>
+    <div class="card"><h3>Too Good To Go-poser</h3><div class="chart-box"><canvas id="c_tgtg"></canvas></div></div>
+    <div class="card"><h3>Faste omkostninger</h3><div class="chart-box"><canvas id="c_omk"></canvas></div></div>
+  </div>
+
+  <!-- Indsigter -->
+  <div class="sektion-titel">Automatiske indsigter</div>
+  <div class="indsigter" id="indsigter"></div>
+
+</div>
+
+<script>
+const PALET = ['#2e7d4f','#5cb88a','#8fd0ad','#f0a843','#e0744b','#5a7d92','#b8c2bc','#3a9d8f','#c9a227','#9b6bd4'];
+const nf  = new Intl.NumberFormat('da-DK',{maximumFractionDigits:0});
+const nf1 = new Intl.NumberFormat('da-DK',{minimumFractionDigits:1,maximumFractionDigits:1});
+const kr  = v => nf.format(Math.round(v||0)) + ' kr.';
+const pct = v => (v==null?'–':nf1.format(v)+'%');
+
+let valgteKategorier = [];   // tom = alle
+let charts = {};
+Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#6b7d74';
+
+// ── Periode-beregning ────────────────────────────────────────────────────
+function isodate(d){ return d.toISOString().slice(0,10); }
+function beregnPeriode(p){
+  const idag = new Date(); idag.setHours(12,0,0,0);
+  let fra = new Date(idag), til = new Date(idag);
+  if(p==='idag'){ /* begge = i dag */ }
+  else if(p==='uge'){ const wd=(idag.getDay()+6)%7; fra.setDate(idag.getDate()-wd); }
+  else if(p==='maaned'){ fra = new Date(idag.getFullYear(),idag.getMonth(),1); }
+  else if(p==='30'){ fra.setDate(idag.getDate()-29); }
+  return {fra:isodate(fra), til:isodate(til)};
+}
+
+// ── Filter-UI ────────────────────────────────────────────────────────────
+const seg = document.getElementById('periode-seg');
+const datoFelt = document.getElementById('dato-felt');
+seg.addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  [...seg.children].forEach(x=>x.classList.remove('aktiv'));
+  b.classList.add('aktiv');
+  if(b.dataset.p==='custom'){ datoFelt.classList.add('vis'); }
+  else { datoFelt.classList.remove('vis'); const pr=beregnPeriode(b.dataset.p);
+         document.getElementById('fra').value=pr.fra; document.getElementById('til').value=pr.til; hent(); }
+});
+document.getElementById('anvend-dato').addEventListener('click', hent);
+
+// Kategori-dropdown
+const katKnap=document.getElementById('kat-knap'), katPop=document.getElementById('kat-pop');
+katKnap.addEventListener('click', ()=>katPop.classList.toggle('vis'));
+document.addEventListener('click', e=>{ if(!e.target.closest('.kat')) katPop.classList.remove('vis'); });
+document.getElementById('kat-alle').addEventListener('click',()=>{ setKat(true); });
+document.getElementById('kat-ingen').addEventListener('click',()=>{ setKat(false); });
+function setKat(alle){ katPop.querySelectorAll('input').forEach(i=>i.checked=alle); opdaterKatLabel(); hent(); }
+function byggKatListe(kats){
+  const wrap=document.getElementById('kat-liste'); wrap.innerHTML='';
+  kats.forEach(k=>{
+    const l=document.createElement('label');
+    l.innerHTML=`<input type="checkbox" value="${k.replace(/"/g,'&quot;')}" checked> ${k}`;
+    l.querySelector('input').addEventListener('change',()=>{ opdaterKatLabel(); hent(); });
+    wrap.appendChild(l);
+  });
+  opdaterKatLabel();
+}
+function opdaterKatLabel(){
+  const bokse=[...katPop.querySelectorAll('input')];
+  const valgt=bokse.filter(b=>b.checked);
+  valgteKategorier = (valgt.length===bokse.length) ? [] : valgt.map(b=>b.value);
+  katKnap.firstChild.textContent = valgteKategorier.length===0
+    ? 'Alle kategorier ' : `${valgteKategorier.length} kategorier valgt `;
+}
+
+// ── Hent + render ────────────────────────────────────────────────────────
+async function hent(){
+  const fra=document.getElementById('fra').value, til=document.getElementById('til').value;
+  if(!fra||!til) return;
+  document.getElementById('loader').classList.add('vis');
+  document.getElementById('fejl').style.display='none';
+  try{
+    let url=`/api/management/data?fra=${fra}&til=${til}`;
+    if(valgteKategorier.length) url+=`&kategori=${encodeURIComponent(valgteKategorier.join(','))}`;
+    const r=await fetch(url);
+    if(r.status===401){ location.href='/login'; return; }
+    if(!r.ok) throw new Error('Serverfejl '+r.status);
+    const d=await r.json();
+    if(!document.getElementById('kat-liste').children.length && d.kategorier) byggKatListe(d.kategorier);
+    render(d);
+  }catch(e){
+    const f=document.getElementById('fejl'); f.textContent='Kunne ikke hente data: '+e.message; f.style.display='block';
+  }finally{
+    document.getElementById('loader').classList.remove('vis');
+  }
+}
+
+function deltaHtml(delta, omvendt=false){
+  if(delta==null) return `<span class="delta flat">–</span>`;
+  const god = omvendt ? delta<0 : delta>=0;
+  const pil = delta>=0?'▲':'▼';
+  return `<span class="delta ${god?'pos':'neg'}">${pil} ${nf1.format(Math.abs(delta))}%</span>`;
+}
+
+function render(d){
+  document.getElementById('periode-tekst').textContent =
+    `${d.periode.fra} – ${d.periode.til} · ${d.periode.dage} dage · sammenlignet med ${d.forrige.fra} – ${d.forrige.til}`;
+
+  // KPI-kort
+  const k=d.kpi;
+  const kort=[
+    {lab:'Omsætning',     val:kr(k.oms.vaerdi),                  delta:k.oms.delta,        sub:'inkl. moms'},
+    {lab:'Dækningsbidrag',val:kr(k.db.vaerdi),                   delta:k.db.delta,         sub:'ekskl. moms'},
+    {lab:'Avancegrad',    val:pct(k.avance_pct.vaerdi),          delta:k.avance_pct.delta, sub:'af oms. ekskl. moms'},
+    {lab:'Antal bonner',  val:nf.format(k.bonner.vaerdi),        delta:k.bonner.delta,     sub:'snit '+kr(k.snit_bon.vaerdi)},
+    {lab:'Solgte varer',  val:nf.format(k.antal.vaerdi),         delta:k.antal.delta,      sub:'antal enheder'},
+    {lab:'TGTG-poser',    val:nf.format(k.tgtg_poser.vaerdi),    delta:k.tgtg_poser.delta, sub:kr(k.tgtg_kr.vaerdi)+' reddet'},
+    {lab:'Faste omk.',    val:kr(k.faste_omk.vaerdi),            delta:k.faste_omk.delta,  sub:'i perioden', omvendt:true},
+    {lab:'Resultat',      val:kr(k.resultat.vaerdi),             delta:k.resultat.delta,   sub:'DB − faste omk.'},
+  ];
+  document.getElementById('kpi-grid').innerHTML = kort.map(c=>`
+    <div class="kpi">
+      <div class="lab">${c.lab}</div>
+      <div class="val">${c.val}</div>
+      <div>${deltaHtml(c.delta, c.omvendt)} <span class="sub">${c.sub}</span></div>
+    </div>`).join('');
+
+  // Indsigter
+  document.getElementById('indsigter').innerHTML = (d.indsigter||[]).map(i=>`
+    <div class="ind ${i.type}"><span class="dot"></span><span>${i.tekst}</span></div>`).join('')
+    || '<div class="tom">Ingen indsigter for perioden.</div>';
+
+  // Grafer
+  const t=d.tidsserie;
+  linje('c_oms', t.map(x=>x.dato), [{label:'Omsætning',data:t.map(x=>x.oms),farve:PALET[0],fyld:true}]);
+  linje('c_avance', t.map(x=>x.dato), [{label:'Avancegrad %',data:t.map(x=>x.avance_pct),farve:PALET[3],fyld:false}], {pct:true});
+
+  donut('c_kat_donut', d.kategori.map(x=>x.kategori), d.kategori.map(x=>x.oms));
+  stacked('c_kat_tid', d.kategori_tid);
+  matrix('c_kat_matrix', d.kategori);
+
+  hbar('c_top_oms', d.top_oms.map(x=>x.navn), d.top_oms.map(x=>x.oms), PALET[0]);
+  hbar('c_top_db',  d.top_db.map(x=>x.navn),  d.top_db.map(x=>x.db),  PALET[1]);
+
+  vbar('c_timer', d.timer.map(x=>String(x.time).padStart(2,'0')+'–'+String(x.time+1).padStart(2,'0')),
+       d.timer.map(x=>x.oms), PALET[5]);
+  vbar('c_ugedag', d.ugedage.map(x=>x.dag), d.ugedage.map(x=>x.oms), PALET[2]);
+
+  betaling('c_betaling', d.betaling);
+  tgtgGraf('c_tgtg', d.tgtg_tid);
+  donut('c_omk', d.omk_kategori.map(x=>x.kategori), d.omk_kategori.map(x=>x.beloeb));
+}
+
+// ── Graf-hjælpere ────────────────────────────────────────────────────────
+function nyChart(id, cfg){
+  if(charts[id]) charts[id].destroy();
+  const ctx=document.getElementById(id);
+  charts[id]=new Chart(ctx, cfg);
+}
+const gridFarve='rgba(0,0,0,.05)';
+function aksePenge(){ return {grid:{color:gridFarve},ticks:{callback:v=>nf.format(v)}}; }
+
+function linje(id, labels, serier, opt={}){
+  nyChart(id,{type:'line',data:{labels,datasets:serier.map(s=>({
+      label:s.label,data:s.data,borderColor:s.farve,
+      backgroundColor:s.fyld?s.farve+'22':'transparent',fill:s.fyld,
+      tension:.3,borderWidth:2,pointRadius:0,pointHoverRadius:4}))},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>
+        opt.pct?` ${nf1.format(c.parsed.y)}%`:' '+kr(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10}},
+              y:opt.pct?{grid:{color:gridFarve},ticks:{callback:v=>v+'%'}}:aksePenge()}}});
+}
+function vbar(id,labels,data,farve){
+  nyChart(id,{type:'bar',data:{labels,datasets:[{data,backgroundColor:farve,borderRadius:6,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.y)}}},
+      scales:{x:{grid:{display:false}},y:aksePenge()}}});
+}
+function hbar(id,labels,data,farve){
+  nyChart(id,{type:'bar',data:{labels,datasets:[{data,backgroundColor:farve,borderRadius:6}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.x)}}},
+      scales:{x:aksePenge(),y:{grid:{display:false}}}}});
+}
+function donut(id,labels,data){
+  nyChart(id,{type:'doughnut',data:{labels,datasets:[{data,
+      backgroundColor:labels.map((_,i)=>PALET[i%PALET.length]),borderWidth:2,borderColor:'#fff'}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'62%',
+      plugins:{legend:{position:'right',labels:{boxWidth:12,padding:10,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>{const tot=c.dataset.data.reduce((a,b)=>a+b,0)||1;
+          return ` ${c.label}: ${kr(c.parsed)} (${nf1.format(c.parsed/tot*100)}%)`;}}}}}});
+}
+function stacked(id,kt){
+  const ds=(kt.serier||[]).map((s,i)=>({label:s,data:kt.data[s],
+     backgroundColor:PALET[i%PALET.length],borderRadius:3,stack:'a'}));
+  nyChart(id,{type:'bar',data:{labels:kt.uger||[],datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:8,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${kr(c.parsed.y)}`}}},
+      scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,...aksePenge()}}}});
+}
+function matrix(id,kat){
+  nyChart(id,{data:{labels:kat.map(x=>x.kategori),datasets:[
+      {type:'bar',label:'Omsætning',data:kat.map(x=>x.oms),backgroundColor:PALET[0],borderRadius:5,yAxisID:'y',order:2},
+      {type:'line',label:'Avancegrad %',data:kat.map(x=>x.avance_pct),borderColor:PALET[4],backgroundColor:PALET[4],
+       yAxisID:'y2',order:1,tension:.3,borderWidth:2,pointRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${nf1.format(c.parsed.y)}%`:' '+kr(c.parsed.y)}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:40,minRotation:0}},
+        y:{position:'left',...aksePenge()},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>v+'%'}}}}});
+}
+function betaling(id,b){
+  nyChart(id,{type:'line',data:{labels:b.map(x=>x.dato),datasets:[
+      {label:'Samlet salg',data:b.map(x=>x.pos_total),borderColor:PALET[0],backgroundColor:PALET[0]+'22',fill:true,tension:.3,borderWidth:2,pointRadius:0},
+      {label:'MobilePay',data:b.map(x=>x.mobilepay),borderColor:PALET[3],backgroundColor:'transparent',tension:.3,borderWidth:2,pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${kr(c.parsed.y)}`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0}},y:aksePenge()}}});
+}
+function tgtgGraf(id,t){
+  nyChart(id,{type:'bar',data:{labels:t.map(x=>x.dato),datasets:[
+      {type:'bar',label:'Poser',data:t.map(x=>x.antal),backgroundColor:PALET[1],borderRadius:5,yAxisID:'y',order:2},
+      {type:'line',label:'Kreditering',data:t.map(x=>x.kr),borderColor:PALET[4],backgroundColor:'transparent',
+       yAxisID:'y2',tension:.3,borderWidth:2,pointRadius:0,order:1}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:12,padding:10}},
+        tooltip:{callbacks:{label:c=>c.dataset.yAxisID==='y2'?` ${kr(c.parsed.y)}`:` ${nf.format(c.parsed.y)} poser`}}},
+      scales:{x:{grid:{display:false},ticks:{maxTicksLimit:10,maxRotation:0}},
+        y:{position:'left',grid:{color:gridFarve},ticks:{precision:0}},
+        y2:{position:'right',grid:{display:false},ticks:{callback:v=>nf.format(v)}}}}});
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+(function init(){
+  const pr=beregnPeriode('30');
+  document.getElementById('fra').value=pr.fra;
+  document.getElementById('til').value=pr.til;
+  hent();
+})();
+</script>
+</body>
+</html>

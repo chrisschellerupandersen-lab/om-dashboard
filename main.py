@@ -341,6 +341,16 @@ async def dashboard(request: Request):
     return resp
 
 
+@app.get("/management", response_class=HTMLResponse)
+async def management(request: Request):
+    if not get_session(request):
+        return RedirectResponse("/login", status_code=302)
+    resp = templates.TemplateResponse("management.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 # ── API ───────────────────────────────────────────────────────────────────────
 
 def _kræv_login(request: Request):
@@ -358,6 +368,21 @@ async def api_data(request: Request):
 async def api_kpi(request: Request, aar: Optional[int] = None):
     _kræv_login(request)
     return database.hent_kpi(aar)
+
+
+@app.get("/api/management/data")
+async def api_management_data(
+    request: Request,
+    fra: str,
+    til: str,
+    kategori: Optional[str] = None,
+):
+    """Samlet datasæt til management-dashboardet.
+    fra/til = ISO-dato (YYYY-MM-DD). kategori = komma-separeret liste (valgfri).
+    """
+    _kræv_login(request)
+    kategorier = [k.strip() for k in kategori.split(",") if k.strip()] if kategori else None
+    return database.hent_management_data(fra, til, kategorier)
 
 
 @app.get("/api/salg/dag-db-detalje")

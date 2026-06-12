@@ -6029,3 +6029,340 @@ def hent_vejr_forecast() -> Dict:
     _vejr_cache["ts"]   = now
     _vejr_cache["data"] = result
     return result
+
+
+# ── MANAGEMENT DASHBOARD ────────────────────────────────────────────────────
+# Samlet datakilde til det moderne management-dashboard.
+# Bruger v_transaktioner (momskorrigeret omsætning + korrekt vareforbrug/DB).
+#   omsætning_korr      = omsætning inkl. moms (bon-korrigeret)
+#   omsaetning_ex_moms  = omsætning ekskl. moms
+#   vf_korrekt          = korrekt vareforbrug (kostpris)
+#   db_korrekt          = dækningsbidrag (ekskl. moms − vareforbrug)
+
+_UGEDAGE_DA = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"]
+
+
+def _mgmt_kat_filter(kategorier: Optional[List[str]]):
+    """Returnér (sql_fragment, params) til kategori-filter."""
+    if not kategorier:
+        return "", []
+    pladser = ",".join("?" for _ in kategorier)
+    return f" AND kategori IN ({pladser})", list(kategorier)
+
+
+def _mgmt_periode_kpi(conn, fra, til, kategorier):
+    kat_sql, kat_p = _mgmt_kat_filter(kategorier)
+    row = conn.execute(f"""
+        SELECT
+            COALESCE(SUM(omsætning_korr),     0) AS oms,
+            COALESCE(SUM(omsaetning_ex_moms), 0) AS oms_ex,
+            COALESCE(SUM(vf_korrekt),         0) AS kost,
+            COALESCE(SUM(db_korrekt),         0) AS db,
+            COALESCE(SUM(antal),              0) AS antal,
+            COUNT(DISTINCT CASE WHEN bon_nr != '' THEN dato || '|' || bon_nr END) AS bonner
+        FROM v_transaktioner
+        WHERE dato >= ? AND dato <= ?{kat_sql}
+    """, [fra, til, *kat_p]).fetchone()
+
+    tgtg = conn.execute("""
+        SELECT COALESCE(SUM(antal),0) AS poser, COALESCE(SUM(kreditering),0) AS kr
+        FROM tgtg_dagssalg WHERE dato >= ? AND dato <= ?
+    """, [fra, til]).fetchone()
+
+    faste = conn.execute("""
+        SELECT COALESCE(SUM(beloeb),0) AS b
+        FROM faste_omkostninger
+        WHERE printf('%04d-%02d', aar, maaned) >= ? AND printf('%04d-%02d', aar, maaned) <= ?
+    """, [fra[:7], til[:7]]).fetchone()
+
+    oms    = float(row["oms"])
+    oms_ex = float(row["oms_ex"])
+    db     = float(row["db"])
+    bonner = int(row["bonner"])
+    faste_b = float(faste["b"])
+    return {
+        "oms":        oms,
+        "oms_ex":     oms_ex,
+        "kost":       float(row["kost"]),
+        "db":         db,
+        "avance_pct": (db / oms_ex * 100) if oms_ex else 0.0,
+        "antal":      float(row["antal"]),
+        "bonner":     bonner,
+        "snit_bon":   (oms / bonner) if bonner else 0.0,
+        "tgtg_poser": float(tgtg["poser"]),
+        "tgtg_kr":    float(tgtg["kr"]),
+        "faste_omk":  faste_b,
+        "resultat":   db - faste_b,
+    }
+
+
+def _delta(nu, foer):
+    """Procentændring; None når sammenligning ikke giver mening."""
+    if foer in (0, 0.0, None):
+        return None
+    return (nu - foer) / abs(foer) * 100
+
+
+def hent_management_data(fra: str, til: str,
+                         kategorier: Optional[List[str]] = None) -> Dict[str, Any]:
+    from datetime import date, timedelta
+
+    d_fra = date.fromisoformat(fra)
+    d_til = date.fromisoformat(til)
+    laengde = (d_til - d_fra).days + 1
+    p_til = d_fra - timedelta(days=1)
+    p_fra = p_til - timedelta(days=laengde - 1)
+    forrige = {"fra": p_fra.isoformat(), "til": p_til.isoformat()}
+
+    kat_sql, kat_p = _mgmt_kat_filter(kategorier)
+
+    with _conn() as conn:
+        # ── KPI'er (nuværende + forrige periode) ──────────────────────────
+        kpi_nu  = _mgmt_periode_kpi(conn, fra, til, kategorier)
+        kpi_for = _mgmt_periode_kpi(conn, forrige["fra"], forrige["til"], kategorier)
+
+        def kpi(navn):
+            return {"vaerdi": kpi_nu[navn], "forrige": kpi_for[navn],
+                    "delta": _delta(kpi_nu[navn], kpi_for[navn])}
+
+        kpis = {n: kpi(n) for n in (
+            "oms", "db", "avance_pct", "bonner", "snit_bon",
+            "antal", "tgtg_poser", "tgtg_kr", "faste_omk", "resultat")}
+
+        # ── Tidsserie pr. dag (omsætning + DB + avance%) ──────────────────
+        rows = conn.execute(f"""
+            SELECT dato,
+                   SUM(omsætning_korr)     AS oms,
+                   SUM(db_korrekt)         AS db,
+                   SUM(omsaetning_ex_moms) AS oms_ex
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY dato ORDER BY dato
+        """, [fra, til, *kat_p]).fetchall()
+        tidsserie = [{
+            "dato": r["dato"],
+            "oms":  round(float(r["oms"] or 0), 2),
+            "db":   round(float(r["db"] or 0), 2),
+            "avance_pct": round((float(r["db"] or 0) / float(r["oms_ex"]) * 100), 2)
+                          if r["oms_ex"] else 0.0,
+        } for r in rows]
+
+        # ── Kategori-aggregat (donut + matrix) ────────────────────────────
+        krows = conn.execute(f"""
+            SELECT COALESCE(NULLIF(TRIM(kategori),''),'Ukendt') AS kategori,
+                   SUM(omsætning_korr)     AS oms,
+                   SUM(db_korrekt)         AS db,
+                   SUM(omsaetning_ex_moms) AS oms_ex
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY 1 ORDER BY oms DESC
+        """, [fra, til, *kat_p]).fetchall()
+        kategori_agg = [{
+            "kategori":   r["kategori"],
+            "oms":        round(float(r["oms"] or 0), 2),
+            "db":         round(float(r["db"] or 0), 2),
+            "avance_pct": round((float(r["db"] or 0) / float(r["oms_ex"]) * 100), 2)
+                          if r["oms_ex"] else 0.0,
+        } for r in krows]
+
+        # Kategori-omsætning forrige periode → bevægelser
+        kfor = {r["kategori"]: float(r["oms"] or 0) for r in conn.execute(f"""
+            SELECT COALESCE(NULLIF(TRIM(kategori),''),'Ukendt') AS kategori,
+                   SUM(omsætning_korr) AS oms
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY 1
+        """, [forrige["fra"], forrige["til"], *kat_p]).fetchall()}
+
+        # ── Kategori vs. tid (stacked, top 6 + Øvrige, pr. uge) ───────────
+        srows = conn.execute(f"""
+            SELECT strftime('%Y-W%W', dato) AS uge,
+                   COALESCE(NULLIF(TRIM(kategori),''),'Ukendt') AS kategori,
+                   SUM(omsætning_korr) AS oms
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY uge, kategori ORDER BY uge
+        """, [fra, til, *kat_p]).fetchall()
+        top6 = [k["kategori"] for k in kategori_agg[:6]]
+        uger_sorteret, pivot = [], {}
+        for r in srows:
+            u = r["uge"]
+            if u not in pivot:
+                pivot[u] = {}
+                uger_sorteret.append(u)
+            navn = r["kategori"] if r["kategori"] in top6 else "Øvrige"
+            pivot[u][navn] = pivot[u].get(navn, 0) + float(r["oms"] or 0)
+        serier = top6 + (["Øvrige"] if any("Øvrige" in v for v in pivot.values()) else [])
+        kategori_tid = {
+            "uger":   uger_sorteret,
+            "serier": serier,
+            "data":   {s: [round(pivot[u].get(s, 0), 2) for u in uger_sorteret] for s in serier},
+        }
+
+        # ── Top 10 varer (omsætning og DB) ────────────────────────────────
+        top_oms = [{"navn": r["varenavn"], "oms": round(float(r["oms"] or 0), 2)}
+                   for r in conn.execute(f"""
+            SELECT varenavn, SUM(omsætning_korr) AS oms
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY varenavn ORDER BY oms DESC LIMIT 10
+        """, [fra, til, *kat_p]).fetchall()]
+        top_db = [{"navn": r["varenavn"], "db": round(float(r["db"] or 0), 2)}
+                  for r in conn.execute(f"""
+            SELECT varenavn, SUM(db_korrekt) AS db
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY varenavn ORDER BY db DESC LIMIT 10
+        """, [fra, til, *kat_p]).fetchall()]
+
+        # ── Salg pr. time ─────────────────────────────────────────────────
+        timer = [{"time": int(r["t"]), "oms": round(float(r["oms"] or 0), 2)}
+                 for r in conn.execute(f"""
+            SELECT time_start AS t, SUM(omsætning_korr) AS oms
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ? AND time_start >= 0{kat_sql}
+            GROUP BY time_start ORDER BY time_start
+        """, [fra, til, *kat_p]).fetchall()]
+
+        # ── Salg pr. ugedag ───────────────────────────────────────────────
+        wd_raw = {int(r["wd"]): float(r["oms"] or 0) for r in conn.execute(f"""
+            SELECT CAST(strftime('%w', dato) AS INT) AS wd, SUM(omsætning_korr) AS oms
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY wd
+        """, [fra, til, *kat_p]).fetchall()}
+        # Vis Man→Søn
+        rk = [1, 2, 3, 4, 5, 6, 0]
+        ugedage = [{"dag": _UGEDAGE_DA[i], "oms": round(wd_raw.get(i, 0), 2)} for i in rk]
+
+        # ── Betaling: MobilePay vs. samlet POS pr. dag ────────────────────
+        mp = {r["dato"]: float(r["mp"] or 0) for r in conn.execute("""
+            SELECT dato, SUM(omsaetning_inkl) AS mp
+            FROM mobilepay_dag WHERE dato >= ? AND dato <= ? GROUP BY dato
+        """, [fra, til]).fetchall()}
+        oms_pr_dag = {t["dato"]: t["oms"] for t in tidsserie}
+        alle_dage = sorted(set(mp) | set(oms_pr_dag))
+        betaling = [{
+            "dato":      d,
+            "mobilepay": round(mp.get(d, 0), 2),
+            "pos_total": round(oms_pr_dag.get(d, 0), 2),
+        } for d in alle_dage]
+
+        # ── TGTG over tid ─────────────────────────────────────────────────
+        tgtg_tid = [{
+            "dato":  r["dato"],
+            "antal": int(r["antal"] or 0),
+            "kr":    round(float(r["kr"] or 0), 2),
+        } for r in conn.execute("""
+            SELECT dato, SUM(antal) AS antal, SUM(kreditering) AS kr
+            FROM tgtg_dagssalg WHERE dato >= ? AND dato <= ?
+            GROUP BY dato ORDER BY dato
+        """, [fra, til]).fetchall()]
+
+        # ── Faste omkostninger pr. kategori ───────────────────────────────
+        omk_kat = [{"kategori": r["kategori"], "beloeb": round(float(r["b"] or 0), 2)}
+                   for r in conn.execute("""
+            SELECT COALESCE(NULLIF(TRIM(kategori),''),'Øvrigt') AS kategori,
+                   SUM(beloeb) AS b
+            FROM faste_omkostninger
+            WHERE printf('%04d-%02d', aar, maaned) >= ?
+              AND printf('%04d-%02d', aar, maaned) <= ?
+            GROUP BY 1 ORDER BY b DESC
+        """, [fra[:7], til[:7]]).fetchall()]
+
+        # ── Tilgængelige kategorier (til filter) ──────────────────────────
+        alle_kat = [r["kategori"] for r in conn.execute("""
+            SELECT DISTINCT COALESCE(NULLIF(TRIM(kategori),''),'Ukendt') AS kategori
+            FROM transaktioner ORDER BY kategori
+        """).fetchall()]
+
+    # ── Indsigter (afledt i Python) ──────────────────────────────────────
+    indsigter = _mgmt_indsigter(kpis, kategori_agg, kfor, timer, ugedage, tidsserie)
+
+    return {
+        "periode":      {"fra": fra, "til": til, "dage": laengde},
+        "forrige":      forrige,
+        "kpi":          kpis,
+        "tidsserie":    tidsserie,
+        "kategori":     kategori_agg,
+        "kategori_tid": kategori_tid,
+        "top_oms":      top_oms,
+        "top_db":       top_db,
+        "timer":        timer,
+        "ugedage":      ugedage,
+        "betaling":     betaling,
+        "tgtg_tid":     tgtg_tid,
+        "omk_kategori": omk_kat,
+        "indsigter":    indsigter,
+        "kategorier":   alle_kat,
+    }
+
+
+def _mgmt_indsigter(kpis, kategori_agg, kfor, timer, ugedage, tidsserie):
+    def kr(v):
+        return f"{v:,.0f} kr.".replace(",", ".")
+    def pct(v):
+        return f"{v:+.1f}%".replace(".", ",")
+    def tal(v, d=1):
+        return f"{v:.{d}f}".replace(".", ",")
+
+    ud = []
+
+    d = kpis["oms"]["delta"]
+    if d is not None:
+        retning = "stigning" if d >= 0 else "fald"
+        ud.append({"type": "positiv" if d >= 0 else "negativ",
+                   "tekst": f"Omsætningen er {kr(kpis['oms']['vaerdi'])} — en {retning} på "
+                            f"{pct(d)} mod forrige periode."})
+
+    ap = kpis["avance_pct"]["vaerdi"]
+    apf = kpis["avance_pct"]["forrige"]
+    if ap:
+        diff = ap - apf
+        ret = "op" if diff >= 0 else "ned"
+        ud.append({"type": "neutral",
+                   "tekst": f"Avancegraden er {tal(ap)}% (ekskl. moms), {ret} "
+                            f"{tal(abs(diff))} pct.-point fra forrige periode."})
+
+    # Største kategori-bevægelse
+    bevaeg = []
+    for k in kategori_agg:
+        f = kfor.get(k["kategori"], 0)
+        if f > 0:
+            bevaeg.append((k["kategori"], (k["oms"] - f) / f * 100, k["oms"] - f))
+    if bevaeg:
+        op = max(bevaeg, key=lambda x: x[1])
+        ned = min(bevaeg, key=lambda x: x[1])
+        if op[1] > 0:
+            ud.append({"type": "positiv",
+                       "tekst": f"Størst fremgang: {op[0]} ({pct(op[1])} i omsætning)."})
+        if ned[1] < 0:
+            ud.append({"type": "negativ",
+                       "tekst": f"Størst tilbagegang: {ned[0]} ({pct(ned[1])} i omsætning)."})
+
+    if kategori_agg:
+        st = kategori_agg[0]
+        total = sum(k["oms"] for k in kategori_agg) or 1
+        ud.append({"type": "neutral",
+                   "tekst": f"Største kategori er {st['kategori']} "
+                            f"({tal(st['oms']/total*100, 0)}% af omsætningen)."})
+
+    if timer:
+        bedste = max(timer, key=lambda x: x["oms"])
+        ud.append({"type": "neutral",
+                   "tekst": f"Travleste tidspunkt er kl. {bedste['time']:02d}–"
+                            f"{bedste['time']+1:02d} ({kr(bedste['oms'])})."})
+
+    if ugedage and any(u["oms"] for u in ugedage):
+        bd = max(ugedage, key=lambda x: x["oms"])
+        ud.append({"type": "neutral",
+                   "tekst": f"Bedste ugedag er {bd['dag']} ({kr(bd['oms'])} i omsætning)."})
+
+    if kpis["tgtg_poser"]["vaerdi"]:
+        ud.append({"type": "positiv",
+                   "tekst": f"{int(kpis['tgtg_poser']['vaerdi'])} Too Good To Go-poser solgt "
+                            f"({kr(kpis['tgtg_kr']['vaerdi'])} reddet fra madspild)."})
+
+    res = kpis["resultat"]["vaerdi"]
+    ud.append({"type": "positiv" if res >= 0 else "negativ",
+               "tekst": f"Resultat efter faste omkostninger: {kr(res)} "
+                        f"(DB {kr(kpis['db']['vaerdi'])} − faste omk. {kr(kpis['faste_omk']['vaerdi'])})."})
+
+    return ud

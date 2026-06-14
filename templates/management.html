@@ -55,6 +55,19 @@
   .kat-pop .top-row{display:flex;justify-content:space-between;padding:4px 9px 8px;border-bottom:1px solid var(--linje);margin-bottom:6px}
   .kat-pop .top-row button{border:0;background:none;color:var(--gron);font-weight:600;font-size:12px;cursor:pointer}
 
+  /* Filter-chips */
+  .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+  .chips:empty{display:none}
+  .chip{display:inline-flex;align-items:center;gap:7px;background:var(--gron-lys);color:var(--gron-mork);
+        border:1px solid rgba(46,125,79,.25);border-radius:20px;padding:5px 6px 5px 12px;font-size:12.5px;font-weight:600}
+  .chip .dim{color:var(--gron);opacity:.65;font-weight:600}
+  .chip button{border:0;background:rgba(46,125,79,.14);color:var(--gron-mork);width:18px;height:18px;border-radius:50%;
+        cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center}
+  .chip button:hover{background:var(--neg);color:#fff}
+  .chip-clear{border:0;background:none;color:var(--svag);font-size:12.5px;font-weight:600;cursor:pointer;
+        text-decoration:underline;padding:5px 8px}
+  .chip-clear:hover{color:var(--neg)}
+
   /* KPI-kort */
   .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px}
   .kpi{background:var(--kort);border:1px solid var(--linje);border-radius:var(--radius);padding:16px 17px;box-shadow:var(--skygge)}
@@ -136,6 +149,9 @@
 
   <div id="fejl"></div>
 
+  <!-- Aktive filtre (chips) -->
+  <div class="chips" id="chips"></div>
+
   <!-- KPI -->
   <div class="kpi-grid" id="kpi-grid"></div>
 
@@ -157,7 +173,7 @@
   </div>
 
   <!-- Varer & tid -->
-  <div class="sektion-titel">Varer &amp; tidsmønstre</div>
+  <div class="sektion-titel">Varer &amp; tidsmønstre <span style="text-transform:none;font-weight:500;color:var(--svagere);letter-spacing:0">· klik en vare, time eller ugedag for at filtrere</span></div>
   <div class="grid g2">
     <div class="card"><h3>Top 10 varer · omsætning</h3><div class="chart-box h-hoj"><canvas id="c_top_oms"></canvas></div></div>
     <div class="card"><h3>Top 10 varer · dækningsbidrag</h3><div class="chart-box h-hoj"><canvas id="c_top_db"></canvas></div></div>
@@ -188,8 +204,10 @@ const nf1 = new Intl.NumberFormat('da-DK',{minimumFractionDigits:1,maximumFracti
 const kr  = v => nf.format(Math.round(v||0)) + ' kr.';
 const pct = v => (v==null?'–':nf1.format(v)+'%');
 
-let valgteKategorier = [];   // tom = alle
+let valgteKategorier = [];   // tom = alle (styres af kategori-dropdown)
+let filtre = {ugedag:[], time:[], vare:[]};  // hver: [{v, label}] — kryds-filtre fra graf-klik
 let charts = {};
+const DIM_NAVN = {kategori:'Kategori', ugedag:'Ugedag', time:'Time', vare:'Vare'};
 Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
 Chart.defaults.font.size = 12;
 Chart.defaults.color = '#6b7d74';
@@ -242,6 +260,7 @@ function opdaterKatLabel(){
   valgteKategorier = (valgt.length===bokse.length) ? [] : valgt.map(b=>b.value);
   katKnap.firstChild.textContent = valgteKategorier.length===0
     ? 'Alle kategorier ' : `${valgteKategorier.length} kategorier valgt `;
+  renderChips();
 }
 
 // Klik på et kategori-element i en graf → filtrér dashboardet til den kategori.
@@ -256,6 +275,45 @@ function filtrerTilKategori(navn){
   hent();
 }
 
+// Generisk kryds-filter (ugedag/time/vare): tilføj/fjern værdi (toggle).
+function toggleFilter(dim, v, label){
+  const arr = filtre[dim];
+  const i = arr.findIndex(x=>String(x.v)===String(v));
+  if(i>=0) arr.splice(i,1); else arr.push({v, label});
+  renderChips();
+  hent();
+}
+function fjernFilter(dim, v){
+  if(dim==='kategori'){
+    const b=[...katPop.querySelectorAll('input')].find(x=>x.value===v);
+    if(b){ b.checked=false; opdaterKatLabel(); hent(); }
+    return;
+  }
+  filtre[dim] = filtre[dim].filter(x=>String(x.v)!==String(v));
+  renderChips();
+  hent();
+}
+function rydAlleFiltre(){
+  katPop.querySelectorAll('input').forEach(i=>i.checked=true);
+  filtre = {ugedag:[], time:[], vare:[]};
+  opdaterKatLabel();   // sætter valgteKategorier=[] + renderChips
+  hent();
+}
+function renderChips(){
+  const c=document.getElementById('chips'); if(!c) return;
+  const liste=[
+    ...valgteKategorier.map(v=>({dim:'kategori', v, label:v})),
+    ...filtre.ugedag.map(x=>({dim:'ugedag', ...x})),
+    ...filtre.time.map(x=>({dim:'time', ...x})),
+    ...filtre.vare.map(x=>({dim:'vare', ...x})),
+  ];
+  const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+  c.innerHTML = liste.length===0 ? '' :
+    liste.map(f=>`<span class="chip"><span class="dim">${DIM_NAVN[f.dim]}:</span> ${esc(f.label)}`
+      +`<button onclick="fjernFilter('${f.dim}','${esc(f.v)}')" title="Fjern filter">✕</button></span>`).join('')
+    + `<button class="chip-clear" onclick="rydAlleFiltre()">Ryd alle filtre</button>`;
+}
+
 // ── Hent + render ────────────────────────────────────────────────────────
 async function hent(){
   const fra=document.getElementById('fra').value, til=document.getElementById('til').value;
@@ -265,6 +323,9 @@ async function hent(){
   try{
     let url=`/api/management/data?fra=${fra}&til=${til}`;
     if(valgteKategorier.length) url+=`&kategori=${encodeURIComponent(valgteKategorier.join(','))}`;
+    if(filtre.ugedag.length) url+=`&ugedag=${filtre.ugedag.map(x=>x.v).join(',')}`;
+    if(filtre.time.length)   url+=`&time=${filtre.time.map(x=>x.v).join(',')}`;
+    if(filtre.vare.length)   url+=`&vare=${encodeURIComponent(filtre.vare.map(x=>x.v).join(','))}`;
     const r=await fetch(url);
     if(r.status===401){ location.href='/login'; return; }
     if(!r.ok) throw new Error('Serverfejl '+r.status);
@@ -322,12 +383,17 @@ function render(d){
   stacked('c_kat_tid', d.kategori_tid);
   matrix('c_kat_matrix', d.kategori);
 
-  hbar('c_top_oms', d.top_oms.map(x=>x.navn), d.top_oms.map(x=>x.oms), PALET[0]);
-  hbar('c_top_db',  d.top_db.map(x=>x.navn),  d.top_db.map(x=>x.db),  PALET[1]);
+  hbar('c_top_oms', d.top_oms.map(x=>x.navn), d.top_oms.map(x=>x.oms), PALET[0],
+       i=>toggleFilter('vare', d.top_oms[i].navn, d.top_oms[i].navn));
+  hbar('c_top_db',  d.top_db.map(x=>x.navn),  d.top_db.map(x=>x.db),  PALET[1],
+       i=>toggleFilter('vare', d.top_db[i].navn, d.top_db[i].navn));
 
-  vbar('c_timer', d.timer.map(x=>String(x.time).padStart(2,'0')+'–'+String(x.time+1).padStart(2,'0')),
-       d.timer.map(x=>x.oms), PALET[5]);
-  vbar('c_ugedag', d.ugedage.map(x=>x.dag), d.ugedage.map(x=>x.oms), PALET[2]);
+  const timeLbl = d.timer.map(x=>String(x.time).padStart(2,'0')+'–'+String(x.time+1).padStart(2,'0'));
+  vbar('c_timer', timeLbl, d.timer.map(x=>x.oms), PALET[5],
+       i=>toggleFilter('time', d.timer[i].time, timeLbl[i]));
+  const WD = [1,2,3,4,5,6,0];   // rækkefølge Man→Søn (strftime %w: 0=søn)
+  vbar('c_ugedag', d.ugedage.map(x=>x.dag), d.ugedage.map(x=>x.oms), PALET[2],
+       i=>toggleFilter('ugedag', WD[i], d.ugedage[i].dag));
 
   betaling('c_betaling', d.betaling);
   tgtgGraf('c_tgtg', d.tgtg_tid);
@@ -354,15 +420,19 @@ function linje(id, labels, serier, opt={}){
       scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:10}},
               y:opt.pct?{grid:{color:gridFarve},ticks:{callback:v=>v+'%'}}:aksePenge()}}});
 }
-function vbar(id,labels,data,farve){
+function vbar(id,labels,data,farve,onKlik){
   nyChart(id,{type:'bar',data:{labels,datasets:[{data,backgroundColor:farve,borderRadius:6,maxBarThickness:46}]},
     options:{responsive:true,maintainAspectRatio:false,
+      onClick:onKlik?(e,els)=>{ if(els.length) onKlik(els[0].index); }:undefined,
+      onHover:onKlik?(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }:undefined,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.y)}}},
       scales:{x:{grid:{display:false}},y:aksePenge()}}});
 }
-function hbar(id,labels,data,farve){
+function hbar(id,labels,data,farve,onKlik){
   nyChart(id,{type:'bar',data:{labels,datasets:[{data,backgroundColor:farve,borderRadius:6}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      onClick:onKlik?(e,els)=>{ if(els.length) onKlik(els[0].index); }:undefined,
+      onHover:onKlik?(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }:undefined,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.x)}}},
       scales:{x:aksePenge(),y:{grid:{display:false}}}}});
 }

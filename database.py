@@ -6042,16 +6042,28 @@ def hent_vejr_forecast() -> Dict:
 _UGEDAGE_DA = ["Søn", "Man", "Tir", "Ons", "Tor", "Fre", "Lør"]
 
 
-def _mgmt_kat_filter(kategorier: Optional[List[str]]):
-    """Returnér (sql_fragment, params) til kategori-filter."""
-    if not kategorier:
-        return "", []
-    pladser = ",".join("?" for _ in kategorier)
-    return f" AND kategori IN ({pladser})", list(kategorier)
+def _mgmt_filter(kategorier=None, ugedage=None, timer=None, varer=None):
+    """Returnér (sql_fragment, params) til kryds-filter på transaktioner.
+    Alle dimensioner kombineres med AND. Tomme/None ignoreres.
+    Bruges kun på transaktioner/v_transaktioner (har kategori/varenavn/time_start)."""
+    sql, params = "", []
+    if kategorier:
+        sql += f" AND kategori IN ({','.join('?' for _ in kategorier)})"
+        params += list(kategorier)
+    if varer:
+        sql += f" AND varenavn IN ({','.join('?' for _ in varer)})"
+        params += list(varer)
+    if timer:
+        sql += f" AND time_start IN ({','.join('?' for _ in timer)})"
+        params += [int(t) for t in timer]
+    if ugedage:
+        sql += f" AND CAST(strftime('%w', dato) AS INT) IN ({','.join('?' for _ in ugedage)})"
+        params += [int(u) for u in ugedage]
+    return sql, params
 
 
-def _mgmt_periode_kpi(conn, fra, til, kategorier):
-    kat_sql, kat_p = _mgmt_kat_filter(kategorier)
+def _mgmt_periode_kpi(conn, fra, til, kategorier, ugedage=None, timer=None, varer=None):
+    kat_sql, kat_p = _mgmt_filter(kategorier, ugedage, timer, varer)
     row = conn.execute(f"""
         SELECT
             COALESCE(SUM(omsætning_korr),     0) AS oms,
@@ -6103,8 +6115,14 @@ def _delta(nu, foer):
     return (nu - foer) / abs(foer) * 100
 
 
-def hent_management_data(fra: str, til: str,
-                         kategorier: Optional[List[str]] = None) -> Dict[str, Any]:
+def hent_mgmt_dashboard(fra: str, til: str,
+                        kategorier: Optional[List[str]] = None,
+                        ugedage: Optional[List[int]] = None,
+                        timer: Optional[List[int]] = None,
+                        varer: Optional[List[str]] = None) -> Dict[str, Any]:
+    """Samlet datasæt til management-dashboardet med kryds-filter på
+    kategori, ugedag, time og vare. (Forveksl ikke med hent_management_data
+    der leverer AI-review-data.)"""
     from datetime import date, timedelta
 
     d_fra = date.fromisoformat(fra)
@@ -6114,12 +6132,12 @@ def hent_management_data(fra: str, til: str,
     p_fra = p_til - timedelta(days=laengde - 1)
     forrige = {"fra": p_fra.isoformat(), "til": p_til.isoformat()}
 
-    kat_sql, kat_p = _mgmt_kat_filter(kategorier)
+    kat_sql, kat_p = _mgmt_filter(kategorier, ugedage, timer, varer)
 
     with _conn() as conn:
         # ── KPI'er (nuværende + forrige periode) ──────────────────────────
-        kpi_nu  = _mgmt_periode_kpi(conn, fra, til, kategorier)
-        kpi_for = _mgmt_periode_kpi(conn, forrige["fra"], forrige["til"], kategorier)
+        kpi_nu  = _mgmt_periode_kpi(conn, fra, til, kategorier, ugedage, timer, varer)
+        kpi_for = _mgmt_periode_kpi(conn, forrige["fra"], forrige["til"], kategorier, ugedage, timer, varer)
 
         def kpi(navn):
             return {"vaerdi": kpi_nu[navn], "forrige": kpi_for[navn],

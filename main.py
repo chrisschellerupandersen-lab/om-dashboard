@@ -376,13 +376,22 @@ async def api_management_data(
     fra: str,
     til: str,
     kategori: Optional[str] = None,
+    ugedag: Optional[str] = None,
+    time: Optional[str] = None,
+    vare: Optional[str] = None,
 ):
-    """Samlet datasæt til management-dashboardet.
-    fra/til = ISO-dato (YYYY-MM-DD). kategori = komma-separeret liste (valgfri).
+    """Samlet datasæt til management-dashboardet med kryds-filter.
+    fra/til = ISO-dato (YYYY-MM-DD). Filtre er komma-separerede lister:
+    kategori (navne), ugedag (0=søn..6=lør), time (0-23), vare (varenavne).
     """
     _kræv_login(request)
-    kategorier = [k.strip() for k in kategori.split(",") if k.strip()] if kategori else None
-    return database.hent_management_data(fra, til, kategorier)
+    def _liste(s):
+        return [x.strip() for x in s.split(",") if x.strip()] if s else None
+    kategorier = _liste(kategori)
+    varer      = _liste(vare)
+    ugedage    = [int(x) for x in _liste(ugedag) or []] or None
+    timer      = [int(x) for x in _liste(time) or []] or None
+    return database.hent_mgmt_dashboard(fra, til, kategorier, ugedage, timer, varer)
 
 
 @app.get("/api/salg/dag-db-detalje")

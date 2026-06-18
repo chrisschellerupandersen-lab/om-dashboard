@@ -104,6 +104,18 @@ def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
     }
 
 
+def _find_uge(tekst: str):
+    """Find ugenummer (1-53) i en tekst — emne eller PDF-indhold. None hvis ingen."""
+    if not tekst:
+        return None
+    m = re.search(r"uge\s*(\d{1,2})", tekst, re.IGNORECASE)
+    if m:
+        u = int(m.group(1))
+        if 1 <= u <= 53:
+            return u
+    return None
+
+
 def gmail_sync_run() -> dict:
     """Hent nye bager-fakturaer fra Gmail og gem i databasen. Returnerer status-dict."""
     try:
@@ -130,6 +142,7 @@ def gmail_sync_run() -> dict:
         messages = result.get("messages", [])
 
         nye = []
+        sprunget = []   # mails der ikke kunne importeres — logges så de er synlige
         for msg in messages:
             msg_id = msg["id"]
             if msg_id in allerede:
@@ -139,13 +152,7 @@ def gmail_sync_run() -> dict:
             subject = headers.get("Subject", "")
             date_str= headers.get("Date", "")
 
-            m_uge = re.search(r"uge\s*(\d+)", subject, re.IGNORECASE)
-            if not m_uge:
-                continue
-            uge = int(m_uge.group(1))
-            m_aar = re.search(r"(202\d)", date_str)
-            aar = int(m_aar.group(1)) if m_aar else datetime.now().year
-
+            # Find PDF-vedhæftning
             att_id = att_name = None
             for part in _iter_parts(full["payload"]):
                 if part.get("mimeType") == "application/pdf":
@@ -153,6 +160,7 @@ def gmail_sync_run() -> dict:
                     att_name = part.get("filename", "faktura.pdf")
                     break
             if not att_id:
+                sprunget.append(f"'{subject[:50]}' (ingen PDF vedhæftet)")
                 continue
 
             att   = service.users().messages().attachments().get(userId="me", messageId=msg_id, id=att_id).execute()
@@ -168,12 +176,25 @@ def gmail_sync_run() -> dict:
             finally:
                 os.unlink(tmp_path)
 
+            # Ugenummer: prøv emnet først, ellers PDF-teksten som fallback
+            uge = _find_uge(subject) or _find_uge(tekst)
+            if not uge:
+                sprunget.append(f"'{subject[:50]}' (kunne ikke finde ugenummer i emne eller PDF)")
+                continue
+
+            # Årstal: mail-dato → PDF-tekst → indeværende år
+            m_aar = re.search(r"(202\d)", date_str) or re.search(r"(202\d)", tekst)
+            aar = int(m_aar.group(1)) if m_aar else datetime.now().year
+
             parsed = _parse_faktura_tekst(tekst, uge, aar)
             nye.append({"msg_id": msg_id, "data": parsed})
 
         if not nye:
-            database.log_gmail_sync("ingen_nye", "Ingen nye fakturaer fundet", 0)
-            return {"ok": True, "besked": "Ingen nye fakturaer", "antal": 0}
+            besked = "Ingen nye fakturaer fundet"
+            if sprunget:
+                besked += ". Sprunget over: " + "; ".join(sprunget)
+            database.log_gmail_sync("ingen_nye", besked, 0)
+            return {"ok": True, "besked": besked, "antal": 0, "sprunget": sprunget}
 
         # Gem i database
         database.gem_bager_regnskab([e["data"] for e in nye])
@@ -181,8 +202,10 @@ def gmail_sync_run() -> dict:
             database.gem_gmail_importeret(entry["msg_id"], entry["data"]["uge"], entry["data"]["aar"])
 
         besked = f"Importeret {len(nye)} faktura(er): " + ", ".join(f"uge {e['data']['uge']}/{e['data']['aar']}" for e in nye)
+        if sprunget:
+            besked += ". Sprunget over: " + "; ".join(sprunget)
         database.log_gmail_sync("ok", besked, len(nye))
-        return {"ok": True, "besked": besked, "antal": len(nye)}
+        return {"ok": True, "besked": besked, "antal": len(nye), "sprunget": sprunget}
 
     except Exception as e:
         msg = f"Sync fejl: {e}"

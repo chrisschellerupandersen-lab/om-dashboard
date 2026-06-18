@@ -117,17 +117,24 @@ def _find_uge(tekst: str):
 
 
 _FAKTURA_PROMPT = (
-    "Dette er en ugentlig bageri-faktura til Organic Market Greve.\n"
-    "Ekstraher præcist følgende felter og returner KUN valid JSON (ingen forklaring):\n"
+    "Dette er en ugentlig bageri-faktura til Organic Market Greve. "
+    "Hver linje har en tekst og et beløb i 'Pris'-kolonnen.\n\n"
+    "Sådan forstås felterne:\n"
+    "- LEVERING (faktura): hovedlinjen 'Levering iflg. specifikation' PLUS eventuelle "
+    "justeringslinjer som 'Uge X rettelse' og 'Levering relativt'. Læg disse beløb sammen "
+    "til ét samlet leveringsbeløb. Justeringslinjerne er en del af leveringen — IKKE returer.\n"
+    "- RETURER: kun linjer der nævner 'Retur wienerbrød', 'Retur boller' eller 'TGTG'. "
+    "Disse står negative på fakturaen — returnér dem som POSITIVE tal i kr.\n\n"
+    "Returnér KUN valid JSON (ingen forklaring, ingen markdown):\n"
     "{\n"
     '  "uge": <ugenummer som heltal>,\n'
     '  "aar": <årstal som heltal>,\n'
-    '  "retur_wiener": <returneret wienerbrød antal stk, 0 hvis ikke nævnt>,\n'
-    '  "retur_boller": <returnerede boller antal stk, 0 hvis ikke nævnt>,\n'
-    '  "tgtg": <Too Good To Go antal stk, 0 hvis ikke nævnt>,\n'
-    '  "b_kvali": <kvalitetskreditering beløb i kr (positivt tal), 0 hvis ikke nævnt>,\n'
-    '  "retur_ialt": <total returkredit i kr (positivt tal), 0 hvis ikke nævnt>,\n'
-    '  "faktura": <faktura total at betale i kr, 0 hvis ikke nævnt>\n'
+    '  "faktura": <samlet leveringsbeløb i kr = levering + justeringslinjer>,\n'
+    '  "retur_wiener": <beløb for returneret wienerbrød i kr, positivt, 0 hvis ingen>,\n'
+    '  "retur_boller": <beløb for returnerede boller i kr, positivt, 0 hvis ingen>,\n'
+    '  "tgtg": <TGTG-krediteringsbeløb i kr, positivt, 0 hvis ingen>,\n'
+    '  "b_kvali": <kvalitetskreditering i kr, positivt, 0 hvis ingen>,\n'
+    '  "retur_ialt": <summen af returer + krediteringer i kr, positivt>\n'
     "}"
 )
 
@@ -151,10 +158,14 @@ def _faktura_felter_fra_pdf(pdf_bytes: bytes) -> dict:
             {"type": "text", "text": _FAKTURA_PROMPT},
         ]}],
     )
-    raw = msg.content[0].text.strip().strip("`")
-    if raw.lower().startswith("json"):
-        raw = raw[4:].strip()
-    data = _json.loads(raw)
+    raw = (msg.content[0].text or "").strip()
+    # Træk JSON-objektet ud — robust mod markdown-fences og omkringliggende tekst
+    m = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not m:
+        raise RuntimeError(
+            "Kunne ikke læse faktura-felter fra PDF "
+            f"(uventet svar: {raw[:100] or 'tomt'}). Er PDF'en en scanning uden tekst?")
+    data = _json.loads(m.group(0))
     for f in ("uge", "aar", "retur_wiener", "retur_boller", "tgtg", "b_kvali", "retur_ialt", "faktura"):
         if f not in data or data[f] is None:
             data[f] = 0

@@ -5565,8 +5565,8 @@ function buildAar() {
     const ash   = `${mono}color:var(--ash);`;
     const clk   = `cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;`;
     const mi    = tblRows.indexOf(r) + 1;  // månedsnummer 1-12
-    return `<tr class="${r.isIndev?'indev':''}">
-      <td><strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
+    return `<tr id="mrow-${mi}" class="${r.isIndev?'indev':''}">
+      <td>${r.omsat>0?`<span id="mexp-${mi}" onclick="toggleMaanedUger(${mi},${aar},event)" title="Vis uger" style="cursor:pointer;color:var(--moss);font-weight:700;margin-right:7px;display:inline-block;width:9px;text-align:center;">+</span>`:'<span style="display:inline-block;width:9px;margin-right:7px;"></span>'}<strong>${r.label}</strong><span style="${markStyle}${mono}font-size:9px;">${mark}</span></td>
       <td class="num">${dk(r.omsat)}</td>
       <td class="num">${dk(r.omsat/1.25)}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mpNetto > 0 ? dk(r.mpNetto) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
@@ -5593,6 +5593,52 @@ function buildAar() {
   document.getElementById('aar-note').textContent =
     `ok = faktiske tal · * = estimat: ${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst · GPM ${c.gpm}% · Faste omk. ${dk(c.faste)} kr/mdr · Resultat = DB − faste omk.`;
 
+}
+
+// Fold en måned ud til ugevise tal (delvise uger ved månedsskift summer op til måneden)
+async function toggleMaanedUger(mi, aar, ev) {
+  if (ev) ev.stopPropagation();
+  const btn = document.getElementById('mexp-' + mi);
+  const aabne = document.querySelectorAll('.wk-m' + mi);
+  if (aabne.length) {                       // allerede åben → luk
+    aabne.forEach(e => e.remove());
+    if (btn) btn.textContent = '+';
+    return;
+  }
+  if (btn) btn.textContent = '…';
+  let d;
+  try {
+    d = await api(`/api/salg/maaned-uger?aar=${aar}&maaned=${mi}`);
+  } catch (e) {
+    if (btn) btn.textContent = '+';
+    return;
+  }
+  const mrow = document.getElementById('mrow-' + mi);
+  if (!mrow) { if (btn) btn.textContent = '+'; return; }
+  const dk = v => Math.round(v).toLocaleString('da-DK');
+  const mono = "font-family:'DM Mono',monospace;";
+  const ash = `${mono}color:var(--ash);`;
+  const html = (d.uger || []).map(w => {
+    const resCls = w.res >= 0 ? '#2d5a2d' : '#9b3420';
+    const delvis = w.delvis ? ` <span style="color:var(--ash);font-size:9px;">(${w.dage} dg)</span>` : '';
+    return `<tr class="wk-m${mi}" style="background:rgba(45,74,45,.035);font-size:11px;">
+      <td style="padding-left:30px;color:var(--ash);">&#8627; Uge ${w.uge}${delvis}</td>
+      <td class="num" style="${mono}">${dk(w.omsat)}</td>
+      <td class="num" style="${ash}">${dk(w.omsat/1.25)}</td>
+      <td class="num" style="${mono}color:var(--moss);">${w.mpNetto>0?dk(w.mpNetto):'—'}</td>
+      <td class="num" style="${ash}">${dk(w.netto)}</td>
+      <td class="num" style="${ash}">${w.bagerVF>0?dk(w.bagerVF):'—'}</td>
+      <td class="num" style="${ash}">${w.andetVF>0?dk(w.andetVF):'—'}</td>
+      <td class="num" style="${ash}">${w.vfTot>0?dk(w.vfTot):'—'}</td>
+      <td class="num" style="${mono}">${dk(w.avance)}</td>
+      <td class="num" style="${mono}">${w.gpm!=null?w.gpm.toFixed(1)+'%':'—'}</td>
+      <td class="num" style="${ash}">${dk(w.faste)}</td>
+      <td class="num" style="${mono}color:${resCls};">${dk(w.res)}</td>
+      <td></td>
+    </tr>`;
+  }).join('');
+  mrow.insertAdjacentHTML('afterend', html);
+  if (btn) btn.textContent = '−';
 }
 
 function buildAarFaktisk(d, c) {

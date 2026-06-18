@@ -1424,6 +1424,103 @@ def hent_aarsdata(aar: int = None) -> Dict:
     }
 
 
+def hent_uger_for_maaned(aar: int, maaned: int) -> Dict:
+    """Ugevis nedbrydning af resultatopgørelsen for én måned.
+    Hver uge medregnes kun med de dage der falder i måneden (delvise uger ved
+    månedsskift), så ugerne summer præcist op til månedstallet. Samme
+    kolonnelogik som den månedlige resultatopgørelse.
+    """
+    from datetime import date as _date, timedelta as _td
+    import calendar
+
+    m_start = _date(aar, maaned, 1)
+    m_end   = _date(aar, maaned, calendar.monthrange(aar, maaned)[1])
+    dage_i_maaned = (m_end - m_start).days + 1
+
+    # ISO-uger der overlapper måneden, med segment (uge ∩ måned)
+    uger: Dict = {}
+    d = m_start
+    while d <= m_end:
+        iy, iw, _ = d.isocalendar()
+        seg = uger.setdefault((iy, iw), [d, d])
+        seg[1] = d                      # d stiger monotont → seg[1] = sidste dag i segmentet
+        d += _td(days=1)
+
+    _ikke_bager = """CAST(CAST(varenummer AS REAL) AS INTEGER) NOT IN (
+        SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+        FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0')"""
+
+    maaned_faste   = faste_omk_maaned_sum(aar).get(maaned, 0) or 0
+    maaned_mp_incl = _mp_map_alle().get((aar, maaned), 0) or 0
+
+    with _conn() as conn:
+        def _sales(s, e):
+            return conn.execute(
+                "SELECT COALESCE(SUM(omsætning),0) v FROM transaktioner WHERE dato>=? AND dato<=?",
+                (s, e)).fetchone()["v"] or 0
+
+        # Bager netto-faktura per ISO-uge (indeværende + forrige år, til årsskifte-uger)
+        bager = {}
+        for r in conn.execute(
+            "SELECT uge, aar, faktura, retur_ialt FROM bager_regnskab WHERE aar=? OR aar=?",
+            (aar, aar - 1)
+        ):
+            bager[(int(r["aar"]), int(r["uge"]))] = (r["faktura"] or 0) - (r["retur_ialt"] or 0)
+
+        maaned_sales = _sales(m_start.isoformat(), m_end.isoformat())
+
+        rows = []
+        for (iy, iw), (segs, sege) in sorted(uger.items()):
+            s, e = segs.isoformat(), sege.isoformat()
+            agg = conn.execute(f"""
+                SELECT COALESCE(SUM(omsætning),0) AS oms,
+                       COALESCE(SUM(CASE WHEN {_ikke_bager} THEN kostpris ELSE 0 END),0) AS vf_andet
+                FROM transaktioner WHERE dato>=? AND dato<=?
+            """, (s, e)).fetchone()
+            oms       = agg["oms"] or 0
+            vf_andet  = round(agg["vf_andet"] or 0)
+            seg_sales = oms
+
+            # MobilePay: månedstotal pro-rateret efter ugens salgsandel (reconcilerer)
+            mp_netto = round(maaned_mp_incl * (seg_sales / maaned_sales) / 1.25) if maaned_sales > 0 else 0
+
+            # Bager-faktura: fuld hvis ugen ligger helt i måneden, ellers efter salgsandel
+            fw_mon = _date.fromisocalendar(iy, iw, 1)
+            fw_sun = fw_mon + _td(days=6)
+            bf_full = bager.get((iy, iw), 0)
+            if bf_full and (fw_mon < m_start or fw_sun > m_end):
+                fw_sales = _sales(fw_mon.isoformat(), fw_sun.isoformat())
+                bf = bf_full * (seg_sales / fw_sales) if fw_sales > 0 else 0
+            else:
+                bf = bf_full
+            bager_vf = round(bf) if bf > 0 else 0
+
+            netto_ex    = oms / 1.25
+            total_netto = netto_ex + mp_netto
+            total_vf    = bager_vf + vf_andet
+            db          = total_netto - total_vf
+            gpm         = (db / total_netto * 100) if total_netto > 0 else None
+            seg_dage    = (sege - segs).days + 1
+            faste       = round(maaned_faste * seg_dage / dage_i_maaned) if dage_i_maaned else 0
+            res         = db - faste
+
+            rows.append({
+                "uge": iw, "fra": s, "til": e, "dage": seg_dage, "delvis": seg_dage < 7,
+                "omsat":   round(oms),
+                "mpNetto": mp_netto,
+                "netto":   round(total_netto),   # NETTO OMSAT (ex-moms + MP)
+                "bagerVF": bager_vf,
+                "andetVF": vf_andet,
+                "vfTot":   round(total_vf),
+                "avance":  round(db),
+                "gpm":     round(gpm, 1) if gpm is not None else None,
+                "faste":   faste,
+                "res":     round(res),
+            })
+
+    return {"aar": aar, "maaned": maaned, "uger": rows}
+
+
 def hent_trend_analyse(periode_dage: int = 21, aar: int = None) -> Dict:
     """Sammenlign seneste periode mod forrige periode (dagsnormaliseret)."""
     from datetime import datetime, timedelta

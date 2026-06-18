@@ -631,6 +631,13 @@ async def api_aarsdata(request: Request, aar: Optional[int] = None):
     return database.hent_aarsdata(aar)
 
 
+@app.get("/api/salg/maaned-uger")
+async def api_maaned_uger(request: Request, aar: int, maaned: int):
+    """Ugevis nedbrydning af resultatopgørelsen for en given måned."""
+    _kræv_login(request)
+    return database.hent_uger_for_maaned(aar, maaned)
+
+
 @app.get("/api/salg/trend")
 async def api_trend(request: Request, dage: int = 21, aar: Optional[int] = None):
     _kræv_login(request)

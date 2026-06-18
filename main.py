@@ -116,6 +116,56 @@ def _find_uge(tekst: str):
     return None
 
 
+_FAKTURA_PROMPT = (
+    "Dette er en ugentlig bageri-faktura til Organic Market Greve.\n"
+    "Ekstraher præcist følgende felter og returner KUN valid JSON (ingen forklaring):\n"
+    "{\n"
+    '  "uge": <ugenummer som heltal>,\n'
+    '  "aar": <årstal som heltal>,\n'
+    '  "retur_wiener": <returneret wienerbrød antal stk, 0 hvis ikke nævnt>,\n'
+    '  "retur_boller": <returnerede boller antal stk, 0 hvis ikke nævnt>,\n'
+    '  "tgtg": <Too Good To Go antal stk, 0 hvis ikke nævnt>,\n'
+    '  "b_kvali": <kvalitetskreditering beløb i kr (positivt tal), 0 hvis ikke nævnt>,\n'
+    '  "retur_ialt": <total returkredit i kr (positivt tal), 0 hvis ikke nævnt>,\n'
+    '  "faktura": <faktura total at betale i kr, 0 hvis ikke nævnt>\n'
+    "}"
+)
+
+
+def _faktura_felter_fra_pdf(pdf_bytes: bytes) -> dict:
+    """Læs bager-faktura-felter præcist fra PDF med Claude. Kaster ved fejl.
+    Bruges af både den manuelle upload og den automatiske Gmail-sync."""
+    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY ikke konfigureret")
+    import anthropic as _ant
+    import json as _json
+    client = _ant.Anthropic(api_key=api_key)
+    msg = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        messages=[{"role": "user", "content": [
+            {"type": "document", "source": {"type": "base64",
+                "media_type": "application/pdf",
+                "data": base64.b64encode(pdf_bytes).decode()}},
+            {"type": "text", "text": _FAKTURA_PROMPT},
+        ]}],
+    )
+    raw = msg.content[0].text.strip().strip("`")
+    if raw.lower().startswith("json"):
+        raw = raw[4:].strip()
+    data = _json.loads(raw)
+    for f in ("uge", "aar", "retur_wiener", "retur_boller", "tgtg", "b_kvali", "retur_ialt", "faktura"):
+        if f not in data or data[f] is None:
+            data[f] = 0
+    for f in ("uge", "aar"):   # disse skal være heltal
+        try:
+            data[f] = int(data[f]) if data[f] else 0
+        except (ValueError, TypeError):
+            data[f] = 0
+    return data
+
+
 def gmail_sync_run() -> dict:
     """Hent nye bager-fakturaer fra Gmail og gem i databasen. Returnerer status-dict."""
     try:
@@ -166,27 +216,42 @@ def gmail_sync_run() -> dict:
             att   = service.users().messages().attachments().get(userId="me", messageId=msg_id, id=att_id).execute()
             pdf_b = base64.urlsafe_b64decode(att.get("data", "") + "==")
 
-            tekst = ""
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(pdf_b); tmp_path = tmp.name
+            uge_emne = _find_uge(subject)
+            m_aar    = re.search(r"(202\d)", date_str)
+            aar_emne = int(m_aar.group(1)) if m_aar else None
+
+            # Primært: læs felterne præcist med Claude (samme som manuel upload).
+            # Fallback: pdfplumber + regex, hvis Claude ikke er tilgængelig/fejler.
             try:
-                with pdfplumber.open(tmp_path) as pdf:
-                    for page in pdf.pages:
-                        tekst += (page.extract_text() or "") + "\n"
-            finally:
-                os.unlink(tmp_path)
+                parsed = _faktura_felter_fra_pdf(pdf_b)
+                if not parsed.get("uge"):
+                    parsed["uge"] = uge_emne
+                if not parsed.get("aar"):
+                    parsed["aar"] = aar_emne or datetime.now().year
+            except Exception as claude_fejl:
+                tekst = ""
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                        tmp.write(pdf_b); tmp_path = tmp.name
+                    try:
+                        with pdfplumber.open(tmp_path) as pdf:
+                            for page in pdf.pages:
+                                tekst += (page.extract_text() or "") + "\n"
+                    finally:
+                        os.unlink(tmp_path)
+                except Exception:
+                    pass
+                uge = uge_emne or _find_uge(tekst)
+                if not uge:
+                    sprunget.append(f"'{subject[:50]}' (kunne ikke læse faktura: {claude_fejl})")
+                    continue
+                m2  = re.search(r"(202\d)", tekst)
+                aar = aar_emne or (int(m2.group(1)) if m2 else datetime.now().year)
+                parsed = _parse_faktura_tekst(tekst, uge, aar)
 
-            # Ugenummer: prøv emnet først, ellers PDF-teksten som fallback
-            uge = _find_uge(subject) or _find_uge(tekst)
-            if not uge:
-                sprunget.append(f"'{subject[:50]}' (kunne ikke finde ugenummer i emne eller PDF)")
+            if not parsed.get("uge"):
+                sprunget.append(f"'{subject[:50]}' (intet ugenummer fundet)")
                 continue
-
-            # Årstal: mail-dato → PDF-tekst → indeværende år
-            m_aar = re.search(r"(202\d)", date_str) or re.search(r"(202\d)", tekst)
-            aar = int(m_aar.group(1)) if m_aar else datetime.now().year
-
-            parsed = _parse_faktura_tekst(tekst, uge, aar)
             nye.append({"msg_id": msg_id, "data": parsed})
 
         if not nye:
@@ -1318,59 +1383,9 @@ async def api_helligdage(request: Request, aar: Optional[int] = None):
 async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
     """Parse bager-faktura PDF med Claude og returner ekstraherede felter."""
     _kræv_login(request)
-    api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        return {"ok": False, "fejl": "ANTHROPIC_API_KEY ikke konfigureret"}
     try:
         pdf_bytes = await fil.read()
-        pdf_b64   = __import__("base64").b64encode(pdf_bytes).decode()
-        import anthropic as _ant
-        client = _ant.Anthropic(api_key=api_key)
-        msg = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=512,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": pdf_b64,
-                        },
-                    },
-                    {
-                        "type": "text",
-                        "text": (
-                            "Dette er en ugentlig bageri-faktura til Organic Market Greve.\n"
-                            "Ekstraher præcist følgende felter og returner KUN valid JSON (ingen forklaring):\n"
-                            "{\n"
-                            '  "uge": <ugenummer som heltal>,\n'
-                            '  "aar": <årstal som heltal>,\n'
-                            '  "retur_wiener": <returneret wienerbrød antal stk, 0 hvis ikke nævnt>,\n'
-                            '  "retur_boller": <returnerede boller antal stk, 0 hvis ikke nævnt>,\n'
-                            '  "tgtg": <Too Good To Go antal stk, 0 hvis ikke nævnt>,\n'
-                            '  "b_kvali": <kvalitetskreditering beløb i kr (positivt tal), 0 hvis ikke nævnt>,\n'
-                            '  "retur_ialt": <total returkredit i kr (positivt tal), 0 hvis ikke nævnt>,\n'
-                            '  "faktura": <faktura total at betale i kr, 0 hvis ikke nævnt>\n'
-                            "}"
-                        ),
-                    },
-                ],
-            }],
-        )
-        import json as _json
-        raw = msg.content[0].text.strip()
-        # Trim markdown code fences hvis til stede
-        raw = raw.strip("`")
-        if raw.lower().startswith("json"):
-            raw = raw[4:].strip()
-        data = _json.loads(raw)
-        # Valider felter
-        for f in ("uge", "aar", "retur_wiener", "retur_boller", "tgtg", "b_kvali", "retur_ialt", "faktura"):
-            if f not in data:
-                data[f] = 0
+        data = _faktura_felter_fra_pdf(pdf_bytes)
         return {"ok": True, "data": data}
     except Exception as exc:
         return {"ok": False, "fejl": str(exc)}

@@ -351,6 +351,16 @@ async def management(request: Request):
     return resp
 
 
+@app.get("/kager", response_class=HTMLResponse)
+async def kager(request: Request):
+    if not get_session(request):
+        return RedirectResponse("/login", status_code=302)
+    resp = templates.TemplateResponse("kager.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 # ── API ───────────────────────────────────────────────────────────────────────
 
 def _kræv_login(request: Request):
@@ -392,6 +402,13 @@ async def api_management_data(
     ugedage    = [int(x) for x in _liste(ugedag) or []] or None
     timer      = [int(x) for x in _liste(time) or []] or None
     return database.hent_mgmt_dashboard(fra, til, kategorier, ugedage, timer, varer)
+
+
+@app.get("/api/kager/data")
+async def api_kager_data(request: Request, aar: Optional[int] = None):
+    """Kage-analyse: ugentlig udvikling, top-kager og nøgletal."""
+    _kræv_login(request)
+    return database.hent_kage_analyse(aar)
 
 
 @app.get("/api/salg/dag-db-detalje")

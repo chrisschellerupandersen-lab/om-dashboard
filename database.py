@@ -19,6 +19,23 @@ _KAFFE_WHERE = """(
     OR LOWER(varenavn) LIKE '%mocha%'
 )"""
 
+# Kager — identificeres på varenavn, da kassesystemet IKKE har en Kager-kategori
+# (alt bagværk ligger under "Bagværk"). Wienerbrød/snegle/snurrer/croissant er
+# bevidst holdt ude (= wienerbrød, ikke kager). Bekræftet med butikken.
+_KAGE_WHERE = """(
+    LOWER(varenavn) LIKE '%træstamme%'
+    OR LOWER(varenavn) LIKE '%kokostop%'
+    OR LOWER(varenavn) LIKE '%romkugle%'
+    OR LOWER(varenavn) LIKE '%hindbærsnitte%'
+    OR LOWER(varenavn) LIKE '%studenterbrød%'
+    OR LOWER(varenavn) LIKE '%napoleonshat%'
+    OR LOWER(varenavn) LIKE '%brownie%'
+    OR LOWER(varenavn) LIKE '%cookie%'
+    OR LOWER(varenavn) LIKE '%muffin%'
+    OR LOWER(varenavn) LIKE '%tiramisu%'
+    OR LOWER(varenavn) LIKE '%brunkager%'
+)"""
+
 
 def _conn() -> sqlite3.Connection:
     db_dir = os.path.dirname(DB_PATH)
@@ -6384,3 +6401,98 @@ def _mgmt_indsigter(kpis, kategori_agg, kfor, timer, ugedage, tidsserie):
                         f"(DB {kr(kpis['db']['vaerdi'])} − faste omk. {kr(kpis['faste_omk']['vaerdi'])})."})
 
     return ud
+
+
+# ── KAGE-ANALYSE ────────────────────────────────────────────────────────────
+# Dedikeret side i dashboardet. Kager identificeres på varenavn (_KAGE_WHERE),
+# da kassesystemet ikke har en Kager-kategori. Ugentlig gruppering sker pr.
+# ISO-uge i Python, så tallene matcher den manuelle Excel-analyse.
+
+def hent_kage_analyse(aar: Optional[int] = None) -> Dict[str, Any]:
+    from datetime import date
+
+    aar_filter = " AND substr(dato,1,4) = ?" if aar else ""
+    params = [str(aar)] if aar else []
+
+    with _conn() as conn:
+        dage = conn.execute(f"""
+            SELECT dato,
+                   SUM(omsætning) AS oms,
+                   SUM(antal)     AS antal,
+                   SUM(avance)    AS avance
+            FROM transaktioner
+            WHERE {_KAGE_WHERE}{aar_filter}
+            GROUP BY dato ORDER BY dato
+        """, params).fetchall()
+
+        top = conn.execute(f"""
+            SELECT varenavn,
+                   SUM(omsætning) AS oms,
+                   SUM(antal)     AS antal
+            FROM transaktioner
+            WHERE {_KAGE_WHERE}{aar_filter}
+            GROUP BY varenavn ORDER BY oms DESC LIMIT 10
+        """, params).fetchall()
+
+        bagv = conn.execute(f"""
+            SELECT COALESCE(SUM(omsætning),0) AS oms
+            FROM transaktioner
+            WHERE kategori IN ('Bagværk','Desserter'){aar_filter}
+        """, params).fetchone()
+
+    # ISO-uge gruppering (matcher Excel-analysen)
+    uger_map: Dict = {}
+    for r in dage:
+        d = date.fromisoformat(r["dato"])
+        iy, iw, _ = d.isocalendar()
+        u = uger_map.setdefault((iy, iw), {"oms": 0.0, "antal": 0.0, "avance": 0.0, "sidste": d})
+        u["oms"]    += float(r["oms"] or 0)
+        u["antal"]  += float(r["antal"] or 0)
+        u["avance"] += float(r["avance"] or 0)
+        if d > u["sidste"]:
+            u["sidste"] = d
+
+    uger = []
+    for (iy, iw), v in sorted(uger_map.items()):
+        net = v["oms"] / 1.25
+        uger.append({
+            "uge":        iw,
+            "aar":        iy,
+            "oms":        round(v["oms"], 2),
+            "antal":      int(v["antal"]),
+            "avance":     round(v["avance"], 2),
+            "avance_pct": round(v["avance"] / net * 100, 1) if net else 0.0,
+            "delvis":     v["sidste"].isoweekday() != 7,   # uge ikke afsluttet søndag
+        })
+
+    tot_oms = sum(u["oms"] for u in uger)
+    tot_ant = sum(u["antal"] for u in uger)
+    tot_av  = sum(u["avance"] for u in uger)
+    tot_net = tot_oms / 1.25
+    bagv_oms = float(bagv["oms"] or 0)
+
+    # Udvikling: seneste 4 hele uger vs de 4 foregående hele uger
+    hele = [u for u in uger if not u["delvis"]]
+    def _snit(seg):
+        return sum(x["oms"] for x in seg) / len(seg) if seg else 0
+    snit_ny, snit_gl = _snit(hele[-4:]), _snit(hele[-8:-4])
+    delta = ((snit_ny - snit_gl) / snit_gl * 100) if snit_gl else None
+
+    return {
+        "total": {
+            "oms":            round(tot_oms),
+            "antal":          int(tot_ant),
+            "avance":         round(tot_av),
+            "avance_pct":     round(tot_av / tot_net * 100, 1) if tot_net else 0.0,
+            "andel_bagvaerk": round(tot_oms / bagv_oms * 100, 1) if bagv_oms else None,
+            "snit_uge":       round(tot_oms / len(uger)) if uger else 0,
+        },
+        "uger": uger,
+        "top":  [{"navn": r["varenavn"], "oms": round(float(r["oms"] or 0)),
+                  "antal": int(r["antal"] or 0)} for r in top],
+        "udvikling": {
+            "seneste4_snit": round(snit_ny),
+            "forrige4_snit": round(snit_gl),
+            "delta_pct":     round(delta, 1) if delta is not None else None,
+        },
+    }

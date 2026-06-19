@@ -3809,7 +3809,7 @@ async function loadAll() {
 
   if (kpi) setSyncNow();
   loadReturStatus();
-  mbLoad();
+  mbLoad(true);   // force: så morgenbriefing også opdateres ved auto-refresh (hvert 10. min)
   loadSpildOverblik();
 
   // Sæt date picker til dagens dato
@@ -7893,9 +7893,16 @@ async function mbLoad(force = false) {
   const aktuelTxt = d.aktuel_klar
     ? `✓ Uge ${d.uge} bestilt · ${d.aktuel_stk.toLocaleString('da-DK')} stk`
     : `⚠ Uge ${d.uge} mangler bestilling`;
-  document.getElementById('mb-deadline-txt').parentElement.insertAdjacentHTML('beforebegin',
-    `<div style="font-family:'DM Mono',monospace;font-size:10px;color:${d.aktuel_klar?'rgba(200,168,75,.8)':'rgba(255,100,100,.8)'};margin-bottom:4px;">${aktuelTxt}</div>`
-  );
+  // get-or-create, så gentagne kald (auto-refresh) ikke laver dubletter
+  let aktuelEl = document.getElementById('mb-aktuel-status');
+  if (!aktuelEl) {
+    aktuelEl = document.createElement('div');
+    aktuelEl.id = 'mb-aktuel-status';
+    aktuelEl.style.cssText = "font-family:'DM Mono',monospace;font-size:10px;margin-bottom:4px;";
+    document.getElementById('mb-deadline-txt').parentElement.insertAdjacentElement('beforebegin', aktuelEl);
+  }
+  aktuelEl.textContent = aktuelTxt;
+  aktuelEl.style.color = d.aktuel_klar ? 'rgba(200,168,75,.8)' : 'rgba(255,100,100,.8)';
 
   // Vis altid badge — tjek bestilling FØR deadline
   if (d.bestilling_klar) {
@@ -8002,20 +8009,27 @@ async function mbLoad(force = false) {
     scales:{ x:{ticks:{font:{size:9},color:'rgba(30,58,30,.5)'},grid:{display:false}},
              y:{ticks:{font:{size:9},color:'rgba(30,58,30,.4)',callback:cb},grid:{color:'rgba(0,0,0,.05)'}} } });
 
+  window._mbCharts = window._mbCharts || {};
   if (d.sparklines && d.sparklines.length) {
     const ctx = document.getElementById('mb-spark-oms')?.getContext('2d');
-    if (ctx) new Chart(ctx, { type:'bar',
-      data:{ labels:d.sparklines.map(r=>r.dato.slice(5)),
-             datasets:[{data:d.sparklines.map(r=>r.oms), backgroundColor:'rgba(30,58,30,.55)', borderRadius:3, borderWidth:0}]},
-      options: spOpts(v=>Math.round(v/1000)+'k', 'kr') });
+    if (ctx) {
+      if (_mbCharts.oms) _mbCharts.oms.destroy();
+      _mbCharts.oms = new Chart(ctx, { type:'bar',
+        data:{ labels:d.sparklines.map(r=>r.dato.slice(5)),
+               datasets:[{data:d.sparklines.map(r=>r.oms), backgroundColor:'rgba(30,58,30,.55)', borderRadius:3, borderWidth:0}]},
+        options: spOpts(v=>Math.round(v/1000)+'k', 'kr') });
+    }
   }
 
   if (d.kaffe_trend && d.kaffe_trend.length) {
     const ctx2 = document.getElementById('mb-spark-kaffe')?.getContext('2d');
-    if (ctx2) new Chart(ctx2, { type:'bar',
-      data:{ labels:d.kaffe_trend.map(r=>r.dato.slice(5)),
-             datasets:[{data:d.kaffe_trend.map(r=>r.antal), backgroundColor:'rgba(139,90,43,.55)', borderRadius:3, borderWidth:0}]},
-      options: spOpts(v=>v, 'kopper') });
+    if (ctx2) {
+      if (_mbCharts.kaffe) _mbCharts.kaffe.destroy();
+      _mbCharts.kaffe = new Chart(ctx2, { type:'bar',
+        data:{ labels:d.kaffe_trend.map(r=>r.dato.slice(5)),
+               datasets:[{data:d.kaffe_trend.map(r=>r.antal), backgroundColor:'rgba(139,90,43,.55)', borderRadius:3, borderWidth:0}]},
+        options: spOpts(v=>v, 'kopper') });
+    }
   }
 
   // Zone 6: Smart alert

@@ -6331,6 +6331,32 @@ def hent_mgmt_dashboard(fra: str, til: str,
             "data":   {s: [round(pivot[u].get(s, 0), 2) for u in uger_sorteret] for s in serier},
         }
 
+        # ── Bagværk vs. øvrige varer — %-andel pr. uge (100% stacked) ─────
+        # Bevidst KUN datoperiode (ikke kategori/vare-filter) — ellers giver
+        # opdelingen ikke mening. Måler andel af omsætning (inkl. moms).
+        ba_rows = conn.execute("""
+            SELECT strftime('%Y-W%W', dato) AS uge,
+                   SUM(CASE WHEN TRIM(kategori) = 'Bagværk' THEN omsætning_korr ELSE 0 END) AS bagvaerk,
+                   SUM(omsætning_korr) AS total
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY uge ORDER BY uge
+        """, [fra, til]).fetchall()
+        bagvaerk_andel = []
+        for r in ba_rows:
+            tot = float(r["total"] or 0)
+            bag = float(r["bagvaerk"] or 0)
+            if tot <= 0:
+                continue
+            bag_pct = round(bag / tot * 100, 1)
+            bagvaerk_andel.append({
+                "uge":          r["uge"],
+                "bagvaerk":     round(bag, 2),
+                "ovrige":       round(tot - bag, 2),
+                "bagvaerk_pct": bag_pct,
+                "ovrige_pct":   round(100 - bag_pct, 1),
+            })
+
         # ── Top 10 varer (omsætning og DB) ────────────────────────────────
         top_oms = [{"navn": r["varenavn"], "oms": round(float(r["oms"] or 0), 2)}
                    for r in conn.execute(f"""
@@ -6415,6 +6441,7 @@ def hent_mgmt_dashboard(fra: str, til: str,
         "tidsserie":    tidsserie,
         "kategori":     kategori_agg,
         "kategori_tid": kategori_tid,
+        "bagvaerk_andel": bagvaerk_andel,
         "top_oms":      top_oms,
         "top_db":       top_db,
         "timer":        timer,

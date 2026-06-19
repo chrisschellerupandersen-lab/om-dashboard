@@ -172,6 +172,9 @@
   <div class="grid" style="margin-top:16px">
     <div class="card"><h3>Kategori-matrix <span class="h-sub">omsætning vs. avancegrad</span></h3><div class="chart-box h-hoj"><canvas id="c_kat_matrix"></canvas></div></div>
   </div>
+  <div class="grid" style="margin-top:16px">
+    <div class="card"><h3>Bagværk vs. øvrige varer <span class="h-sub">· andel af omsætning pr. uge (hele perioden)</span></h3><div class="chart-box"><canvas id="c_bagvaerk"></canvas></div></div>
+  </div>
 
   <!-- Varer & tid -->
   <div class="sektion-titel">Varer &amp; tidsmønstre <span style="text-transform:none;font-weight:500;color:var(--svagere);letter-spacing:0">· klik en vare, time eller ugedag for at filtrere</span></div>
@@ -383,6 +386,7 @@ function render(d){
   donut('c_kat_donut', d.kategori.map(x=>x.kategori), d.kategori.map(x=>x.oms), {klikbar:true});
   stacked('c_kat_tid', d.kategori_tid);
   matrix('c_kat_matrix', d.kategori);
+  bagvaerkAndel('c_bagvaerk', d.bagvaerk_andel);
 
   hbar('c_top_oms', d.top_oms.map(x=>x.navn), d.top_oms.map(x=>x.oms), PALET[0],
        i=>toggleFilter('vare', d.top_oms[i].navn, d.top_oms[i].navn));
@@ -457,6 +461,22 @@ function stacked(id,kt){
       plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:8,font:{size:11}}},
         tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${kr(c.parsed.y)}`}}},
       scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,...aksePenge()}}}});
+}
+function bagvaerkAndel(id,rows){
+  rows = rows||[];
+  const labels = rows.map(r=>r.uge.replace('-W','-u'));
+  nyChart(id,{type:'line',data:{labels,datasets:[
+      {label:'Bagværk',data:rows.map(r=>r.bagvaerk_pct),borderColor:PALET[0],backgroundColor:PALET[0]+'cc',fill:true,stack:'a',tension:.3,borderWidth:1,pointRadius:0},
+      {label:'Øvrige varer',data:rows.map(r=>r.ovrige_pct),borderColor:PALET[3],backgroundColor:PALET[3]+'cc',fill:true,stack:'a',tension:.3,borderWidth:1,pointRadius:0}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom',labels:{boxWidth:11,padding:8,font:{size:11}}},
+        tooltip:{mode:'index',callbacks:{label:c=>{
+          const r=rows[c.dataIndex];
+          const krv=c.dataset.label==='Bagværk'?r.bagvaerk:r.ovrige;
+          return ` ${c.dataset.label}: ${nf1.format(c.parsed.y)}% (${kr(krv)})`;}}}},
+      scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:12}},
+        y:{stacked:true,min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:gridFarve}}}}});
 }
 function matrix(id,kat){
   nyChart(id,{data:{labels:kat.map(x=>x.kategori),datasets:[

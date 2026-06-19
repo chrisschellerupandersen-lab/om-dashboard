@@ -476,7 +476,7 @@ function bagvaerkAndel(id,rows){
           const krv=c.dataset.label==='Bagværk'?r.bagvaerk:r.ovrige;
           return ` ${c.dataset.label}: ${nf1.format(c.parsed.y)}% (${kr(krv)})`;}}}},
       scales:{x:{grid:{display:false},ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:12}},
-        y:{stacked:true,min:0,max:100,ticks:{stepSize:5,callback:v=>v+'%'},grid:{color:gridFarve}}}}});
+        y:{stacked:true,min:0,max:100,ticks:{stepSize:5,maxTicksLimit:21,autoSkip:false,callback:v=>v+'%'},grid:{color:gridFarve}}}}});
 }
 function matrix(id,kat){
   nyChart(id,{data:{labels:kat.map(x=>x.kategori),datasets:[

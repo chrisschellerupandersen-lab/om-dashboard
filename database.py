@@ -6324,7 +6324,8 @@ def hent_mgmt_dashboard(fra: str, til: str,
         _kk_nu  = _kat_oms(fra, til)
         _kk_for = _kat_oms(forrige["fra"], forrige["til"])
         _KPI_KATS = [("Bagværk", "Bagværk"), ("Kaffe", "Kaffe to-go"),
-                     ("Kolonial", "Kolonial"), ("Færdigretter", "Færdigretter / To-Home")]
+                     ("Kolonial", "Kolonial"), ("Færdigretter", "Færdigretter / To-Home"),
+                     ("Mejeri", "Mejeri")]
         kategori_kpi = []
         for label, kat in _KPI_KATS:
             nu, foer = _kk_nu.get(kat, 0), _kk_for.get(kat, 0)

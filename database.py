@@ -6314,6 +6314,23 @@ def hent_mgmt_dashboard(fra: str, til: str,
             GROUP BY 1
         """, [forrige["fra"], forrige["til"], *kat_p]).fetchall()}
 
+        # ── Kategori-KPI'er (faste kategorier, omsætning + Δ måned-over-måned)
+        # Kun datoperiode (ikke kategori/vare-filter), så kortene altid vises.
+        def _kat_oms(f, t):
+            return {r["kategori"]: float(r["oms"] or 0) for r in conn.execute("""
+                SELECT TRIM(kategori) AS kategori, SUM(omsætning_korr) AS oms
+                FROM v_transaktioner WHERE dato >= ? AND dato <= ? GROUP BY 1
+            """, [f, t]).fetchall()}
+        _kk_nu  = _kat_oms(fra, til)
+        _kk_for = _kat_oms(forrige["fra"], forrige["til"])
+        _KPI_KATS = [("Bagværk", "Bagværk"), ("Kaffe", "Kaffe to-go"),
+                     ("Kolonial", "Kolonial"), ("Færdigretter", "Færdigretter / To-Home")]
+        kategori_kpi = []
+        for label, kat in _KPI_KATS:
+            nu, foer = _kk_nu.get(kat, 0), _kk_for.get(kat, 0)
+            kategori_kpi.append({"label": label, "oms": round(nu),
+                                 "forrige": round(foer), "delta": _delta(nu, foer)})
+
         # ── Kategori vs. tid (stacked, top 6 + Øvrige, pr. uge) ───────────
         srows = conn.execute(f"""
             SELECT strftime('%Y-W%W', dato) AS uge,
@@ -6450,6 +6467,7 @@ def hent_mgmt_dashboard(fra: str, til: str,
         "kategori":     kategori_agg,
         "kategori_tid": kategori_tid,
         "bagvaerk_andel": bagvaerk_andel,
+        "kategori_kpi": kategori_kpi,
         "top_oms":      top_oms,
         "top_db":       top_db,
         "timer":        timer,

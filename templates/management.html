@@ -363,9 +363,10 @@ function render(d){
     {lab:'Antal bonner',  val:nf.format(k.bonner.vaerdi),        delta:k.bonner.delta,     sub:'snit '+kr(k.snit_bon.vaerdi)},
     {lab:'Solgte varer',  val:nf.format(k.antal.vaerdi),         delta:k.antal.delta,      sub:'antal enheder'},
     {lab:'TGTG-poser',    val:nf.format(k.tgtg_poser.vaerdi),    delta:k.tgtg_poser.delta, sub:kr(k.tgtg_kr.vaerdi)+' reddet'},
-    {lab:'Faste omk.',    val:kr(k.faste_omk.vaerdi),            delta:k.faste_omk.delta,  sub:'i perioden', omvendt:true},
-    {lab:'Resultat',      val:kr(k.resultat.vaerdi),             delta:k.resultat.delta,   sub:'DB − faste omk.'},
   ];
+  // Kategori-KPI'er (omsætning + Δ vs. sidste måned)
+  (d.kategori_kpi||[]).forEach(c=>kort.push(
+    {lab:c.label, val:kr(c.oms), delta:c.delta, sub:'omsætning · vs. sidste md.'}));
   document.getElementById('kpi-grid').innerHTML = kort.map(c=>`
     <div class="kpi">
       <div class="lab">${c.lab}</div>

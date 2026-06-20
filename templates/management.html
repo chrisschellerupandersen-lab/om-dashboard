@@ -356,23 +356,33 @@ function render(d){
 
   // KPI-kort
   const k=d.kpi;
+  const dd = o => (o.vaerdi==null||o.forrige==null) ? null : o.vaerdi-o.forrige;  // absolut ændring
+  const absfmt = (v,kind) => {
+    if(v==null) return '';
+    const s = v>=0?'+':'−', a = Math.abs(v);
+    return kind==='kr'   ? s+nf.format(Math.round(a))+' kr'
+         : kind==='pp'   ? s+nf1.format(a)+' pp'
+         :                 s+nf.format(Math.round(a));
+  };
   const kort=[
-    {lab:'Omsætning',     val:kr(k.oms.vaerdi),                  delta:k.oms.delta,        sub:'inkl. moms'},
-    {lab:'Dækningsbidrag',val:kr(k.db.vaerdi),                   delta:k.db.delta,         sub:'ekskl. moms'},
-    {lab:'Avancegrad',    val:pct(k.avance_pct.vaerdi),          delta:k.avance_pct.delta, sub:'af oms. ekskl. moms'},
-    {lab:'Antal bonner',  val:nf.format(k.bonner.vaerdi),        delta:k.bonner.delta,     sub:'snit '+kr(k.snit_bon.vaerdi)},
-    {lab:'Solgte varer',  val:nf.format(k.antal.vaerdi),         delta:k.antal.delta,      sub:'antal enheder'},
-    {lab:'TGTG-poser',    val:nf.format(k.tgtg_poser.vaerdi),    delta:k.tgtg_poser.delta, sub:kr(k.tgtg_kr.vaerdi)+' reddet'},
+    {lab:'Omsætning',     val:kr(k.oms.vaerdi),                  delta:k.oms.delta,        abs:dd(k.oms),        kind:'kr',    sub:'inkl. moms'},
+    {lab:'Dækningsbidrag',val:kr(k.db.vaerdi),                   delta:k.db.delta,         abs:dd(k.db),         kind:'kr',    sub:'ekskl. moms'},
+    {lab:'Avancegrad',    val:pct(k.avance_pct.vaerdi),          delta:k.avance_pct.delta, abs:dd(k.avance_pct), kind:'pp',    sub:'af oms. ekskl. moms'},
+    {lab:'Antal bonner',  val:nf.format(k.bonner.vaerdi),        delta:k.bonner.delta,     abs:dd(k.bonner),     kind:'count', sub:'snit '+kr(k.snit_bon.vaerdi)},
+    {lab:'Solgte varer',  val:nf.format(k.antal.vaerdi),         delta:k.antal.delta,      abs:dd(k.antal),      kind:'count', sub:'antal enheder'},
+    {lab:'TGTG-poser',    val:nf.format(k.tgtg_poser.vaerdi),    delta:k.tgtg_poser.delta, abs:dd(k.tgtg_poser), kind:'count', sub:kr(k.tgtg_kr.vaerdi)+' reddet'},
   ];
   // Kategori-KPI'er (omsætning + Δ vs. sidste måned)
   (d.kategori_kpi||[]).forEach(c=>kort.push(
-    {lab:c.label, val:kr(c.oms), delta:c.delta, sub:'omsætning · vs. sidste md.'}));
-  document.getElementById('kpi-grid').innerHTML = kort.map(c=>`
-    <div class="kpi">
+    {lab:c.label, val:kr(c.oms), delta:c.delta, abs:(c.oms-c.forrige), kind:'kr', sub:'vs. sidste md.'}));
+  document.getElementById('kpi-grid').innerHTML = kort.map(c=>{
+    const a = absfmt(c.abs, c.kind);
+    const aClr = c.abs==null ? '' : (c.abs>=0 ? 'var(--pos)' : 'var(--neg)');
+    return `<div class="kpi">
       <div class="lab">${c.lab}</div>
       <div class="val">${c.val}</div>
-      <div>${deltaHtml(c.delta, c.omvendt)} <span class="sub">${c.sub}</span></div>
-    </div>`).join('');
+      <div>${deltaHtml(c.delta, c.omvendt)}${a?` <span style="font-size:12px;font-weight:600;color:${aClr};">${a}</span>`:''} <span class="sub">${c.sub}</span></div>
+    </div>`;}).join('');
 
   // Indsigter
   document.getElementById('indsigter').innerHTML = (d.indsigter||[]).map(i=>`

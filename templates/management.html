@@ -400,9 +400,9 @@ function render(d){
   bagvaerkAndel('c_bagvaerk', d.bagvaerk_andel);
 
   hbar('c_top_oms', d.top_oms.map(x=>x.navn), d.top_oms.map(x=>x.oms), PALET[0],
-       i=>toggleFilter('vare', d.top_oms[i].navn, d.top_oms[i].navn));
+       i=>toggleFilter('vare', d.top_oms[i].navn, d.top_oms[i].navn), d.top_oms.map(x=>x.delta));
   hbar('c_top_db',  d.top_db.map(x=>x.navn),  d.top_db.map(x=>x.db),  PALET[1],
-       i=>toggleFilter('vare', d.top_db[i].navn, d.top_db[i].navn));
+       i=>toggleFilter('vare', d.top_db[i].navn, d.top_db[i].navn), d.top_db.map(x=>x.delta));
 
   const timeLbl = d.timer.map(x=>String(x.time).padStart(2,'0')+'–'+String(x.time+1).padStart(2,'0'));
   vbar('c_timer', timeLbl, d.timer.map(x=>x.oms), PALET[5],
@@ -444,12 +444,20 @@ function vbar(id,labels,data,farve,onKlik){
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.y)}}},
       scales:{x:{grid:{display:false}},y:aksePenge()}}});
 }
-function hbar(id,labels,data,farve,onKlik){
-  nyChart(id,{type:'bar',data:{labels,datasets:[{data,backgroundColor:farve,borderRadius:6}]},
+function hbar(id,labels,data,farve,onKlik,trends){
+  // trends (valgfri): array af Δ% pr. vare → trend-pil + farve (op=grøn, ned=amber)
+  const harTrend = Array.isArray(trends);
+  const NED='#d8863f', FLAD='#b8c2bc';
+  const lbls = harTrend ? labels.map((l,i)=> l + (trends[i]==null?'':(trends[i]>=0?'  ▲':'  ▼'))) : labels;
+  const farver = harTrend ? trends.map(t=> t==null?FLAD : (t>=0?farve:NED)) : farve;
+  nyChart(id,{type:'bar',data:{labels:lbls,datasets:[{data,backgroundColor:farver,borderRadius:6}]},
     options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
       onClick:onKlik?(e,els)=>{ if(els.length) onKlik(els[0].index); }:undefined,
       onHover:onKlik?(e,els)=>{ e.native.target.style.cursor=els.length?'pointer':'default'; }:undefined,
-      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>' '+kr(c.parsed.x)}}},
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{
+        let s=' '+kr(c.parsed.x);
+        if(harTrend && trends[c.dataIndex]!=null) s+=`  (${trends[c.dataIndex]>=0?'▲ +':'▼ '}${nf1.format(trends[c.dataIndex])}% vs. sidste md.)`;
+        return s; }}}},
       scales:{x:aksePenge(),y:{grid:{display:false}}}}});
 }
 function donut(id,labels,data,opt={}){

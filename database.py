@@ -6383,19 +6383,36 @@ def hent_mgmt_dashboard(fra: str, til: str,
                 "ovrige_pct":   round(100 - bag_pct, 1),
             })
 
-        # ── Top 10 varer (omsætning og DB) ────────────────────────────────
-        top_oms = [{"navn": r["varenavn"], "oms": round(float(r["oms"] or 0), 2)}
-                   for r in conn.execute(f"""
+        # ── Top 10 varer (omsætning og DB) + trend vs. forrige periode ────
+        # Forrige periodes oms/DB pr. vare → trend-pile på top-listerne
+        prev_vare = {r["varenavn"]: (float(r["oms"] or 0), float(r["db"] or 0))
+                     for r in conn.execute(f"""
+            SELECT varenavn, SUM(omsætning_korr) AS oms, SUM(db_korrekt) AS db
+            FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
+            GROUP BY varenavn
+        """, [forrige["fra"], forrige["til"], *kat_p]).fetchall()}
+
+        top_oms = []
+        for r in conn.execute(f"""
             SELECT varenavn, SUM(omsætning_korr) AS oms
             FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
             GROUP BY varenavn ORDER BY oms DESC LIMIT 10
-        """, [fra, til, *kat_p]).fetchall()]
-        top_db = [{"navn": r["varenavn"], "db": round(float(r["db"] or 0), 2)}
-                  for r in conn.execute(f"""
+        """, [fra, til, *kat_p]).fetchall():
+            oms = round(float(r["oms"] or 0), 2)
+            foer = prev_vare.get(r["varenavn"], (0, 0))[0]
+            top_oms.append({"navn": r["varenavn"], "oms": oms,
+                            "forrige": round(foer, 2), "delta": _delta(oms, foer)})
+
+        top_db = []
+        for r in conn.execute(f"""
             SELECT varenavn, SUM(db_korrekt) AS db
             FROM v_transaktioner WHERE dato >= ? AND dato <= ?{kat_sql}
             GROUP BY varenavn ORDER BY db DESC LIMIT 10
-        """, [fra, til, *kat_p]).fetchall()]
+        """, [fra, til, *kat_p]).fetchall():
+            db = round(float(r["db"] or 0), 2)
+            foer = prev_vare.get(r["varenavn"], (0, 0))[1]
+            top_db.append({"navn": r["varenavn"], "db": db,
+                           "forrige": round(foer, 2), "delta": _delta(db, foer)})
 
         # ── Salg pr. time ─────────────────────────────────────────────────
         timer = [{"time": int(r["t"]), "oms": round(float(r["oms"] or 0), 2)}

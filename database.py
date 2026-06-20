@@ -6239,11 +6239,19 @@ def hent_mgmt_dashboard(fra: str, til: str,
     der leverer AI-review-data.)"""
     from datetime import date, timedelta
 
+    from calendar import monthrange
+
+    def _minus_en_maaned(dd):
+        """Samme dag-i-måned én måned tilbage (klampet til månedens sidste dag)."""
+        y, m = (dd.year - 1, 12) if dd.month == 1 else (dd.year, dd.month - 1)
+        return date(y, m, min(dd.day, monthrange(y, m)[1]))
+
     d_fra = date.fromisoformat(fra)
     d_til = date.fromisoformat(til)
     laengde = (d_til - d_fra).days + 1
-    p_til = d_fra - timedelta(days=1)
-    p_fra = p_til - timedelta(days=laengde - 1)
+    # Sammenlign måned-over-måned: samme datoer én måned tilbage
+    p_fra = _minus_en_maaned(d_fra)
+    p_til = _minus_en_maaned(d_til)
     forrige = {"fra": p_fra.isoformat(), "til": p_til.isoformat()}
 
     kat_sql, kat_p = _mgmt_filter(kategorier, ugedage, timer, varer)

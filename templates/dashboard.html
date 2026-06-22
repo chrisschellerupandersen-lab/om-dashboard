@@ -5314,8 +5314,10 @@ function buildAar() {
                avance:db_kr, gpm, faste, res:Math.round(db_kr - faste) };
     }
     const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
-    const avance = Math.round(omsat * c.gpm / 100);
     const netto  = Math.round(omsat / 1.25);
+    // GPM anvendes på ex-moms netto — samme basis som faktiske måneder (db_kr/netto).
+    // (Tidligere blev GPM ganget på inkl-moms omsat → DB 25% for høj.)
+    const avance = Math.round(netto * c.gpm / 100);
     return { m, dage, type:'estimat', sf:c.saeson[i], omsat, mpNetto:0, netto,
              bagerVF:null, andetVF:null, vfTot:null,
              avance, gpm:c.gpm, faste, res:avance - faste };
@@ -5383,7 +5385,8 @@ function buildAar() {
   }
 
   // ── Top 5 KPIs ─────────────────────────────────────────────────────────────
-  const fromLbl = indev ? `${AAR_MND_NAVNE[indev.m-1].toLowerCase()} – dec ${aar}` : `jan – dec ${aar}`;
+  // Prognose årsresultat = HELE året (faktiske mdr. + estimat for resten)
+  const fromLbl = `jan – dec ${aar} · ${fMaaneder.length} mdr. faktisk + estimat`;
   document.getElementById('aar2-top').innerHTML = `
     <div class="kpi-card" style="background:var(--forest);border-color:var(--forest);">
       <div class="kpi-label" style="color:rgba(200,168,75,.7);">Prognose årsresultat</div>

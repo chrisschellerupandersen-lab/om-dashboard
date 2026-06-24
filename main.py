@@ -1280,8 +1280,12 @@ def _byg_bestilling_xlsx(d: dict) -> bytes:
             sku_int = int(sku_val)
             if sku_int in prod_map:
                 p = prod_map[sku_int]
-                # Opdater pris (kolonne D = index 3)
-                if p.get("pris_ex_moms"):
+                # Pris (kolonne D = index 3): skabelonen er pris-master og
+                # opdateres ved prisændringer (fx bagerens nye prisliste).
+                # Importeret pris bruges kun som fallback hvis skabelonen
+                # mangler pris for varen — ellers ville en gammel importeret
+                # pris overskrive de opdaterede skabelonpriser.
+                if not row[3].value and p.get("pris_ex_moms"):
                     row[3].value = p["pris_ex_moms"]
                 # Indsæt anbefalede antal (E-K)
                 anb = p.get("anbefalet", {})

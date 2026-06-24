@@ -400,6 +400,19 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .aar-cfg-lbl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
 .aar-cfg-inp{width:100%;border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:6px 8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--charcoal);background:var(--parchment);box-sizing:border-box;}
 .aar-cfg-inp:focus{outline:none;border-color:var(--forest);}
+.scen-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.scen-card{text-align:left;cursor:pointer;background:var(--white);border:1px solid rgba(30,58,30,.15);border-left:3px solid var(--scen-farve);border-radius:3px;padding:12px 14px;transition:all .12s;font-family:inherit;}
+.scen-card:hover{border-color:var(--scen-farve);box-shadow:0 1px 4px rgba(30,58,30,.08);}
+.scen-card.aktiv{background:var(--scen-farve);border-color:var(--scen-farve);}
+.scen-card.aktiv .scen-hdr,.scen-card.aktiv .scen-res{color:#fff;}
+.scen-card.aktiv .scen-hdr span,.scen-card.aktiv .scen-oms{color:rgba(255,255,255,.7);}
+.scen-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--scen-farve);font-weight:600;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.scen-hdr span{font-size:8px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ash);}
+.scen-res{font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:var(--charcoal);margin-top:6px;}
+.scen-oms{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:2px;}
+.scen-note{grid-column:1/-1;font-size:11px;color:var(--ash);line-height:1.45;background:rgba(200,168,75,.07);border:1px solid rgba(200,168,75,.2);border-radius:3px;padding:8px 12px;}
+.scen-note strong{color:var(--forest);}
+@media(max-width:760px){.scen-wrap{grid-template-columns:1fr;}}
 .aar-saeson-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;}
 .aar-saeson-cell{text-align:center;}
 .aar-saeson-cell label{font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);display:block;margin-bottom:2px;}
@@ -1765,6 +1778,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </div>
             </div>
           </div>
+          <!-- Scenarie-vælger -->
+          <div class="scen-wrap" id="aar-scenarie"></div>
           <!-- Top 5 KPIs -->
           <div class="aar2-top" id="aar2-top"></div>
           <!-- Midt: Indeværende måned + Årsfremdrift -->
@@ -5041,6 +5056,13 @@ function setDageN(n, el) {
 const AAR_MND_NAVNE = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
 const AAR_MND_KORT  = ['Jan','Feb','Mar','Apr','Maj','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 const AAR_DEFAULT_SAESON = [0.93,0.88,0.95,0.97,1.12,1.15,1.08,1.10,1.00,0.97,0.95,1.85];
+// Scenarier — multiplikator på estimat-måneder (faktiske måneder påvirkes ikke).
+// Faste omk. skaleres IKKE. Budgettér likviditet efter "forsigtigt".
+const AAR_SCENARIER = {
+  forsigtigt:  { mult: 0.90, label: 'Forsigtigt',  sub: '−10% på estimat',  farve: '#8a7a3a' },
+  basis:       { mult: 1.00, label: 'Basis',       sub: 'dine faktorer',    farve: 'var(--forest)' },
+  optimistisk: { mult: 1.10, label: 'Optimistisk', sub: '+10% på estimat',  farve: '#3e7a3e' },
+};
 
 let _aarLoaded = false;
 let _aarRaw    = null;
@@ -5057,6 +5079,7 @@ function defaultAarCfg(base, gpm) {
     faste:  13000,
     haevet: 0,
     saeson: [...AAR_DEFAULT_SAESON],
+    scenarie: 'basis',
   };
 }
 
@@ -5099,7 +5122,15 @@ function recalcAar() {
     faste:  parseFloat(document.getElementById('cfg-faste').value)   || 0,
     haevet: parseFloat(document.getElementById('cfg-haevet').value)  || 0,
     saeson: Array.from({length:12}, (_,i) => parseFloat(document.getElementById('cfg-s'+(i+1))?.value) || 1),
+    scenarie: (_aarCfg && _aarCfg.scenarie) || 'basis',
   };
+  localStorage.setItem('aar_cfg_v2', JSON.stringify(_aarCfg));
+  buildAar();
+}
+
+function setScenarie(navn) {
+  if (!AAR_SCENARIER[navn] || !_aarCfg) return;
+  _aarCfg.scenarie = navn;
   localStorage.setItem('aar_cfg_v2', JSON.stringify(_aarCfg));
   buildAar();
 }
@@ -5275,6 +5306,8 @@ async function fasteOmkTilfoej() {
 
 function buildAar() {
   const d = _aarRaw; const c = _aarCfg; const aar = d.aar;
+  const scen = (c.scenarie && AAR_SCENARIER[c.scenarie]) ? c.scenarie : 'basis';
+  const scenMult = AAR_SCENARIER[scen].mult;
   if (!d.maaneder) { document.getElementById('aar-no-data').style.display=''; document.getElementById('aar-content').style.display='none'; return; }
   document.getElementById('aar-no-data').style.display='none';
   document.getElementById('aar-content').style.display='';
@@ -5313,7 +5346,8 @@ function buildAar() {
                omsat:f.omsaetning, mpNetto, netto, bagerVF, andetVF, vfTot,
                avance:db_kr, gpm, faste, res:Math.round(db_kr - faste) };
     }
-    const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage);
+    // Estimat-måneder skaleres med valgt scenarie (forsigtigt/basis/optimistisk).
+    const omsat  = Math.round(c.base * (1 + c.vaekst/100) * c.saeson[i] * dage * scenMult);
     const netto  = Math.round(omsat / 1.25);
     // GPM anvendes på ex-moms netto — samme basis som faktiske måneder (db_kr/netto).
     // (Tidligere blev GPM ganget på inkl-moms omsat → DB 25% for høj.)
@@ -5384,9 +5418,44 @@ function buildAar() {
               totalProj:last.omsat, dagSnit:Math.round(last.omsat/last.faktDage), restDage:0, isLive:false };
   }
 
+  // ── Scenarie-bånd ──────────────────────────────────────────────────────────
+  // Beregn estimat-måneders basis-aggregater (mult=1), så alle 3 scenarier kan vises på én gang.
+  let estOmsatB = 0, estAvanceB = 0, estFasteB = 0, antalEst = 0;
+  for (let i = 0; i < 12; i++) {
+    const mm = i + 1;
+    if (faktisk[mm]) continue;
+    antalEst++;
+    const dg = mndDage(aar, mm);
+    const oB = Math.round(c.base * (1 + c.vaekst / 100) * c.saeson[i] * dg);
+    const nB = Math.round(oB / 1.25);
+    estOmsatB  += oB;
+    estAvanceB += Math.round(nB * c.gpm / 100);
+    estFasteB  += harDBFaste ? (dbFasteSum[mm] || 0) : c.faste;
+  }
+  const scenBand = Object.entries(AAR_SCENARIER).map(([navn, s]) => ({
+    navn, ...s,
+    omsat: ytdOmsat + Math.round(estOmsatB * s.mult),
+    res:   ytdRes   + Math.round(estAvanceB * s.mult) - estFasteB,
+  }));
+  const scenBandEl = document.getElementById('aar-scenarie');
+  if (scenBandEl) {
+    scenBandEl.innerHTML = scenBand.map(b => {
+      const aktiv = b.navn === scen;
+      return `<button type="button" onclick="setScenarie('${b.navn}')"
+        class="scen-card${aktiv ? ' aktiv' : ''}"
+        style="--scen-farve:${b.farve};">
+        <div class="scen-hdr">${aktiv ? '● ' : ''}${b.label}<span>${b.sub}</span></div>
+        <div class="scen-res">${dk(b.res)} kr</div>
+        <div class="scen-oms">Omsætning ${dk(b.omsat)} kr</div>
+      </button>`;
+    }).join('') + (antalEst > 0
+      ? `<div class="scen-note">Scenariet skalerer kun de ${antalEst} estimat-måneder. Faste omk. og faktiske måneder ændres ikke. Læg budget & likviditet efter <strong>Forsigtigt</strong>.</div>`
+      : `<div class="scen-note">Året er fuldt afsluttet — ingen estimat-måneder at skalere.</div>`);
+  }
+
   // ── Top 5 KPIs ─────────────────────────────────────────────────────────────
   // Prognose årsresultat = HELE året (faktiske mdr. + estimat for resten)
-  const fromLbl = `jan – dec ${aar} · ${fMaaneder.length} mdr. faktisk + estimat`;
+  const fromLbl = `jan – dec ${aar} · ${fMaaneder.length} mdr. faktisk + estimat · ${AAR_SCENARIER[scen].label.toLowerCase()}`;
   document.getElementById('aar2-top').innerHTML = `
     <div class="kpi-card" style="background:var(--forest);border-color:var(--forest);">
       <div class="kpi-label" style="color:rgba(200,168,75,.7);">Prognose årsresultat</div>
@@ -5594,7 +5663,7 @@ function buildAar() {
   }).join('');
 
   document.getElementById('aar-note').textContent =
-    `ok = faktiske tal · * = estimat: ${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst · GPM ${c.gpm}% · Faste omk. ${dk(c.faste)} kr/mdr · Resultat = DB − faste omk.`;
+    `ok = faktiske tal · * = estimat: ${dk(c.base)} kr/dag × sæsonfaktor × ${c.vaekst>=0?'+':''}${c.vaekst}% vækst${scenMult!==1?` × ${AAR_SCENARIER[scen].label.toLowerCase()} (${scenMult>1?'+':''}${Math.round((scenMult-1)*100)}%)`:''} · GPM ${c.gpm}% · Faste omk. ${dk(c.faste)} kr/mdr · Resultat = DB − faste omk.`;
 
 }
 

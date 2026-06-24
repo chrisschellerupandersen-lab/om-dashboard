@@ -268,6 +268,22 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_kp_vn ON varekostpris(varenummer, gyldig_fra);
 
+            -- Dato-styrede kostpriser (manuelle prisændringer med gyldig_fra/til).
+            -- Matcher på varenavn (stabilt på tværs af systemet) og har FØRSTE prioritet
+            -- i kostpris-beregningen, så fx en bagerprisstigning fra en bestemt dato
+            -- slår igennem fremad uden at ændre historikken før datoen.
+            CREATE TABLE IF NOT EXISTS vare_pris_periode (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                varenavn     TEXT NOT NULL,
+                pris_ex_moms REAL NOT NULL DEFAULT 0,
+                gyldig_fra   TEXT NOT NULL,
+                gyldig_til   TEXT,
+                kilde        TEXT DEFAULT 'manuel',
+                oprettet     TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(varenavn, gyldig_fra) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_pp_navn ON vare_pris_periode(varenavn, gyldig_fra);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -297,6 +313,8 @@ def init_db():
             SELECT tc.*,
                    tc.omsætning_korr / 1.25 AS omsaetning_ex_moms,
                    CASE
+                       WHEN pp.pris_ex_moms IS NOT NULL AND pp.pris_ex_moms > 0
+                           THEN tc.antal * pp.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                        WHEN s.pris_ex_moms > 0
                            THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                        WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
@@ -305,6 +323,8 @@ def init_db():
                    END AS vf_korrekt,
                    tc.omsætning_korr / 1.25
                        - CASE
+                             WHEN pp.pris_ex_moms IS NOT NULL AND pp.pris_ex_moms > 0
+                                 THEN tc.antal * pp.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                              WHEN s.pris_ex_moms > 0
                                  THEN tc.antal * s.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                              WHEN kp.kostpris_enhed IS NOT NULL AND kp.kostpris_enhed > 0 AND tc.antal > 0
@@ -320,7 +340,11 @@ def init_db():
                 AND tc.varenummer = kp.varenummer
                 AND LOWER(TRIM(kp.varenavn)) = LOWER(TRIM(tc.varenavn))
                 AND kp.gyldig_fra <= tc.dato
-                AND (kp.gyldig_til IS NULL OR kp.gyldig_til >= tc.dato);
+                AND (kp.gyldig_til IS NULL OR kp.gyldig_til >= tc.dato)
+            LEFT JOIN vare_pris_periode pp
+                ON LOWER(TRIM(pp.varenavn)) = LOWER(TRIM(tc.varenavn))
+                AND pp.gyldig_fra <= tc.dato
+                AND (pp.gyldig_til IS NULL OR pp.gyldig_til >= tc.dato);
         """)
         # Migrationer til eksisterende tabeller
         for sql in [
@@ -3809,6 +3833,11 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
             LIMIT 8
         """).fetchall()
 
+        # Dato-styret kostpris for mål-ugen (mandag) — overstyrer importeret pris,
+        # så bestilling TIL uge 28+ får nye priser mens uge 27 beholder de gamle.
+        _maal_mon  = date.fromisocalendar(maal_aar, maal_uge, 1).isoformat()
+        _pp_priser = _aktive_priser(conn, _maal_mon)
+
         # ── Har vi en faktisk indlæst bestilling for mål-ugen? ──────────────
         faktisk_rows = conn.execute("""
             SELECT varenummer, varenavn, pris_ex_moms,
@@ -3829,7 +3858,8 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
                     print(f"Fejl ved konvertering af dag-værdier for {r['varenavn']}: {e}")
                     dag_vals = {d: 0 for d in DAGE}
                 total_p  = sum(dag_vals.values())
-                pris     = float(r["pris_ex_moms"] or 0)
+                pris     = _pp_priser.get(str(r["varenavn"]).strip().lower(),
+                                          float(r["pris_ex_moms"] or 0))
                 kat      = _kat(r["varenavn"], sd_map)
                 produkter.append({
                     "varenummer":      r["varenummer"] or "",
@@ -4036,7 +4066,8 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
 
         total_basis = sum(basis_dag[d] for d in DAGE)
         total_anb   = sum(anb_dag[d]   for d in DAGE)
-        pris = float(r["pris_ex_moms"] or 0)
+        pris = _pp_priser.get(str(r["varenavn"]).strip().lower(),
+                              float(r["pris_ex_moms"] or 0))
 
         # Samme uge sidste år for dette produkt
         sa = sidst_aar_map.get(vn, {})
@@ -5997,6 +6028,60 @@ def korriger_varekostpris(varenummer: str, kostpris_enhed: float, gyldig_fra: st
             "VALUES (?,?,?,?,'manuel')",
             (varenummer, navn, round(kostpris_enhed, 4), gyldig_fra)
         )
+
+
+# ── Dato-styrede kostpriser (vare_pris_periode) ────────────────────────────────
+
+def _aktive_priser(conn, dato_iso: str) -> Dict:
+    """{varenavn_lower: pris_ex_moms} for de priser der er gyldige på en given dato."""
+    rows = conn.execute(
+        "SELECT varenavn, pris_ex_moms FROM vare_pris_periode "
+        "WHERE gyldig_fra <= ? AND (gyldig_til IS NULL OR gyldig_til >= ?)",
+        (dato_iso, dato_iso)
+    ).fetchall()
+    return {str(r["varenavn"]).strip().lower(): float(r["pris_ex_moms"] or 0) for r in rows}
+
+
+def gem_prisperiode_bulk(linjer: List[Dict]) -> int:
+    """Indsæt dato-styrede priser. For hver vare lukkes evt. tidligere åben periode
+    (gyldig_til = gyldig_fra − 1 dag) før den nye åbnes. Idempotent via UNIQUE-replace."""
+    from datetime import date as _d, timedelta as _td
+    n = 0
+    with _conn() as conn:
+        for r in linjer:
+            navn = str(r.get("varenavn", "")).strip()
+            gfra = str(r.get("gyldig_fra", "")).strip()
+            if not navn or not gfra:
+                continue
+            pris = float(r.get("pris_ex_moms", 0) or 0)
+            til = (_d.fromisoformat(gfra) - _td(days=1)).isoformat()
+            conn.execute(
+                "UPDATE vare_pris_periode SET gyldig_til=? "
+                "WHERE LOWER(TRIM(varenavn))=LOWER(TRIM(?)) AND gyldig_til IS NULL AND gyldig_fra < ?",
+                (til, navn, gfra)
+            )
+            conn.execute(
+                "INSERT INTO vare_pris_periode (varenavn, pris_ex_moms, gyldig_fra, kilde) "
+                "VALUES (?,?,?,?)",
+                (navn, pris, gfra, str(r.get("kilde", "manuel")))
+            )
+            n += 1
+    return n
+
+
+def hent_prisperioder() -> List[Dict]:
+    """Alle dato-styrede priser, nyeste først."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT id, varenavn, pris_ex_moms, gyldig_fra, gyldig_til, kilde "
+            "FROM vare_pris_periode ORDER BY gyldig_fra DESC, varenavn"
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def slet_prisperiode(id_: int) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM vare_pris_periode WHERE id=?", (id_,))
 
 
 def hent_gmail_importerede() -> set:

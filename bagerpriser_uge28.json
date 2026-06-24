@@ -1,0 +1,211 @@
+{
+  "gyldig_fra": "2026-07-06",
+  "kilde": "bager uge 28 2026",
+  "linjer": [
+    {
+      "varenavn": "ØKO - Hvedebrød",
+      "pris_ex_moms": 24.2,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Landbrød",
+      "pris_ex_moms": 27.3,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kernebrød",
+      "pris_ex_moms": 24.96,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Hvedebrød, m/ birkes",
+      "pris_ex_moms": 25.58,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Ciabattaflute",
+      "pris_ex_moms": 20.04,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Foccacia",
+      "pris_ex_moms": 187.2,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Signaturbrød",
+      "pris_ex_moms": 28.93,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Softkernerugbrød 1000g",
+      "pris_ex_moms": 24.96,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Softkernerugbrød 1400g",
+      "pris_ex_moms": 35.29,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Hvedeboller m/Birkes",
+      "pris_ex_moms": 6.92,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Hvedeboller",
+      "pris_ex_moms": 6.13,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Müslibolle",
+      "pris_ex_moms": 6.92,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kernebolle",
+      "pris_ex_moms": 6.55,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Græskarstykke",
+      "pris_ex_moms": 7.42,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Teboller plain",
+      "pris_ex_moms": 6.13,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Teboller rosin",
+      "pris_ex_moms": 7.3,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Teboller choko",
+      "pris_ex_moms": 7.79,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Tebirkes",
+      "pris_ex_moms": 12.48,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Grovbirkes",
+      "pris_ex_moms": 12.24,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Croissant",
+      "pris_ex_moms": 11.11,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Crossaint Marcipan & Chok",
+      "pris_ex_moms": 12.36,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kanel snegl",
+      "pris_ex_moms": 11.23,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - HØJ Romsnegle",
+      "pris_ex_moms": 12.85,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kanelsnurrer",
+      "pris_ex_moms": 11.6,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kardemommesnurrer in form, sugar on top",
+      "pris_ex_moms": 13.98,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Frøsnapper",
+      "pris_ex_moms": 12.42,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Høj Kanel snegl",
+      "pris_ex_moms": 12.72,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Wienerstang",
+      "pris_ex_moms": 35.65,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kanelstang med choko",
+      "pris_ex_moms": 35.65,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Spandauer m. vanilje",
+      "pris_ex_moms": 12.11,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Spandauer m. hindbær",
+      "pris_ex_moms": 12.24,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Træstammer",
+      "pris_ex_moms": 15.77,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Napoleonshat",
+      "pris_ex_moms": 20.17,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Cookies",
+      "pris_ex_moms": 15.37,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Kokostoppe",
+      "pris_ex_moms": 15.12,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Romkugler m. choko",
+      "pris_ex_moms": 8.8,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Studenterbrød - halv plade",
+      "pris_ex_moms": 60.5,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Hindbærsnitter",
+      "pris_ex_moms": 15.0,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Banan muffin",
+      "pris_ex_moms": 17.03,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Brownie",
+      "pris_ex_moms": 18.09,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Æble/kanel muffin",
+      "pris_ex_moms": 17.02,
+      "gyldig_fra": "2026-07-06"
+    }
+  ]
+}

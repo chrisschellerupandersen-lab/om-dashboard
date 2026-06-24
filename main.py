@@ -1835,6 +1835,54 @@ async def stamdata_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/prisperiode")
+async def api_prisperiode(request: Request):
+    _kræv_login(request)
+    return database.hent_prisperioder()
+
+
+@app.post("/api/prisperiode/gem")
+async def prisperiode_gem(request: Request):
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    varenavn   = body.get("varenavn", "").strip()
+    gyldig_fra = body.get("gyldig_fra", "").strip()
+    if not varenavn or not gyldig_fra:
+        raise HTTPException(status_code=400, detail="Mangler varenavn eller gyldig_fra")
+    antal = database.gem_prisperiode_bulk([{
+        "varenavn":     varenavn,
+        "pris_ex_moms": float(body.get("pris_ex_moms", 0) or 0),
+        "gyldig_fra":   gyldig_fra,
+    }])
+    return {"ok": True, "linjer": antal}
+
+
+@app.delete("/api/prisperiode/{id_}")
+async def prisperiode_slet(request: Request, id_: int):
+    _kræv_login(request)
+    database.slet_prisperiode(id_)
+    return {"ok": True}
+
+
+@app.post("/api/prisperiode/bulk")
+async def prisperiode_bulk(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    antal = database.gem_prisperiode_bulk(linjer)
+    return {"ok": True, "linjer": antal}
+
+
 @app.get("/api/kontrol/varenumre")
 async def api_kontrol_varenumre(request: Request):
     _kræv_login(request)

@@ -1701,6 +1701,12 @@ async def api_tgtg_overblik(request: Request, aar: Optional[int] = None):
     return database.hent_tgtg_overblik(aar)
 
 
+@app.get("/api/tgtg/spec/{uge}")
+async def api_tgtg_spec(request: Request, uge: int, aar: int):
+    _kræv_login(request)
+    return database.hent_tgtg_spec(int(uge), int(aar))
+
+
 @app.post("/api/tgtg/dagssalg")
 async def api_tgtg_dagssalg(request: Request):
     """Modtager dagligt salg fra tgtg_sync.py eller manuel input."""

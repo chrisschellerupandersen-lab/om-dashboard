@@ -2122,6 +2122,43 @@ def hent_tgtg_overblik(aar: int = None) -> Dict:
     }
 
 
+def hent_tgtg_spec(uge: int, aar: int) -> Dict:
+    """Specifikation af TGTG-salg for én ISO-uge: dato × posetype × antal × kreditering.
+    Bruges som drill-down fra TGTG-opgørelser (ugetabel, morgenbriefing, svind)."""
+    from datetime import date as _date
+    mon = _date.fromisocalendar(aar, uge, 1)
+    son = _date.fromisocalendar(aar, uge, 7)
+    with _conn() as conn:
+        linjer = conn.execute("""
+            SELECT dato, pose_navn,
+                   SUM(antal)       AS antal,
+                   SUM(kreditering) AS kreditering
+            FROM tgtg_dagssalg
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY dato, pose_navn
+            ORDER BY dato, pose_navn
+        """, (mon.isoformat(), son.isoformat())).fetchall()
+        per_pose = conn.execute("""
+            SELECT pose_navn,
+                   SUM(antal)       AS antal,
+                   SUM(kreditering) AS kreditering
+            FROM tgtg_dagssalg
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY pose_navn
+            ORDER BY kreditering DESC
+        """, (mon.isoformat(), son.isoformat())).fetchall()
+    linjer   = [dict(r) for r in linjer]
+    per_pose = [dict(r) for r in per_pose]
+    return {
+        "uge": uge, "aar": aar,
+        "dato_start": mon.isoformat(), "dato_slut": son.isoformat(),
+        "linjer":      linjer,
+        "per_pose":    per_pose,
+        "total_antal": sum(int(r["antal"] or 0) for r in linjer),
+        "total_kr":    round(sum(float(r["kreditering"] or 0) for r in linjer), 2),
+    }
+
+
 def hent_svind_data(aar: int = None) -> List[Dict]:
     """Kombinerer bestilling, bager_regnskab og kassesalg per uge.
     Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk.

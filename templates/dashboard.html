@@ -7024,6 +7024,58 @@ async function tgtgGemManuel() {
   }
 }
 
+// TGTG spec drill-down — viser dato × posetype × antal × kreditering for én uge
+async function tgtgSpec(uge, aar) {
+  const modal = document.getElementById('tgtg-spec-modal');
+  const body  = document.getElementById('tgtg-spec-body');
+  document.getElementById('tgtg-spec-titel').textContent = `TGTG-salg · uge ${uge} ${aar}`;
+  document.getElementById('tgtg-spec-sub').textContent   = 'Henter…';
+  body.innerHTML = '';
+  modal.style.display = 'flex';
+  let d;
+  try {
+    const r = await fetch(`/api/tgtg/spec/${uge}?aar=${aar}`);
+    d = await r.json();
+  } catch(e) {
+    body.innerHTML = '<div style="padding:20px;text-align:center;color:var(--ash);">Fejl ved hentning</div>';
+    return;
+  }
+  const mono    = "font-family:'DM Mono',monospace;";
+  const dk      = v => Math.round(v).toLocaleString('da-DK');
+  const fmtDato = s => new Date(s).toLocaleDateString('da-DK',{weekday:'short',day:'numeric',month:'short'});
+  document.getElementById('tgtg-spec-sub').textContent =
+    `${fmtDato(d.dato_start)} – ${fmtDato(d.dato_slut)} · ${d.total_antal||0} poser · ${dk(d.total_kr||0)} kr`;
+  if (!d.linjer || !d.linjer.length) {
+    body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--ash);">Ingen TGTG-salg registreret i denne uge.</div>';
+    return;
+  }
+  const th = t => `<th style="text-align:${t.r?'right':'left'};padding:4px 8px;${mono}font-size:9px;letter-spacing:.06em;color:var(--ash);">${t.t}</th>`;
+  const poseRows = (d.per_pose||[]).map(p =>
+    `<tr><td style="padding:5px 8px;font-size:13px;">${p.pose_navn}</td>
+      <td class="num" style="${mono}font-size:13px;">${p.antal}</td>
+      <td class="num" style="${mono}font-size:13px;color:var(--forest);font-weight:500;">${dk(p.kreditering)} kr</td></tr>`).join('');
+  const dagRows = d.linjer.map(r =>
+    `<tr><td style="padding:5px 8px;font-size:12px;color:var(--ash);">${fmtDato(r.dato)}</td>
+      <td style="padding:5px 8px;font-size:13px;">${r.pose_navn}</td>
+      <td class="num" style="${mono}font-size:13px;">${r.antal}</td>
+      <td class="num" style="${mono}font-size:13px;color:var(--forest);">${dk(r.kreditering)} kr</td></tr>`).join('');
+  body.innerHTML = `
+    <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Pr. posetype</div>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
+      <thead><tr style="border-bottom:1px solid var(--border);">
+        ${th({t:'POSETYPE'})}${th({t:'ANTAL',r:1})}${th({t:'KREDITERING',r:1})}
+      </tr></thead><tbody>${poseRows}</tbody></table>
+    <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Dag for dag</div>
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid var(--border);">
+        ${th({t:'DAG'})}${th({t:'POSETYPE'})}${th({t:'ANTAL',r:1})}${th({t:'KR',r:1})}
+      </tr></thead><tbody>${dagRows}</tbody></table>`;
+}
+
+function lukTgtgSpec() {
+  document.getElementById('tgtg-spec-modal').style.display = 'none';
+}
+
 async function loadTgtg() {
   if (_tgtgLoaded) return;
   _tgtgLoaded = true;
@@ -7129,8 +7181,8 @@ async function loadTgtg() {
                         : Math.abs(ls) > 50
                         ? 'Stor akkumuleret difference — tjek om dato-offset er korrekt'
                         : '';
-        return `<tr>
-          <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
+        return `<tr style="cursor:pointer;" onclick="tgtgSpec(${r.uge},${r.aar})" title="Klik for specifikation af solgte poser">
+          <td style="font-size:13px;padding:6px 8px;">Uge ${r.uge} <span style="color:var(--ash);font-size:11px;">${r.aar}</span> <span style="color:var(--amber);font-size:10px;">↗</span></td>
           <td class="num" style="${mono}font-size:13px;">${r.total_antal}</td>
           <td class="num" style="${mono}font-size:13px;color:var(--forest);">${r.beregnet_kr.toFixed(2)} kr</td>
           <td class="num" style="${mono}font-size:13px;color:var(--ash);">${harBager ? r.bager_kr.toFixed(2) + ' kr' : '—'}</td>
@@ -7674,6 +7726,12 @@ async function _spildHent(uge, aar) {
   document.getElementById('spild-k-tgtg').textContent    = (d.total_tgtg||0).toLocaleString('da-DK');
   document.getElementById('spild-k-tgtg-sub').textContent = d.total_tgtg_poser > 0
     ? `${d.total_tgtg_poser} poser` : 'poser';
+  const _stEl = document.getElementById('spild-k-tgtg');
+  if (_stEl && _stEl.parentElement) {
+    _stEl.parentElement.style.cursor = 'pointer';
+    _stEl.parentElement.title = 'Klik for TGTG-specifikation';
+    _stEl.parentElement.onclick = () => tgtgSpec(uge, aar);
+  }
 
   const totalRester = d.total_rester || 0;
   document.getElementById('spild-k-rester').textContent = totalRester.toLocaleString('da-DK');
@@ -8020,6 +8078,11 @@ async function mbLoad(force = false) {
   const tgtgEl = document.getElementById('mb-tgtg-kr');
   tgtgEl.textContent = d.tgtg_kr > 0 ? dk(d.tgtg_kr) : '0 kr';
   tgtgEl.style.color = d.tgtg_ok ? 'var(--moss)' : d.tgtg_advarsel ? 'var(--danger)' : 'var(--gold)';
+  if (d.uge && d.aar) {
+    tgtgEl.style.cursor = 'pointer';
+    tgtgEl.title = 'Klik for TGTG-specifikation';
+    tgtgEl.onclick = () => tgtgSpec(d.uge, d.aar);
+  }
   document.getElementById('mb-tgtg-sub').textContent = d.tgtg_ok ? `✓ ${d.tgtg_poser} poser · under mål` : `⚠ ${d.tgtg_poser} poser · over mål`;
   document.getElementById('mb-tgtg-sub').style.color = d.tgtg_ok ? 'var(--moss)' : 'var(--danger)';
 
@@ -11219,5 +11282,20 @@ async function dagDbDetaljeLoad() {
   } catch(e) { console.error('dagDbDetaljeLoad:', e); }
 }
 </script>
+
+<!-- TGTG spec drill-down modal (top-niveau, så den vises uanset aktivt panel) -->
+<div id="tgtg-spec-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px;"
+     onclick="if(event.target===this)lukTgtgSpec()">
+  <div style="background:var(--bg);border-radius:12px;padding:24px;width:680px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:4px;">
+      <div>
+        <h3 style="margin:0;font-size:16px;" id="tgtg-spec-titel">TGTG-salg</h3>
+        <div id="tgtg-spec-sub" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);margin-top:3px;"></div>
+      </div>
+      <button onclick="lukTgtgSpec()" style="padding:6px 12px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">Luk ✕</button>
+    </div>
+    <div id="tgtg-spec-body" style="margin-top:14px;"></div>
+  </div>
+</div>
 </body>
 </html>

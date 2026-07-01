@@ -2284,10 +2284,12 @@ async def api_morgenbriefing(request: Request):
     prev_uge = kpi.get("prev_uge") or {}
     mtd      = kpi.get("mtd")      or {}
 
-    # WTD (week-to-date)
+    # WTD (week-to-date) — hent_kpi.uge inkluderer allerede MobilePay + fakturasalg
     wtd_oms  = uge_data.get("omsaetning") or 0
     wtd_db   = uge_data.get("db_kr")      or 0
     wtd_dbpct= uge_data.get("db_pct")     or 0
+    wtd_ekstra_mp      = uge_data.get("ekstra_mp") or 0
+    wtd_ekstra_faktura = uge_data.get("ekstra_faktura") or 0
 
     # Spild denne uge
     try:
@@ -2419,6 +2421,8 @@ async def api_morgenbriefing(request: Request):
         "wtd_oms":       round(wtd_oms / 1.25),
         "wtd_db_pct":    round(wtd_dbpct, 1) if wtd_dbpct else None,
         "wtd_dage":      spild_d.get("n_dage", 0),
+        "wtd_ekstra_mp":      round(wtd_ekstra_mp),
+        "wtd_ekstra_faktura": round(wtd_ekstra_faktura),
         # TGTG
         "tgtg_kr":       tgtg_kr,
         "tgtg_poser":    tgtg_poser,

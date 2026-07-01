@@ -365,7 +365,7 @@ function render(d){
          :                 s+nf.format(Math.round(a));
   };
   const kort=[
-    {lab:'Omsætning',     val:kr(k.oms.vaerdi),                  delta:k.oms.delta,        abs:dd(k.oms),        kind:'kr',    sub:'inkl. moms'},
+    {lab:'Omsætning',     val:kr(k.oms.vaerdi),                  delta:k.oms.delta,        abs:dd(k.oms),        kind:'kr',    sub:(d.ekstra_omsaetning && d.ekstra_omsaetning.ialt>0) ? `inkl. moms · heraf +${kr(d.ekstra_omsaetning.mp)} MobilePay +${kr(d.ekstra_omsaetning.faktura)} B2B` : 'inkl. moms'},
     {lab:'Dækningsbidrag',val:kr(k.db.vaerdi),                   delta:k.db.delta,         abs:dd(k.db),         kind:'kr',    sub:'ekskl. moms'},
     {lab:'Avancegrad',    val:pct(k.avance_pct.vaerdi),          delta:k.avance_pct.delta, abs:dd(k.avance_pct), kind:'pp',    sub:'af oms. ekskl. moms'},
     {lab:'Antal bonner',  val:nf.format(k.bonner.vaerdi),        delta:k.bonner.delta,     abs:dd(k.bonner),     kind:'count', sub:'snit '+kr(k.snit_bon.vaerdi)},

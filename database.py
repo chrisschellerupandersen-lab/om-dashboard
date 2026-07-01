@@ -832,19 +832,43 @@ def hent_kpi(aar: int = None) -> Dict:
                 "kilde": kilde,
             }
 
+        # Fold øvrig omsætning (MobilePay + fakturasalg) ind i hvert segment,
+        # så omsætning + DB er korrekt overalt og sammenligninger er apples-to-apples.
+        def _aug(row, fra, til):
+            if not row:
+                return None
+            d = dict(row)
+            e = _ekstra_omsaetning(conn, fra, til)
+            d["omsaetning"] = (d.get("omsaetning") or 0) + e["ialt_incl"]   # incl. moms
+            if "db_kr" in d.keys():
+                d["db_kr"] = (d.get("db_kr") or 0) + e["ialt"]              # ren margin
+                if (d.get("omsaetning") or 0) > 0:
+                    d["db_pct"] = d["db_kr"] * 1.25 / d["omsaetning"] * 100
+            d["ekstra_mp"]      = e["mp_netto"]
+            d["ekstra_faktura"] = e["faktura"]
+            return d
+
+        dag_a           = _aug(dag, seneste_dato, seneste_dato)
+        uge_a           = _aug(uge, uge_mandag, seneste_dato)
+        prev_uge_a      = _aug(prev_uge_row, prev_uge_start, prev_uge_end)
+        prev_dag_a      = _aug(prev_dag_row, prev_dag_dato, prev_dag_dato)
+        prev_prev_dag_a = _aug(prev_prev_dag_row, prev_prev_dag_dato, prev_prev_dag_dato)
+        mtd_a           = _aug(mtd_row, mtd_start, seneste_dato)
+        prev_mtd_a      = _aug(prev_mtd_row, prev_mtd_start, prev_mtd_end)
+
     return {
-        "dag":              dict(dag)               if dag               else None,
-        "uge":              dict(uge)               if uge               else None,
+        "dag":              dag_a,
+        "uge":              uge_a,
         "uge_mandag":       uge_mandag,
-        "prev_uge":         dict(prev_uge_row)      if prev_uge_row      else None,
+        "prev_uge":         prev_uge_a,
         "prev_uge_start":   prev_uge_start,
         "prev_uge_end":     prev_uge_end,
-        "prev_dag":         dict(prev_dag_row)      if prev_dag_row      else None,
+        "prev_dag":         prev_dag_a,
         "prev_dag_dato":    prev_dag_dato,
         "seneste_time":     seneste_time,
-        "prev_prev_dag":    dict(prev_prev_dag_row) if prev_prev_dag_row else None,
-        "mtd":              dict(mtd_row)           if mtd_row           else None,
-        "prev_mtd":         dict(prev_mtd_row)      if prev_mtd_row      else None,
+        "prev_prev_dag":    prev_prev_dag_a,
+        "mtd":              mtd_a,
+        "prev_mtd":         prev_mtd_a,
         "snit_uge":         snit_row["snit_uge"]    if snit_row          else None,
         "snit_dag":         dag_snit_row["snit_dag"] if dag_snit_row     else None,
         "snit_12uger_dag":  dict(snit_4u_row)        if snit_4u_row       else None,
@@ -1502,6 +1526,37 @@ def slet_faktura_salg(id_: int) -> None:
         conn.execute("DELETE FROM faktura_salg WHERE id=?", (id_,))
 
 
+def _ekstra_omsaetning(conn, fra: str, til: str) -> Dict:
+    """Netto ex-moms omsætning i perioden der IKKE er i Shopbox:
+    MobilePay (gemt inkl. moms → ÷1.25) + fakturasalg/B2B (allerede ex moms).
+    Bruges til at gøre total-omsætning + DB korrekt på tværs af rapporter.
+    Behandles som ren omsætning uden ekstra vareforbrug (samme som i Årsplanen)."""
+    mp = conn.execute(
+        "SELECT COALESCE(SUM(omsaetning_inkl),0) AS incl FROM mobilepay_dag WHERE dato BETWEEN ? AND ?",
+        (fra, til)
+    ).fetchone()
+    mp_incl  = round(float(mp["incl"] or 0), 2)
+    mp_netto = round(mp_incl / 1.25, 2)
+    fs = conn.execute(
+        "SELECT COALESCE(SUM(beloeb_ex_moms),0) AS kr FROM faktura_salg WHERE dato BETWEEN ? AND ?",
+        (fra, til)
+    ).fetchone()
+    faktura = round(float(fs["kr"] or 0), 2)  # ex moms
+    return {
+        "mp_incl":   mp_incl,
+        "mp_netto":  mp_netto,
+        "faktura":   faktura,
+        "ialt":      round(mp_netto + faktura, 2),          # ex moms (netto)
+        "ialt_incl": round(mp_incl + faktura * 1.25, 2),    # inkl moms (brød = 25%)
+    }
+
+
+def hent_ekstra_omsaetning(fra: str, til: str) -> Dict:
+    """Public wrapper — øvrig omsætning (MobilePay + faktura) for en periode."""
+    with _conn() as conn:
+        return _ekstra_omsaetning(conn, fra, til)
+
+
 def hent_uger_for_maaned(aar: int, maaned: int) -> Dict:
     """Ugevis nedbrydning af resultatopgørelsen for én måned.
     Hver uge medregnes kun med de dage der falder i måneden (delvise uger ved
@@ -1832,12 +1887,15 @@ def hent_dashboard_data() -> Dict:
             FROM transaktioner
         """).fetchone()
 
-        avance_pct = 0.0
-        if totaler["omsætning"] > 0:
-            # avance fra Shopbox = omsætning_inkl - kostpris_ex (blander moms)
-            # Korrekt ex-moms GPM: (avance - omsætning*0.2) / (omsætning/1.25) * 100
-            avance_ex = totaler["avance"] - totaler["omsætning"] * 0.2
-            avance_pct = avance_ex / (totaler["omsætning"] / 1.25) * 100
+        # Øvrig omsætning (MobilePay + fakturasalg) — hele perioden
+        ekstra = _ekstra_omsaetning(conn, "0000-01-01", "9999-12-31")
+
+        # avance ex-moms fra Shopbox + øvrig omsætning (ren margin, intet ekstra VF)
+        shopbox_oms_ex = totaler["omsætning"] / 1.25 if totaler["omsætning"] else 0.0
+        avance_ex = (totaler["avance"] - totaler["omsætning"] * 0.2) + ekstra["ialt"]
+        oms_ex_total = shopbox_oms_ex + ekstra["ialt"]
+        avance_pct = (avance_ex / oms_ex_total * 100) if oms_ex_total > 0 else 0.0
+        total_oms_incl = round(totaler["omsætning"] + ekstra["ialt_incl"], 2)
 
         senest = conn.execute(
             "SELECT indlæst_dato FROM uploads ORDER BY id DESC LIMIT 1"
@@ -1848,7 +1906,11 @@ def hent_dashboard_data() -> Dict:
         "top_produkter": [{"varenavn": r["varenavn"] or "Ukendt", "omsætning": round(r["total_omsætning"], 2), "antal": round(r["total_antal"], 1)} for r in top],
         "kpi": {
             "seneste_dag_omsætning": round(seneste_dag_omsætning, 2),
-            "total_omsætning":       round(totaler["omsætning"], 2),
+            "total_omsætning":       total_oms_incl,
+            "total_omsætning_shopbox": round(totaler["omsætning"], 2),
+            "ekstra_mp":             ekstra["mp_netto"],
+            "ekstra_faktura":        ekstra["faktura"],
+            "ekstra_ialt_incl":      ekstra["ialt_incl"],
             "avance_pct":            round(avance_pct, 1),
             "antal_varer":           totaler["antal_varer"],
             "seneste_rapport_dato":  seneste_dato,
@@ -6382,19 +6444,32 @@ def _mgmt_periode_kpi(conn, fra, til, kategorier, ugedage=None, timer=None, vare
     db     = float(row["db"])
     bonner = int(row["bonner"])
     faste_b = float(faste["b"])
+
+    # Øvrig omsætning (MobilePay + fakturasalg) — kun på det ufiltrerede total,
+    # da MP/faktura ikke har vare/kategori/ugedag/time at filtrere på.
+    ufiltreret = not (kategorier or varer or ugedage or timer)
+    ekstra = _ekstra_omsaetning(conn, fra, til) if ufiltreret else {"mp_netto": 0.0, "faktura": 0.0, "ialt": 0.0, "ialt_incl": 0.0}
+    oms_incl_total = oms + ekstra["ialt_incl"]   # headline omsætning inkl. moms
+    oms_ex_total   = oms_ex + ekstra["ialt"]
+    db_total       = db + ekstra["ialt"]   # ren omsætning — intet ekstra vareforbrug
     return {
-        "oms":        oms,
-        "oms_ex":     oms_ex,
+        "oms":        oms_incl_total,
+        "oms_shopbox": oms,
+        "oms_ex":     oms_ex_total,
+        "oms_ex_shopbox": oms_ex,
+        "ekstra_mp":  ekstra["mp_netto"],
+        "ekstra_faktura": ekstra["faktura"],
+        "ekstra_ialt": ekstra["ialt"],
         "kost":       float(row["kost"]),
-        "db":         db,
-        "avance_pct": (db / oms_ex * 100) if oms_ex else 0.0,
+        "db":         db_total,
+        "avance_pct": (db_total / oms_ex_total * 100) if oms_ex_total else 0.0,
         "antal":      float(row["antal"]),
         "bonner":     bonner,
         "snit_bon":   (oms / bonner) if bonner else 0.0,
         "tgtg_poser": float(tgtg["poser"]),
         "tgtg_kr":    float(tgtg["kr"]),
         "faste_omk":  faste_b,
-        "resultat":   db - faste_b,
+        "resultat":   db_total - faste_b,
     }
 
 
@@ -6657,6 +6732,12 @@ def hent_mgmt_dashboard(fra: str, til: str,
         "periode":      {"fra": fra, "til": til, "dage": laengde},
         "forrige":      forrige,
         "kpi":          kpis,
+        "ekstra_omsaetning": {
+            "mp":      kpi_nu.get("ekstra_mp", 0.0),
+            "faktura": kpi_nu.get("ekstra_faktura", 0.0),
+            "ialt":    kpi_nu.get("ekstra_ialt", 0.0),
+            "oms_shopbox": kpi_nu.get("oms_shopbox", 0.0),
+        },
         "tidsserie":    tidsserie,
         "kategori":     kategori_agg,
         "kategori_tid": kategori_tid,

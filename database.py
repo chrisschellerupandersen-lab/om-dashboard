@@ -838,6 +838,7 @@ def hent_kpi(aar: int = None) -> Dict:
             if not row:
                 return None
             d = dict(row)
+            d["omsaetning_shopbox"] = d.get("omsaetning") or 0   # ren Shopbox (til kurv/snit)
             e = _ekstra_omsaetning(conn, fra, til)
             d["omsaetning"] = (d.get("omsaetning") or 0) + e["ialt_incl"]   # incl. moms
             if "db_kr" in d.keys():

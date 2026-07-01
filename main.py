@@ -2394,7 +2394,8 @@ async def api_morgenbriefing(request: Request):
 
     dag_db_pct   = dag.get("db_pct") or 0
     dag_kunder   = dag.get("transak") or 0
-    dag_kurv     = round(dag_oms / dag_kunder) if dag_kunder > 0 else 0
+    # Kurv = ren Shopbox-omsætning ÷ kassebonner (MobilePay/B2B tælles ikke som kurve)
+    dag_kurv     = round((dag.get("omsaetning_shopbox") or dag_oms) / dag_kunder) if dag_kunder > 0 else 0
 
     DAGE_DA = ["Mandag","Tirsdag","Onsdag","Torsdag","Fredag","Lørdag","Søndag"]
     MND_DA  = ["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"]

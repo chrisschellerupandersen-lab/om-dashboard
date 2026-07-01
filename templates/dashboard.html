@@ -3965,7 +3965,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
     // ── Dag-kasser ────────────────────────────────────────────────────────
     if (dag.transak > 0) {
       document.getElementById('kpi-kunder').textContent = dag.transak;
-      const kurv = dag.omsaetning && dag.transak ? Math.round(dag.omsaetning / dag.transak) : 0;
+      const kurv = dag.omsaetning && dag.transak ? Math.round((dag.omsaetning_shopbox ?? dag.omsaetning) / dag.transak) : 0;
       document.getElementById('kpi-kurv').textContent = kurv > 0 ? kurv.toLocaleString('da-DK') + ' kr/kurv' : '—';
     }
 
@@ -3988,6 +3988,12 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       // Omsætning dag
       const el1 = document.getElementById('new-ov-omsat');
       if (el1 && dag.omsaetning != null) el1.textContent = kr(dag.omsaetning);
+      if (el1) {
+        const subEl = el1.parentElement.querySelector('.kpi-s');
+        if (subEl) subEl.textContent = (dag.ekstra_mp > 0 || dag.ekstra_faktura > 0)
+          ? `incl. moms · +${kr(dag.ekstra_mp)} MP +${kr(dag.ekstra_faktura)} B2B`
+          : 'incl. moms';
+      }
 
       // Vareforbrug
       const el2 = document.getElementById('new-ov-vf');
@@ -4012,7 +4018,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       // Kurv dag
       const el8 = document.getElementById('new-ov-kurv');
       if (el8 && dag.omsaetning != null && dag.transak > 0) {
-        el8.textContent = Math.round(dag.omsaetning / dag.transak).toLocaleString('da-DK') + ' kr';
+        el8.textContent = Math.round((dag.omsaetning_shopbox ?? dag.omsaetning) / dag.transak).toLocaleString('da-DK') + ' kr';
       }
 
       // Sæt aktuel tid i KL-feltet
@@ -4046,7 +4052,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
 
       const cmp4 = document.getElementById('new-ov-cmp-kurv');
       if (cmp4 && dag.transak > 0 && prevDag.transak > 0) {
-        const pct = ((dag.omsaetning / dag.transak) / (prevDag.omsaetning / prevDag.transak) - 1) * 100;
+        const pct = (((dag.omsaetning_shopbox ?? dag.omsaetning) / dag.transak) / ((prevDag.omsaetning_shopbox ?? prevDag.omsaetning) / prevDag.transak) - 1) * 100;
         cmp4.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
         cmp4.className = pct >= 0 ? 'up' : 'dn';
       }
@@ -4062,7 +4068,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       if (wtd3 && uge.transak != null) wtd3.textContent = uge.transak.toLocaleString('da-DK');
       const wtd4 = document.getElementById('new-ov-wtd-kurv');
       if (wtd4 && uge.omsaetning != null && uge.transak > 0) {
-        wtd4.textContent = Math.round(uge.omsaetning / uge.transak).toLocaleString('da-DK') + ' kr';
+        wtd4.textContent = Math.round((uge.omsaetning_shopbox ?? uge.omsaetning) / uge.transak).toLocaleString('da-DK') + ' kr';
       }
 
       // MTD (måned til dato)
@@ -4070,7 +4076,7 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       if (mtd.omsaetning != null) _setMtd('new-ov-mtd-oms', kr(mtd.omsaetning));
       if (mtd.db_kr != null) _setMtd('new-ov-mtd-db', kr(mtd.db_kr) + (mtd.db_pct != null ? ' (' + mtd.db_pct.toFixed(0) + '%)' : ''));
       if (mtd.transak != null) _setMtd('new-ov-mtd-kunder', mtd.transak.toLocaleString('da-DK'));
-      if (mtd.omsaetning != null && mtd.transak > 0) _setMtd('new-ov-mtd-kurv', Math.round(mtd.omsaetning / mtd.transak).toLocaleString('da-DK') + ' kr');
+      if (mtd.omsaetning != null && mtd.transak > 0) _setMtd('new-ov-mtd-kurv', Math.round((mtd.omsaetning_shopbox ?? mtd.omsaetning) / mtd.transak).toLocaleString('da-DK') + ' kr');
 
       // vs forrige uge kort
       const _setPrev = (id, pct, tekst) => {
@@ -4092,8 +4098,8 @@ function buildForside(kpi, dage, uger, idag, katUge) {
         _setPrev('new-ov-prev-kunder', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
       if (uge.transak > 0 && prevUge.transak > 0) {
-        const kurvNu   = Math.round(uge.omsaetning / uge.transak);
-        const kurvPrev = Math.round(prevUge.omsaetning / prevUge.transak);
+        const kurvNu   = Math.round((uge.omsaetning_shopbox ?? uge.omsaetning) / uge.transak);
+        const kurvPrev = Math.round((prevUge.omsaetning_shopbox ?? prevUge.omsaetning) / prevUge.transak);
         const pct = (kurvNu / kurvPrev - 1) * 100;
         _setPrev('new-ov-prev-kurv', pct, (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%');
       }
@@ -8190,7 +8196,8 @@ async function mbLoad(force = false) {
   const progress = Math.min(100, Math.round((d.wtd_dage / 7) * 100));
   document.getElementById('mb-uge-progress').style.width = progress + '%';
   document.getElementById('mb-wtd-oms').textContent = d.wtd_oms > 0 ? dk(d.wtd_oms) : '—';
-  document.getElementById('mb-wtd-dage').textContent = `${d.wtd_dage} dage med data`;
+  document.getElementById('mb-wtd-dage').textContent = `${d.wtd_dage} dage med data`
+    + ((d.wtd_ekstra_mp > 0 || d.wtd_ekstra_faktura > 0) ? ` · +${dk(d.wtd_ekstra_mp)} MP +${dk(d.wtd_ekstra_faktura)} B2B` : '');
 
   const tgtgEl = document.getElementById('mb-tgtg-kr');
   tgtgEl.textContent = d.tgtg_kr > 0 ? dk(d.tgtg_kr) : '0 kr';

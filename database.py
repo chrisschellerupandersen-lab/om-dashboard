@@ -284,6 +284,18 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_pp_navn ON vare_pris_periode(varenavn, gyldig_fra);
 
+            -- Fakturasalg (e-conomic) — B2B-salg der IKKE er i Shopbox.
+            -- Beløb ex moms. Ren omsætning: vareforbruget ligger allerede i
+            -- bagerfakturaen (typisk brød), så DB stiger med det fulde beløb.
+            CREATE TABLE IF NOT EXISTS faktura_salg (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato           TEXT NOT NULL,
+                beskrivelse    TEXT DEFAULT '',
+                beloeb_ex_moms REAL NOT NULL DEFAULT 0,
+                oprettet       TEXT DEFAULT (datetime('now','localtime'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_faktura_salg_dato ON faktura_salg(dato);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -1434,6 +1446,16 @@ def hent_aarsdata(aar: int = None) -> Dict:
         """, (str(aar),)).fetchall()
         vf_ikke_bager: Dict = {r["maaned"]: r["vf"] for r in ikke_bager_rows}
 
+        # Fakturasalg (e-conomic, B2B) per måned — ex moms. Ren omsætning.
+        fs_rows = conn.execute("""
+            SELECT CAST(strftime('%m', dato) AS INTEGER) AS maaned,
+                   ROUND(SUM(beloeb_ex_moms), 2) AS kr
+            FROM faktura_salg
+            WHERE strftime('%Y', dato) = ?
+            GROUP BY maaned
+        """, (str(aar),)).fetchall()
+        fakturasalg_maaned: Dict = {r["maaned"]: r["kr"] for r in fs_rows}
+
     return {
         "aar":               aar,
         "maaneder":          [dict(r) for r in rows],
@@ -1442,10 +1464,42 @@ def hent_aarsdata(aar: int = None) -> Dict:
         "base_gpm":          base_row["gpm"]       if base_row else None,
         "faktura_maaned":    faktura_maaned,
         "mp_netto_maaned":   mp_netto_maaned,
+        "fakturasalg_maaned": fakturasalg_maaned,
         "vf_ikke_bager":     vf_ikke_bager,
         "faste_omk":         hent_faste_omk(aar),
         "faste_omk_sum":     faste_omk_maaned_sum(aar),
     }
+
+
+# ── Fakturasalg (e-conomic / B2B) ──────────────────────────────────────────────
+
+def gem_faktura_salg(dato: str, beskrivelse: str, beloeb_ex_moms: float) -> int:
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO faktura_salg (dato, beskrivelse, beloeb_ex_moms) VALUES (?,?,?)",
+            (dato, beskrivelse.strip(), round(float(beloeb_ex_moms or 0), 2))
+        )
+        return cur.lastrowid
+
+
+def hent_faktura_salg(aar: int = None) -> List[Dict]:
+    with _conn() as conn:
+        if aar:
+            rows = conn.execute(
+                "SELECT id, dato, beskrivelse, beloeb_ex_moms FROM faktura_salg "
+                "WHERE strftime('%Y',dato)=? ORDER BY dato DESC, id DESC", (str(aar),)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, dato, beskrivelse, beloeb_ex_moms FROM faktura_salg "
+                "ORDER BY dato DESC, id DESC LIMIT 300"
+            ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def slet_faktura_salg(id_: int) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM faktura_salg WHERE id=?", (id_,))
 
 
 def hent_uger_for_maaned(aar: int, maaned: int) -> Dict:

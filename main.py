@@ -1889,6 +1889,34 @@ async def prisperiode_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.get("/api/fakturasalg")
+async def api_fakturasalg(request: Request, aar: Optional[int] = None):
+    _kræv_login(request)
+    return database.hent_faktura_salg(aar)
+
+
+@app.post("/api/fakturasalg/gem")
+async def api_fakturasalg_gem(request: Request):
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    dato  = body.get("dato", "").strip()
+    beloeb = float(body.get("beloeb_ex_moms", 0) or 0)
+    if not dato or beloeb <= 0:
+        raise HTTPException(status_code=400, detail="Mangler dato eller beløb")
+    id_ = database.gem_faktura_salg(dato, body.get("beskrivelse", ""), beloeb)
+    return {"ok": True, "id": id_}
+
+
+@app.delete("/api/fakturasalg/{id_}")
+async def api_fakturasalg_slet(request: Request, id_: int):
+    _kræv_login(request)
+    database.slet_faktura_salg(id_)
+    return {"ok": True}
+
+
 @app.get("/api/kontrol/varenumre")
 async def api_kontrol_varenumre(request: Request):
     _kræv_login(request)

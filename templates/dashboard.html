@@ -1815,7 +1815,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <th class="num" title="Shopbox omsætning inkl. moms">Omsætning inkl. moms</th>
                 <th class="num" title="Total omsætning ex-moms (÷1.25)">Omsætning ex-moms</th>
                 <th class="num" title="MobilePay omsætning ex-moms (÷1.25) — indgår i Netto omsat" style="color:rgba(100,200,100,.8);">MP ex-moms</th>
-                <th class="num" title="Total netto ex-moms = (Shopbox + MobilePay) ÷ 1.25">Netto omsat</th>
+                <th class="num" title="Fakturasalg/B2B fra e-conomic (ex moms) — ren omsætning, indgår i Netto omsat og DB" style="color:rgba(200,168,75,.9);">Faktura B2B</th>
+                <th class="num" title="Total netto ex-moms = Shopbox/1.25 + MobilePay + Fakturasalg">Netto omsat</th>
                 <th class="num" title="Bager faktura efter retur-kreditering (ex-moms)">Bager Faktura</th>
                 <th class="num">Andet VF</th>
                 <th class="num">VF i alt</th>
@@ -3022,6 +3023,49 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- FAKTURASALG (B2B / e-conomic) -->
+      <div class="panel" id="p-fakturasalg">
+        <div class="page-hdr">
+          <h2>Fakturasalg (B2B)</h2>
+          <p>Salg på faktura fra e-conomic som ikke er i Shopbox — fx brød til virksomheder. Beløb ex moms · ren omsætning (vareforbrug ligger allerede i bagerfakturaen) · indgår i Årsplanens netto, DB og resultat</p>
+        </div>
+
+        <div class="aar2-top" id="fs-kpi" style="margin-bottom:18px;"></div>
+
+        <div class="card" style="margin-bottom:18px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--gold);margin-bottom:10px;">REGISTRÉR FAKTURASALG</div>
+          <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+            <div>
+              <label style="font-size:11px;color:var(--ash);display:block;margin-bottom:3px;">Dato</label>
+              <input type="date" id="fs-dato" style="padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--charcoal);">
+            </div>
+            <div style="flex:1;min-width:180px;">
+              <label style="font-size:11px;color:var(--ash);display:block;margin-bottom:3px;">Beskrivelse (fx kunde)</label>
+              <input type="text" id="fs-besk" placeholder="fx Virksomhed A/S — brød" style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--charcoal);">
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--ash);display:block;margin-bottom:3px;">Beløb ex moms (kr)</label>
+              <input type="number" id="fs-beloeb" min="0" step="0.01" placeholder="0" style="width:140px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg);color:var(--charcoal);text-align:right;">
+            </div>
+            <button onclick="fakturasalgGem()" id="fs-gem-btn" style="padding:8px 18px;background:var(--forest);color:var(--amber);border:none;border-radius:6px;font-weight:500;cursor:pointer;font-size:13px;">+ Tilføj</button>
+            <span id="fs-status" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);"></span>
+          </div>
+        </div>
+
+        <div class="aar2-tbl-wrap">
+          <div class="aar2-tbl-hdr"><span class="aar2-tbl-hdr-l">Registrerede fakturasalg</span></div>
+          <table class="aar2-tbl">
+            <thead><tr>
+              <th>Dato</th>
+              <th>Beskrivelse</th>
+              <th class="num">Beløb ex moms</th>
+              <th style="width:40px;"></th>
+            </tr></thead>
+            <tbody id="fs-tbody"><tr><td colspan="4" class="empty">Indlæser…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- MANGLER KOSTPRIS -->
       <div class="panel" id="p-kostpris">
         <div class="page-hdr">
@@ -3419,6 +3463,7 @@ const NAV_SVG = {
   returtgtg:    '<path d="M3 5h10l-1 9a1 1 0 01-1 1H5a1 1 0 01-1-1L3 5zm2-3h6v2H5V2zm1 5v6h1V7H6zm3 0v6h1V7H9z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
+  fakturasalg:  '<path d="M3 1h7l3 3v11H3V1zm6 1v3h3M5 8h6M5 10h6M5 12h4"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
   stamdata:     '<path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/>',
   hjaelp:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm.25-3.2c0 .4-.3.7-.7.7H7.7a.7.7 0 01-.7-.7v-.3c0-1 .6-1.7 1.3-2.1.4-.2.7-.6.7-1 0-.6-.4-1-1-1s-1 .4-1 1H5.5C5.5 4 6.6 3 8 3s2.5 1 2.5 2.3c0 .9-.5 1.7-1.3 2.1-.3.2-.5.5-.5.9h.3v.02z"/>',
@@ -3436,6 +3481,7 @@ const NAV_DEFAULT = [
   {id:'margin',      label:'Margin Analyse',        group:'Salg & økonomi',      hidden:false},
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
+  {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
   {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
@@ -5320,6 +5366,7 @@ function buildAar() {
   const fmStr = d.faktura_maaned  || {};  // bageri VF
   const vfStr = d.vf_ikke_bager   || {};  // andet VF
   const mpStr = d.mp_netto_maaned || {};  // MobilePay netto (ex-moms)
+  const fsStr = d.fakturasalg_maaned || {};  // Fakturasalg B2B (ex-moms, ren omsætning)
 
   // Byg DB-baseret faste omk. sum per måned: {maaned: sum}
   const dbFasteSum = {};
@@ -5337,13 +5384,14 @@ function buildAar() {
       const andetVF = vfStr[m] || 0;
       const vfTot   = bagerVF + andetVF;
       const mpNetto = mpStr[m] || 0;
-      // Netto omsætning = Shopbox ex-moms + MobilePay netto
-      const netto   = Math.round(f.omsaetning / 1.25 + mpNetto);
-      // DB = Netto omsætning − VF i alt
+      const fakturaSalg = fsStr[m] || 0;  // B2B-fakturasalg ex-moms (ren omsætning)
+      // Netto omsætning = Shopbox ex-moms + MobilePay netto + fakturasalg (B2B)
+      const netto   = Math.round(f.omsaetning / 1.25 + mpNetto + fakturaSalg);
+      // DB = Netto omsætning − VF i alt (faktura har intet ekstra VF — ligger i bagerfaktura)
       const db_kr   = Math.round(netto - vfTot);
       const gpm     = netto > 0 ? db_kr / netto * 100 : 0;
       return { m, dage, faktDage:f.faktiske_dage, type:'faktisk',
-               omsat:f.omsaetning, mpNetto, netto, bagerVF, andetVF, vfTot,
+               omsat:f.omsaetning, mpNetto, fakturaSalg, netto, bagerVF, andetVF, vfTot,
                avance:db_kr, gpm, faste, res:Math.round(db_kr - faste) };
     }
     // Estimat-måneder skaleres med valgt scenarie (forsigtigt/basis/optimistisk).
@@ -5352,7 +5400,7 @@ function buildAar() {
     // GPM anvendes på ex-moms netto — samme basis som faktiske måneder (db_kr/netto).
     // (Tidligere blev GPM ganget på inkl-moms omsat → DB 25% for høj.)
     const avance = Math.round(netto * c.gpm / 100);
-    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, mpNetto:0, netto,
+    return { m, dage, type:'estimat', sf:c.saeson[i], omsat, mpNetto:0, fakturaSalg:0, netto,
              bagerVF:null, andetVF:null, vfTot:null,
              avance, gpm:c.gpm, faste, res:avance - faste };
   });
@@ -5614,6 +5662,7 @@ function buildAar() {
     isIndev: aar===thisYear && r.m===thisMonth,
     omsat:   r.omsat,
     mpNetto: r.mpNetto || 0,
+    fakturaSalg: r.fakturaSalg || 0,
     netto:   r.type==='faktisk' ? r.netto  : null,
     bagerVF: r.type==='faktisk' ? r.bagerVF : null,
     andetVF: r.type==='faktisk' ? r.andetVF : null,
@@ -5642,6 +5691,7 @@ function buildAar() {
       <td class="num">${dk(r.omsat)}</td>
       <td class="num">${dk(r.omsat/1.25)}</td>
       <td class="num" style="${mono}color:var(--moss);">${r.mpNetto > 0 ? dk(r.mpNetto) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
+      <td class="num" style="${mono}color:var(--amber);">${r.fakturaSalg > 0 ? dk(r.fakturaSalg) : '<span style="color:rgba(30,58,30,.2);">—</span>'}</td>
       <td class="num" style="${ash}">${r.netto!=null?dk(r.netto):'—'}</td>
       <td class="num" style="${ash}${r.bagerVF>0?clk:''}" title="${r.bagerVF>0?'Klik for ugeoversigt':''}"
           onclick="${r.bagerVF>0?`vfDrillDown(${aar},${mi},'bager')`:''}">
@@ -7022,6 +7072,73 @@ async function tgtgGemManuel() {
     status.style.color = 'var(--danger)';
     status.textContent = 'Fejl ved gem';
   }
+}
+
+// ── Fakturasalg (B2B / e-conomic) ────────────────────────────────────────────
+async function loadFakturasalg() {
+  const datoEl = document.getElementById('fs-dato');
+  if (datoEl && !datoEl.value) datoEl.value = new Date().toISOString().slice(0,10);
+  let rows;
+  try { rows = await (await fetch('/api/fakturasalg')).json(); }
+  catch(e) { document.getElementById('fs-tbody').innerHTML = '<tr><td colspan="4" class="empty">Fejl ved hentning</td></tr>'; return; }
+  const mono = "font-family:'DM Mono',monospace;";
+  const dk = v => Math.round(v).toLocaleString('da-DK');
+  const y  = new Date().getFullYear();
+  const nu = new Date().toISOString().slice(0,7);
+  const iaar   = rows.filter(r => (r.dato||'').slice(0,4) === String(y));
+  const totIaar = iaar.reduce((s,r)=>s+(r.beloeb_ex_moms||0),0);
+  const totMdr  = rows.filter(r=>(r.dato||'').slice(0,7)===nu).reduce((s,r)=>s+(r.beloeb_ex_moms||0),0);
+  document.getElementById('fs-kpi').innerHTML = `
+    <div class="kpi-card" style="background:var(--forest);border-color:var(--forest);">
+      <div class="kpi-label" style="color:rgba(200,168,75,.7);">Fakturasalg ${y}</div>
+      <div class="kpi-val" style="color:var(--amber);font-size:26px;">${dk(totIaar)} kr</div>
+      <div class="kpi-sub" style="color:rgba(255,255,255,.45);">ex moms · ${iaar.length} fakturaer</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Denne måned</div>
+      <div class="kpi-val">${dk(totMdr)} kr</div>
+      <div class="kpi-sub">ex moms</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Antal i alt</div>
+      <div class="kpi-val">${rows.length}</div>
+      <div class="kpi-sub">registrerede fakturaer</div>
+    </div>`;
+  document.getElementById('fs-tbody').innerHTML = rows.length
+    ? rows.map(r => `<tr>
+        <td style="${mono}font-size:12px;">${r.dato}</td>
+        <td style="font-size:13px;">${(r.beskrivelse||'').replace(/</g,'&lt;') || '<span style="color:var(--ash);">—</span>'}</td>
+        <td class="num" style="${mono}color:var(--amber);font-weight:500;">${dk(r.beloeb_ex_moms)} kr</td>
+        <td class="num"><span onclick="fakturasalgSlet(${r.id})" title="Slet" style="cursor:pointer;color:var(--danger);font-size:14px;">✕</span></td>
+      </tr>`).join('')
+    : '<tr><td colspan="4" class="empty">Ingen fakturasalg registreret endnu.</td></tr>';
+}
+
+async function fakturasalgGem() {
+  const dato   = document.getElementById('fs-dato').value;
+  const besk   = document.getElementById('fs-besk').value;
+  const beloeb = parseFloat(document.getElementById('fs-beloeb').value);
+  const status = document.getElementById('fs-status');
+  if (!dato || !(beloeb > 0)) { status.textContent = 'Udfyld dato og beløb'; status.style.color = 'var(--danger)'; return; }
+  const btn = document.getElementById('fs-gem-btn'); btn.disabled = true;
+  try {
+    const r = await fetch('/api/fakturasalg/gem', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dato, beskrivelse: besk, beloeb_ex_moms: beloeb})});
+    if (!r.ok) throw new Error();
+    status.textContent = '✓ Gemt'; status.style.color = 'var(--moss)';
+    document.getElementById('fs-besk').value = ''; document.getElementById('fs-beloeb').value = '';
+    _aarLoaded = false;               // Årsplan genindlæses ved næste besøg
+    await loadFakturasalg();
+  } catch(e) { status.textContent = '✗ Fejl'; status.style.color = 'var(--danger)'; }
+  btn.disabled = false;
+  setTimeout(() => { status.textContent = ''; }, 2500);
+}
+
+async function fakturasalgSlet(id) {
+  if (!confirm('Slet dette fakturasalg?')) return;
+  await fetch('/api/fakturasalg/' + id, {method:'DELETE'});
+  _aarLoaded = false;
+  await loadFakturasalg();
 }
 
 // TGTG spec drill-down — viser dato × posetype × antal × kreditering for én uge
@@ -9719,6 +9836,7 @@ window.showPanel = function(id, el) {
   if (id === 'returtgtg')    loadReturTgtg();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();
+  if (id === 'fakturasalg') loadFakturasalg();
   if (id === 'stamdata')   loadStamdata();
   if (id === 'management') { mgmtIndlaes(); mgmtInitForslag(); }
 };

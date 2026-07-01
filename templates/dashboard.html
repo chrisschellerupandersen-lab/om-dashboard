@@ -5454,8 +5454,14 @@ function buildAar() {
         // Brug årsplan-konfigurationens forventede dagsnit for resten (sæson × vækst)
         const planSnit = Math.round(c.base * (1 + c.vaekst / 100) * (c.saeson[entry.m - 1] || 1));
         const estRest  = Math.round(planSnit * restDage);
+        // Projekteret DB = faktisk DB indtil nu + estimeret DB for resten
+        // (GPM på rest-omsætning ex-moms). Undgår ekstrapolation der sprænger
+        // når dagen lige er startet (lille faktisk omsætning i nævneren).
+        const projAvance = Math.round((entry.avance || 0) + (estRest / 1.25) * (c.gpm / 100));
+        const projRes    = Math.round(projAvance - (entry.faste || 0));
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:estRest,
-                  totalProj:entry.omsat+estRest, dagSnit:faktSnit, restDage, isLive:true };
+                  totalProj:entry.omsat+estRest, dagSnit:faktSnit, restDage, isLive:true,
+                  projAvance, projRes };
       } else if (entry.type === 'faktisk') {
         indev = { ...entry, faktiskOmsat:entry.omsat, estimatOmsat:0,
                   totalProj:entry.omsat, dagSnit:Math.round(entry.omsat/entry.faktDage), restDage:0, isLive:false };
@@ -5579,7 +5585,7 @@ function buildAar() {
 
       <div class="aar2-mnd-stats">
         <div><div class="aar2-stat-l">DB · faktiske dage</div><div class="aar2-stat-v">${indev.faktiskOmsat > 0 ? dk(indev.avance)+' kr' : '—'}</div></div>
-        <div><div class="aar2-stat-l">Resultat (est.)</div><div class="aar2-stat-v">${dk(indev.res)} kr</div></div>
+        <div><div class="aar2-stat-l">Resultat (est.)</div><div class="aar2-stat-v">${dk(indev.projRes != null ? indev.projRes : indev.res)} kr</div></div>
         <div><div class="aar2-stat-l">Dag-snit · faktisk</div><div class="aar2-stat-v">${dk(indev.dagSnit)} kr</div></div>
       </div>`;
   }
@@ -5638,10 +5644,9 @@ function buildAar() {
     const isIndev = aar === thisYear && r.m === thisMonth && indev && indev.isLive;
     let res = r.res, avance = r.avance;
     if (isIndev && indev) {
-      // Skaler avance proportionalt med projektion
-      const projFaktor = indev.totalProj > 0 && r.omsat > 0 ? indev.totalProj / r.omsat : 1;
-      avance = Math.round((r.avance || 0) * projFaktor);
-      res    = Math.round(avance - (r.faste || 0));
+      // Brug projekteret DB/resultat (faktisk indtil nu + estimat for resten)
+      avance = indev.projAvance != null ? indev.projAvance : (r.avance || 0);
+      res    = indev.projRes    != null ? indev.projRes    : (r.res    || 0);
     }
     chartData.push({ label: AAR_MND_KORT[r.m-1], type: r.type, isIndev, res, avance });
   });

@@ -63,14 +63,20 @@ def _sidst_tal(linje: str) -> float:
     return abs(_tal(tal[-1])) if tal else 0.0
 
 
+def _sidst_tal_signed(linje: str) -> float:
+    """Som _sidst_tal, men bevarer fortegn (justeringslinjer kan være negative)."""
+    tal = re.findall(r"-?[0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]+)?|-?[0-9]+(?:,[0-9]+)?", linje)
+    return _tal(tal[-1]) if tal else 0.0
+
+
 def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
     retur_wiener = retur_boller = tgtg = b_kvali = faktura = subtotal = 0.0
     _next_levering = False
     for linje in tekst.splitlines():
         l = linje.strip(); ll = l.lower()
         if _next_levering:
-            val = _sidst_tal(l)
-            if val > 100: faktura = val
+            val = _sidst_tal_signed(l)
+            if abs(val) > 100: faktura += val
             _next_levering = False
             continue
         if re.search(r"retur\s+wien", ll):
@@ -82,10 +88,12 @@ def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
         elif re.search(r"kvali|b-?kredit|kvalitets", ll):
             if not re.search(r"retur|wiener|boller|tgtg", ll):
                 b_kvali = _sidst_tal(l)
-        elif re.search(r"levering", ll):
-            val = _sidst_tal(l)
-            if val > 100: faktura = val
-            else: _next_levering = True
+        elif re.search(r"levering|rettelse", ll):
+            # Levering + justeringslinjer ('Levering relativt', 'Uge X rettelse')
+            # LÆGGES SAMMEN (signeret) — de er alle en del af leveringsbeløbet.
+            val = _sidst_tal_signed(l)
+            if abs(val) > 100: faktura += val
+            elif re.search(r"levering", ll): _next_levering = True
         elif re.search(r"subtotal", ll):
             subtotal = _sidst_tal(l)
         elif not faktura and re.search(r"total\s+dkk\s*:", ll):
@@ -1399,14 +1407,37 @@ async def api_helligdage(request: Request, aar: Optional[int] = None):
 
 @app.post("/api/bager/upload-pdf")
 async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
-    """Parse bager-faktura PDF med Claude og returner ekstraherede felter."""
+    """Parse bager-faktura PDF. Primært Claude; fallback til pdfplumber + regex
+    hvis Claude ikke er tilgængelig (fx ANTHROPIC_API_KEY mangler)."""
     _kræv_login(request)
     try:
         pdf_bytes = await fil.read()
-        data = _faktura_felter_fra_pdf(pdf_bytes)
-        return {"ok": True, "data": data}
     except Exception as exc:
         return {"ok": False, "fejl": str(exc)}
+    try:
+        data = _faktura_felter_fra_pdf(pdf_bytes)
+        return {"ok": True, "data": data}
+    except Exception as claude_fejl:
+        try:
+            import pdfplumber
+            tekst = ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(pdf_bytes); tmp_path = tmp.name
+            try:
+                with pdfplumber.open(tmp_path) as pdf:
+                    for page in pdf.pages:
+                        tekst += (page.extract_text() or "") + "\n"
+            finally:
+                os.unlink(tmp_path)
+            uge = _find_uge(tekst)
+            if not uge:
+                return {"ok": False, "fejl": f"Kunne ikke læse faktura ({claude_fejl}); intet ugenummer i PDF"}
+            m_aar = re.search(r"(202\d)", tekst)
+            aar   = int(m_aar.group(1)) if m_aar else datetime.now().year
+            data  = _parse_faktura_tekst(tekst, uge, aar)
+            return {"ok": True, "data": data, "kilde": "fallback"}
+        except Exception as fb_fejl:
+            return {"ok": False, "fejl": f"Claude: {claude_fejl} · fallback: {fb_fejl}"}
 
 
 @app.post("/api/retur/scan")

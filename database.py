@@ -6238,6 +6238,52 @@ def slet_prisperiode(id_: int) -> None:
         conn.execute("DELETE FROM vare_pris_periode WHERE id=?", (id_,))
 
 
+def auto_prisopdater_fra_bestilling(uge: int, aar: int, linjer: List[Dict]) -> Dict:
+    """Kaldes ved import af en ugebestilling. I stedet for at overskrive den
+    TIDLØSE varestamdata (som ville genberegne historikken), gøres to ting:
+      1. Helt nye varer oprettes i varestamdata (baseline, rører ikke eksisterende).
+      2. Ægte prisændringer registreres som DATEREDE priser (vare_pris_periode)
+         med gyldig_fra = ugens mandag — så gamle salg beholder den gamle pris
+         og nye salg fra den uge bruger den nye pris. Uændrede priser gør intet."""
+    from datetime import date as _d
+    try:
+        mon = _d.fromisocalendar(int(aar), int(uge), 1).isoformat()
+    except Exception:
+        mon = None
+    nye_varer = 0
+    prisaendringer: List[Dict] = []
+    with _conn() as conn:
+        stam = {str(r["varenavn"]).strip().lower(): r["pris_ex_moms"]
+                for r in conn.execute("SELECT varenavn, pris_ex_moms FROM varestamdata")}
+        dateret = _aktive_priser(conn, mon) if mon else {}
+        for l in linjer:
+            navn = str(l.get("varenavn") or "").strip()
+            sku  = str(l.get("varenummer") or "").strip()
+            try:
+                pris = float(l.get("pris_ex_moms") or 0)
+            except (ValueError, TypeError):
+                pris = 0.0
+            if not navn or pris <= 0:
+                continue
+            k = navn.lower()
+            if k not in stam:
+                # Ny vare — opret baseline (uden at røre eksisterende priser)
+                conn.execute(
+                    "INSERT OR IGNORE INTO varestamdata (sku, varenavn, type, pris_ex_moms, portioner) "
+                    "VALUES (?,?,?,?,1)", (sku, navn, "Bagværk", round(pris, 2)))
+                stam[k] = pris
+                nye_varer += 1
+                continue
+            # Eksisterende vare — kun dateret ændring hvis prisen reelt afviger
+            gaeldende = dateret.get(k, stam.get(k))
+            if mon and gaeldende is not None and abs(pris - float(gaeldende)) > 0.005:
+                prisaendringer.append({"varenavn": navn, "pris_ex_moms": round(pris, 2),
+                                       "gyldig_fra": mon, "kilde": "bestilling"})
+    if prisaendringer:
+        gem_prisperiode_bulk(prisaendringer)
+    return {"nye_varer": nye_varer, "prisaendringer": len(prisaendringer)}
+
+
 def hent_gmail_importerede() -> set:
     with _conn() as conn:
         rows = conn.execute("SELECT msg_id FROM gmail_importerede").fetchall()

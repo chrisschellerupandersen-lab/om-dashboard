@@ -733,17 +733,11 @@ async def bestilling_opdater(request: Request):
 
     antal = database.gem_ugebestilling(int(uge), int(aar), linjer)
 
-    # Auto-opdater stamdata fra bestillingslinjer (SKU + pris_ex_moms)
-    stamdata_linjer = [
-        {"sku": l["varenummer"], "varenavn": l["varenavn"],
-         "type": "Bagværk", "pris_ex_moms": l["pris_ex_moms"]}
-        for l in linjer
-        if l.get("varenummer") and l.get("pris_ex_moms", 0) > 0
-    ]
-    if stamdata_linjer:
-        database.gem_stamdata_bulk(stamdata_linjer)
+    # Nye varer → varestamdata (baseline). Ægte prisændringer → daterede priser
+    # (vare_pris_periode, gyldig fra ugens mandag). Historikken røres IKKE.
+    pris_res = database.auto_prisopdater_fra_bestilling(int(uge), int(aar), linjer)
 
-    return {"ok": True, "uge": uge, "aar": aar, "linjer": antal}
+    return {"ok": True, "uge": uge, "aar": aar, "linjer": antal, **pris_res}
 
 
 @app.get("/api/bagvaerk/dag/{uge}")

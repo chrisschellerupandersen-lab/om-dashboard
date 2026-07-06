@@ -1796,6 +1796,13 @@ async def api_spild_overblik(request: Request):
     return {"denne_uge": denne, "forrige_uge": forrig}
 
 
+@app.get("/api/spild/uge-serie")
+async def api_spild_uge_serie(request: Request, antal: int = 24):
+    """Ugevis svind% (spild-rapportens beregning) for de seneste N uger."""
+    _kræv_login(request)
+    return database.hent_spild_uge_serie(int(antal))
+
+
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)

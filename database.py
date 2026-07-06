@@ -2540,6 +2540,31 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
         return {"uge": uge, "aar": aar, "har_data": False, "fejl": str(e)}
 
 
+def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
+    """Ugevis svind% for de seneste N uger — SAMME beregning som spild-rapporten
+    (hent_spild_uge_overblik pr. uge). Ældste uge først. Indeværende uge medtages,
+    men frontend udelader den (ufærdig). Uger uden data får svind_pct = None."""
+    from datetime import date as _d, timedelta as _td
+    iso = _d.today().isocalendar()
+    man_cur = _d.fromisocalendar(iso[0], iso[1], 1)   # mandag i indeværende ISO-uge
+    serie: List[Dict] = []
+    for i in range(max(1, antal_uger)):
+        man = man_cur - _td(weeks=i)
+        w   = man.isocalendar()
+        o   = hent_spild_uge_overblik(w[1], w[0])
+        serie.append({
+            "uge":        w[1],
+            "aar":        w[0],
+            "svind_pct":  o.get("svind_pct"),
+            "bestilt":    o.get("bestilt"),
+            "n_dage":     o.get("n_dage", 0),
+            "er_komplet": o.get("er_komplet", False),
+            "har_data":   o.get("har_data", False),
+        })
+    serie.reverse()   # ældste først
+    return serie
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 

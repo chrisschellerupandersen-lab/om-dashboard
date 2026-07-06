@@ -4546,9 +4546,15 @@ function buildSvindChart(data) {
 }
 
 // ── SPILD-UDVIKLING (20 uger + trend, uden indeværende uge) ───────────────────
-function buildSpildTrend(data) {
+// Bruger spild-rapportens ugevise beregning (/api/spild/uge-serie).
+async function buildSpildTrend() {
   const card = document.getElementById('spild-trend-card');
   if (!card) return;
+  let serie;
+  try { serie = await api('/api/spild/uge-serie?antal=26'); }
+  catch (e) { card.style.display = 'none'; return; }
+  if (!serie || !serie.length) { card.style.display = 'none'; return; }
+
   // Indeværende ISO-uge — skal IKKE tælle med (ugen er ikke færdig)
   const _t = new Date();
   const _u = new Date(Date.UTC(_t.getFullYear(), _t.getMonth(), _t.getDate()));
@@ -4556,10 +4562,9 @@ function buildSpildTrend(data) {
   const _ys = new Date(Date.UTC(_u.getUTCFullYear(), 0, 1));
   const curUge = Math.ceil((((_u - _ys) / 86400000) + 1) / 7), curAar = _u.getUTCFullYear();
 
-  // Kun afsluttede uger med spild-tal, kronologisk, seneste 20
-  const rows = [...data]
+  // Serien er allerede ældste-først; kun uger med spild-tal, uden indeværende, seneste 20
+  const rows = serie
     .filter(r => r.svind_pct != null && !(r.uge === curUge && r.aar === curAar))
-    .sort((a, b) => a.aar !== b.aar ? a.aar - b.aar : a.uge - b.uge)
     .slice(-20);
   if (rows.length < 3) { card.style.display = 'none'; return; }
   card.style.display = '';
@@ -7774,6 +7779,7 @@ async function loadSvind(force = false) {
   if (_svindLoaded && !force && (nu - _svindTs) < 120000) return;
   _svindLoaded = true;
   _svindTs     = nu;
+  buildSpildTrend();   // uafhængig af /api/bager/svind — henter egne uge-data
   const data = await api(`/api/bager/svind?aar=${VALGT_AAR}`);
   if (!data || !data.length) {
     document.getElementById('svind-tbody').innerHTML =
@@ -7863,7 +7869,6 @@ async function loadSvind(force = false) {
 
   // Byg scorecard, chart og svind-alert fra forside
   buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, svindUger.length);
-  buildSpildTrend(data);
   buildSvindChart(data);
   addSvindAlert(gnsSvind, data[data.length-1]?.uge);
 }

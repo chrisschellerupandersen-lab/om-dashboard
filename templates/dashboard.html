@@ -2698,6 +2698,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
         </div>
 
+        <!-- SPILD-UDVIKLING (20 uger, trend, uden indeværende) -->
+        <div class="card" id="spild-trend-card" style="display:none;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Spild-udvikling · seneste 20 uger</span>
+            <span id="spild-trend-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <div style="position:relative;height:210px;"><canvas id="c-spild-trend"></canvas></div>
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-top:6px;">Indeværende (ufærdige) uge tælles ikke med · stiplet linje = trend</div>
+        </div>
+
         <!-- BESTILLINGSHISTORIK CHART -->
         <div class="card" id="svind-hist-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -4532,6 +4542,55 @@ function buildSvindChart(data) {
              // Tegn 15%- og 22%-grænselinjer som annotations ville, her via dataset-reference kun
            }}
     }
+  });
+}
+
+// ── SPILD-UDVIKLING (20 uger + trend, uden indeværende uge) ───────────────────
+function buildSpildTrend(data) {
+  const card = document.getElementById('spild-trend-card');
+  if (!card) return;
+  // Indeværende ISO-uge — skal IKKE tælle med (ugen er ikke færdig)
+  const _t = new Date();
+  const _u = new Date(Date.UTC(_t.getFullYear(), _t.getMonth(), _t.getDate()));
+  const _dn = _u.getUTCDay() || 7; _u.setUTCDate(_u.getUTCDate() + 4 - _dn);
+  const _ys = new Date(Date.UTC(_u.getUTCFullYear(), 0, 1));
+  const curUge = Math.ceil((((_u - _ys) / 86400000) + 1) / 7), curAar = _u.getUTCFullYear();
+
+  // Kun afsluttede uger med spild-tal, kronologisk, seneste 20
+  const rows = [...data]
+    .filter(r => r.svind_pct != null && !(r.uge === curUge && r.aar === curAar))
+    .sort((a, b) => a.aar !== b.aar ? a.aar - b.aar : a.uge - b.uge)
+    .slice(-20);
+  if (rows.length < 3) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  const labels = rows.map(r => `U${r.uge}`);
+  const pct    = rows.map(r => +r.svind_pct.toFixed(1));
+  const colors = pct.map(v => v < 15 ? 'rgba(45,90,45,.7)' : v < 22 ? 'rgba(200,168,75,.75)' : 'rgba(192,57,43,.7)');
+
+  // Lineær regression → trendlinje
+  const n = pct.length; let sx = 0, sy = 0, sxy = 0, sxx = 0;
+  pct.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x; });
+  const slope = (n * sxy - sx * sy) / ((n * sxx - sx * sx) || 1);
+  const intercept = (sy - slope * sx) / n;
+  const trend = pct.map((_, x) => +(intercept + slope * x).toFixed(2));
+
+  const diff    = trend[trend.length - 1] - trend[0];
+  const retning = slope > 0.05 ? 'stigende ⬆' : slope < -0.05 ? 'faldende ⬇' : 'stabil →';
+  const retFarve= slope > 0.05 ? 'var(--danger)' : slope < -0.05 ? 'var(--moss)' : 'var(--ash)';
+  const gns     = (sy / n).toFixed(1);
+  const infoEl  = document.getElementById('spild-trend-info');
+  if (infoEl) infoEl.innerHTML =
+    `${n} uger · snit ${gns}% · trend <span style="color:${retFarve};font-weight:600;">${retning} ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>`;
+
+  mk('c-spild-trend', 'bar', labels, [
+    { label:'Spild %', data:pct, backgroundColor:colors, borderRadius:3, order:2 },
+    { label:'Trend', data:trend, type:'line', borderColor:'rgba(30,58,30,.85)', borderDash:[6,4],
+      borderWidth:2, pointRadius:0, tension:0, order:1 }
+  ], {
+    plugins:{ legend:{ display:true, labels:{ font:{size:10}, padding:10, usePointStyle:true }}},
+    scales:{ y:{ min:0, ticks:{ callback:v => v + '%', font:{size:10} }, grid:{ color:'rgba(30,58,30,.05)' } },
+             x:{ ticks:{ font:{size:9} } } }
   });
 }
 
@@ -7804,6 +7863,7 @@ async function loadSvind(force = false) {
 
   // Byg scorecard, chart og svind-alert fra forside
   buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, svindUger.length);
+  buildSpildTrend(data);
   buildSvindChart(data);
   addSvindAlert(gnsSvind, data[data.length-1]?.uge);
 }

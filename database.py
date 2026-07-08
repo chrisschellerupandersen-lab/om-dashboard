@@ -2528,13 +2528,33 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
         tgtg      = sum(dag["tgtg"]      for dag in dage)
         svind_stk = sum(dag["svind"] or 0 for dag in dage)
         svind_pct = round(svind_stk / bestilt * 100, 1) if bestilt > 0 else None
+        # Spild FØR TGTG: TGTG tælles som spild (viser reel overproduktion)
+        svind_foer     = svind_stk + tgtg
+        svind_pct_foer = round(svind_foer / bestilt * 100, 1) if bestilt > 0 else None
         n_dage    = len(dage)
+
+        # Per-dag detalje (til drill-down + heatmap)
+        dag_detalje = [{
+            "dag":       dag["dag"],
+            "dag_label": dag.get("dag_label", dag["dag"]),
+            "dato":      dag["dato"],
+            "bestilt":   dag["bestilt"],
+            "solgt":     dag["kassesalg"],
+            "tgtg":      dag["tgtg"],
+            "svind":     dag["svind"],
+            "svind_pct": dag.get("svind_pct"),
+            "svind_pct_foer_tgtg": (
+                round(((dag["svind"] or 0) + dag["tgtg"]) / dag["bestilt"] * 100, 1)
+                if dag["bestilt"] > 0 else None),
+        } for dag in dage]
 
         return {
             "uge": uge, "aar": aar, "har_data": True,
             "bestilt": bestilt, "kassesalg": kassesalg, "tgtg": tgtg,
             "svind": svind_stk, "svind_pct": svind_pct,
+            "svind_foer_tgtg": svind_foer, "svind_pct_foer_tgtg": svind_pct_foer,
             "n_dage": n_dage, "er_komplet": n_dage >= 6,
+            "dage": dag_detalje,
         }
     except Exception as e:
         return {"uge": uge, "aar": aar, "har_data": False, "fejl": str(e)}
@@ -2556,10 +2576,13 @@ def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
             "uge":        w[1],
             "aar":        w[0],
             "svind_pct":  o.get("svind_pct"),
+            "svind_pct_foer_tgtg": o.get("svind_pct_foer_tgtg"),
+            "tgtg":       o.get("tgtg"),
             "bestilt":    o.get("bestilt"),
             "n_dage":     o.get("n_dage", 0),
             "er_komplet": o.get("er_komplet", False),
             "har_data":   o.get("har_data", False),
+            "dage":       o.get("dage", []),
         })
     serie.reverse()   # ældste først
     return serie

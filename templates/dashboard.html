@@ -2705,7 +2705,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <span id="spild-trend-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
           <div style="position:relative;height:210px;"><canvas id="c-spild-trend"></canvas></div>
-          <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-top:6px;">Indeværende (ufærdige) uge tælles ikke med · stiplet linje = trend</div>
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-top:6px;">Klik på en uge for dag-detaljer · søjle = spild efter TGTG · linje = spild før TGTG (TGTG=spild) · stiplet = trend · indeværende uge tælles ikke med</div>
+
+          <!-- HEATMAP: ugedag × uge -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;gap:10px;flex-wrap:wrap;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Spild pr. dag pr. uge — hvor går det galt?</span>
+            <div style="display:flex;gap:4px;">
+              <button id="spild-hm-efter" onclick="spildHeatmapMode('efter')" style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;cursor:pointer;background:var(--forest);color:var(--amber);">efter TGTG</button>
+              <button id="spild-hm-foer" onclick="spildHeatmapMode('foer')" style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;cursor:pointer;background:none;color:var(--charcoal);">før TGTG</button>
+            </div>
+          </div>
+          <div id="spild-heatmap" style="overflow-x:auto;"></div>
         </div>
 
         <!-- BESTILLINGSHISTORIK CHART -->
@@ -4569,11 +4579,14 @@ async function buildSpildTrend() {
   if (rows.length < 3) { card.style.display = 'none'; return; }
   card.style.display = '';
 
+  _spildRows = rows;   // gem til drill-down + heatmap
+
   const labels = rows.map(r => `U${r.uge}`);
   const pct    = rows.map(r => +r.svind_pct.toFixed(1));
+  const pctFoer= rows.map(r => r.svind_pct_foer_tgtg != null ? +r.svind_pct_foer_tgtg.toFixed(1) : null);
   const colors = pct.map(v => v < 15 ? 'rgba(45,90,45,.7)' : v < 22 ? 'rgba(200,168,75,.75)' : 'rgba(192,57,43,.7)');
 
-  // Lineær regression → trendlinje
+  // Lineær regression → trendlinje (spild efter TGTG)
   const n = pct.length; let sx = 0, sy = 0, sxy = 0, sxx = 0;
   pct.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x; });
   const slope = (n * sxy - sx * sy) / ((n * sxx - sx * sx) || 1);
@@ -4584,20 +4597,102 @@ async function buildSpildTrend() {
   const retning = slope > 0.05 ? 'stigende ⬆' : slope < -0.05 ? 'faldende ⬇' : 'stabil →';
   const retFarve= slope > 0.05 ? 'var(--danger)' : slope < -0.05 ? 'var(--moss)' : 'var(--ash)';
   const gns     = (sy / n).toFixed(1);
+  const gnsFoer = (pctFoer.reduce((s, v) => s + (v || 0), 0) / n).toFixed(1);
   const infoEl  = document.getElementById('spild-trend-info');
   if (infoEl) infoEl.innerHTML =
-    `${n} uger · snit ${gns}% · trend <span style="color:${retFarve};font-weight:600;">${retning} ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>`;
+    `snit ${gns}% (før TGTG ${gnsFoer}%) · trend <span style="color:${retFarve};font-weight:600;">${retning} ${diff >= 0 ? '+' : ''}${diff.toFixed(1)} pp</span>`;
 
   mk('c-spild-trend', 'bar', labels, [
-    { label:'Spild %', data:pct, backgroundColor:colors, borderRadius:3, order:2 },
-    { label:'Trend', data:trend, type:'line', borderColor:'rgba(30,58,30,.85)', borderDash:[6,4],
-      borderWidth:2, pointRadius:0, tension:0, order:1 }
+    { label:'Spild efter TGTG', data:pct, backgroundColor:colors, borderRadius:3, order:3 },
+    { label:'Spild før TGTG', data:pctFoer, type:'line', borderColor:'rgba(200,120,40,.95)',
+      backgroundColor:'transparent', borderWidth:2, pointRadius:3, pointBackgroundColor:'rgba(200,120,40,.95)', tension:.25, order:1, spanGaps:true },
+    { label:'Trend', data:trend, type:'line', borderColor:'rgba(30,58,30,.7)', borderDash:[6,4],
+      borderWidth:2, pointRadius:0, tension:0, order:2 }
   ], {
+    onClick:(e, els) => { if (els && els.length) { const r = _spildRows[els[0].index]; if (r) spildDagDrill(r.uge, r.aar); } },
     plugins:{ legend:{ display:true, labels:{ font:{size:10}, padding:10, usePointStyle:true }}},
     scales:{ y:{ min:0, ticks:{ callback:v => v + '%', font:{size:10} }, grid:{ color:'rgba(30,58,30,.05)' } },
              x:{ ticks:{ font:{size:9} } } }
   });
+
+  buildSpildHeatmap();
 }
+
+// State + hjælpere til heatmap og drill-down
+let _spildRows = [];
+let _spildHmMode = 'efter';
+const _SPILD_DAGE = [['man','Man'],['tir','Tir'],['ons','Ons'],['tor','Tor'],['fre','Fre'],['loe','Lør'],['son','Søn']];
+
+function _spildFarve(pct) {
+  if (pct == null) return 'rgba(30,58,30,.06)';
+  const v = Math.max(0, Math.min(40, pct)) / 40;   // 0..40% → 0..1
+  const r = Math.round(45 + (192 - 45) * v), g = Math.round(90 + (57 - 90) * v), b = Math.round(45 + (43 - 45) * v);
+  return `rgb(${r},${g},${b})`;
+}
+
+function buildSpildHeatmap() {
+  const wrap = document.getElementById('spild-heatmap');
+  if (!wrap) return;
+  if (!_spildRows.length) { wrap.innerHTML = ''; return; }
+  const felt = _spildHmMode === 'foer' ? 'svind_pct_foer_tgtg' : 'svind_pct';
+  const cw = 32;
+  let html = `<table style="border-collapse:separate;border-spacing:2px;font-family:'DM Mono',monospace;font-size:9px;">`;
+  html += `<thead><tr><th style="width:30px;"></th>` +
+    _spildRows.map(r => `<th style="width:${cw}px;color:var(--ash);font-weight:500;cursor:pointer;" title="Klik for dag-detaljer" onclick="spildDagDrill(${r.uge},${r.aar})">U${r.uge}</th>`).join('') +
+    `</tr></thead><tbody>`;
+  _SPILD_DAGE.forEach(([dk, dl]) => {
+    html += `<tr><td style="color:var(--ash);text-align:right;padding-right:4px;">${dl}</td>`;
+    _spildRows.forEach(r => {
+      const dag = (r.dage || []).find(d => d.dag === dk);
+      const val = dag ? dag[felt] : null;
+      const tip = dag ? `U${r.uge} ${dl}: bestilt ${dag.bestilt}, solgt ${dag.solgt}, TGTG ${dag.tgtg}, spild ${dag.svind != null ? dag.svind : '—'} (${val != null ? val + '%' : '—'})` : '';
+      html += `<td title="${tip}" onclick="spildDagDrill(${r.uge},${r.aar})" style="width:${cw}px;height:20px;text-align:center;color:#fff;background:${_spildFarve(val)};border-radius:2px;cursor:pointer;">${val == null ? '' : Math.round(val)}</td>`;
+    });
+    html += `</tr>`;
+  });
+  wrap.innerHTML = html + `</tbody></table>`;
+}
+
+function spildHeatmapMode(mode) {
+  _spildHmMode = mode;
+  const ef = document.getElementById('spild-hm-efter'), fo = document.getElementById('spild-hm-foer');
+  if (ef && fo) {
+    ef.style.background = mode === 'efter' ? 'var(--forest)' : 'none';
+    ef.style.color      = mode === 'efter' ? 'var(--amber)' : 'var(--charcoal)';
+    fo.style.background = mode === 'foer' ? 'var(--forest)' : 'none';
+    fo.style.color      = mode === 'foer' ? 'var(--amber)' : 'var(--charcoal)';
+  }
+  buildSpildHeatmap();
+}
+
+function spildDagDrill(uge, aar) {
+  const r = _spildRows.find(x => x.uge === uge && x.aar === aar);
+  if (!r) return;
+  const dk = v => v == null ? '—' : Math.round(v).toLocaleString('da-DK');
+  const mono = "font-family:'DM Mono',monospace;";
+  document.getElementById('spild-dag-titel').textContent = `Spild pr. dag · uge ${uge} ${aar}`;
+  document.getElementById('spild-dag-sub').textContent =
+    `bestilt ${dk(r.bestilt)} · spild efter TGTG ${r.svind_pct}% · før TGTG ${r.svind_pct_foer_tgtg}%`;
+  const dagLabel = { man:'Mandag', tir:'Tirsdag', ons:'Onsdag', tor:'Torsdag', fre:'Fredag', loe:'Lørdag', son:'Søndag' };
+  const body = (r.dage || []).map(d => `<tr>
+      <td style="padding:5px 8px;font-size:13px;">${d.dag_label || dagLabel[d.dag] || d.dag}</td>
+      <td class="num" style="${mono}font-size:12px;">${dk(d.bestilt)}</td>
+      <td class="num" style="${mono}font-size:12px;">${dk(d.solgt)}</td>
+      <td class="num" style="${mono}font-size:12px;color:var(--moss);">${dk(d.tgtg)}</td>
+      <td class="num" style="${mono}font-size:12px;">${dk(d.svind)}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:600;">${d.svind_pct != null ? d.svind_pct + '%' : '—'}</td>
+      <td class="num" style="${mono}font-size:12px;color:rgba(200,120,40,.95);">${d.svind_pct_foer_tgtg != null ? d.svind_pct_foer_tgtg + '%' : '—'}</td>
+    </tr>`).join('');
+  document.getElementById('spild-dag-body').innerHTML = `
+    <table style="width:100%;border-collapse:collapse;">
+      <thead><tr style="border-bottom:1px solid var(--border);">
+        ${['DAG','BESTILT','SOLGT','TGTG','SPILD','SPILD%','FØR TGTG'].map((h,i)=>`<th style="text-align:${i?'right':'left'};padding:4px 8px;${mono}font-size:9px;color:var(--ash);">${h}</th>`).join('')}
+      </tr></thead><tbody>${body || '<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--ash);">Ingen dage</td></tr>'}</tbody>
+    </table>`;
+  document.getElementById('spild-dag-modal').style.display = 'flex';
+}
+
+function lukSpildDag() { document.getElementById('spild-dag-modal').style.display = 'none'; }
 
 // ── SVIND SCORECARD ───────────────────────────────────────────────────────────
 function buildSvindScorecard(totFaktura, totRetur, totNetto, gnsSvind, nUger) {
@@ -11490,6 +11585,21 @@ async function dagDbDetaljeLoad() {
       <button onclick="lukTgtgSpec()" style="padding:6px 12px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">Luk ✕</button>
     </div>
     <div id="tgtg-spec-body" style="margin-top:14px;"></div>
+  </div>
+</div>
+
+<!-- Spild dag-drill modal -->
+<div id="spild-dag-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:flex-start;justify-content:center;overflow:auto;padding:40px 16px;"
+     onclick="if(event.target===this)lukSpildDag()">
+  <div style="background:var(--bg);border-radius:12px;padding:24px;width:640px;max-width:100%;box-shadow:0 8px 32px rgba(0,0,0,.25);">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:4px;">
+      <div>
+        <h3 style="margin:0;font-size:16px;" id="spild-dag-titel">Spild pr. dag</h3>
+        <div id="spild-dag-sub" style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);margin-top:3px;"></div>
+      </div>
+      <button onclick="lukSpildDag()" style="padding:6px 12px;background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px;">Luk ✕</button>
+    </div>
+    <div id="spild-dag-body" style="margin-top:14px;"></div>
   </div>
 </div>
 </body>

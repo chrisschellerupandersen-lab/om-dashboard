@@ -2533,6 +2533,24 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
         svind_pct_foer = round(svind_foer / bestilt * 100, 1) if bestilt > 0 else None
         n_dage    = len(dage)
 
+        # ── Kr-værdisætning (kostpris) ──────────────────────────────────────
+        # Spild i kr = kostpris af overskud FØR TGTG · TGTG kr = kreditering ·
+        # Netto spild = Spild − TGTG · Solgt = solgte stk × kostpris/stk
+        with _conn() as _c:
+            kp = _c.execute("""
+                SELECT SUM((man+tir+ons+tor+fre+loe+son) * pris_ex_moms) AS kr,
+                       SUM(man+tir+ons+tor+fre+loe+son)                 AS stk
+                FROM ugebestillinger WHERE uge=? AND aar=?
+            """, (uge, aar)).fetchone()
+            kostpris_stk = round((kp["kr"] or 0) / kp["stk"], 4) if (kp and kp["stk"]) else 0.0
+            # TGTG kr = bager-fakturaens TGTG-kreditering for ugen (matcher fakturaen)
+            br = _c.execute("SELECT tgtg FROM bager_regnskab WHERE uge=? AND aar=?", (uge, aar)).fetchone()
+            tgtg_kr = round(float(br["tgtg"]), 2) if (br and br["tgtg"]) else 0.0
+        spild_foer_stk  = svind_stk + tgtg                       # overskud før TGTG (stk)
+        solgt_kr        = round(kassesalg * kostpris_stk, 2)
+        spild_kr        = round(spild_foer_stk * kostpris_stk, 2)  # brutto før TGTG
+        netto_spild_kr  = round(spild_kr - tgtg_kr, 2)
+
         # Per-dag detalje (til drill-down + heatmap)
         dag_detalje = [{
             "dag":       dag["dag"],
@@ -2553,6 +2571,9 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
             "bestilt": bestilt, "kassesalg": kassesalg, "tgtg": tgtg,
             "svind": svind_stk, "svind_pct": svind_pct,
             "svind_foer_tgtg": svind_foer, "svind_pct_foer_tgtg": svind_pct_foer,
+            "kostpris_stk": kostpris_stk,
+            "solgt_kr": solgt_kr, "tgtg_kr": tgtg_kr,
+            "spild_kr": spild_kr, "netto_spild_kr": netto_spild_kr,
             "n_dage": n_dage, "er_komplet": n_dage >= 6,
             "dage": dag_detalje,
         }
@@ -2579,6 +2600,10 @@ def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
             "svind_pct_foer_tgtg": o.get("svind_pct_foer_tgtg"),
             "tgtg":       o.get("tgtg"),
             "bestilt":    o.get("bestilt"),
+            "solgt_kr":       o.get("solgt_kr"),
+            "tgtg_kr":        o.get("tgtg_kr"),
+            "spild_kr":       o.get("spild_kr"),
+            "netto_spild_kr": o.get("netto_spild_kr"),
             "n_dage":     o.get("n_dage", 0),
             "er_komplet": o.get("er_komplet", False),
             "har_data":   o.get("har_data", False),

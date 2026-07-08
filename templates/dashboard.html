@@ -2718,6 +2718,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="spild-heatmap" style="overflow-x:auto;"></div>
         </div>
 
+        <!-- HVAD KOSTER SPILDET — KR PR. UGE -->
+        <div class="card" id="spild-kr-card" style="display:none;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Hvad koster spildet? · kr pr. uge</span>
+            <span id="spild-kr-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:520px;">
+              <thead><tr>
+                <th>Uge</th>
+                <th class="num" title="Solgte stk × kostpris/stk">Solgt (kostpris)</th>
+                <th class="num" title="TGTG-kreditering fra bagerfakturaen">TGTG</th>
+                <th class="num" title="Kostpris af overskud FØR TGTG">Spild</th>
+                <th class="num" title="Spild − TGTG-indtægt">Netto spild</th>
+              </tr></thead>
+              <tbody id="spild-kr-tbody"></tbody>
+            </table>
+          </div>
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-top:6px;">Spild = kostpris af overskud før TGTG · Netto spild = Spild − TGTG-indtægt · værdisat til bagerens kostpris/stk · klik en uge for dag-detaljer</div>
+        </div>
+
         <!-- BESTILLINGSHISTORIK CHART -->
         <div class="card" id="svind-hist-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
@@ -4616,6 +4637,39 @@ async function buildSpildTrend() {
   });
 
   buildSpildHeatmap();
+  buildSpildKrTabel();
+}
+
+// Kr-tabel: hvad koster spildet pr. uge
+function buildSpildKrTabel() {
+  const card = document.getElementById('spild-kr-card');
+  const tb   = document.getElementById('spild-kr-tbody');
+  if (!card || !tb) return;
+  if (!_spildRows.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const dk = v => v == null ? '—' : Math.round(v).toLocaleString('da-DK');
+  const mono = "font-family:'DM Mono',monospace;";
+  let tSolgt = 0, tTgtg = 0, tSpild = 0, tNetto = 0;
+  const rows = [..._spildRows].reverse();   // nyeste øverst
+  tb.innerHTML = rows.map(r => {
+    tSolgt += r.solgt_kr || 0; tTgtg += r.tgtg_kr || 0; tSpild += r.spild_kr || 0; tNetto += r.netto_spild_kr || 0;
+    const nettoClr = (r.netto_spild_kr || 0) > 0 ? 'var(--danger)' : 'var(--moss)';
+    return `<tr style="cursor:pointer;" onclick="spildDagDrill(${r.uge},${r.aar})" title="Klik for dag-detaljer">
+      <td><strong>Uge ${r.uge}</strong> <span style="color:var(--ash);font-size:11px;">${r.aar}</span></td>
+      <td class="num" style="${mono}">${dk(r.solgt_kr)} kr</td>
+      <td class="num" style="${mono}color:var(--moss);">${dk(r.tgtg_kr)} kr</td>
+      <td class="num" style="${mono}">${dk(r.spild_kr)} kr</td>
+      <td class="num" style="${mono}color:${nettoClr};font-weight:600;">${dk(r.netto_spild_kr)} kr</td>
+    </tr>`;
+  }).join('') + `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
+      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);">Total ${rows.length} uger</td>
+      <td class="num" style="${mono}font-weight:600;">${dk(tSolgt)} kr</td>
+      <td class="num" style="${mono}font-weight:600;color:var(--moss);">${dk(tTgtg)} kr</td>
+      <td class="num" style="${mono}font-weight:600;">${dk(tSpild)} kr</td>
+      <td class="num" style="${mono}font-weight:700;color:var(--danger);">${dk(tNetto)} kr</td>
+    </tr>`;
+  const info = document.getElementById('spild-kr-info');
+  if (info) info.textContent = `netto spild i snit ${(rows.length ? Math.round(tNetto / rows.length) : 0).toLocaleString('da-DK')} kr/uge`;
 }
 
 // State + hjælpere til heatmap og drill-down

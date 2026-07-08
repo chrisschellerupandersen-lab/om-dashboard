@@ -1817,6 +1817,13 @@ async def api_bagvaerk_optimering(request: Request, antal: int = 12):
     return database.hent_bestilling_optimering(int(antal))
 
 
+@app.get("/api/bagvaerk/anbefaling")
+async def api_bagvaerk_anbefaling(request: Request, antal: int = 12):
+    """Newsvendor optimal bestillingsmængde pr. vare pr. ugedag."""
+    _kræv_login(request)
+    return database.hent_bestilling_anbefaling(int(antal))
+
+
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)

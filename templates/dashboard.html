@@ -455,6 +455,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .aar2-tbl th.num{text-align:right;}
 .aar2-tbl td{padding:10px 16px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
 .aar2-tbl tr.indev td{background:rgba(200,168,75,.04);}
+.bern-opt-hint{display:none;}
+#p-beregner.vis-opt .bern-opt-hint{display:block;}
 .aar2-tbl tr:hover td{background:var(--cream);}
 .aar2-minibar-bg{height:6px;background:rgba(30,58,30,.07);border-radius:1px;overflow:hidden;width:120px;}
 .aar2-minibar-fill{height:100%;border-radius:1px;}
@@ -2986,7 +2988,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <span id="bern-uge-label" style="font-size:20px;font-weight:500;color:var(--forest);">Uge —</span>
           <span id="bern-dato-label" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--ash);"></span>
           <button onclick="bernNext()" style="background:var(--parchment);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:6px 14px;cursor:pointer;font-size:16px;">→</button>
-          <button onclick="bernHentKontekst()" id="bern-main-btn" style="margin-left:auto;background:var(--forest);color:#fff;border:none;border-radius:4px;padding:8px 18px;cursor:pointer;font-weight:500;font-size:13px;">🔄 Opdater analyse</button>
+          <button onclick="bernToggleOpt()" id="bern-opt-btn" title="Vis økonomisk optimal mængde pr. dag (newsvendor)" style="margin-left:auto;background:var(--parchment);color:var(--charcoal);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:8px 14px;cursor:pointer;font-weight:500;font-size:12px;">💡 Vis øk. optimal</button>
+          <button onclick="bernHentKontekst()" id="bern-main-btn" style="background:var(--forest);color:#fff;border:none;border-radius:4px;padding:8px 18px;cursor:pointer;font-weight:500;font-size:13px;">🔄 Opdater analyse</button>
           <span id="bern-event-badge" style="display:none;background:rgba(30,58,30,.10);color:var(--forest);border:1px solid rgba(30,58,30,.25);border-radius:20px;padding:3px 12px;font-size:12px;font-weight:500;letter-spacing:.02em;"></span>
         </div>
         <div style="margin-bottom:12px;">
@@ -9194,13 +9197,22 @@ async function loadBernUge(uge, aar) {
           }
         }
 
+        // Newsvendor optimal (økonomisk) — skjult hint, vises via toggle
+        let optHtml = '';
+        const _anb = (window._bernAnb || {})[String(p.varenummer || '')];
+        if (_anb && _anb.optimal && _anb.optimal[dag] != null) {
+          const o = _anb.optimal[dag];
+          const oClr = o > v ? 'var(--moss)' : o < v ? 'var(--danger)' : 'var(--ash)';
+          optHtml = `<span class="bern-opt-hint" style="font-size:9px;color:${oClr};line-height:1.1;" title="Økonomisk optimal (${_anb.service}% service level)">øk ${o}</span>`;
+        }
+
         return `<td class="num bern-cell" contenteditable="true"
           data-vn="${p.varenummer || ''}" data-dag="${dag}"
           onblur="bernCellSave(this)"
           onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"
           onpaste="event.preventDefault();const t=event.clipboardData.getData('text/plain').replace(/\\D/g,'');document.execCommand('insertText',false,t);"
           style="${mono}${wkBg}${v===0&&!isMinAnb?'color:var(--ash);':''}${manStyle}${minStyle}cursor:text;min-width:28px;"${tipAttr}
-        >${v}${diffHtml}${vejrCellHtml}</td>`;
+        >${v}${diffHtml}${vejrCellHtml}${optHtml}</td>`;
       }).join('');
 
       const diffTotal   = p.total_anbefalet - p.total_basis;
@@ -9456,8 +9468,16 @@ async function loadBeregner() {
   const iso = _isoUgeIdag();
   let uge = iso.uge + 1, aar = iso.aar;
   if (uge > 52) { uge = 1; aar++; }
+  try { window._bernAnb = await api('/api/bagvaerk/anbefaling?antal=12'); } catch (e) { window._bernAnb = {}; }
   await loadBernUge(uge, aar);
   bernLoadSidstSolgt();
+}
+
+function bernToggleOpt() {
+  const panel = document.getElementById('p-beregner');
+  const on = panel.classList.toggle('vis-opt');
+  const btn = document.getElementById('bern-opt-btn');
+  if (btn) { btn.style.background = on ? 'var(--forest)' : 'var(--parchment)'; btn.style.color = on ? '#fff' : 'var(--charcoal)'; }
 }
 
 async function bernLoadSidstSolgt() {

@@ -2830,6 +2830,98 @@ def hent_bestilling_optimering(antal_uger: int = 12) -> Dict:
     return {"varer": varer, "tgtg_pr_stk": tgtg_pr_stk}
 
 
+def _inv_normal(p: float) -> float:
+    """Invers standardnormalfordeling (Acklam-approksimation): z så P(X<z)=p."""
+    import math
+    if p <= 0: return -3.5
+    if p >= 1: return 3.5
+    a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00]
+    b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01]
+    c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00]
+    dd = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00]
+    pl = 0.02425
+    if p < pl:
+        q = math.sqrt(-2 * math.log(p))
+        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((dd[0]*q+dd[1])*q+dd[2])*q+dd[3])*q+1)
+    if p <= 1 - pl:
+        q = p - 0.5; r = q*q
+        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1)
+    q = math.sqrt(-2 * math.log(1 - p))
+    return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((dd[0]*q+dd[1])*q+dd[2])*q+dd[3])*q+1)
+
+
+def hent_bestilling_anbefaling(antal_uger: int = 12) -> Dict:
+    """Newsvendor-anbefaling PR. VARE PR. UGEDAG: optimal bestillingsmængde.
+    optimal = forventet efterspørgsel (µ) + z(service level) × dag-udsving (σ).
+    Service level: returbar → generøs (~90%, retur dækker overskud); kun-TGTG →
+    Cu/(Cu+Co). Returnerer {varenummer: {optimal:{man..son}, service, retur_type}}."""
+    from datetime import date as _d, timedelta as _td
+    fra = (_d.today() - _td(weeks=antal_uger)).isoformat()
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT uge, aar FROM ugebestillinger ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()
+        if not row:
+            return {}
+        prods = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms FROM ugebestillinger
+            WHERE uge=? AND aar=? AND varenummer!='' AND varenummer!='0'
+        """, (row["uge"], row["aar"])).fetchall()
+        dagrows = conn.execute("""
+            SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vnr, dato, SUM(antal) AS antal
+            FROM transaktioner WHERE dato >= ? AND varenummer != '' GROUP BY vnr, dato
+        """, (fra,)).fetchall()
+        sp = {}
+        for r in conn.execute("""
+            SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vnr, SUM(antal) AS a, SUM(omsætning) AS o
+            FROM transaktioner WHERE dato >= ? AND varenummer != '' GROUP BY vnr
+        """, (fra,)).fetchall():
+            sp[str(r["vnr"])] = {"a": r["a"] or 0, "o": r["o"] or 0}
+        t = conn.execute("""
+            SELECT SUM(ds.kreditering) AS kr, SUM(ds.antal * COALESCE(tp.enheder_per_pose,1)) AS stk
+            FROM tgtg_dagssalg ds LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
+            WHERE ds.dato >= ?
+        """, (fra,)).fetchone()
+        tgtg_pr_stk = (t["kr"] or 0) / t["stk"] if (t and t["stk"]) else 0.0
+
+    # Daglige salg pr. varenummer pr. ugedag (Man=0..Søn=6)
+    by: Dict = {}
+    for r in dagrows:
+        vnr = str(r["vnr"]); wd = _d.fromisoformat(r["dato"]).weekday()
+        by.setdefault(vnr, {}).setdefault(wd, []).append(r["antal"] or 0)
+
+    out: Dict = {}
+    for p in prods:
+        vnr = str(int(float(p["varenummer"]))) if p["varenummer"] else ""
+        if not vnr or vnr not in by:
+            continue
+        kost = float(p["pris_ex_moms"] or 0)
+        rtype, rpct = _retur_type(p["varenavn"])
+        s = sp.get(vnr, {}); solgt = s.get("a", 0)
+        salgspris = (s.get("o", 0) / 1.25) / solgt if solgt else None
+        cu = (salgspris - kost) if (salgspris and salgspris > kost) else None
+        if rtype.startswith("returbar"):
+            service = 0.90
+        elif cu is not None:
+            co = max(0.0, kost - tgtg_pr_stk)
+            service = cu / (cu + co) if (cu + co) > 0 else 0.6
+        else:
+            service = 0.6
+        service = min(0.97, max(0.5, service))
+        z = _inv_normal(service)
+        dag_opt: Dict = {}
+        for i, dagnavn in enumerate(DAGE):
+            vals = by.get(vnr, {}).get(i, [])
+            if not vals:
+                continue
+            mu = sum(vals) / len(vals)
+            sd = (sum((x - mu) ** 2 for x in vals) / len(vals)) ** 0.5 if len(vals) > 1 else 0.0
+            dag_opt[dagnavn] = max(0, round(mu + z * sd))
+        if dag_opt:
+            out[vnr] = {"optimal": dag_opt, "service": round(service * 100), "retur_type": rtype}
+    return out
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 

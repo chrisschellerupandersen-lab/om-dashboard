@@ -2345,22 +2345,31 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
             key = (iso[1], iso[0])
             tgtg_stk_map[key] = tgtg_stk_map.get(key, 0) + int(r["stk"] or 0)
 
-        aar_filter1 = "AND b.aar = ?" if aar else ""
+        # Driv ugelisten fra bestillinger UNION faktura — så en uge vises straks
+        # der er bestillings-/salgsdata (økonomi-kolonner udfyldes når fakturaen kommer).
+        aar_filter1 = "WHERE ug.aar = ?" if aar else ""
         aar_params  = (aar,) if aar else ()
         rows = conn.execute(f"""
+            WITH uger AS (
+                SELECT DISTINCT uge, aar FROM ugebestillinger
+                WHERE varenummer != '' AND varenummer != '0'
+                UNION
+                SELECT DISTINCT uge, aar FROM bager_regnskab
+            )
             SELECT
-                b.uge, b.aar,
+                ug.uge, ug.aar,
                 ROUND(SUM(u.total_antal), 0)                   AS bestilt_stk,
                 ROUND(SUM(u.total_pris),  2)                   AS bestilt_kr,
                 b.retur_wiener, b.retur_boller, b.tgtg, b.b_kvali, b.retur_ialt,
                 b.faktura,
-                ROUND(b.faktura - b.retur_ialt, 2)             AS netto_kr
-            FROM bager_regnskab b
-            LEFT JOIN ugebestillinger u ON u.uge = b.uge AND u.aar = b.aar
-            WHERE 1=1 {aar_filter1}
-            GROUP BY b.uge, b.aar
-            ORDER BY b.aar DESC, b.uge DESC
-            LIMIT 12
+                ROUND(COALESCE(b.faktura,0) - COALESCE(b.retur_ialt,0), 2) AS netto_kr
+            FROM uger ug
+            LEFT JOIN ugebestillinger u ON u.uge = ug.uge AND u.aar = ug.aar
+            LEFT JOIN bager_regnskab   b ON b.uge = ug.uge AND b.aar = ug.aar
+            {aar_filter1}
+            GROUP BY ug.uge, ug.aar
+            ORDER BY ug.aar DESC, ug.uge DESC
+            LIMIT 20
         """, aar_params).fetchall()
 
     from calendar import monthrange as _monthrange

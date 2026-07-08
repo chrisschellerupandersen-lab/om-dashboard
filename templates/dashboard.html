@@ -4725,11 +4725,16 @@ function spildDagDrill(uge, aar) {
   if (!r) return;
   const dk = v => v == null ? '—' : Math.round(v).toLocaleString('da-DK');
   const mono = "font-family:'DM Mono',monospace;";
+  const kp = r.kostpris_stk || 0;
   document.getElementById('spild-dag-titel').textContent = `Spild pr. dag · uge ${uge} ${aar}`;
   document.getElementById('spild-dag-sub').textContent =
-    `bestilt ${dk(r.bestilt)} · spild efter TGTG ${r.svind_pct}% · før TGTG ${r.svind_pct_foer_tgtg}%`;
+    `bestilt ${dk(r.bestilt)} · spild efter TGTG ${r.svind_pct}% · før TGTG ${r.svind_pct_foer_tgtg}% · kostpris ${kp.toFixed(2).replace('.', ',')} kr/stk`;
   const dagLabel = { man:'Mandag', tir:'Tirsdag', ons:'Onsdag', tor:'Torsdag', fre:'Fredag', loe:'Lørdag', son:'Søndag' };
-  const body = (r.dage || []).map(d => `<tr>
+  let tB = 0, tS = 0, tT = 0, tSp = 0, tSpKr = 0;
+  const body = (r.dage || []).map(d => {
+    const spKr = Math.round((d.svind || 0) * kp);
+    tB += d.bestilt || 0; tS += d.solgt || 0; tT += d.tgtg || 0; tSp += d.svind || 0; tSpKr += spKr;
+    return `<tr>
       <td style="padding:5px 8px;font-size:13px;">${d.dag_label || dagLabel[d.dag] || d.dag}</td>
       <td class="num" style="${mono}font-size:12px;">${dk(d.bestilt)}</td>
       <td class="num" style="${mono}font-size:12px;">${dk(d.solgt)}</td>
@@ -4737,13 +4742,47 @@ function spildDagDrill(uge, aar) {
       <td class="num" style="${mono}font-size:12px;">${dk(d.svind)}</td>
       <td class="num" style="${mono}font-size:12px;font-weight:600;">${d.svind_pct != null ? d.svind_pct + '%' : '—'}</td>
       <td class="num" style="${mono}font-size:12px;color:rgba(200,120,40,.95);">${d.svind_pct_foer_tgtg != null ? d.svind_pct_foer_tgtg + '%' : '—'}</td>
-    </tr>`).join('');
+      <td class="num" style="${mono}font-size:12px;">${dk(spKr)} kr</td>
+    </tr>`;
+  }).join('');
+  const totPct = tB > 0 ? (tSp / tB * 100).toFixed(1) : '—';
+  const totalRow = `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
+      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);padding:5px 8px;">Total</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:600;">${dk(tB)}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:600;">${dk(tS)}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:600;color:var(--moss);">${dk(tT)}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:600;">${dk(tSp)}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:700;">${totPct}%</td>
+      <td class="num" style="${mono}font-size:12px;color:rgba(200,120,40,.95);">${r.svind_pct_foer_tgtg != null ? r.svind_pct_foer_tgtg + '%' : '—'}</td>
+      <td class="num" style="${mono}font-size:12px;font-weight:700;">${dk(tSpKr)} kr</td>
+    </tr>`;
+  const harFaktura = (r.faktura_kr || 0) > 0;
+  const afstem = `
+    <div style="margin-top:16px;">
+      <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Afstemning i kr — mod bagerfakturaen</div>
+      ${harFaktura ? `
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr><td style="padding:4px 8px;">Leverance (bagerfaktura)</td><td class="num" style="${mono}">${dk(r.faktura_kr)} kr</td></tr>
+        <tr><td style="padding:4px 8px;">− Retur til bager (wienerbrød + boller)</td><td class="num" style="${mono}color:var(--moss);">−${dk(r.retur_bager_kr)} kr</td></tr>
+        <tr><td style="padding:4px 8px;">− TGTG-kreditering</td><td class="num" style="${mono}color:var(--moss);">−${dk(r.tgtg_kr)} kr</td></tr>
+        <tr style="border-top:1px solid var(--border);"><td style="padding:5px 8px;font-weight:600;">= Netto til bager</td><td class="num" style="${mono}font-weight:700;">${dk(r.netto_faktura_kr)} kr</td></tr>
+      </table>`
+      : `<div style="padding:8px;color:var(--ash);font-size:12px;">Bagerfaktura ikke importeret endnu for denne uge — leverance/retur i kr afventer.</div>`}
+      <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin:14px 0 6px;">Spild i kroner (kostpris)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <tr><td style="padding:4px 8px;">Spild før TGTG (kostpris)</td><td class="num" style="${mono}">${dk(r.spild_kr)} kr</td></tr>
+        <tr><td style="padding:4px 8px;">− TGTG-indtægt</td><td class="num" style="${mono}color:var(--moss);">−${dk(r.tgtg_kr)} kr</td></tr>
+        <tr style="border-top:1px solid var(--border);"><td style="padding:5px 8px;font-weight:600;">= Netto spild</td><td class="num" style="${mono}font-weight:700;color:var(--danger);">${dk(r.netto_spild_kr)} kr</td></tr>
+      </table>
+    </div>`;
   document.getElementById('spild-dag-body').innerHTML = `
-    <table style="width:100%;border-collapse:collapse;">
+    <div style="overflow-x:auto;">
+    <table style="width:100%;border-collapse:collapse;min-width:520px;">
       <thead><tr style="border-bottom:1px solid var(--border);">
-        ${['DAG','BESTILT','SOLGT','TGTG','SPILD','SPILD%','FØR TGTG'].map((h,i)=>`<th style="text-align:${i?'right':'left'};padding:4px 8px;${mono}font-size:9px;color:var(--ash);">${h}</th>`).join('')}
-      </tr></thead><tbody>${body || '<tr><td colspan="7" style="padding:16px;text-align:center;color:var(--ash);">Ingen dage</td></tr>'}</tbody>
-    </table>`;
+        ${['DAG','BESTILT','SOLGT','TGTG','SPILD','SPILD%','FØR TGTG','SPILD KR'].map((h,i)=>`<th style="text-align:${i?'right':'left'};padding:4px 8px;${mono}font-size:9px;color:var(--ash);">${h}</th>`).join('')}
+      </tr></thead><tbody>${body || '<tr><td colspan="8" style="padding:16px;text-align:center;color:var(--ash);">Ingen dage</td></tr>'}${body ? totalRow : ''}</tbody>
+    </table>
+    </div>${afstem}`;
   document.getElementById('spild-dag-modal').style.display = 'flex';
 }
 

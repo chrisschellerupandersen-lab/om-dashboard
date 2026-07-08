@@ -2552,9 +2552,14 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
                 FROM ugebestillinger WHERE uge=? AND aar=?
             """, (uge, aar)).fetchone()
             kostpris_stk = round((kp["kr"] or 0) / kp["stk"], 4) if (kp and kp["stk"]) else 0.0
-            # TGTG kr = bager-fakturaens TGTG-kreditering for ugen (matcher fakturaen)
-            br = _c.execute("SELECT tgtg FROM bager_regnskab WHERE uge=? AND aar=?", (uge, aar)).fetchone()
-            tgtg_kr = round(float(br["tgtg"]), 2) if (br and br["tgtg"]) else 0.0
+            # Bager-faktura for ugen (til afstemning i kr)
+            br = _c.execute(
+                "SELECT faktura, retur_wiener, retur_boller, retur_ialt, tgtg "
+                "FROM bager_regnskab WHERE uge=? AND aar=?", (uge, aar)).fetchone()
+            tgtg_kr        = round(float(br["tgtg"]), 2) if (br and br["tgtg"]) else 0.0
+            faktura_kr     = round(float(br["faktura"]), 2) if (br and br["faktura"]) else 0.0
+            retur_bager_kr = round(float(br["retur_wiener"] or 0) + float(br["retur_boller"] or 0), 2) if br else 0.0
+            netto_faktura_kr = round(faktura_kr - float(br["retur_ialt"] or 0), 2) if br else 0.0
         spild_foer_stk  = svind_stk + tgtg                       # overskud før TGTG (stk)
         solgt_kr        = round(kassesalg * kostpris_stk, 2)
         spild_kr        = round(spild_foer_stk * kostpris_stk, 2)  # brutto før TGTG
@@ -2583,6 +2588,8 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
             "kostpris_stk": kostpris_stk,
             "solgt_kr": solgt_kr, "tgtg_kr": tgtg_kr,
             "spild_kr": spild_kr, "netto_spild_kr": netto_spild_kr,
+            "faktura_kr": faktura_kr, "retur_bager_kr": retur_bager_kr,
+            "netto_faktura_kr": netto_faktura_kr,
             "n_dage": n_dage, "er_komplet": n_dage >= 6,
             "dage": dag_detalje,
         }
@@ -2609,10 +2616,15 @@ def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
             "svind_pct_foer_tgtg": o.get("svind_pct_foer_tgtg"),
             "tgtg":       o.get("tgtg"),
             "bestilt":    o.get("bestilt"),
+            "kassesalg":  o.get("kassesalg"),
+            "kostpris_stk":   o.get("kostpris_stk"),
             "solgt_kr":       o.get("solgt_kr"),
             "tgtg_kr":        o.get("tgtg_kr"),
             "spild_kr":       o.get("spild_kr"),
             "netto_spild_kr": o.get("netto_spild_kr"),
+            "faktura_kr":       o.get("faktura_kr"),
+            "retur_bager_kr":   o.get("retur_bager_kr"),
+            "netto_faktura_kr": o.get("netto_faktura_kr"),
             "n_dage":     o.get("n_dage", 0),
             "er_komplet": o.get("er_komplet", False),
             "har_data":   o.get("har_data", False),

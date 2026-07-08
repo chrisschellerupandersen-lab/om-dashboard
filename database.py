@@ -2733,6 +2733,103 @@ def hent_bagvaerk_oekonomi(antal_uger: int = 20) -> Dict:
     return {"uger": uger, "korrelationer": korr, "opsummering": opsummering}
 
 
+# Bagerens retur-liste (RE.pdf): 13,5% retur på wienerbrød, 10% på boller.
+# Brød "krediteres ikke"; enkelte wiener/boller + alle kager "tages ikke retur".
+_RETUR_IKKE = (
+    'græskarstykke', 'teboller rosin', 'grovbirkes', 'frøsnapper',
+    'høj kanel snegl', 'kanelstang', 'spandauer m. vanilje', 'spandauer m vanilje',
+)
+def _retur_type(varenavn: str):
+    """Returnerer (type, retur_pct): 'returbar_wiener'/'returbar_boller'/'ikke_returbar'."""
+    n = (varenavn or '').lower()
+    if any(k in n for k in ('hvedebrød', 'landbrød', 'kernebrød', 'ciabatta',
+                            'signatur br', 'rugbrød', 'foccacia', 'focaccia', 'frostbrød')):
+        return ('ikke_returbar', 0.0)
+    if any(k in n for k in ('stammer', 'amagerkage', 'napoleonshat', 'cookie', 'kokostop',
+                            'romkugl', 'studenterbr', 'snitter', 'muffin', 'brownie',
+                            'honning', 'banankage', 'citron snitte', 'kage')):
+        return ('ikke_returbar', 0.0)
+    if any(k in n for k in _RETUR_IKKE):
+        return ('ikke_returbar', 0.0)
+    if any(k in n for k in ('wiener', 'croissant', 'crossaint', 'snegl', 'snurrer',
+                            'birkes', 'spandauer', 'romsnegle', 'kardemomme', 'fastelavns')):
+        return ('returbar_wiener', 0.135)
+    if any(k in n for k in ('bolle', 'hveder', 'teboller', 'müsli', 'musli')):
+        return ('returbar_boller', 0.10)
+    return ('ikke_returbar', 0.0)
+
+
+def hent_bestilling_optimering(antal_uger: int = 12) -> Dict:
+    """Newsvendor-anbefaling pr. bagervare: service level ud fra økonomi + retur-type.
+    Cu = salgspris − kostpris (tabt DB ved udsolgt).
+    Co = kostpris − genvinding; returbar → genvinding ≈ fuld (op til retur-grænse) →
+    bestil rigeligt; kun-TGTG → genvinding = TGTG-kreditering/stk → bestil stramt."""
+    from datetime import date as _d, timedelta as _td
+    fra = (_d.today() - _td(weeks=antal_uger)).isoformat()
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT uge, aar FROM ugebestillinger ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()
+        if not row:
+            return {"varer": [], "tgtg_pr_stk": 0}
+        prods = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms
+            FROM ugebestillinger WHERE uge=? AND aar=? AND varenummer!='' AND varenummer!='0'
+            ORDER BY id
+        """, (row["uge"], row["aar"])).fetchall()
+        # Salg pr. varenummer i perioden (salgspris ex moms + antal solgt)
+        salg = {}
+        for r in conn.execute("""
+            SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vnr,
+                   SUM(antal) AS solgt, SUM(omsætning) AS oms
+            FROM transaktioner WHERE dato >= ? AND varenummer != '' GROUP BY vnr
+        """, (fra,)).fetchall():
+            salg[str(r["vnr"])] = {"solgt": r["solgt"] or 0, "oms": r["oms"] or 0}
+        # Bestilt pr. varenummer i perioden (til sell-through)
+        best = {}
+        for r in conn.execute("""
+            SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vnr,
+                   SUM(total_antal) AS bestilt
+            FROM ugebestillinger
+            WHERE (aar*100+uge) >= (SELECT MAX(aar*100+uge)-? FROM ugebestillinger)
+            GROUP BY vnr
+        """, (antal_uger,)).fetchall():
+            best[str(r["vnr"])] = r["bestilt"] or 0
+        # TGTG-genvinding pr. stk (global)
+        t = conn.execute("""
+            SELECT SUM(ds.kreditering) AS kr,
+                   SUM(ds.antal * COALESCE(tp.enheder_per_pose, 1)) AS stk
+            FROM tgtg_dagssalg ds LEFT JOIN tgtg_poser tp ON ds.item_id = tp.item_id
+            WHERE ds.dato >= ?
+        """, (fra,)).fetchone()
+        tgtg_pr_stk = round((t["kr"] or 0) / t["stk"], 2) if (t and t["stk"]) else 0.0
+
+    varer = []
+    for p in prods:
+        navn = p["varenavn"]
+        vnr  = str(int(float(p["varenummer"]))) if p["varenummer"] else ""
+        kostpris = float(p["pris_ex_moms"] or 0)
+        rtype, rpct = _retur_type(navn)
+        s = salg.get(vnr, {})
+        solgt = s.get("solgt", 0)
+        salgspris = round((s.get("oms", 0) / 1.25) / solgt, 2) if solgt else None  # ex moms/stk
+        bestilt = best.get(vnr, 0)
+        sell_through = round(solgt / bestilt * 100, 1) if bestilt else None
+        cu = round((salgspris - kostpris), 2) if (salgspris and salgspris > kostpris) else None
+        # Co: returbar → lille (retur dækker); kun-TGTG → kostpris − TGTG/stk
+        if rtype.startswith('returbar'):
+            co = None  # styres af retur-grænse, ikke service level
+        else:
+            co = round(max(0.0, kostpris - tgtg_pr_stk), 2)
+        service = round(cu / (cu + co) * 100, 1) if (cu is not None and co is not None and (cu + co) > 0) else None
+        varer.append({
+            "varenavn": navn, "varenummer": vnr, "kostpris": round(kostpris, 2),
+            "salgspris": salgspris, "retur_type": rtype, "retur_pct": round(rpct * 100, 1),
+            "cu": cu, "co": co, "service_level": service,
+            "sell_through": sell_through, "bestilt": bestilt, "solgt": solgt,
+        })
+    return {"varer": varer, "tgtg_pr_stk": tgtg_pr_stk}
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 

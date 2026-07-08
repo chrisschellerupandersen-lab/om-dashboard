@@ -2832,6 +2832,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:480px;" id="boek-profil"></table></div>
           </div>
         </div>
+        <!-- Optimal bestilling pr. vare (newsvendor) — vises uanset faktura-data -->
+        <div class="card" style="margin-bottom:14px;" id="boek-opt-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:12px;flex-wrap:wrap;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Optimal bestillingsstrategi pr. vare</span>
+            <span id="boek-opt-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;">
+            <thead><tr>
+              <th>Vare</th>
+              <th title="Kan varen returneres til bageren?">Retur</th>
+              <th class="num" title="Kostpris pr. stk (ex moms)">Kostpris</th>
+              <th class="num" title="Salgspris pr. stk (ex moms)">Salgspris</th>
+              <th class="num" title="Dækningsbidrag pr. stk (Cu)">DB/stk</th>
+              <th class="num" title="Optimalt service level = Cu/(Cu+Co) — kun for ikke-returbare">Service level</th>
+              <th class="num" title="Solgt ÷ bestilt historisk">Sell-through</th>
+              <th>Anbefaling</th>
+            </tr></thead>
+            <tbody id="boek-opt-tbody"></tbody>
+          </table></div>
+          <div style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);margin-top:6px;">Returbar: overskud op til grænsen krediteres → bestil rigeligt. Kun-TGTG: overskud = spild − delvis TGTG → service level = Cu/(Cu+Co), bestil stramt.</div>
+        </div>
       </div>
 
       <!-- SPILD-RAPPORT -->
@@ -4825,6 +4846,7 @@ function lukSpildDag() { document.getElementById('spild-dag-modal').style.displa
 
 // ── BAGVÆRKS-ØKONOMI & OPTIMERING ─────────────────────────────────────────────
 async function loadBagvaerkOek() {
+  buildBestillingOptimering();   // uafhængig af faktura-data — vis altid
   let d;
   try { d = await api('/api/bagvaerk/oekonomi?antal=20'); }
   catch (e) { d = null; }
@@ -4918,6 +4940,47 @@ async function loadBagvaerkOek() {
       ${row('TGTG kr', B.tgtg, D.tgtg, ' kr', false)}
       </tbody>`;
   }
+}
+
+async function buildBestillingOptimering() {
+  const tb = document.getElementById('boek-opt-tbody');
+  if (!tb) return;
+  let d;
+  try { d = await api('/api/bagvaerk/optimering?antal=12'); } catch (e) { d = null; }
+  const varer = (d && d.varer) || [];
+  if (!varer.length) { tb.innerHTML = '<tr><td colspan="8" class="empty">Ingen varer</td></tr>'; return; }
+  const mono = "font-family:'DM Mono',monospace;";
+  const kr = v => v == null ? '—' : Number(v).toLocaleString('da-DK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const badge = (txt, farve) => `<span style="${mono}font-size:9px;padding:2px 7px;border-radius:10px;background:${farve};color:#fff;">${txt}</span>`;
+  const returBadge = t => t === 'returbar_wiener' ? badge('wiener 13,5%', 'var(--moss)')
+    : t === 'returbar_boller' ? badge('boller 10%', 'var(--moss)')
+    : badge('kun TGTG', 'var(--clay)');
+  document.getElementById('boek-opt-info').textContent = `TGTG-genvinding ~${(d.tgtg_pr_stk || 0).toLocaleString('da-DK')} kr/stk`;
+  tb.innerHTML = varer.map(v => {
+    const returbar = v.retur_type.startsWith('returbar');
+    // Anbefaling
+    let anb, aClr;
+    if (returbar) {
+      const load = v.sell_through != null && v.sell_through >= 92;
+      anb = load ? 'Bestil MERE — du løber ofte tør, og retur er gratis' : 'Bestil rigeligt — buffer op til retur-grænsen er gratis';
+      aClr = 'var(--moss)';
+    } else {
+      const dyrt = v.sell_through != null && v.sell_through < 70;
+      anb = dyrt ? 'Bestil STRAMT ned — meget spild, kun TGTG redder' : 'Hold stramt — ram efterspørgslen, spild er dyrt';
+      aClr = dyrt ? 'var(--danger)' : 'var(--clay)';
+    }
+    const stClr = v.sell_through == null ? 'var(--ash)' : v.sell_through >= 90 ? 'var(--danger)' : v.sell_through >= 75 ? 'var(--moss)' : 'var(--gold)';
+    return `<tr>
+      <td style="font-size:13px;">${v.varenavn.replace('ØKO - ', '')}</td>
+      <td>${returBadge(v.retur_type)}</td>
+      <td class="num" style="${mono}">${kr(v.kostpris)}</td>
+      <td class="num" style="${mono}">${v.salgspris != null ? kr(v.salgspris) : '—'}</td>
+      <td class="num" style="${mono}color:var(--forest);">${v.cu != null ? kr(v.cu) : '—'}</td>
+      <td class="num" style="${mono}">${v.service_level != null ? v.service_level + '%' : (returbar ? '~høj' : '—')}</td>
+      <td class="num" style="${mono}color:${stClr};font-weight:500;">${v.sell_through != null ? v.sell_through + '%' : '—'}</td>
+      <td style="font-size:11px;color:${aClr};">${anb}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ── SVIND SCORECARD ───────────────────────────────────────────────────────────

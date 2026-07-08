@@ -1803,6 +1803,13 @@ async def api_spild_uge_serie(request: Request, antal: int = 24):
     return database.hent_spild_uge_serie(int(antal))
 
 
+@app.get("/api/bagvaerk/oekonomi")
+async def api_bagvaerk_oekonomi(request: Request, antal: int = 20):
+    """Uge-DB på bagværk + korrelationer → DB-optimering."""
+    _kræv_login(request)
+    return database.hent_bagvaerk_oekonomi(int(antal))
+
+
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)

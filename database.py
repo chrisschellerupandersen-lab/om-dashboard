@@ -2634,6 +2634,105 @@ def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
     return serie
 
 
+def _pearson(xs: List[float], ys: List[float]):
+    """Pearson-korrelation mellem to lige lange lister. None hvis < 3 punkter."""
+    n = len(xs)
+    if n < 3:
+        return None
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    sxy = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+    sxx = sum((x - mx) ** 2 for x in xs)
+    syy = sum((y - my) ** 2 for y in ys)
+    if sxx <= 0 or syy <= 0:
+        return None
+    return round(sxy / (sxx ** 0.5 * syy ** 0.5), 3)
+
+
+def hent_bagvaerk_oekonomi(antal_uger: int = 20) -> Dict:
+    """Uge-DB på bagværk + korrelationer → hvordan maksimeres DB pr. uge.
+    DB = butiksomsætning (bagværk, salgspris ex moms) − netto bagerfaktura
+    (leverance − retur − TGTG). Analyserer om høje indkøb/TGTG betaler sig,
+    eller om mindre indkøb + mindre spild giver højere DB."""
+    from datetime import date as _d
+    serie = hent_spild_uge_serie(antal_uger + 6)
+
+    # Bagværk butiksomsætning (inkl. moms) pr. ISO-uge
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT dato, ROUND(SUM(omsætning), 2) AS oms
+            FROM transaktioner
+            WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
+                SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
+                FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0')
+            GROUP BY dato
+        """).fetchall()
+    salg_uge: Dict = {}
+    for r in rows:
+        iso = _d.fromisoformat(r["dato"]).isocalendar()
+        salg_uge[(iso[1], iso[0])] = salg_uge.get((iso[1], iso[0]), 0.0) + (r["oms"] or 0.0)
+
+    uger: List[Dict] = []
+    for s in serie:
+        if not s.get("har_data"):
+            continue
+        oms_ex   = round(salg_uge.get((s["uge"], s["aar"]), 0.0) / 1.25, 2)
+        vf       = s.get("netto_faktura_kr")            # ex moms, kun hvis faktura
+        har_fak  = (s.get("faktura_kr") or 0) > 0
+        db       = round(oms_ex - vf, 2) if (har_fak and oms_ex > 0) else None
+        db_pct   = round(db / oms_ex * 100, 1) if (db is not None and oms_ex > 0) else None
+        bestilt  = s.get("bestilt") or 0
+        kassesalg= s.get("kassesalg") or 0
+        sell     = round(kassesalg / bestilt * 100, 1) if bestilt > 0 else None
+        uger.append({
+            "uge": s["uge"], "aar": s["aar"],
+            "oms_ex": oms_ex, "vareforbrug": vf if har_fak else None, "db": db, "db_pct": db_pct,
+            "indkoeb_kr": s.get("faktura_kr") if har_fak else None,
+            "bestilt": bestilt, "svind_pct": s.get("svind_pct"),
+            "sell_through": sell, "tgtg_kr": s.get("tgtg_kr"), "spild_kr": s.get("spild_kr"),
+            "har_faktura": har_fak,
+        })
+
+    # Korrelationer — kun uger med DB (dvs. faktura + salg)
+    m = [u for u in uger if u["db"] is not None
+         and u["indkoeb_kr"] and u["svind_pct"] is not None and u["sell_through"] is not None]
+    def _corr(nøgle):
+        return _pearson([u["db"] for u in m], [u[nøgle] for u in m])
+    korr = {
+        "db_vs_indkoeb":      _corr("indkoeb_kr"),
+        "db_vs_svind":        _corr("svind_pct"),
+        "db_vs_sellthrough":  _corr("sell_through"),
+        "db_vs_tgtg":         _corr("tgtg_kr"),
+        "n": len(m),
+    }
+
+    # Opsummering + "sweet spot": profil for de bedste vs. dårligste DB-uger
+    opsummering: Dict = {}
+    if m:
+        ndb = len(m)
+        opsummering["snit_db"]          = round(sum(u["db"] for u in m) / ndb)
+        opsummering["snit_db_pct"]      = round(sum(u["db_pct"] for u in m) / ndb, 1)
+        opsummering["snit_svind_pct"]   = round(sum(u["svind_pct"] for u in m) / ndb, 1)
+        opsummering["snit_sellthrough"] = round(sum(u["sell_through"] for u in m) / ndb, 1)
+        opsummering["snit_indkoeb"]     = round(sum(u["indkoeb_kr"] for u in m) / ndb)
+        opsummering["snit_tgtg"]        = round(sum((u["tgtg_kr"] or 0) for u in m) / ndb)
+        sort = sorted(m, key=lambda u: u["db"])
+        k = max(1, ndb // 3)
+        bedste, daarlig = sort[-k:], sort[:k]
+        def prof(g):
+            return {
+                "db":           round(sum(u["db"] for u in g) / len(g)),
+                "indkoeb":      round(sum(u["indkoeb_kr"] for u in g) / len(g)),
+                "svind_pct":    round(sum(u["svind_pct"] for u in g) / len(g), 1),
+                "sellthrough":  round(sum(u["sell_through"] for u in g) / len(g), 1),
+                "tgtg":         round(sum((u["tgtg_kr"] or 0) for u in g) / len(g)),
+            }
+        opsummering["bedste_uger"]   = prof(bedste)
+        opsummering["daarlige_uger"] = prof(daarlig)
+
+    return {"uger": uger, "korrelationer": korr, "opsummering": opsummering}
+
+
 def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     """Dag-niveau spild-data for en ISO-uge.
 

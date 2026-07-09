@@ -9197,10 +9197,12 @@ async function loadBernUge(uge, aar) {
           }
         }
 
-        // Newsvendor optimal (økonomisk) — skjult hint, vises via toggle
+        // Newsvendor optimal (økonomisk) — skjult hint, vises via toggle.
+        // RESPEKTÉR basis: kun dage hvor din basis har et antal (>0) — tomme
+        // basis-dage betyder "sælg ikke her", så der foreslås intet.
         let optHtml = '';
         const _anb = (window._bernAnb || {})[String(p.varenummer || '')];
-        if (_anb && _anb.optimal && _anb.optimal[dag] != null) {
+        if (b > 0 && _anb && _anb.optimal && _anb.optimal[dag] != null) {
           const o = _anb.optimal[dag];
           const oClr = o > v ? 'var(--moss)' : o < v ? 'var(--danger)' : 'var(--ash)';
           optHtml = `<span class="bern-opt-hint" style="font-size:9px;color:${oClr};line-height:1.1;" title="Økonomisk optimal (${_anb.service}% service level)">øk ${o}</span>`;

@@ -112,6 +112,39 @@ def _parse_faktura_tekst(tekst: str, uge: int, aar: int) -> dict:
     }
 
 
+def _afstem_faktura_mod_subtotal(data: dict, pdf_bytes: bytes) -> dict:
+    """Selv-korrigerende afstemning: fakturaen (leverance) skal altid være
+    subtotal + retur i alt. Læser PDF'ens egen subtotal og retter faktura hvis
+    den afviger (fanger fx en misset 'Levering relativt'-linje i Claude/fallback)."""
+    try:
+        import pdfplumber
+        tekst = ""
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+            tmp.write(pdf_bytes); _tp = tmp.name
+        try:
+            with pdfplumber.open(_tp) as pdf:
+                for page in pdf.pages:
+                    tekst += (page.extract_text() or "") + "\n"
+        finally:
+            os.unlink(_tp)
+    except Exception:
+        return data
+    subtotal = 0.0
+    for linje in tekst.splitlines():
+        if re.search(r"subtotal", linje, re.IGNORECASE):
+            subtotal = _sidst_tal(linje)
+            break
+    if subtotal <= 0:
+        return data
+    retur_ialt = float(data.get("retur_ialt", 0) or 0)
+    forventet  = round(subtotal + retur_ialt, 2)
+    faktura    = float(data.get("faktura", 0) or 0)
+    if abs(faktura - forventet) > 1.0:   # afviger → ret til subtotal + retur
+        data["faktura"] = forventet
+        data["_afstemt"] = True
+    return data
+
+
 def _find_uge(tekst: str):
     """Find ugenummer (1-53) i en tekst — emne eller PDF-indhold. None hvis ingen."""
     if not tekst:
@@ -271,6 +304,7 @@ def gmail_sync_run() -> dict:
             if not parsed.get("uge"):
                 sprunget.append(f"'{subject[:50]}' (intet ugenummer fundet)")
                 continue
+            parsed = _afstem_faktura_mod_subtotal(parsed, pdf_b)  # afstem mod subtotal
             nye.append({"msg_id": msg_id, "data": parsed})
 
         if not nye:
@@ -1410,6 +1444,7 @@ async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
         return {"ok": False, "fejl": str(exc)}
     try:
         data = _faktura_felter_fra_pdf(pdf_bytes)
+        data = _afstem_faktura_mod_subtotal(data, pdf_bytes)
         return {"ok": True, "data": data}
     except Exception as claude_fejl:
         try:
@@ -1429,6 +1464,7 @@ async def bager_upload_pdf(request: Request, fil: UploadFile = File(...)):
             m_aar = re.search(r"(202\d)", tekst)
             aar   = int(m_aar.group(1)) if m_aar else datetime.now().year
             data  = _parse_faktura_tekst(tekst, uge, aar)
+            data  = _afstem_faktura_mod_subtotal(data, pdf_bytes)
             return {"ok": True, "data": data, "kilde": "fallback"}
         except Exception as fb_fejl:
             return {"ok": False, "fejl": f"Claude: {claude_fejl} · fallback: {fb_fejl}"}

@@ -2138,6 +2138,14 @@ async def api_db_shopbox(request: Request, aar: Optional[int] = None):
     return database.hent_db_shopbox(aar)
 
 
+@app.get("/api/db-shopbox/poster")
+async def api_db_shopbox_poster(request: Request, slags: str, periode: str):
+    """Drill-down: varer/poster bag DB for én periode."""
+    _kræv_login(request)
+    kort = {"dage": "dag", "uger": "uge", "maaneder": "maaned"}
+    return database.hent_db_shopbox_poster(kort.get(slags, slags), periode)
+
+
 @app.get("/api/kontrol/varenumre")
 async def api_kontrol_varenumre(request: Request):
     _kræv_login(request)

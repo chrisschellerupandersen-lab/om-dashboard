@@ -2849,7 +2849,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:440px;" id="dbs-tabel"></table>
           </div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:8px;">Klik på en periode for at se posterne bag ↓</div>
         </div>
+
+        <!-- Drill-down: poster bag valgt periode -->
+        <div class="card" id="dbs-drill" style="margin-top:14px;display:none;"></div>
       </div>
 
       <div class="panel" id="p-social">
@@ -3684,7 +3688,8 @@ function dbsRenderTable(rows, mode){
     const per = (mode==='dage' || x.under)
       ? `${x.label} <span style="color:var(--ash);font-size:11px;">${x.under}</span>`
       : x.label;
-    html += `<tr>
+    const lblEsc = (x.label + (x.under?(' '+x.under):'')).replace(/'/g,"\\'");
+    html += `<tr style="cursor:pointer;" onclick="dbsDrill('${mode}','${x.periode}','${lblEsc}')" title="Se posterne bag">
       <td style="text-align:left;">${per}</td>
       <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
       <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
@@ -3692,6 +3697,52 @@ function dbsRenderTable(rows, mode){
   });
   html += `</tbody>`;
   t.innerHTML = html;
+}
+
+async function dbsDrill(slags, periode, label){
+  const box = document.getElementById('dbs-drill');
+  box.style.display = 'block';
+  box.innerHTML = '<div class="empty">Henter poster…</div>';
+  box.scrollIntoView({behavior:'smooth', block:'nearest'});
+  let d;
+  try {
+    d = await fetch(`/api/db-shopbox/poster?slags=${encodeURIComponent(slags)}&periode=${encodeURIComponent(periode)}`).then(r=>r.json());
+  } catch(e){ box.innerHTML = '<div class="empty">Kunne ikke hente poster.</div>'; return; }
+  const t = d.total || {};
+  const advarsel = t.mangler_kost_antal > 0
+    ? `<div style="background:#f7dede;color:#8a3a3a;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;">⚠️ ${t.mangler_kost_antal} vare(r) mangler kostpris → deres DB (og dermed DG) er kunstigt høj. Ret kostprisen under Varestamdata.</div>`
+    : '';
+  let rows = (d.poster||[]).map(p=>{
+    const dgClr = p.dg_pct>=35?'var(--moss)':p.dg_pct>=25?'#8a6800':'var(--danger)';
+    const flag = p.mangler_kost ? ' <span style="color:#c0392b;" title="Mangler kostpris">⚠️</span>' : '';
+    return `<tr>
+      <td style="text-align:left;">${p.varenavn}${flag}</td>
+      <td style="text-align:right;">${p.antal}</td>
+      <td style="text-align:right;">${_dbsKr(p.oms_ex)}</td>
+      <td style="text-align:right;">${_dbsKr(p.vf)}</td>
+      <td style="text-align:right;font-weight:600;">${_dbsKr(p.db_kr)}</td>
+      <td style="text-align:right;color:${dgClr};font-weight:600;">${_dbsPct(p.dg_pct)}</td></tr>`;
+  }).join('');
+  if(!rows) rows = `<tr><td colspan="6" style="text-align:center;color:var(--ash);padding:12px;">Ingen poster</td></tr>`;
+  box.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Poster bag ${label} — kun Shopbox, ex moms</span>
+      <button onclick="document.getElementById('dbs-drill').style.display='none'" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--ash);cursor:pointer;font-size:12px;padding:4px 10px;">Luk ✕</button>
+    </div>
+    ${advarsel}
+    <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:520px;">
+      <thead><tr>
+        <th style="text-align:left;">Vare</th><th style="text-align:right;">Antal</th>
+        <th style="text-align:right;">Oms ex moms</th><th style="text-align:right;">Vareforbrug</th>
+        <th style="text-align:right;">DB kr</th><th style="text-align:right;">DG %</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+        <td style="text-align:left;">I alt</td><td></td>
+        <td style="text-align:right;">${_dbsKr(t.oms_ex)}</td>
+        <td style="text-align:right;">${_dbsKr(t.vf)}</td>
+        <td style="text-align:right;">${_dbsKr(t.db_kr)}</td>
+        <td style="text-align:right;">${_dbsPct(t.dg_pct)}</td></tr></tfoot>
+    </table></div>`;
 }
 
 // ── SOCIAL SELLING ────────────────────────────────────────────────────────────

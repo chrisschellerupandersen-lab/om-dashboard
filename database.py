@@ -7485,12 +7485,14 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
     params = (str(aar),) if aar else ()
 
     def _agg(conn, period_expr, limit):
+        # Momsen er trukket fra i salg: oms_ex = omsaetning_ex_moms (omsætning/1.25),
+        # og DG = DB (ex moms) / salg (ex moms).
         sql = f"""
             SELECT {period_expr}                            AS periode,
-                   COALESCE(SUM(omsætning),0)/1.25          AS oms_ex,
+                   COALESCE(SUM(omsaetning_ex_moms),0)      AS oms_ex,
                    COALESCE(SUM(db_korrekt),0)              AS db_kr,
-                   CASE WHEN SUM(omsætning)>0
-                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                   CASE WHEN SUM(omsaetning_ex_moms)>0
+                        THEN SUM(db_korrekt)/SUM(omsaetning_ex_moms)*100
                         ELSE 0 END                          AS dg_pct
             FROM v_transaktioner
             {aar_where}
@@ -7543,3 +7545,56 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
         maaneder = _rens(_agg(conn, "strftime('%Y-%m', dato)", antal_maaneder), "måned")
 
     return {"dage": dage, "uger": uger, "maaneder": maaneder}
+
+
+def hent_db_shopbox_poster(slags: str, periode: str) -> dict:
+    """Drill-down: de enkelte varer/poster bag DB for én periode (Shopbox).
+    slags: 'dag' | 'uge' | 'maaned' · periode: matcher periode-nøglen fra
+    hent_db_shopbox (dato / '%Y-%W' / '%Y-%m'). Alle beløb ex moms."""
+    if slags == "dag":
+        where = "dato = ?"
+    elif slags == "uge":
+        where = "strftime('%Y-%W', dato) = ?"
+    else:  # maaned
+        where = "strftime('%Y-%m', dato) = ?"
+
+    sql = f"""
+        SELECT varenavn,
+               COALESCE(SUM(antal),0)                    AS antal,
+               COALESCE(SUM(omsaetning_ex_moms),0)       AS oms_ex,
+               COALESCE(SUM(vf_korrekt),0)               AS vf,
+               COALESCE(SUM(db_korrekt),0)               AS db_kr,
+               CASE WHEN SUM(omsaetning_ex_moms)>0
+                    THEN SUM(db_korrekt)/SUM(omsaetning_ex_moms)*100
+                    ELSE 0 END                           AS dg_pct,
+               SUM(CASE WHEN COALESCE(vf_korrekt,0)<=0 AND omsaetning_ex_moms>0
+                        THEN 1 ELSE 0 END)               AS mangler_kost
+        FROM v_transaktioner
+        WHERE {where}
+        GROUP BY varenavn
+        ORDER BY db_kr DESC
+    """
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = [dict(r) for r in conn.execute(sql, (periode,)).fetchall()]
+
+    poster = [{
+        "varenavn":     r["varenavn"] or "(ukendt)",
+        "antal":        int(r["antal"] or 0),
+        "oms_ex":       round(r["oms_ex"] or 0),
+        "vf":           round(r["vf"] or 0),
+        "db_kr":        round(r["db_kr"] or 0),
+        "dg_pct":       round(r["dg_pct"] or 0, 1),
+        "mangler_kost": int(r["mangler_kost"] or 0) > 0,
+    } for r in rows]
+
+    tot_oms = sum(p["oms_ex"] for p in poster)
+    tot_db  = sum(p["db_kr"] for p in poster)
+    total = {
+        "oms_ex": round(tot_oms),
+        "vf":     round(sum(p["vf"] for p in poster)),
+        "db_kr":  round(tot_db),
+        "dg_pct": round(tot_db / tot_oms * 100, 1) if tot_oms else 0,
+        "mangler_kost_antal": sum(1 for p in poster if p["mangler_kost"]),
+    }
+    return {"slags": slags, "periode": periode, "poster": poster, "total": total}

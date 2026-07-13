@@ -3609,7 +3609,10 @@ async function loadSocial() {
     const auto = st.auto_publicer
       ? '🟢 AUTO-PILOT: opslag publiceres automatisk hver morgen'
       : '⏸️ Manuel godkendelse: du godkender/publicerer selv (sæt SOCIAL_AUTO_PUBLICER=1 for fuld autopilot)';
-    banner.innerHTML = `📣 ${fb}<br>${ai}<br>${auto}`;
+    const stemme = st.stemme_aktiv
+      ? '🗣️ Stemme-efterligning aktiv — henter jeres egne opslag som stil-reference'
+      : '○ Stemme-efterligning inaktiv (kræver både FB-token + AI-nøgle)';
+    banner.innerHTML = `📣 ${fb}<br>${ai}<br>${stemme}<br>${auto}`;
   } catch { banner.textContent = 'Kunne ikke hente status'; }
 
   liste.innerHTML = '<div class="empty">Indlæser…</div>';

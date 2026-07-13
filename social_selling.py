@@ -11,6 +11,7 @@ Ingen ToS-risiko: kun opslag på egen side. Ingen automatiske cold-DM'er.
 from __future__ import annotations
 
 import os
+import time
 import hashlib
 from datetime import date, datetime
 from typing import Dict, List, Optional
@@ -175,19 +176,69 @@ def generer_opslag(dag: Optional[date] = None, data: Optional[Dict] = None,
     return resultat
 
 
+# Cache af egne opslag (stemme-reference) — hentes højst hver 6. time
+_STIL_CACHE: Dict[str, object] = {"tid": 0.0, "eksempler": []}
+
+
+def hent_stil_eksempler(antal: int = 25, max_alder_sek: int = 21600) -> List[str]:
+    """Hent jeres egne seneste opslag fra Facebook som stemme-reference.
+    Cachet i 6 timer. Returnerer liste af opslagstekster (tomme sprunget over).
+    Tom liste hvis token ikke er sat eller kaldet fejler."""
+    if not facebook_konfigureret():
+        return []
+    nu = time.time()
+    if _STIL_CACHE["eksempler"] and (nu - float(_STIL_CACHE["tid"])) < max_alder_sek:
+        return list(_STIL_CACHE["eksempler"])  # type: ignore
+    page_id = os.environ.get("FB_PAGE_ID")
+    token = os.environ.get("FB_PAGE_TOKEN")
+    try:
+        import requests
+        r = requests.get(
+            f"https://graph.facebook.com/v21.0/{page_id}/published_posts",
+            params={"fields": "message", "limit": antal, "access_token": token},
+            timeout=20,
+        )
+        j = r.json()
+        data = j.get("data", []) if isinstance(j, dict) else []
+        tekster = [d.get("message", "").strip() for d in data if d.get("message", "").strip()]
+        if tekster:
+            _STIL_CACHE["tid"] = nu
+            _STIL_CACHE["eksempler"] = tekster
+        return tekster
+    except Exception:
+        return []
+
+
 def _ai_polish(opslag: Dict) -> Optional[str]:
     """Lad Claude finpudse opslaget så det ikke bliver skabelon-agtigt.
+    Bruger jeres egne opslag som stemme-reference når de kan hentes.
     Returnerer None ved fejl (så vi falder tilbage til skabelonen)."""
     try:
         import anthropic as _ant
         client = _ant.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+
+        # Hent jeres egne opslag som stil-eksempler (few-shot stemme-efterligning)
+        eksempler = hent_stil_eksempler()
+        stil_blok = ""
+        if eksempler:
+            # Tag op til 8 af de mest relevante (længde 40–600 tegn) som eksempler
+            udvalg = [e for e in eksempler if 40 <= len(e) <= 600][:8] or eksempler[:8]
+            numre = "\n\n".join(f"[{i+1}] {e}" for i, e in enumerate(udvalg))
+            stil_blok = (
+                "\n\nHER ER HVORDAN VI SELV SKRIVER PÅ FACEBOOK (efterlign nøjagtigt "
+                "denne stemme, tone, længde, emoji-brug og måde at åbne/afslutte på):\n"
+                + numre + "\n"
+            )
+
         prompt = (
             "Du er social media-ansvarlig for Organic Market Greve — en "
             "økologisk købmand, café og bageri på " + ADRESSE + ". Finpuds "
             "nedenstående Facebook-opslag så det lyder varmt, lokalt og "
             "menneskeligt — ikke som reklame. Behold budskab, call-to-action, "
-            "linket og længden (max ~600 tegn). Behold 1-3 relevante emojis. "
-            "Svar KUN med den færdige opslagstekst, intet andet.\n\n---\n"
+            "linket og længden (max ~600 tegn). Behold 1-3 relevante emojis."
+            + stil_blok +
+            "\nSvar KUN med den færdige opslagstekst, intet andet.\n\n"
+            "OPSLAG DER SKAL FINPUDSES:\n---\n"
             + opslag["tekst"]
         )
         msg = client.messages.create(

@@ -2046,10 +2046,13 @@ async def api_fakturasalg_slet(request: Request, id_: int):
 async def api_social_status(request: Request):
     """Status: er Facebook + AI konfigureret, og auto-publicering slået til?"""
     _kræv_login(request)
+    fb = social_selling.facebook_konfigureret()
+    ai = bool(os.environ.get("ANTHROPIC_API_KEY"))
     return {
-        "fb_konfigureret": social_selling.facebook_konfigureret(),
-        "ai_tilgaengelig": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "fb_konfigureret": fb,
+        "ai_tilgaengelig": ai,
         "auto_publicer":   os.environ.get("SOCIAL_AUTO_PUBLICER") == "1",
+        "stemme_aktiv":    fb and ai,
     }
 
 

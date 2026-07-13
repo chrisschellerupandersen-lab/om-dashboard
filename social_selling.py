@@ -16,11 +16,26 @@ import hashlib
 from datetime import date, datetime
 from typing import Dict, List, Optional
 
-# Sæt SOCIAL_BESTIL_LINK til en KUNDE-vendt bestillingsside for at få
-# "bestil på <link>" med i opslagene. Er den ikke sat, bruges kun CTA'en
-# (fx "skriv til os") — så vi aldrig linker til det interne dashboard.
-BESTIL_LINK = os.environ.get("SOCIAL_BESTIL_LINK", "").strip()
+# Kunde-vendte landingssider (aldrig det interne dashboard).
+# B2B-landingsside findes allerede (forudbestilling til virksomheder).
+# FEST-siden (private lejligheder) findes endnu ikke — sæt SOCIAL_FEST_LINK
+# når den er bygget, så linkes lejligheds-opslag også til en bestillingsside.
+B2B_LINK  = os.environ.get(
+    "SOCIAL_B2B_LINK",
+    "https://bestilling-app-production.up.railway.app/b2b",
+).strip()
+FEST_LINK = os.environ.get("SOCIAL_FEST_LINK", "").strip()
 ADRESSE = "Greve Strandvej 20"
+
+# Opslagstyper der er virksomheds-rettede → link til B2B-landingssiden.
+_B2B_TYPER = {
+    "b2b-moede", "firma-fast", "saeson-opstart", "saeson-julefrokost-booking",
+}
+
+
+def _link_for(type_: str) -> str:
+    """Vælg kunde-landingsside efter opslagstype. Tom = ingen link (kun CTA)."""
+    return B2B_LINK if type_ in _B2B_TYPER else FEST_LINK
 
 # ── Opslags-skabeloner pr. ugedag (0=mandag … 6=søndag) ───────────────────────
 # STRATEGI: driv bestillinger til lejligheder (fødselsdage, fester, konfirmation,
@@ -255,8 +270,9 @@ def generer_opslag(dag: Optional[date] = None, data: Optional[Dict] = None,
     skab = _vaelg_skabelon(d)
 
     tekst = skab["tekst"] + _data_tilfoejelse(skab, data)
-    if BESTIL_LINK:
-        tekst = f"{tekst}\n\n👉 {skab['cta']} — eller bestil på {BESTIL_LINK}"
+    link = _link_for(skab["type"])
+    if link:
+        tekst = f"{tekst}\n\n👉 {skab['cta']} — eller se mere & bestil: {link}"
     else:
         tekst = f"{tekst}\n\n👉 {skab['cta']}"
 

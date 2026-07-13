@@ -16,103 +16,189 @@ import hashlib
 from datetime import date, datetime
 from typing import Dict, List, Optional
 
-BESTIL_LINK = os.environ.get(
-    "SOCIAL_BESTIL_LINK",
-    "https://om-dashboard-production-0f3a.up.railway.app",
-)
+# Sæt SOCIAL_BESTIL_LINK til en KUNDE-vendt bestillingsside for at få
+# "bestil på <link>" med i opslagene. Er den ikke sat, bruges kun CTA'en
+# (fx "skriv til os") — så vi aldrig linker til det interne dashboard.
+BESTIL_LINK = os.environ.get("SOCIAL_BESTIL_LINK", "").strip()
 ADRESSE = "Greve Strandvej 20"
 
 # ── Opslags-skabeloner pr. ugedag (0=mandag … 6=søndag) ───────────────────────
-# Hver ugedag har flere varianter; motoren vælger deterministisk ud fra datoen,
-# så samme dag altid giver samme opslag, men uge for uge varierer.
+# STRATEGI: driv bestillinger til lejligheder (fødselsdage, fester, konfirmation,
+# reception m.m.) og til virksomheder (mødeforplejning, firmafester, julefrokost).
+# Hver ugedag har flere varianter; motoren vælger deterministisk ud fra datoen.
+# CTA'er er samtale-baserede ("skriv til os") — passer til bespoke tilbud og
+# fødes senere direkte ind i Messenger-autosvar (fase 2).
 
 _SKABELONER: Dict[int, List[Dict]] = {
-    0: [  # Mandag — B2B / mødeforplejning
-        {"type": "b2b-morgen",
-         "tekst": ("Ny uge, fyldt kalender? ☕🥐 Vi pakker friskbagt morgenbrød "
-                   "og kaffe klar til afhentning fra kl. 06 — bestilt aftenen før, "
-                   "klar når I møder ind.\n\nKontorer i Greve: skriv 'MORGEN' i en "
-                   "besked, så laver vi en fast aftale til jeres hus."),
-         "cta": "Skriv 'MORGEN' i en besked", "billede_hint": "Bakke med friskbagt brød + kaffe, morgenlys"},
+    0: [  # Mandag — virksomheder / B2B
         {"type": "b2b-moede",
-         "tekst": ("Møde i denne uge? 🤝 Lad os stå for forplejningen: friskbagt "
-                   "økologisk brød og rigtig kaffe, klar til afhentning kl. 06 — "
-                   "uden binding.\n\nSkriv antal personer i en besked, så sender "
-                   "vi en lille menu."),
-         "cta": "Skriv antal personer", "billede_hint": "Mødebord med brød, kaffe og friske råvarer"},
+         "tekst": ("Skal I holde møde eller event i denne uge? 🤝 Lad os stå for "
+                   "forplejningen — friskbagt økologisk brød, sødt og rigtig kaffe, "
+                   "klar til afhentning eller levering.\n\nVirksomheder i Greve: "
+                   "skriv 'FIRMA' + antal personer, så sender vi en menu."),
+         "cta": "Skriv 'FIRMA' + antal personer", "billede_hint": "Flot mødebakke med brød, kaffe og kage"},
+        {"type": "firma-fast",
+         "tekst": ("Faste morgenbrød-aftaler til kontoret ☕🥐 Bestilt i forvejen, "
+                   "friskbagt og klar fra kl. 06 — uden at nogen hos jer skal tænke "
+                   "på det.\n\nSkriv 'FIRMA', så laver vi en aftale til jeres hus."),
+         "cta": "Skriv 'FIRMA'", "billede_hint": "Kontor får leveret friskbagt om morgenen"},
     ],
-    1: [  # Tirsdag — bag-om / friskbagt
-        {"type": "bagom",
-         "tekst": ("Kl. 05:12 er ovnen tændt. 🌅 De første økologiske boller er "
-                   "på vej ud, og duften siger god morgen til hele huset.\n\nAlt "
-                   "bages friskt hver dag her på " + ADRESSE + " — klar fra kl. 06."),
-         "cta": "Kom forbi og mærk forskellen", "billede_hint": "Bager ved ovnen tidlig morgen, damp fra brødet"},
-        {"type": "haandvaerk",
-         "tekst": ("Godt brød har ingen genveje. 🥖 Vores dej hviler natten over, "
-                   "så den får smag og skorpe som den skal — økologisk mel, tid "
-                   "og håndværk.\n\nFriskbagt hver morgen på " + ADRESSE + "."),
-         "cta": "Smag forskellen i dag", "billede_hint": "Nærbillede af sprød brødskorpe"},
+    1: [  # Tirsdag — håndværk/kvalitet knyttet til lejligheder
+        {"type": "kage-haandvaerk",
+         "tekst": ("En lagkage til festen skal smage af noget. 🎂 Vi bager fra "
+                   "bunden med økologiske råvarer — fyld, bunde og pynt efter jeres "
+                   "ønske. Perfekt til fødselsdagen eller den store dag.\n\n"
+                   "Skriv 'KAGE' + dato, så finder vi den rette."),
+         "cta": "Skriv 'KAGE' + dato", "billede_hint": "Hjemmelavet lagkage, nærbillede af pynt"},
+        {"type": "catering-kvalitet",
+         "tekst": ("Catering med rigtig smag. 🌿 Til jeres arrangement laver vi "
+                   "det søde og det salte af friske, økologiske råvarer — ikke "
+                   "noget fra en fjern fabrik.\n\nHar I noget på vej? Skriv 'FEST', "
+                   "så snakker vi menu."),
+         "cta": "Skriv 'FEST'", "billede_hint": "Indbydende catering-opstilling, økologiske råvarer"},
     ],
-    2: [  # Onsdag — social proof / midtuge-tilbud
-        {"type": "socialproof",
-         "tekst": ("\"Vores kunder tror, vi har hyret en privatkok\" 😄 — sådan "
-                   "lyder det fra et af de kontorer i Greve, der nu får friskbagt "
-                   "og kaffe klar hver uge.\n\nVil I have det samme til jeres møder? "
-                   "Skriv 'MØDE', så sender vi en menu."),
-         "cta": "Skriv 'MØDE'", "billede_hint": "Glad medarbejder med kaffe og brød på kontoret"},
-        {"type": "midtuge",
-         "tekst": ("Midt i ugen fortjener en pause der smager af noget. ☕ Kig "
-                   "forbi til en frisk kop kaffe og dagens bagværk — vi står klar "
-                   "på " + ADRESSE + "."),
-         "cta": "Tag en midtuge-pause hos os", "billede_hint": "Kaffe og kage på cafébord"},
+    2: [  # Onsdag — social proof fra lejligheder + inspiration
+        {"type": "event-socialproof",
+         "tekst": ("Sidste weekend leverede vi kagebord til en rund fødselsdag her "
+                   "i Greve — og bordet var tomt inden gæsterne var færdige med at "
+                   "rose det. 🎉🎂\n\nSkal vi gøre jeres næste fest lidt lettere? "
+                   "Skriv 'FEST', så hjælper vi."),
+         "cta": "Skriv 'FEST'", "billede_hint": "Fyldt kagebord til fest, glade gæster"},
+        {"type": "kagebord-inspiration",
+         "tekst": ("Sådan kan et kagebord se ud til jeres fest 🎂🍰 Blandet efter "
+                   "anledning og antal — fra intim fødselsdag til stort arrangement. "
+                   "Alt bagt fra bunden.\n\nSkriv 'KAGEBORD', så sætter vi et sammen "
+                   "til jer."),
+         "cta": "Skriv 'KAGEBORD'", "billede_hint": "Overdådigt kagebord ovenfra"},
     ],
-    3: [  # Torsdag — kaffe / hverdagspause
-        {"type": "kaffe",
-         "tekst": ("Torsdagens kaffe smager bedst, når nogen andre har bagt til "
-                   "den. 🥐☕ Kig forbi og få en rigtig god kop + noget frisk fra "
-                   "ovnen.\n\nVi er her på " + ADRESSE + "."),
-         "cta": "Kom forbi efter kaffe", "billede_hint": "Latte med flot mælkeskum, hyggeligt café-hjørne"},
-        {"type": "forudbestil-weekend",
-         "tekst": ("Weekenden nærmer sig 🌿 Skal der friskbagt brød på bordet "
-                   "lørdag morgen? Bestil i forvejen, så står det klar — og du "
-                   "slipper for køen.\n\nSkriv 'WEEKEND' i en besked."),
-         "cta": "Skriv 'WEEKEND'", "billede_hint": "Weekend-morgenbord med brød, æg og juice"},
+    3: [  # Torsdag — fødselsdage / kager
+        {"type": "foedselsdag",
+         "tekst": ("Fødselsdag på vej? 🎂 Lad os bage kagen, så du kan nyde dagen. "
+                   "Lagkage, kagemand eller et helt kagebord — friskbagt og efter "
+                   "jeres ønske.\n\nSkriv 'FØDSELSDAG' + dato, så er den sag klaret."),
+         "cta": "Skriv 'FØDSELSDAG' + dato", "billede_hint": "Festlig fødselsdagslagkage med lys"},
+        {"type": "boern-foedselsdag",
+         "tekst": ("Børnefødselsdag i klassen eller derhjemme? 🧁 Vi pakker "
+                   "kagemand, boller og det hele klar til afhentning — nemt for jer, "
+                   "en fest for dem.\n\nSkriv 'BØRNEFEST' + antal, så klarer vi resten."),
+         "cta": "Skriv 'BØRNEFEST' + antal", "billede_hint": "Kagemand og boller til børnefødselsdag"},
     ],
-    4: [  # Fredag — weekend-trafik
-        {"type": "weekend",
-         "tekst": ("Fredag! 🎉 I morgen smager bedst med friskbagt brød og en "
-                   "kop kaffe, som du ikke selv skulle brygge. Kig forbi " + ADRESSE +
-                   " i weekenden — vi har bagt til dig."),
-         "cta": "Vi ses i weekenden", "billede_hint": "Fredagsstemning, brød og kaffe to-go"},
-        {"type": "weekend-familie",
-         "tekst": ("Weekend betyder god tid og godt brød. 🥖 Tag familien med "
-                   "forbi til brunch-råvarer, friskbagt og økologisk godt fra "
-                   "hylderne.\n\n" + ADRESSE + " — åbent i weekenden."),
-         "cta": "Tag familien med forbi", "billede_hint": "Familie ved brunchbord, friske råvarer"},
+    4: [  # Fredag — weekendfester / arrangementer
+        {"type": "weekend-fest",
+         "tekst": ("Fest i weekenden? 🎉 Nå det endnu — vi kan stadig bage "
+                   "kagebord, brød og catering til jeres arrangement. Friskt, "
+                   "økologisk og klar til afhentning.\n\nSkriv 'FEST' + dato, så "
+                   "finder vi ud af det."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Festbord dækket med bagværk og catering"},
+        {"type": "reception-jubilaeum",
+         "tekst": ("Reception, dåb eller jubilæum? 🥂 Vi står for det søde og det "
+                   "salte, så I kan koncentrere jer om gæsterne. Alt bagt fra bunden "
+                   "med økologiske råvarer.\n\nSkriv 'ARRANGEMENT', så snakker vi menu."),
+         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Elegant reception-opstilling med kransekage/kage"},
     ],
-    5: [  # Lørdag — brunch / oplevelse
-        {"type": "brunch",
-         "tekst": ("God lørdag! 🌞 Der er dækket op med friskbagt, økologiske "
-                   "råvarer og kaffe der er værd at stå op til. Kom forbi " + ADRESSE +
-                   " og gør weekenden lidt bedre."),
-         "cta": "Kom til lørdags-brunch", "billede_hint": "Indbydende brunchopstilling"},
+    5: [  # Lørdag — store arrangementer / brunch-catering
+        {"type": "stor-catering",
+         "tekst": ("Stort arrangement på vej? 🎪 Fra 20 til 200 gæster pakker vi "
+                   "brød, kagebord og catering klar — friskbagt og økologisk, uden "
+                   "at I skal løfte en finger i køkkenet.\n\nSkriv 'ARRANGEMENT' + "
+                   "antal, så laver vi et tilbud."),
+         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Stort cateringbord til mange gæster"},
+        {"type": "brunch-catering",
+         "tekst": ("Skal I samle familie eller kolleger til brunch? 🍳🥐 Vi pakker "
+                   "det hele klar — friskbagt brød, sødt og det til at fylde bordet. "
+                   "\n\nSkriv 'BRUNCH' + antal, så står det klar."),
+         "cta": "Skriv 'BRUNCH' + antal", "billede_hint": "Overdådigt brunchbord til en gruppe"},
     ],
-    6: [  # Søndag — værdi / madspild / ro
-        {"type": "oekologi",
-         "tekst": ("Søndagsro og rene råvarer. 🌱 Vi tror på økologi, håndværk "
-                   "og at bage efter det, der bliver spist — ikke smidt ud. Derfor "
-                   "bager vi efter bestilling og passer på både smag og klode.\n\n"
-                   "Skal vi bage til dig i næste uge? Skriv 'I MORGEN' + hvad du vil have."),
-         "cta": "Skriv 'I MORGEN' + ønske", "billede_hint": "Rolige økologiske råvarer, søndagsstemning"},
-        {"type": "antispild",
-         "tekst": ("Vi bager efter bestilling for at undgå madspild — så jo "
-                   "tidligere du bestiller til i morgen, jo sikrere er din. 🌍🥐\n\n"
-                   "Skriv 'I MORGEN' + dit ønske, så står det klar."),
-         "cta": "Skriv 'I MORGEN' + ønske", "billede_hint": "Friskbagt på hylde, 'bagt efter bestilling'"},
+    6: [  # Søndag — planlæg i god tid
+        {"type": "planlaeg-lejlighed",
+         "tekst": ("Har I en lejlighed på vej? 📅 Fødselsdag, konfirmation, "
+                   "firmafest eller reception — de bedste datoer bookes først, og "
+                   "bagt i god tid bliver det bare bedre.\n\nSkriv hvad I planlægger, "
+                   "så holder vi en plads til jer."),
+         "cta": "Skriv hvad I planlægger", "billede_hint": "Kalender + kage, planlægnings-stemning"},
+        {"type": "book-tidligt",
+         "tekst": ("Den gode kage til den store dag starter med en besked. 🎂 Jo "
+                   "før vi ved det, jo mere kan vi skræddersy til jer — og jo "
+                   "sikrere er jeres dato.\n\nSkriv 'KAGE' eller 'FEST' + dato, så "
+                   "er I i gang."),
+         "cta": "Skriv 'KAGE'/'FEST' + dato", "billede_hint": "Bager pynter kage til bestilling"},
     ],
 }
 
-_HASHTAGS = "#OrganicMarketGreve #Greve #økologi #friskbagt #bæredygtigt #lokalt"
+# ── Sæson-lejligheder (måned → et stærkt anlednings-opslag) ────────────────────
+# Rammer folk mens de PLANLÆGGER — det er her de store ordrer skabes.
+_SAESON: Dict[int, Dict] = {
+    1:  {"type": "saeson-nytaarskur",
+         "tekst": ("Godt nytår! 🥂 Skal I holde nytårskur eller reception i "
+                   "januar, står vi klar med kransekage, kagebord og catering. "
+                   "Og planlægger I allerede forårets konfirmation eller fest — så "
+                   "book datoen nu.\n\nSkriv 'ARRANGEMENT', så er I i gang."),
+         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Kransekage og bobler, nytårsstemning"},
+    2:  {"type": "saeson-konfirmation-tidlig",
+         "tekst": ("Konfirmation til foråret? 💐 Nu er tiden at booke kagebordet. "
+                   "Vi bager lagkager, boller og det hele fra bunden — og de "
+                   "populære datoer i maj går hurtigt.\n\nSkriv 'KONFIRMATION' + "
+                   "dato, så holder vi pladsen."),
+         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Festligt konfirmations-kagebord"},
+    3:  {"type": "saeson-paaske",
+         "tekst": ("Påskefrokost for familien eller kontoret? 🐣 Vi pakker "
+                   "friskbagt brød, sødt og det salte klar til jeres bord.\n\n"
+                   "Skriv 'PÅSKE' + antal, så står det klar til afhentning."),
+         "cta": "Skriv 'PÅSKE' + antal", "billede_hint": "Påskefrokostbord med bagværk"},
+    4:  {"type": "saeson-konfirmation",
+         "tekst": ("Konfirmationssæsonen er her 💐 Skal vi stå for kagebordet, så I "
+                   "kan nyde dagen med familien? Lagkager, boller og det hele — "
+                   "friskbagt og økologisk.\n\nSkriv 'KONFIRMATION' + dato, så laver "
+                   "vi et tilbud."),
+         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Konfirmations-kagebord, forårsstemning"},
+    5:  {"type": "saeson-fest-forening",
+         "tekst": ("Maj og juni er fyldt med konfirmationer, studenterfester og "
+                   "runde fødselsdage 🎓🎉 Skal vi bage til jeres? De gode "
+                   "weekender bookes lige nu.\n\nSkriv 'FEST' + dato, så holder vi "
+                   "pladsen."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Studenterfest/konfirmation med kagebord"},
+    6:  {"type": "saeson-sommerfest",
+         "tekst": ("Sommerfest, bryllup eller havefest på vej? ☀️🎉 Vi laver "
+                   "kagebord og catering, der holder til en lang sommeraften — "
+                   "friskt og økologisk.\n\nSkriv 'FEST' + antal, så snakker vi menu."),
+         "cta": "Skriv 'FEST' + antal", "billede_hint": "Sommerhavefest med cateringbord"},
+    7:  {"type": "saeson-sommer-arrangement",
+         "tekst": ("Firmaskovtur, familiefest eller sommer-sammenkomst? 🌳 Vi "
+                   "pakker friskbagt og catering klar til jeres udflugt eller fest.\n\n"
+                   "Skriv 'ARRANGEMENT' + antal, så er I klar."),
+         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Cateringkurve til sommerudflugt"},
+    8:  {"type": "saeson-opstart",
+         "tekst": ("Ny sæson på kontoret? 🍂 Start op med friskbagt til møderne "
+                   "eller en lille firmafrokost. Og planlægger I allerede "
+                   "julefrokosten — så er det nu, de gode datoer findes.\n\nSkriv "
+                   "'FIRMA', så laver vi en aftale."),
+         "cta": "Skriv 'FIRMA'", "billede_hint": "Kontor-opstart med friskbagt forplejning"},
+    9:  {"type": "saeson-hoestfest",
+         "tekst": ("Høstfest, firmaevent eller rund fødselsdag i efteråret? 🍂🎉 "
+                   "Vi står for kagebord og catering, så I kan hygge jer med "
+                   "gæsterne.\n\nSkriv 'FEST' + dato, så finder vi ud af det."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Efterårsfest med kagebord"},
+    10: {"type": "saeson-julefrokost-booking",
+         "tekst": ("Julefrokosten planlægges nu 🎄 Skal vi stå for det søde og det "
+                   "salte til jeres firma- eller familiejulefrokost? De bedste "
+                   "december-datoer bookes allerede.\n\nSkriv 'JULEFROKOST' + antal, "
+                   "så holder vi pladsen."),
+         "cta": "Skriv 'JULEFROKOST' + antal", "billede_hint": "Julefrokostbord med bagværk og kransekage"},
+    11: {"type": "saeson-jul-tidlig",
+         "tekst": ("December fylder hurtigt op 🎄 Julefrokoster, receptioner og "
+                   "kagebord til de søde juledage — book jeres nu, så vi kan bage "
+                   "det perfekt til jer.\n\nSkriv 'JUL' + hvad I skal bruge."),
+         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julehygge med kransekage og bagværk"},
+    12: {"type": "saeson-jul",
+         "tekst": ("Julen er lig med godt bagværk 🎄 Kransekage til nytår, "
+                   "kagebord til juledagene, brød til den store frokost — bestil i "
+                   "god tid, så det står klar når I skal bruge det.\n\nSkriv 'JUL' + "
+                   "ønske, så klarer vi resten."),
+         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julebord med kransekage og friskbagt"},
+}
+
+_HASHTAGS = ("#OrganicMarketGreve #Greve #kagebord #catering #fødselsdag "
+             "#konfirmation #økologisk #festienemmere")
 
 
 # ── Deterministisk variant-valg ───────────────────────────────────────────────
@@ -122,6 +208,20 @@ def _vaelg_variant(d: date) -> Dict:
     # Rotér på ugenummer så samme ugedag varierer uge for uge
     uge = d.isocalendar()[1]
     return varianter[uge % len(varianter)]
+
+
+def _saeson_for_dato(d: date) -> Optional[Dict]:
+    """Sæson-lejlighed for måneden (fx konfirmation i april, jul i december)."""
+    return _SAESON.get(d.month)
+
+
+def _vaelg_skabelon(d: date) -> Dict:
+    """Vælg dagens opslag: sæson-lejlighed på planlægningsdage (ons/fre),
+    ellers den evergreen ugedags-variant."""
+    saeson = _saeson_for_dato(d)
+    if saeson and d.weekday() in (2, 4):
+        return saeson
+    return _vaelg_variant(d)
 
 
 # ── Data-drevet krydderi (fejler pænt hvis data mangler) ──────────────────────
@@ -152,10 +252,13 @@ def generer_opslag(dag: Optional[date] = None, data: Optional[Dict] = None,
     """Byg ét færdigt opslag til den givne dag (default: i dag).
     Returnerer {dato, type, tekst, cta, hashtags, billede_hint, ai}."""
     d = dag or date.today()
-    skab = _vaelg_variant(d)
+    skab = _vaelg_skabelon(d)
 
     tekst = skab["tekst"] + _data_tilfoejelse(skab, data)
-    tekst = f"{tekst}\n\n👉 {skab['cta']} — eller bestil på {BESTIL_LINK}"
+    if BESTIL_LINK:
+        tekst = f"{tekst}\n\n👉 {skab['cta']} — eller bestil på {BESTIL_LINK}"
+    else:
+        tekst = f"{tekst}\n\n👉 {skab['cta']}"
 
     resultat = {
         "dato": d.isoformat(),

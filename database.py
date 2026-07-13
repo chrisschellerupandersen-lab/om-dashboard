@@ -6709,6 +6709,50 @@ def auto_prisopdater_fra_bestilling(uge: int, aar: int, linjer: List[Dict]) -> D
     return {"nye_varer": nye_varer, "prisaendringer": len(prisaendringer)}
 
 
+def hent_prisaendringer() -> List[Dict]:
+    """Alle prisændringer på bagværk/kager: for hver daterede pris (vare_pris_periode)
+    findes før-prisen (den forrige daterede pris, ellers den tidløse varestamdata-pris)
+    og %-stigningen beregnes. Alle priser er indkøbspris ex moms. Nyeste ændring først."""
+    from collections import defaultdict
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        stam = {}
+        for r in conn.execute("SELECT varenavn, pris_ex_moms, type FROM varestamdata"):
+            stam[str(r["varenavn"]).strip().lower()] = (r["pris_ex_moms"], r["type"])
+        rows = conn.execute(
+            "SELECT varenavn, pris_ex_moms, gyldig_fra, kilde FROM vare_pris_periode "
+            "ORDER BY LOWER(TRIM(varenavn)), gyldig_fra"
+        ).fetchall()
+
+    grupper = defaultdict(list)
+    for r in rows:
+        grupper[str(r["varenavn"]).strip().lower()].append(r)
+
+    ud = []
+    for k, perioder in grupper.items():
+        base = stam.get(k)
+        prev = float(base[0]) if base and base[0] not in (None, 0) else None
+        vtype = base[1] if base else ""
+        for p in perioder:
+            efter = float(p["pris_ex_moms"] or 0)
+            foer = prev
+            pct = ((efter - foer) / foer * 100) if (foer and foer > 0) else None
+            ud.append({
+                "varenavn":   p["varenavn"],
+                "type":       vtype or "",
+                "gyldig_fra": p["gyldig_fra"],
+                "foer":       round(foer, 2) if foer is not None else None,
+                "efter":      round(efter, 2),
+                "diff":       round(efter - foer, 2) if foer is not None else None,
+                "pct":        round(pct, 1) if pct is not None else None,
+                "kilde":      p["kilde"],
+            })
+            prev = efter
+
+    ud.sort(key=lambda x: (x["gyldig_fra"] or "", x["varenavn"].lower()), reverse=True)
+    return ud
+
+
 def hent_gmail_importerede() -> set:
     with _conn() as conn:
         rows = conn.execute("SELECT msg_id FROM gmail_importerede").fetchall()

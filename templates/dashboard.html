@@ -2821,6 +2821,24 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 
       <!-- BAGVÆRKS-ØKONOMI & OPTIMERING -->
+      <div class="panel" id="p-prisaendring">
+        <div class="page-hdr">
+          <h2>Prisændringer — bagværk &amp; kager</h2>
+          <p>Indkøbspriser fra bageren · før-pris → efter-pris → % stigning · alle beløb ex moms · nyeste ændring først</p>
+        </div>
+        <div class="aar2-top" id="pa-kpi" style="margin-bottom:16px;"></div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Prisændringer</span>
+            <input id="pa-soeg" type="text" placeholder="Søg vare…" oninput="paRender()"
+                   style="padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:180px;">
+          </div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:520px;" id="pa-tabel"></table>
+          </div>
+        </div>
+      </div>
+
       <div class="panel" id="p-dbshopbox">
         <div class="page-hdr">
           <h2>DB — kun Shopbox-salg</h2>
@@ -3612,7 +3630,69 @@ function showPanel(id, el) {
   if (id === 'basis') loadBasis();
   if (id === 'social') loadSocial();
   if (id === 'dbshopbox') loadDbShopbox();
+  if (id === 'prisaendring') loadPrisaendring();
   closeSidebar();
+}
+
+// ── PRISÆNDRINGER (bagværk/kager) ─────────────────────────────────────────────
+let _paData = null, _paSort = {col:'gyldig_fra', dir:'desc'};
+
+function _paKr(n){ return (n==null)?'—':n.toLocaleString('da-DK',{minimumFractionDigits:2,maximumFractionDigits:2})+' kr'; }
+function _paPct(n){ if(n==null) return '—'; const s=n>0?'+':''; return s+n.toLocaleString('da-DK',{minimumFractionDigits:1,maximumFractionDigits:1})+' %'; }
+
+async function loadPrisaendring(){
+  try { _paData = await fetch('/api/prisaendringer').then(r=>r.json()); }
+  catch(e){ document.getElementById('pa-tabel').innerHTML='<tbody><tr><td style="padding:12px;">Kunne ikke hente data.</td></tr></tbody>'; return; }
+  paRenderKpi();
+  paRender();
+}
+
+function paRenderKpi(){
+  const d = _paData||[];
+  const c = document.getElementById('pa-kpi');
+  c.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;';
+  const stig = d.filter(x=>x.pct!=null);
+  const snit = stig.length ? stig.reduce((a,x)=>a+x.pct,0)/stig.length : null;
+  const antalOp  = d.filter(x=>x.pct!=null && x.pct>0).length;
+  const antalNed = d.filter(x=>x.pct!=null && x.pct<0).length;
+  const tile=(lbl,val,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+    <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">${lbl}</div>
+    <div style="font-size:26px;font-weight:700;color:var(--forest);line-height:1;">${val}</div>
+    <div style="font-size:11px;color:var(--ash);margin-top:5px;">${sub||''}</div></div>`;
+  c.innerHTML = tile('Antal ændringer', d.length, antalOp+' op · '+antalNed+' ned')
+    + tile('Snit stigning', snit!=null?_paPct(snit):'—', 'gennemsnit over alle')
+    + tile('Seneste ændring', (d[0]&&d[0].gyldig_fra)||'—', '');
+}
+
+function paSortBy(col){
+  if(_paSort.col===col) _paSort.dir=_paSort.dir==='asc'?'desc':'asc';
+  else _paSort={col, dir:(col==='varenavn'?'asc':'desc')};
+  paRender();
+}
+function _paArrow(col){ return _paSort.col===col ? (_paSort.dir==='asc'?' ▲':' ▼') : '<span style="opacity:.25;"> ⇅</span>'; }
+
+function paRender(){
+  const t = document.getElementById('pa-tabel');
+  let rows = (_paData||[]).slice();
+  const q = (document.getElementById('pa-soeg').value||'').trim().toLowerCase();
+  if(q) rows = rows.filter(x=>(x.varenavn||'').toLowerCase().includes(q));
+  rows = _dbsSortRows(rows, _paSort);
+  const th=(col,lbl,align)=>`<th style="text-align:${align};cursor:pointer;user-select:none;" onclick="paSortBy('${col}')">${lbl}${_paArrow(col)}</th>`;
+  let html = `<thead><tr>
+    ${th('varenavn','Vare','left')}${th('gyldig_fra','Gældende fra','left')}
+    ${th('foer','Før','right')}${th('efter','Efter','right')}${th('pct','Stigning %','right')}</tr></thead><tbody>`;
+  if(!rows.length) html += `<tr><td colspan="5" style="text-align:center;color:var(--ash);padding:14px;">Ingen prisændringer endnu</td></tr>`;
+  rows.forEach(x=>{
+    const pctClr = x.pct==null?'var(--ash)':x.pct>0?'var(--danger)':x.pct<0?'var(--moss)':'var(--ash)';
+    html += `<tr>
+      <td style="text-align:left;">${x.varenavn}</td>
+      <td style="text-align:left;color:var(--ash);">${x.gyldig_fra||'—'}</td>
+      <td style="text-align:right;">${_paKr(x.foer)}</td>
+      <td style="text-align:right;font-weight:600;">${_paKr(x.efter)}</td>
+      <td style="text-align:right;font-weight:700;color:${pctClr};">${_paPct(x.pct)}</td></tr>`;
+  });
+  html += `</tbody>`;
+  t.innerHTML = html;
 }
 
 // ── DB (SHOPBOX) ──────────────────────────────────────────────────────────────
@@ -3932,6 +4012,7 @@ const NAV_SVG = {
   bagvaerkoek:  '<path d="M2 13h12v1H2zm1-2h10l-1-5H4l-1 5zm5-8a2 2 0 012 2H6a2 2 0 012-2z"/>',
   social:       '<path d="M13 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2v3l3-3h5a1 1 0 001-1V3a1 1 0 00-1-1zM5 6h6v1H5V6zm0 3h4v1H5V9z"/>',
   dbshopbox:    '<path d="M2 13h12v1H2zm1-5h2v4H3zm3-3h2v7H6zm3 4h2v3H9zm3-6h2v9h-2z"/>',
+  prisaendring: '<path d="M8 1l2.5 4.5L8 4 5.5 5.5 8 1zM2 7h12v1H2zm1 3h10v1H3zm1 3h8v1H4z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   fakturasalg:  '<path d="M3 1h7l3 3v11H3V1zm6 1v3h3M5 8h6M5 10h6M5 12h4"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
@@ -3954,6 +4035,7 @@ const NAV_DEFAULT = [
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
+  {id:'prisaendring',label:'Prisændringer',         group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
   {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},

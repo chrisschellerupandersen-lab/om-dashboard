@@ -2146,6 +2146,13 @@ async def api_db_shopbox_poster(request: Request, slags: str, periode: str):
     return database.hent_db_shopbox_poster(kort.get(slags, slags), periode)
 
 
+@app.get("/api/prisaendringer")
+async def api_prisaendringer(request: Request):
+    """Prisændringer på bagværk/kager: før-pris, efter-pris, %-stigning."""
+    _kræv_login(request)
+    return database.hent_prisaendringer()
+
+
 @app.get("/api/kontrol/varenumre")
 async def api_kontrol_varenumre(request: Request):
     _kræv_login(request)

@@ -17,14 +17,16 @@ from datetime import date, datetime
 from typing import Dict, List, Optional
 
 # Kunde-vendte landingssider (aldrig det interne dashboard).
-# B2B-landingsside findes allerede (forudbestilling til virksomheder).
-# FEST-siden (private lejligheder) findes endnu ikke — sæt SOCIAL_FEST_LINK
-# når den er bygget, så linkes lejligheds-opslag også til en bestillingsside.
+# B2B  = forudbestilling til virksomheder (/b2b)
+# FEST = private lejligheder: fødselsdag/konfirmation/fest (/fest)
 B2B_LINK  = os.environ.get(
     "SOCIAL_B2B_LINK",
     "https://bestilling-app-production.up.railway.app/b2b",
 ).strip()
-FEST_LINK = os.environ.get("SOCIAL_FEST_LINK", "").strip()
+FEST_LINK = os.environ.get(
+    "SOCIAL_FEST_LINK",
+    "https://bestilling-app-production.up.railway.app/fest",
+).strip()
 ADRESSE = "Greve Strandvej 20"
 
 # Opslagstyper der er virksomheds-rettede → link til B2B-landingssiden.

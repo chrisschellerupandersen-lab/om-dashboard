@@ -6710,74 +6710,72 @@ def auto_prisopdater_fra_bestilling(uge: int, aar: int, linjer: List[Dict]) -> D
 
 
 def hent_prisaendringer() -> List[Dict]:
-    """Alle prisændringer på bagværk/kager: for hver daterede pris (vare_pris_periode)
-    findes før-prisen og %-stigningen beregnes. Alle priser er indkøbspris ex moms.
-
-    Før-pris findes i denne rækkefølge (bagerens varer ligger ikke i varestamdata,
-    så den historiske bestilling er den vigtigste kilde):
-      1. Forrige daterede pris for varen (kæde af ændringer)
-      2. Seneste tidligere ugebestilling med en pris på samme vare (før gyldig_fra)
-      3. Den tidløse varestamdata-pris
+    """Prisændringer på bagværk/kager fundet i bestillingshistorikken + de daterede
+    priser. Grupperes på VARENUMMER (SKU) — stabilt på tværs af skabeloner — så
+    bagerens nye varenavn parres korrekt med den gamle pris via SKU'en. En ændring
+    opstår hver gang indkøbsprisen (ex moms) skifter fra én dato til den næste.
     Nyeste ændring først."""
     from collections import defaultdict
     from datetime import date as _d
+
+    def _norm(s):
+        return " ".join(str(s or "").split()).lower()
+
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
-        stam = {}
-        for r in conn.execute("SELECT varenavn, pris_ex_moms, type FROM varestamdata"):
-            stam[str(r["varenavn"]).strip().lower()] = (r["pris_ex_moms"], r["type"])
-        # Historiske bestillingspriser pr. vare (mandag-dato → pris), sorteret
-        best = defaultdict(list)
-        for r in conn.execute(
-            "SELECT varenavn, uge, aar, pris_ex_moms FROM ugebestillinger WHERE pris_ex_moms > 0"
-        ):
-            try:
-                mon = _d.fromisocalendar(int(r["aar"]), int(r["uge"]), 1).isoformat()
-            except Exception:
-                continue
-            best[str(r["varenavn"]).strip().lower()].append((mon, float(r["pris_ex_moms"])))
-        for k in best:
-            best[k].sort()
-        rows = conn.execute(
-            "SELECT varenavn, pris_ex_moms, gyldig_fra, kilde FROM vare_pris_periode "
-            "ORDER BY LOWER(TRIM(varenavn)), gyldig_fra"
+        best = conn.execute(
+            "SELECT varenummer, varenavn, uge, aar, pris_ex_moms "
+            "FROM ugebestillinger WHERE pris_ex_moms > 0"
+        ).fetchall()
+        stam_type = {_norm(r["varenavn"]): r["type"]
+                     for r in conn.execute("SELECT varenavn, type FROM varestamdata")}
+        perioder = conn.execute(
+            "SELECT varenavn, pris_ex_moms, gyldig_fra "
+            "FROM vare_pris_periode WHERE pris_ex_moms > 0"
         ).fetchall()
 
-    def _best_foer(k, gfra):
-        """Seneste bestillingspris på varen fra FØR gyldig_fra."""
-        kand = [pris for (mon, pris) in best.get(k, []) if gfra and mon < gfra]
-        return kand[-1] if kand else None
+    # Byg tidslinje pr. nøgle (SKU hvis muligt, ellers normaliseret navn)
+    tidslinje = defaultdict(list)     # key -> [(dato, pris, varenavn)]
+    navn2key = {}                     # normaliseret navn -> key (til at folde perioder ind)
+    for r in best:
+        sku = str(r["varenummer"] or "").strip()
+        navn = str(r["varenavn"] or "").strip()
+        try:
+            dato = _d.fromisocalendar(int(r["aar"]), int(r["uge"]), 1).isoformat()
+        except Exception:
+            continue
+        key = sku if sku else "NAVN:" + _norm(navn)
+        tidslinje[key].append((dato, float(r["pris_ex_moms"]), navn))
+        if navn:
+            navn2key.setdefault(_norm(navn), key)
 
-    grupper = defaultdict(list)
-    for r in rows:
-        grupper[str(r["varenavn"]).strip().lower()].append(r)
+    # Fold daterede priser ind — matchet navn→SKU, ellers på eget navn
+    for r in perioder:
+        navn = str(r["varenavn"] or "").strip()
+        key = navn2key.get(_norm(navn), "NAVN:" + _norm(navn))
+        tidslinje[key].append((str(r["gyldig_fra"]), float(r["pris_ex_moms"]), navn))
 
     ud = []
-    for k, perioder in grupper.items():
-        base = stam.get(k)
-        stam_pris = float(base[0]) if base and base[0] not in (None, 0) else None
-        vtype = base[1] if base else ""
-        prev = None
-        for p in perioder:  # sorteret efter gyldig_fra stigende
-            efter = float(p["pris_ex_moms"] or 0)
-            gfra = p["gyldig_fra"]
-            foer = prev
-            if foer is None:
-                foer = _best_foer(k, gfra)
-            if foer is None:
-                foer = stam_pris
-            pct = ((efter - foer) / foer * 100) if (foer and foer > 0) else None
-            ud.append({
-                "varenavn":   p["varenavn"],
-                "type":       vtype or "",
-                "gyldig_fra": gfra,
-                "foer":       round(foer, 2) if foer is not None else None,
-                "efter":      round(efter, 2),
-                "diff":       round(efter - foer, 2) if foer is not None else None,
-                "pct":        round(pct, 1) if pct is not None else None,
-                "kilde":      p["kilde"],
-            })
-            prev = efter
+    for key, punkter in tidslinje.items():
+        # Én pris pr. dato (nyeste indlæsning vinder ved samme dato)
+        pr_dato = {}
+        for dato, pris, navn in sorted(punkter, key=lambda x: x[0]):
+            pr_dato[dato] = (pris, navn)
+        seq = [(d, pr_dato[d][0], pr_dato[d][1]) for d in sorted(pr_dato)]
+        for i in range(1, len(seq)):
+            foer, efter = seq[i - 1][1], seq[i][1]
+            if foer and abs(efter - foer) > 0.005:
+                navn = seq[i][2]
+                ud.append({
+                    "varenavn":   navn,
+                    "type":       stam_type.get(_norm(navn), ""),
+                    "gyldig_fra": seq[i][0],
+                    "foer":       round(foer, 2),
+                    "efter":      round(efter, 2),
+                    "diff":       round(efter - foer, 2),
+                    "pct":        round((efter - foer) / foer * 100, 1) if foer > 0 else None,
+                    "kilde":      "bestilling",
+                })
 
     ud.sort(key=lambda x: (x["gyldig_fra"] or "", x["varenavn"].lower()), reverse=True)
     return ud

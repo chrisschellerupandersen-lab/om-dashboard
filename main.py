@@ -2131,6 +2131,13 @@ async def api_social_slet(request: Request, id_: int):
     return {"ok": True}
 
 
+@app.get("/api/db-shopbox")
+async def api_db_shopbox(request: Request, aar: Optional[int] = None):
+    """DB (kr) + DG (%) for kun Shopbox-salg, pr. dag/uge/måned."""
+    _kræv_login(request)
+    return database.hent_db_shopbox(aar)
+
+
 @app.get("/api/kontrol/varenumre")
 async def api_kontrol_varenumre(request: Request):
     _kræv_login(request)

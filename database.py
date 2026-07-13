@@ -7461,3 +7461,85 @@ def opdater_social_opslag(opslag_id: int, tekst: str = None, status: str = None,
 def slet_social_opslag(opslag_id: int) -> None:
     with _conn() as conn:
         conn.execute("DELETE FROM social_opslag WHERE id=?", (opslag_id,))
+
+
+# ── DB-fokus: kun Shopbox-salg (v_transaktioner) ──────────────────────────────
+
+_DK_MDR = ["", "januar", "februar", "marts", "april", "maj", "juni",
+           "juli", "august", "september", "oktober", "november", "december"]
+_DK_DAGE = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"]
+
+
+def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
+                    antal_uger: int = 16, antal_maaneder: int = 12) -> dict:
+    """Dækningsbidrag (DB, kr) og dækningsgrad (DG, %) for KUN Shopbox-salg
+    (v_transaktioner — MobilePay og faktura-B2B er IKKE med), aggregeret pr.
+    dag, uge og måned.
+
+    Konvention som resten af dashboardet:
+      omsætning er inkl. moms · db_korrekt er DB i kr (ex moms)
+      oms_ex = omsætning / 1.25 · dg_pct = db_korrekt*1.25 / omsætning * 100
+    """
+    from datetime import date as _d
+    aar_where = "WHERE strftime('%Y', dato) = ?" if aar else ""
+    params = (str(aar),) if aar else ()
+
+    def _agg(conn, period_expr, limit):
+        sql = f"""
+            SELECT {period_expr}                            AS periode,
+                   COALESCE(SUM(omsætning),0)/1.25          AS oms_ex,
+                   COALESCE(SUM(db_korrekt),0)              AS db_kr,
+                   CASE WHEN SUM(omsætning)>0
+                        THEN SUM(db_korrekt)*1.25/SUM(omsætning)*100
+                        ELSE 0 END                          AS dg_pct
+            FROM v_transaktioner
+            {aar_where}
+            GROUP BY {period_expr}
+            ORDER BY periode DESC
+            LIMIT {int(limit)}
+        """
+        return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+    def _rens(rows, slags):
+        ud = []
+        for r in rows:
+            p = r["periode"]
+            if slags == "dag":
+                try:
+                    dt = _d.fromisoformat(p)
+                    label = p
+                    under = _DK_DAGE[dt.weekday()]
+                except Exception:
+                    label, under = p, ""
+            elif slags == "uge":
+                # '%Y-%W' → "Uge WW"
+                try:
+                    y, w = p.split("-")
+                    label = f"Uge {int(w):02d}"
+                    under = y
+                except Exception:
+                    label, under = p, ""
+            else:  # måned '%Y-%m'
+                try:
+                    y, m = p.split("-")
+                    label = f"{_DK_MDR[int(m)].capitalize()} {y}"
+                    under = ""
+                except Exception:
+                    label, under = p, ""
+            ud.append({
+                "periode": p,
+                "label":   label,
+                "under":   under,
+                "oms_ex":  round(r["oms_ex"] or 0),
+                "db_kr":   round(r["db_kr"] or 0),
+                "dg_pct":  round(r["dg_pct"] or 0, 1),
+            })
+        return ud
+
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        dage     = _rens(_agg(conn, "dato", antal_dage), "dag")
+        uger     = _rens(_agg(conn, "strftime('%Y-%W', dato)", antal_uger), "uge")
+        maaneder = _rens(_agg(conn, "strftime('%Y-%m', dato)", antal_maaneder), "måned")
+
+    return {"dage": dage, "uger": uger, "maaneder": maaneder}

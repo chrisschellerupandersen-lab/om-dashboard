@@ -2821,6 +2821,37 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 
       <!-- BAGVÆRKS-ØKONOMI & OPTIMERING -->
+      <div class="panel" id="p-dbshopbox">
+        <div class="page-hdr">
+          <h2>DB — kun Shopbox-salg</h2>
+          <p>Dækningsbidrag (DB, kr) og dækningsgrad (DG, %) for de varer vi sælger i Shopbox · MobilePay og faktura-B2B er IKKE med · omsætning ex moms</p>
+        </div>
+
+        <!-- KPI-fliser: seneste dag / uge / måned -->
+        <div class="aar2-top" id="dbs-kpi" style="margin-bottom:16px;"></div>
+
+        <!-- Toggle + graf -->
+        <div class="card" style="margin-bottom:14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">DB kr (søjle) · DG % (linje)</span>
+            <div id="dbs-toggle" style="display:flex;gap:4px;">
+              <button onclick="dbsSetMode('dage')"     class="dbs-tab" data-m="dage">Dag</button>
+              <button onclick="dbsSetMode('uger')"     class="dbs-tab" data-m="uger">Uge</button>
+              <button onclick="dbsSetMode('maaneder')" class="dbs-tab" data-m="maaneder">Måned</button>
+            </div>
+          </div>
+          <div style="position:relative;height:230px;"><canvas id="c-dbs"></canvas></div>
+        </div>
+
+        <!-- Tabel -->
+        <div class="card">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;" id="dbs-tabel-titel">Pr. dag</div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:440px;" id="dbs-tabel"></table>
+          </div>
+        </div>
+      </div>
+
       <div class="panel" id="p-social">
         <div class="page-hdr">
           <h2>Social selling</h2>
@@ -3576,7 +3607,91 @@ function showPanel(id, el) {
   // Load specific page data
   if (id === 'basis') loadBasis();
   if (id === 'social') loadSocial();
+  if (id === 'dbshopbox') loadDbShopbox();
   closeSidebar();
+}
+
+// ── DB (SHOPBOX) ──────────────────────────────────────────────────────────────
+let _dbsData = null, _dbsMode = 'dage';
+
+function _dbsKr(n){ return (n==null)?'—':Math.round(n).toLocaleString('da-DK')+' kr'; }
+function _dbsPct(n){ return (n==null)?'—':(Math.round(n*10)/10).toLocaleString('da-DK')+' %'; }
+
+async function loadDbShopbox(){
+  const kpi = document.getElementById('dbs-kpi');
+  try {
+    _dbsData = await fetch('/api/db-shopbox').then(r=>r.json());
+  } catch(e){ if(kpi) kpi.innerHTML = '<div class="empty">Kunne ikke hente data.</div>'; return; }
+  dbsRenderKpi();
+  dbsSetMode(_dbsMode);
+}
+
+function dbsRenderKpi(){
+  const d = _dbsData || {};
+  const dag = (d.dage||[])[0], uge = (d.uger||[])[0], mdr = (d.maaneder||[])[0];
+  const c = document.getElementById('dbs-kpi');
+  c.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;';
+  const tile = (titel,o)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">${titel}${o?' · '+o.label:''}</div>
+      <div style="font-size:26px;font-weight:700;color:var(--forest);line-height:1;">${o?_dbsKr(o.db_kr):'—'}</div>
+      <div style="font-size:11px;color:var(--ash);margin-top:5px;">${o?('DG '+_dbsPct(o.dg_pct)+' · oms '+_dbsKr(o.oms_ex)):''}</div>
+    </div>`;
+  c.innerHTML = tile('Seneste dag', dag) + tile('Seneste uge', uge) + tile('Seneste måned', mdr);
+}
+
+function dbsSetMode(mode){
+  _dbsMode = mode;
+  document.querySelectorAll('#dbs-toggle .dbs-tab').forEach(b=>{
+    const on = b.dataset.m === mode;
+    b.style.cssText = 'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;'
+      + (on ? 'background:var(--forest);color:#fff;border:1px solid var(--forest);' : 'background:#fff;color:var(--ash);border:1px solid var(--border);');
+  });
+  const rows = ((_dbsData||{})[mode]||[]);
+  document.getElementById('dbs-tabel-titel').textContent =
+    mode==='dage'?'Pr. dag':mode==='uger'?'Pr. uge':'Pr. måned';
+  dbsRenderChart(rows);
+  dbsRenderTable(rows, mode);
+}
+
+function dbsRenderChart(rows){
+  const r = rows.slice().reverse();  // ældst → nyest
+  const lab = r.map(x => _dbsMode==='dage' ? fmtDato(x.periode) : x.label.replace('Uge ','U'));
+  const dbClr = r.map(x => x.dg_pct>=35?'rgba(45,90,45,.75)':x.dg_pct>=25?'rgba(200,168,75,.8)':'rgba(192,57,43,.7)');
+  mk('c-dbs','bar', lab, [
+    { label:'DB kr', data:r.map(x=>x.db_kr), backgroundColor:dbClr, borderRadius:3, yAxisID:'y', order:2 },
+    { label:'DG %', data:r.map(x=>x.dg_pct), type:'line', borderColor:'rgba(139,69,19,.9)', backgroundColor:'transparent', borderWidth:2, pointRadius:2, tension:.25, yAxisID:'y1', order:1 }
+  ], {
+    plugins:{ legend:{ display:true, labels:{ font:{size:10}, padding:10, usePointStyle:true }}},
+    scales:{
+      y:{  position:'left',  ticks:{ callback:v=>Math.round(v/1000)+'k', font:{size:10} }, grid:{ color:'rgba(30,58,30,.05)' } },
+      y1:{ position:'right', min:0, ticks:{ callback:v=>Math.round(v)+'%', font:{size:10} }, grid:{ display:false } },
+      x:{ ticks:{ font:{size:9}, maxRotation:0, autoSkip:true } }
+    }
+  });
+}
+
+function dbsRenderTable(rows, mode){
+  const t = document.getElementById('dbs-tabel');
+  const perLbl = mode==='dage'?'Dato':mode==='uger'?'Uge':'Måned';
+  let html = `<thead><tr>
+    <th style="text-align:left;">${perLbl}</th>
+    <th style="text-align:right;">Omsætning</th>
+    <th style="text-align:right;">DB kr</th>
+    <th style="text-align:right;">DG %</th></tr></thead><tbody>`;
+  if(!rows.length) html += `<tr><td colspan="4" style="text-align:center;color:var(--ash);padding:12px;">Ingen data endnu</td></tr>`;
+  rows.forEach(x=>{
+    const dgClr = x.dg_pct>=35?'var(--moss)':x.dg_pct>=25?'#8a6800':'var(--danger)';
+    const per = (mode==='dage' || x.under)
+      ? `${x.label} <span style="color:var(--ash);font-size:11px;">${x.under}</span>`
+      : x.label;
+    html += `<tr>
+      <td style="text-align:left;">${per}</td>
+      <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
+      <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
+      <td style="text-align:right;color:${dgClr};font-weight:600;">${_dbsPct(x.dg_pct)}</td></tr>`;
+  });
+  html += `</tbody>`;
+  t.innerHTML = html;
 }
 
 // ── SOCIAL SELLING ────────────────────────────────────────────────────────────
@@ -3725,6 +3840,7 @@ const NAV_SVG = {
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
   bagvaerkoek:  '<path d="M2 13h12v1H2zm1-2h10l-1-5H4l-1 5zm5-8a2 2 0 012 2H6a2 2 0 012-2z"/>',
   social:       '<path d="M13 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2v3l3-3h5a1 1 0 001-1V3a1 1 0 00-1-1zM5 6h6v1H5V6zm0 3h4v1H5V9z"/>',
+  dbshopbox:    '<path d="M2 13h12v1H2zm1-5h2v4H3zm3-3h2v7H6zm3 4h2v3H9zm3-6h2v9h-2z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   fakturasalg:  '<path d="M3 1h7l3 3v11H3V1zm6 1v3h3M5 8h6M5 10h6M5 12h4"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
@@ -3742,6 +3858,7 @@ const NAV_DEFAULT = [
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
   {id:'margin',      label:'Margin Analyse',        group:'Salg & økonomi',      hidden:false},
+  {id:'dbshopbox',   label:'DB (Shopbox)',          group:'Salg & økonomi',      hidden:false},
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},

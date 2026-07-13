@@ -1348,6 +1348,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
           </div>
           <div id="ret-st-dage" style="display:flex;justify-content:center;gap:5px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);"></div>
+          <!-- Næste uge (kommende uge) -->
+          <div id="ret-st-naeste" style="display:none;margin-top:10px;padding-top:8px;border-top:1px solid var(--border);">
+            <div id="ret-st-naeste-ttl" style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--ash);text-align:center;margin-bottom:6px;">NÆSTE UGE</div>
+            <div style="display:flex;align-items:stretch;">
+              <div style="flex:1;text-align:center;padding:2px 6px;">
+                <div id="ret-st-nb-val" style="font-family:'DM Mono',monospace;font-size:30px;font-weight:700;line-height:1;color:var(--forest);">—</div>
+                <div style="font-size:8px;letter-spacing:.08em;color:var(--ash);margin-top:3px;">BOLLER</div>
+                <div id="ret-st-nb-sub" style="font-size:9px;color:var(--moss);margin-top:2px;min-height:11px;"></div>
+              </div>
+              <div style="width:1px;background:var(--border);margin:2px 6px;"></div>
+              <div style="flex:1;text-align:center;padding:2px 6px;">
+                <div id="ret-st-nw-val" style="font-family:'DM Mono',monospace;font-size:30px;font-weight:700;line-height:1;color:var(--forest);">—</div>
+                <div style="font-size:8px;letter-spacing:.08em;color:var(--ash);margin-top:3px;">WIENERBRØD</div>
+                <div id="ret-st-nw-sub" style="font-size:9px;color:var(--moss);margin-top:2px;min-height:11px;"></div>
+              </div>
+            </div>
+          </div>
           <div id="ret-st-footer" style="font-size:10px;color:var(--ash);text-align:center;margin-top:6px;"></div>
         </div>
 
@@ -2804,6 +2821,27 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
 
       <!-- BAGVÆRKS-ØKONOMI & OPTIMERING -->
+      <div class="panel" id="p-social">
+        <div class="page-hdr">
+          <h2>Social selling</h2>
+          <p>Automatisk genererede Facebook-opslag ud fra jeres data · motoren laver et nyt opslag hver morgen kl. 06:30 · godkend og publicér — eller lad det køre helt selv når token er koblet på</p>
+        </div>
+
+        <!-- Status-banner -->
+        <div class="card" id="social-status" style="margin-bottom:14px;background:var(--forest);border-color:var(--forest);color:#fff;font-family:'DM Mono',monospace;font-size:11px;line-height:1.7;"></div>
+
+        <!-- Værktøjslinje -->
+        <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <button onclick="socialGenerer()" style="background:var(--forest);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;">✍️ Generér nyt opslag</button>
+          <label style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);text-transform:uppercase;letter-spacing:.08em;">Dato
+            <input type="date" id="social-dato" style="margin-left:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
+          </label>
+          <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">(tom = i dag · motoren vælger opslagstype ud fra ugedagen)</span>
+        </div>
+
+        <div id="social-liste"><div class="empty">Indlæser…</div></div>
+      </div>
+
       <div class="panel" id="p-bagvaerkoek">
         <div class="page-hdr">
           <h2>Bagværks-økonomi &amp; optimering</h2>
@@ -3537,7 +3575,118 @@ function showPanel(id, el) {
   }
   // Load specific page data
   if (id === 'basis') loadBasis();
+  if (id === 'social') loadSocial();
   closeSidebar();
+}
+
+// ── SOCIAL SELLING ────────────────────────────────────────────────────────────
+let _socialFbKonf = false;
+
+const SOCIAL_TYPE_LBL = {
+  'b2b-morgen':'B2B morgen','b2b-moede':'B2B møde','bagom':'Bag om','haandvaerk':'Håndværk',
+  'socialproof':'Social proof','midtuge':'Midtuge','kaffe':'Kaffe','forudbestil-weekend':'Forudbestil',
+  'weekend':'Weekend','weekend-familie':'Weekend familie','brunch':'Brunch','oekologi':'Økologi','antispild':'Anti-spild'
+};
+const SOCIAL_STATUS_STIL = {
+  'kladde':    {t:'Kladde',    b:'#8a7a2a', bg:'#fdf6d8'},
+  'godkendt':  {t:'Godkendt',  b:'#2f6b2f', bg:'#dff0df'},
+  'publiceret':{t:'Publiceret',b:'#1c4d80', bg:'#dceaf7'},
+  'sprunget':  {t:'Sprunget over', b:'#8a3a3a', bg:'#f7dede'},
+};
+
+async function loadSocial() {
+  const liste = document.getElementById('social-liste');
+  const banner = document.getElementById('social-status');
+  try {
+    const st = await fetch('/api/social/status').then(r=>r.json());
+    _socialFbKonf = !!st.fb_konfigureret;
+    const fb = st.fb_konfigureret
+      ? '✅ Facebook koblet på — opslag kan publiceres'
+      : '⚠️ Facebook ikke koblet på endnu — opslag gemmes som kladde (sæt FB_PAGE_ID + FB_PAGE_TOKEN på Railway)';
+    const ai = st.ai_tilgaengelig
+      ? '✅ AI-finpudsning aktiv (Claude)'
+      : '○ AI-finpudsning fra (bruger skabeloner) — sæt ANTHROPIC_API_KEY for variation';
+    const auto = st.auto_publicer
+      ? '🟢 AUTO-PILOT: opslag publiceres automatisk hver morgen'
+      : '⏸️ Manuel godkendelse: du godkender/publicerer selv (sæt SOCIAL_AUTO_PUBLICER=1 for fuld autopilot)';
+    banner.innerHTML = `📣 ${fb}<br>${ai}<br>${auto}`;
+  } catch { banner.textContent = 'Kunne ikke hente status'; }
+
+  liste.innerHTML = '<div class="empty">Indlæser…</div>';
+  try {
+    const rows = await fetch('/api/social/opslag?antal=40').then(r=>r.json());
+    if (!rows.length) {
+      liste.innerHTML = '<div class="empty">Ingen opslag endnu. Tryk “Generér nyt opslag” eller vent til motoren kører kl. 06:30.</div>';
+      return;
+    }
+    liste.innerHTML = rows.map(socialKort).join('');
+  } catch (e) {
+    liste.innerHTML = '<div class="empty">Kunne ikke hente opslag.</div>';
+  }
+}
+
+function socialKort(o) {
+  const s = SOCIAL_STATUS_STIL[o.status] || SOCIAL_STATUS_STIL['kladde'];
+  const typeLbl = SOCIAL_TYPE_LBL[o.type] || o.type;
+  const kilde = o.kilde === 'motor' ? '🤖 auto' : '✍️ manuel';
+  const pubBtn = (_socialFbKonf && o.status !== 'publiceret')
+    ? `<button onclick="socialPubliner(${o.id})" style="background:#1c4d80;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer;">📤 Publicér nu</button>` : '';
+  const godkBtn = (o.status === 'kladde')
+    ? `<button onclick="socialStatus(${o.id},'godkendt')" style="background:#2f6b2f;color:#fff;border:none;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer;">✔ Godkend</button>` : '';
+  const fbHint = (!_socialFbKonf && o.status !== 'publiceret')
+    ? `<span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Kopiér & slå op manuelt indtil token er sat</span>` : '';
+  return `
+  <div class="card" style="margin-bottom:12px;" data-sid="${o.id}">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="background:${s.bg};color:${s.b};font-family:'DM Mono',monospace;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:20px;">${s.t}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">${o.dato} · ${typeLbl} · ${kilde}${o.ai?' · AI':''}</span>
+      ${o.fb_post_id?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:#1c4d80;">FB: ${o.fb_post_id}</span>`:''}
+    </div>
+    <textarea id="social-txt-${o.id}" style="width:100%;min-height:120px;padding:10px;border:1px solid var(--border);border-radius:8px;font-size:14px;line-height:1.5;font-family:inherit;resize:vertical;box-sizing:border-box;" ${o.status==='publiceret'?'readonly':''}>${(o.tekst||'').replace(/</g,'&lt;')}</textarea>
+    ${o.billede_hint?`<div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);margin-top:6px;">📷 Billed-idé: ${o.billede_hint}</div>`:''}
+    ${o.hashtags?`<div style="font-size:12px;color:#1c4d80;margin-top:4px;">${o.hashtags}</div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+      ${o.status!=='publiceret'?`<button onclick="socialGem(${o.id})" style="background:#fff;color:var(--forest);border:1px solid var(--forest);padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer;">💾 Gem tekst</button>`:''}
+      <button onclick="socialKopier(${o.id})" style="background:#fff;color:var(--ash);border:1px solid var(--border);padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer;">📋 Kopiér</button>
+      ${godkBtn}${pubBtn}
+      <button onclick="socialSlet(${o.id})" style="background:#fff;color:#8a3a3a;border:1px solid #e0c0c0;padding:7px 12px;border-radius:6px;font-size:12px;cursor:pointer;">🗑 Slet</button>
+      ${fbHint}
+    </div>
+  </div>`;
+}
+
+async function socialGenerer() {
+  const dato = document.getElementById('social-dato').value;
+  try {
+    const r = await fetch('/api/social/generer', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(dato?{dato}:{})}).then(r=>r.json());
+    if (r.ok) loadSocial();
+    else alert('Kunne ikke generere opslag');
+  } catch { alert('Fejl ved generering'); }
+}
+
+async function socialGem(id) {
+  const tekst = document.getElementById('social-txt-'+id).value;
+  await fetch('/api/social/opdater', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,tekst})});
+  loadSocial();
+}
+async function socialStatus(id, status) {
+  await fetch('/api/social/opdater', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,status})});
+  loadSocial();
+}
+async function socialPubliner(id) {
+  if (!confirm('Publicér dette opslag på Facebook nu?')) return;
+  const r = await fetch('/api/social/publicer', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})}).then(r=>r.json());
+  if (r.ok) { loadSocial(); }
+  else alert('Kunne ikke publicere: ' + (r.fejl||'ukendt fejl'));
+}
+async function socialSlet(id) {
+  if (!confirm('Slet dette opslag?')) return;
+  await fetch('/api/social/'+id, {method:'DELETE'});
+  loadSocial();
+}
+function socialKopier(id) {
+  const t = document.getElementById('social-txt-'+id).value;
+  navigator.clipboard.writeText(t).then(()=>{}, ()=>{});
 }
 
 // ── NAV CUSTOMIZATION ─────────────────────────────────────────────────────────
@@ -3562,6 +3711,7 @@ const NAV_SVG = {
   returtgtg:    '<path d="M3 5h10l-1 9a1 1 0 01-1 1H5a1 1 0 01-1-1L3 5zm2-3h6v2H5V2zm1 5v6h1V7H6zm3 0v6h1V7H9z"/>',
   beregner:     '<path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/>',
   bagvaerkoek:  '<path d="M2 13h12v1H2zm1-2h10l-1-5H4l-1 5zm5-8a2 2 0 012 2H6a2 2 0 012-2z"/>',
+  social:       '<path d="M13 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2v3l3-3h5a1 1 0 001-1V3a1 1 0 00-1-1zM5 6h6v1H5V6zm0 3h4v1H5V9z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   fakturasalg:  '<path d="M3 1h7l3 3v11H3V1zm6 1v3h3M5 8h6M5 10h6M5 12h4"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
@@ -3595,6 +3745,7 @@ const NAV_DEFAULT = [
   {id:'returtgtg',   label:'Retur & TGTG forslag',  group:'Bageri & indkøb',     hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Analyse & rapporter',  hidden:false},
+  {id:'social',      label:'Social selling',        group:'Marketing',            hidden:false},
   {id:'stamdata',    label:'Varestamdata',          group:'Administration',       hidden:false},
   {id:'kp-historik', label:'Kostpris historik',     group:'Administration',       hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',       hidden:false},
@@ -3606,6 +3757,7 @@ const NAV_GRP_IKON = {
   'Salg & økonomi':     '📈',
   'Bageri & indkøb':   '🥐',
   'Analyse & rapporter':'📊',
+  'Marketing':          '📣',
   'Administration':     '⚙️',
 };
 // Collapse-tilstand gemt i localStorage
@@ -11817,6 +11969,26 @@ async function loadReturStatus() {
       const n = d.antal_dage_registreret || 0;
       footer.textContent = n > 0 ? n + ' af 7 dage registreret · send mandag' : 'Registrer mandag for uge ' + d.aktuel_uge + ' →';
       footer.style.color = ash;
+    }
+
+    // Næste uge (kommende uge) — vises altid som ekstra tal-par
+    const nEl = document.getElementById('ret-st-naeste');
+    if (nEl && d.naeste_uge) {
+      nEl.style.display = '';
+      document.getElementById('ret-st-naeste-ttl').textContent = 'NÆSTE UGE (' + d.naeste_uge + ')';
+      const nb = document.getElementById('ret-st-nb-val');
+      const nw = document.getElementById('ret-st-nw-val');
+      const nbSub = document.getElementById('ret-st-nb-sub');
+      const nwSub = document.getElementById('ret-st-nw-sub');
+      nb.textContent = d.naeste_sendt_boller;
+      nw.textContent = d.naeste_sendt_wiener;
+      if (d.naeste_er_registreret) {
+        nbSub.textContent = (d.naeste_rest_boller > 0) ? 'kan sende ' + d.naeste_rest_boller + ' mere' : 'kvote brugt ✓';
+        nwSub.textContent = (d.naeste_rest_wiener > 0) ? 'kan sende ' + d.naeste_rest_wiener + ' mere' : 'kvote brugt ✓';
+      } else {
+        nbSub.textContent = d.naeste_max_boller > 0 ? 'maks ' + d.naeste_max_boller : 'ingen bestilling endnu';
+        nwSub.textContent = d.naeste_max_wiener > 0 ? 'maks ' + d.naeste_max_wiener : '';
+      }
     }
   } catch(e) { console.error('loadReturStatus:', e); }
 }

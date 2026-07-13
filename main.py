@@ -16,6 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 import database
+import social_selling
 import parser as xlsx_parser
 
 # ── Gmail auto-import ─────────────────────────────────────────────────────────
@@ -365,6 +366,36 @@ def _planlagt_tgtg_sync():
         print(f"[TGTG auto-sync exception] {str(e)[:100]}")
 
 
+def _planlagt_social_generering():
+    """Generér dagens Facebook-opslag. Auto-publicér hvis SOCIAL_AUTO_PUBLICER=1
+    og token er sat; ellers gem som kladde til godkendelse."""
+    try:
+        data = None
+        try:
+            data = {"spild_serie": database.hent_spild_uge_serie(12)}
+        except Exception:
+            data = None
+        op = social_selling.generer_opslag(data=data)
+        auto = (os.environ.get("SOCIAL_AUTO_PUBLICER") == "1"
+                and social_selling.facebook_konfigureret())
+        status = "godkendt" if auto else "kladde"
+        rid = database.gem_social_opslag(
+            op["dato"], op["type"], op["tekst"], op["cta"],
+            op["hashtags"], op["billede_hint"], status=status, kilde="motor")
+        if auto and rid:
+            res = social_selling.publicer_paa_facebook(op["tekst"])
+            if res.get("ok"):
+                database.opdater_social_opslag(rid, status="publiceret",
+                                               fb_post_id=res["post_id"])
+                print(f"[Social auto-publiceret] {op['type']} → {res['post_id']}")
+            else:
+                print(f"[Social publicering fejl] {res.get('fejl')}")
+        else:
+            print(f"[Social opslag genereret som kladde] {op['type']} {op['dato']}")
+    except Exception as e:
+        print(f"[Social generering exception] {str(e)[:150]}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
@@ -377,6 +408,9 @@ async def lifespan(app: FastAPI):
     _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=19, minute=0)
     _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=20, minute=0)
     jobs.append("TGTG auto-sync: dagligt 16:00 + 19:00 + 20:00")
+    # Social selling: generér dagens opslag hver morgen kl. 06:30
+    _scheduler.add_job(_planlagt_social_generering, "cron", hour=6, minute=30)
+    jobs.append("Social opslag: dagligt 06:30")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")
@@ -2003,6 +2037,94 @@ async def api_fakturasalg_gem(request: Request):
 async def api_fakturasalg_slet(request: Request, id_: int):
     _kræv_login(request)
     database.slet_faktura_salg(id_)
+    return {"ok": True}
+
+
+# ── Social selling ────────────────────────────────────────────────────────────
+
+@app.get("/api/social/status")
+async def api_social_status(request: Request):
+    """Status: er Facebook + AI konfigureret, og auto-publicering slået til?"""
+    _kræv_login(request)
+    return {
+        "fb_konfigureret": social_selling.facebook_konfigureret(),
+        "ai_tilgaengelig": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "auto_publicer":   os.environ.get("SOCIAL_AUTO_PUBLICER") == "1",
+    }
+
+
+@app.get("/api/social/opslag")
+async def api_social_opslag(request: Request, antal: int = 40, status: Optional[str] = None):
+    _kræv_login(request)
+    return database.hent_social_opslag(int(antal), status)
+
+
+@app.post("/api/social/generer")
+async def api_social_generer(request: Request):
+    """Generér et opslag (i dag eller given dato) og gem som kladde."""
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    dag = None
+    if body.get("dato"):
+        try:
+            dag = datetime.strptime(body["dato"], "%Y-%m-%d").date()
+        except Exception:
+            dag = None
+    data = None
+    try:
+        data = {"spild_serie": database.hent_spild_uge_serie(12)}
+    except Exception:
+        data = None
+    op = social_selling.generer_opslag(dag=dag, data=data, brug_ai=body.get("ai", True))
+    rid = database.gem_social_opslag(
+        op["dato"], op["type"], op["tekst"], op["cta"],
+        op["hashtags"], op["billede_hint"], status="kladde", kilde="manuel",
+    )
+    return {"ok": True, "id": rid, "opslag": op}
+
+
+@app.post("/api/social/opdater")
+async def api_social_opdater(request: Request):
+    """Redigér tekst eller skift status (kladde/godkendt/sprunget)."""
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    oid = int(body.get("id", 0) or 0)
+    if not oid:
+        raise HTTPException(status_code=400, detail="Mangler id")
+    database.opdater_social_opslag(
+        oid, tekst=body.get("tekst"), status=body.get("status"))
+    return {"ok": True}
+
+
+@app.post("/api/social/publicer")
+async def api_social_publicer(request: Request):
+    """Publicér ét opslag på Facebook nu. Kræver FB_PAGE_ID + FB_PAGE_TOKEN."""
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    oid = int(body.get("id", 0) or 0)
+    op = database.hent_social_opslag_en(oid)
+    if not op:
+        raise HTTPException(status_code=404, detail="Opslag findes ikke")
+    res = social_selling.publicer_paa_facebook(op["tekst"])
+    if res.get("ok"):
+        database.opdater_social_opslag(oid, status="publiceret", fb_post_id=res["post_id"])
+        return {"ok": True, "post_id": res["post_id"]}
+    return {"ok": False, "fejl": res.get("fejl", "Ukendt fejl")}
+
+
+@app.delete("/api/social/{id_}")
+async def api_social_slet(request: Request, id_: int):
+    _kræv_login(request)
+    database.slet_social_opslag(id_)
     return {"ok": True}
 
 

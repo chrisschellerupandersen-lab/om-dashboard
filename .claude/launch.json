@@ -2,20 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "Bestilling App",
-      "runtimeExecutable": "C:\\Program Files\\nodejs\\node.exe",
-      "runtimeArgs": ["bestilling-app/server.mjs"],
-      "port": 3000,
-      "env": {
-        "ADMIN_USER": "admin",
-        "ADMIN_PASS": "test"
-      }
+      "name": "dashboard",
+      "runtimeExecutable": "C:\\Users\\ChrisSchellerupAnder\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"],
+      "port": 8000
     },
     {
-      "name": "Dashboard",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["dashboard/main.py"],
-      "port": 5000
+      "name": "bestilling-app",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["bestilling-app/server.mjs"],
+      "port": 3000
+    },
+    {
+      "name": "economic-debitor",
+      "runtimeExecutable": "C:\\Users\\ChrisSchellerupAnder\\AppData\\Local\\Python\\pythoncore-3.14-64\\python.exe",
+      "runtimeArgs": ["economic-debitor/app.py"],
+      "port": 8000
     }
   ]
 }

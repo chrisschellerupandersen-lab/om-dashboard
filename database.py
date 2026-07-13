@@ -296,6 +296,25 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_faktura_salg_dato ON faktura_salg(dato);
 
+            -- Social selling: auto-genererede Facebook-opslag.
+            -- status: kladde | godkendt | publiceret | sprunget
+            CREATE TABLE IF NOT EXISTS social_opslag (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato        TEXT NOT NULL,
+                type        TEXT NOT NULL DEFAULT 'generel',
+                tekst       TEXT NOT NULL,
+                cta         TEXT DEFAULT '',
+                hashtags    TEXT DEFAULT '',
+                billede_hint TEXT DEFAULT '',
+                status      TEXT NOT NULL DEFAULT 'kladde',
+                fb_post_id  TEXT DEFAULT '',
+                kilde       TEXT DEFAULT 'motor',
+                oprettet    TEXT DEFAULT (datetime('now','localtime')),
+                publiceret  TEXT,
+                UNIQUE(dato, type) ON CONFLICT IGNORE
+            );
+            CREATE INDEX IF NOT EXISTS idx_social_dato ON social_opslag(dato);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -5037,17 +5056,59 @@ def hent_retur_kpi() -> dict:
 
     # Datointerval for aktuel uge (søg på dato ikke uge-felt — JS gemte muligvis forkert uge)
     mandag_uge = date.fromisocalendar(aktuel_aar, aktuel_uge, 1)
-    sondag_uge = mandag_uge + timedelta(days=6)
-    mandag_str = mandag_uge.isoformat()
-    sondag_str = sondag_uge.isoformat()
 
-    with _conn() as conn:
-        aktuel = conn.execute("""
+    # Næste uge (den kommende uge) — så man altid kan se begge
+    naeste_mandag = mandag_uge + timedelta(days=7)
+    naeste_iso = naeste_mandag.isocalendar()
+    naeste_uge = int(naeste_iso[1])
+    naeste_aar = int(naeste_iso[0])
+
+    # Wienerbrød-klassificering (bruges til begge uger)
+    _WIENER_LIKE = """(
+        LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
+        (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
+        LOWER(varenavn) LIKE '%snegl%'     OR
+        LOWER(varenavn) LIKE '%snurrer%'    OR LOWER(varenavn) LIKE '%snurr%'     OR
+        LOWER(varenavn) LIKE '%spandauer%'  OR LOWER(varenavn) LIKE '%wienerstang%' OR
+        LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
+    )"""
+
+    def _uge_data(conn, uge, aar):
+        """Sendt retur (via datointerval) + kvote (via ugebestillinger) for én uge."""
+        m = date.fromisocalendar(aar, uge, 1)
+        s = m + timedelta(days=6)
+        sendt = conn.execute("""
             SELECT SUM(CASE WHEN kategori='boller' THEN antal ELSE 0 END) AS boller,
                    SUM(CASE WHEN kategori='wienerbroed' THEN antal ELSE 0 END) AS wiener,
                    MAX(registreret_dato) AS dato
             FROM retur_detaljer WHERE registreret_dato >= ? AND registreret_dato <= ?
-        """, (mandag_str, sondag_str)).fetchone()
+        """, (m.isoformat(), s.isoformat())).fetchone()
+        b = conn.execute("""
+            SELECT COALESCE(SUM(total_antal), 0) AS t FROM ugebestillinger
+            WHERE uge=? AND aar=? AND LOWER(varenavn) LIKE '%bolle%'
+        """, (uge, aar)).fetchone()
+        w = conn.execute(f"""
+            SELECT COALESCE(SUM(total_antal), 0) AS t FROM ugebestillinger
+            WHERE uge=? AND aar=? AND {_WIENER_LIKE}
+        """, (uge, aar)).fetchone()
+        bestilt_b = round(b['t'] or 0)
+        bestilt_w = round(w['t'] or 0)
+        maxb = round(bestilt_b * 0.10)
+        maxw = round(bestilt_w * 0.135)
+        sb = int(sendt['boller'] or 0) if sendt else 0
+        sw = int(sendt['wiener'] or 0) if sendt else 0
+        return {
+            'dato': sendt['dato'] if sendt else None,
+            'er_registreret': bool(sendt and sendt['dato']),
+            'sendt_boller': sb, 'sendt_wiener': sw,
+            'bestilt_boller': bestilt_b, 'bestilt_wiener': bestilt_w,
+            'max_boller': maxb, 'max_wiener': maxw,
+            'rest_boller': max(0, maxb - sb), 'rest_wiener': max(0, maxw - sw),
+        }
+
+    with _conn() as conn:
+        akt = _uge_data(conn, aktuel_uge, aktuel_aar)
+        nst = _uge_data(conn, naeste_uge, naeste_aar)
 
         seneste = conn.execute("""
             SELECT uge, aar, MAX(registreret_dato) AS dato,
@@ -5056,36 +5117,6 @@ def hent_retur_kpi() -> dict:
             FROM retur_detaljer GROUP BY uge, aar ORDER BY aar DESC, uge DESC LIMIT 1
         """).fetchone()
 
-        # Kvote fra ugebestillinger for aktuel uge
-        # Direkte LIKE på varenavn — varestamdata.type er 'Bagværk' for alle bestillingsvarer
-        b_best = conn.execute("""
-            SELECT COALESCE(SUM(total_antal), 0) AS t
-            FROM ugebestillinger
-            WHERE uge=? AND aar=?
-            AND LOWER(varenavn) LIKE '%bolle%'
-        """, (aktuel_uge, aktuel_aar)).fetchone()
-        w_best = conn.execute("""
-            SELECT COALESCE(SUM(total_antal), 0) AS t
-            FROM ugebestillinger
-            WHERE uge=? AND aar=?
-            AND (
-                LOWER(varenavn) LIKE '%croissant%' OR LOWER(varenavn) LIKE '%crossaint%' OR
-                (LOWER(varenavn) LIKE '%birkes%' AND LOWER(varenavn) NOT LIKE '%hvede%') OR
-                LOWER(varenavn) LIKE '%snegl%'     OR
-                LOWER(varenavn) LIKE '%snurrer%'    OR LOWER(varenavn) LIKE '%snurr%'     OR
-                LOWER(varenavn) LIKE '%spandauer%'  OR LOWER(varenavn) LIKE '%wienerstang%' OR
-                LOWER(varenavn) LIKE '%kanelstang%' OR LOWER(varenavn) LIKE '%frøsnapper%'
-            )
-        """, (aktuel_uge, aktuel_aar)).fetchone()
-
-    bestilt_boller = round(b_best['t'] or 0)
-    bestilt_wiener = round(w_best['t'] or 0)
-    max_boller = round(bestilt_boller * 0.10)
-    max_wiener = round(bestilt_wiener * 0.135)
-    sendt_b = int(aktuel['boller'] or 0) if aktuel else 0
-    sendt_w = int(aktuel['wiener'] or 0) if aktuel else 0
-
-    er_registreret = bool(aktuel and aktuel['dato'])
     dage_status = hent_retur_dage_status(aktuel_uge, aktuel_aar)
     antal_registreret = sum(1 for d in dage_status if d['registreret'])
     return {
@@ -5095,16 +5126,28 @@ def hent_retur_kpi() -> dict:
         'dage_status': dage_status,
         'antal_dage_registreret': antal_registreret,
         'er_mandag': weekday == 0,
-        'er_registreret': er_registreret,
-        'sendt_boller': sendt_b,
-        'sendt_wiener': sendt_w,
-        'registreret_dato': aktuel['dato'] if aktuel else None,
-        'bestilt_boller': bestilt_boller,
-        'bestilt_wiener': bestilt_wiener,
-        'max_boller': max_boller,
-        'max_wiener': max_wiener,
-        'rest_boller': max(0, max_boller - sendt_b),
-        'rest_wiener': max(0, max_wiener - sendt_w),
+        'er_registreret': akt['er_registreret'],
+        'sendt_boller': akt['sendt_boller'],
+        'sendt_wiener': akt['sendt_wiener'],
+        'registreret_dato': akt['dato'],
+        'bestilt_boller': akt['bestilt_boller'],
+        'bestilt_wiener': akt['bestilt_wiener'],
+        'max_boller': akt['max_boller'],
+        'max_wiener': akt['max_wiener'],
+        'rest_boller': akt['rest_boller'],
+        'rest_wiener': akt['rest_wiener'],
+        # Næste uge (kommende uge) — vises altid som ekstra tal-par
+        'naeste_uge': naeste_uge,
+        'naeste_aar': naeste_aar,
+        'naeste_er_registreret': nst['er_registreret'],
+        'naeste_sendt_boller': nst['sendt_boller'],
+        'naeste_sendt_wiener': nst['sendt_wiener'],
+        'naeste_bestilt_boller': nst['bestilt_boller'],
+        'naeste_bestilt_wiener': nst['bestilt_wiener'],
+        'naeste_max_boller': nst['max_boller'],
+        'naeste_max_wiener': nst['max_wiener'],
+        'naeste_rest_boller': nst['rest_boller'],
+        'naeste_rest_wiener': nst['rest_wiener'],
         'seneste_uge': int(seneste['uge']) if seneste else None,
         'seneste_aar': int(seneste['aar']) if seneste else None,
         'seneste_boller': int(seneste['boller'] or 0) if seneste else 0,
@@ -7350,3 +7393,71 @@ def hent_kage_analyse(aar: Optional[int] = None) -> Dict[str, Any]:
             "delta_pct":     round(delta, 1) if delta is not None else None,
         },
     }
+
+
+# ── Social selling (auto-genererede Facebook-opslag) ──────────────────────────
+
+def gem_social_opslag(dato: str, type: str, tekst: str, cta: str = "",
+                      hashtags: str = "", billede_hint: str = "",
+                      status: str = "kladde", kilde: str = "motor") -> int:
+    """Gem et opslag. UNIQUE(dato, type) ON CONFLICT IGNORE → dubletter droppes.
+    Returnerer rid hvis oprettet, ellers id på eksisterende (eller 0)."""
+    with _conn() as conn:
+        cur = conn.execute(
+            """INSERT INTO social_opslag (dato, type, tekst, cta, hashtags,
+                                          billede_hint, status, kilde)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (dato, type, tekst, cta, hashtags, billede_hint, status, kilde),
+        )
+        if cur.rowcount:
+            return cur.lastrowid
+        row = conn.execute(
+            "SELECT id FROM social_opslag WHERE dato=? AND type=?", (dato, type)
+        ).fetchone()
+        return row[0] if row else 0
+
+
+def hent_social_opslag(antal: int = 40, status: str = None) -> List[Dict]:
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        if status:
+            rows = conn.execute(
+                """SELECT * FROM social_opslag WHERE status=?
+                   ORDER BY dato DESC, id DESC LIMIT ?""", (status, antal)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT * FROM social_opslag
+                   ORDER BY dato DESC, id DESC LIMIT ?""", (antal,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_social_opslag_en(opslag_id: int) -> Optional[Dict]:
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        r = conn.execute("SELECT * FROM social_opslag WHERE id=?", (opslag_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def opdater_social_opslag(opslag_id: int, tekst: str = None, status: str = None,
+                          fb_post_id: str = None) -> None:
+    sets, vals = [], []
+    if tekst is not None:
+        sets.append("tekst=?"); vals.append(tekst)
+    if status is not None:
+        sets.append("status=?"); vals.append(status)
+        if status == "publiceret":
+            sets.append("publiceret=datetime('now','localtime')")
+    if fb_post_id is not None:
+        sets.append("fb_post_id=?"); vals.append(fb_post_id)
+    if not sets:
+        return
+    vals.append(opslag_id)
+    with _conn() as conn:
+        conn.execute(f"UPDATE social_opslag SET {', '.join(sets)} WHERE id=?", vals)
+
+
+def slet_social_opslag(opslag_id: int) -> None:
+    with _conn() as conn:
+        conn.execute("DELETE FROM social_opslag WHERE id=?", (opslag_id,))

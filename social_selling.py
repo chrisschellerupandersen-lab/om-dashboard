@@ -46,176 +46,179 @@ def _link_for(type_: str) -> str:
 # CTA'er er samtale-baserede ("skriv til os") — passer til bespoke tilbud og
 # fødes senere direkte ind i Messenger-autosvar (fase 2).
 
+# VIGTIGT: Nævn KUN varer vi faktisk har i bestillings-appen.
+# Brød: surdejsbrød, signaturbrød, flute, rugbrød · Boller: surdejsboller, teboller
+# Wienerbrød: croissant, kanelsnegl, kanelsnurrer, kardemommesnurrer, tebirkes,
+#   frøsnapper, wienerstang, kanelstang · Kager (stykker): træstammer, hindbærsnitter,
+#   napoleonshat, cookies, kokostoppe, romkugler, studenterbrød (halv plade)
+# Til bordet: juice, smør, syltetøj, pålægschokolade · Små-catering: tapaskasse,
+#   burgerpose (begge 2 pers). INGEN lagkager/kagemand/kransekage — dem har vi ikke.
 _SKABELONER: Dict[int, List[Dict]] = {
     0: [  # Mandag — virksomheder / B2B
         {"type": "b2b-moede",
-         "tekst": ("Skal I holde møde eller event i denne uge? 🤝 Lad os stå for "
-                   "forplejningen — friskbagt økologisk brød, sødt og rigtig kaffe, "
-                   "klar til afhentning eller levering.\n\nVirksomheder i Greve: "
-                   "skriv 'FIRMA' + antal personer, så sender vi en menu."),
-         "cta": "Skriv 'FIRMA' + antal personer", "billede_hint": "Flot mødebakke med brød, kaffe og kage"},
+         "tekst": ("Skal I holde møde eller event i denne uge? 🤝 Vi pakker "
+                   "friskbagt surdejsbrød, boller, wienerbrød og kager klar — plus "
+                   "juice til bordet. Klar til afhentning fra kl. 06.\n\n"
+                   "Virksomheder i Greve: skriv 'FIRMA' + antal personer."),
+         "cta": "Skriv 'FIRMA' + antal personer", "billede_hint": "Mødebakke med surdejsbrød, boller og wienerbrød"},
         {"type": "firma-fast",
-         "tekst": ("Faste morgenbrød-aftaler til kontoret ☕🥐 Bestilt i forvejen, "
-                   "friskbagt og klar fra kl. 06 — uden at nogen hos jer skal tænke "
-                   "på det.\n\nSkriv 'FIRMA', så laver vi en aftale til jeres hus."),
-         "cta": "Skriv 'FIRMA'", "billede_hint": "Kontor får leveret friskbagt om morgenen"},
+         "tekst": ("Faste morgenbrød-aftaler til kontoret 🥐 Friskbagt surdejsbrød, "
+                   "boller og wienerbrød, bestilt i forvejen og klar til afhentning "
+                   "fra kl. 06 — uden at nogen hos jer skal tænke på det.\n\n"
+                   "Skriv 'FIRMA', så laver vi en aftale."),
+         "cta": "Skriv 'FIRMA'", "billede_hint": "Kurv med friskbagt brød og wienerbrød til kontor"},
     ],
-    1: [  # Tirsdag — håndværk/kvalitet knyttet til lejligheder
+    1: [  # Tirsdag — kvalitet knyttet til lejligheder
         {"type": "kage-haandvaerk",
-         "tekst": ("En lagkage til festen skal smage af noget. 🎂 Vi bager fra "
-                   "bunden med økologiske råvarer — fyld, bunde og pynt efter jeres "
-                   "ønske. Perfekt til fødselsdagen eller den store dag.\n\n"
-                   "Skriv 'KAGE' + dato, så finder vi den rette."),
-         "cta": "Skriv 'KAGE' + dato", "billede_hint": "Hjemmelavet lagkage, nærbillede af pynt"},
+         "tekst": ("Skal I fejre noget? 🎉 Forudbestil et kaffebord af friskbagt "
+                   "wienerbrød — croissant, kanelsnegl, kardemommesnurrer — og kager "
+                   "som træstammer, hindbærsnitter og napoleonshat. Alt bagt fra "
+                   "bunden.\n\nSkriv 'FEST' + dato."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Fad med wienerbrød og stykkager"},
         {"type": "catering-kvalitet",
-         "tekst": ("Catering med rigtig smag. 🌿 Til jeres arrangement laver vi "
-                   "det søde og det salte af friske, økologiske råvarer — ikke "
-                   "noget fra en fjern fabrik.\n\nHar I noget på vej? Skriv 'FEST', "
-                   "så snakker vi menu."),
-         "cta": "Skriv 'FEST'", "billede_hint": "Indbydende catering-opstilling, økologiske råvarer"},
+         "tekst": ("Til den lille sammenkomst 🌿 Friskbagt surdejsbrød og boller, "
+                   "en tapaskasse eller burgerpose, og wienerbrød til kaffen — alt "
+                   "økologisk og bagt fra bunden.\n\nHar I noget på vej? Skriv 'FEST'."),
+         "cta": "Skriv 'FEST'", "billede_hint": "Surdejsbrød, tapaskasse og wienerbrød på bord"},
     ],
-    2: [  # Onsdag — social proof fra lejligheder + inspiration
+    2: [  # Onsdag — inspiration til lejligheder
         {"type": "event-socialproof",
-         "tekst": ("Sidste weekend leverede vi kagebord til en rund fødselsdag her "
-                   "i Greve — og bordet var tomt inden gæsterne var færdige med at "
-                   "rose det. 🎉🎂\n\nSkal vi gøre jeres næste fest lidt lettere? "
-                   "Skriv 'FEST', så hjælper vi."),
-         "cta": "Skriv 'FEST'", "billede_hint": "Fyldt kagebord til fest, glade gæster"},
+         "tekst": ("Et bord fyldt med friskbagt wienerbrød og kager gør enhver fest "
+                   "lidt bedre 🍰 Croissant, kanelsnurrer, træstammer, napoleonshat "
+                   "og hindbærsnitter — sammensat efter antal gæster.\n\n"
+                   "Skriv 'FEST' + antal."),
+         "cta": "Skriv 'FEST' + antal", "billede_hint": "Bord med wienerbrød og stykkager til fest"},
         {"type": "kagebord-inspiration",
-         "tekst": ("Sådan kan et kagebord se ud til jeres fest 🎂🍰 Blandet efter "
-                   "anledning og antal — fra intim fødselsdag til stort arrangement. "
-                   "Alt bagt fra bunden.\n\nSkriv 'KAGEBORD', så sætter vi et sammen "
-                   "til jer."),
-         "cta": "Skriv 'KAGEBORD'", "billede_hint": "Overdådigt kagebord ovenfra"},
+         "tekst": ("Skal I have gæster i weekenden? 🥐 Forudbestil friskbagt "
+                   "surdejsbrød, boller og wienerbrød, så I slipper for morgenkøen "
+                   "og kan hygge jer i stedet.\n\nSkriv 'GÆSTER' + antal."),
+         "cta": "Skriv 'GÆSTER' + antal", "billede_hint": "Morgenbord med friskbagt brød og wienerbrød"},
     ],
-    3: [  # Torsdag — fødselsdage / kager
+    3: [  # Torsdag — fødselsdage
         {"type": "foedselsdag",
-         "tekst": ("Fødselsdag på vej? 🎂 Lad os bage kagen, så du kan nyde dagen. "
-                   "Lagkage, kagemand eller et helt kagebord — friskbagt og efter "
-                   "jeres ønske.\n\nSkriv 'FØDSELSDAG' + dato, så er den sag klaret."),
-         "cta": "Skriv 'FØDSELSDAG' + dato", "billede_hint": "Festlig fødselsdagslagkage med lys"},
+         "tekst": ("Fødselsdag på vej? 🎉 Forudbestil friskbagt wienerbrød, boller "
+                   "og kager — træstammer, hindbærsnitter, cookies og kokostoppe — "
+                   "klar til afhentning.\n\nSkriv 'FØDSELSDAG' + dato."),
+         "cta": "Skriv 'FØDSELSDAG' + dato", "billede_hint": "Fad med wienerbrød og stykkager til fødselsdag"},
         {"type": "boern-foedselsdag",
          "tekst": ("Børnefødselsdag i klassen eller derhjemme? 🧁 Vi pakker "
-                   "kagemand, boller og det hele klar til afhentning — nemt for jer, "
-                   "en fest for dem.\n\nSkriv 'BØRNEFEST' + antal, så klarer vi resten."),
-         "cta": "Skriv 'BØRNEFEST' + antal", "billede_hint": "Kagemand og boller til børnefødselsdag"},
+                   "teboller, boller og kager (træstammer, cookies, kokostoppe) klar "
+                   "til afhentning — nemt for jer.\n\nSkriv 'BØRNEFEST' + antal."),
+         "cta": "Skriv 'BØRNEFEST' + antal", "billede_hint": "Teboller og stykkager til børnefødselsdag"},
     ],
     4: [  # Fredag — weekendfester / arrangementer
         {"type": "weekend-fest",
-         "tekst": ("Fest i weekenden? 🎉 Nå det endnu — vi kan stadig bage "
-                   "kagebord, brød og catering til jeres arrangement. Friskt, "
-                   "økologisk og klar til afhentning.\n\nSkriv 'FEST' + dato, så "
-                   "finder vi ud af det."),
-         "cta": "Skriv 'FEST' + dato", "billede_hint": "Festbord dækket med bagværk og catering"},
+         "tekst": ("Fest i weekenden? 🎉 Nå det endnu — forudbestil friskbagt "
+                   "surdejsbrød, wienerbrød og kager til jeres gæster. Klar til "
+                   "afhentning.\n\nSkriv 'FEST' + dato."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Festbord med brød, wienerbrød og kager"},
         {"type": "reception-jubilaeum",
-         "tekst": ("Reception, dåb eller jubilæum? 🥂 Vi står for det søde og det "
-                   "salte, så I kan koncentrere jer om gæsterne. Alt bagt fra bunden "
-                   "med økologiske råvarer.\n\nSkriv 'ARRANGEMENT', så snakker vi menu."),
-         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Elegant reception-opstilling med kransekage/kage"},
+         "tekst": ("Reception, dåb eller jubilæum? 🥂 Vi står for det friskbagte — "
+                   "wienerbrød, kager, surdejsbrød og boller, plus en tapaskasse til "
+                   "det salte.\n\nSkriv 'ARRANGEMENT'."),
+         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Reception-bord med wienerbrød, kager og tapas"},
     ],
-    5: [  # Lørdag — store arrangementer / brunch-catering
+    5: [  # Lørdag — større arrangementer / brunch
         {"type": "stor-catering",
-         "tekst": ("Stort arrangement på vej? 🎪 Fra 20 til 200 gæster pakker vi "
-                   "brød, kagebord og catering klar — friskbagt og økologisk, uden "
-                   "at I skal løfte en finger i køkkenet.\n\nSkriv 'ARRANGEMENT' + "
-                   "antal, så laver vi et tilbud."),
-         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Stort cateringbord til mange gæster"},
+         "tekst": ("Stort arrangement på vej? 🎪 Fra få til mange gæster pakker vi "
+                   "friskbagt surdejsbrød, boller, wienerbrød og kager klar til "
+                   "afhentning — økologisk og bagt fra bunden.\n\n"
+                   "Skriv 'ARRANGEMENT' + antal."),
+         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Stort bord med brød, boller og wienerbrød"},
         {"type": "brunch-catering",
-         "tekst": ("Skal I samle familie eller kolleger til brunch? 🍳🥐 Vi pakker "
-                   "det hele klar — friskbagt brød, sødt og det til at fylde bordet. "
-                   "\n\nSkriv 'BRUNCH' + antal, så står det klar."),
-         "cta": "Skriv 'BRUNCH' + antal", "billede_hint": "Overdådigt brunchbord til en gruppe"},
+         "tekst": ("Skal I samle familie eller kolleger til brunch? 🥐 Forudbestil "
+                   "friskbagt surdejsbrød, boller, wienerbrød og juice — klar til "
+                   "afhentning.\n\nSkriv 'BRUNCH' + antal."),
+         "cta": "Skriv 'BRUNCH' + antal", "billede_hint": "Brunchbord med brød, boller, wienerbrød og juice"},
     ],
     6: [  # Søndag — planlæg i god tid
         {"type": "planlaeg-lejlighed",
          "tekst": ("Har I en lejlighed på vej? 📅 Fødselsdag, konfirmation, "
-                   "firmafest eller reception — de bedste datoer bookes først, og "
-                   "bagt i god tid bliver det bare bedre.\n\nSkriv hvad I planlægger, "
-                   "så holder vi en plads til jer."),
-         "cta": "Skriv hvad I planlægger", "billede_hint": "Kalender + kage, planlægnings-stemning"},
+                   "firmafest eller bare gæster — forudbestil det friskbagte i god "
+                   "tid, så det står klar når I skal bruge det.\n\n"
+                   "Skriv hvad I planlægger."),
+         "cta": "Skriv hvad I planlægger", "billede_hint": "Kalender og friskbagt brød, planlægnings-stemning"},
         {"type": "book-tidligt",
-         "tekst": ("Den gode kage til den store dag starter med en besked. 🎂 Jo "
-                   "før vi ved det, jo mere kan vi skræddersy til jer — og jo "
-                   "sikrere er jeres dato.\n\nSkriv 'KAGE' eller 'FEST' + dato, så "
-                   "er I i gang."),
-         "cta": "Skriv 'KAGE'/'FEST' + dato", "billede_hint": "Bager pynter kage til bestilling"},
+         "tekst": ("Jo før vi ved det, jo bedre kan vi bage til jer 🥐 Forudbestil "
+                   "surdejsbrød, boller, wienerbrød og kager til jeres dag.\n\n"
+                   "Skriv 'FEST' eller 'FIRMA' + dato."),
+         "cta": "Skriv 'FEST'/'FIRMA' + dato", "billede_hint": "Friskbagt brød og wienerbrød klar til afhentning"},
     ],
 }
 
 # ── Sæson-lejligheder (måned → et stærkt anlednings-opslag) ────────────────────
 # Rammer folk mens de PLANLÆGGER — det er her de store ordrer skabes.
+# Kun rigtige varer (ingen kransekage/lagkage).
 _SAESON: Dict[int, Dict] = {
     1:  {"type": "saeson-nytaarskur",
-         "tekst": ("Godt nytår! 🥂 Skal I holde nytårskur eller reception i "
-                   "januar, står vi klar med kransekage, kagebord og catering. "
-                   "Og planlægger I allerede forårets konfirmation eller fest — så "
-                   "book datoen nu.\n\nSkriv 'ARRANGEMENT', så er I i gang."),
-         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Kransekage og bobler, nytårsstemning"},
+         "tekst": ("Godt nytår! 🥂 Skal I have gæster i januar? Forudbestil "
+                   "friskbagt wienerbrød, kager og surdejsbrød. Og planlægger I "
+                   "allerede forårets konfirmation eller fest — så book datoen nu.\n\n"
+                   "Skriv 'ARRANGEMENT'."),
+         "cta": "Skriv 'ARRANGEMENT'", "billede_hint": "Friskbagt wienerbrød og kager, nytårsstemning"},
     2:  {"type": "saeson-konfirmation-tidlig",
-         "tekst": ("Konfirmation til foråret? 💐 Nu er tiden at booke kagebordet. "
-                   "Vi bager lagkager, boller og det hele fra bunden — og de "
-                   "populære datoer i maj går hurtigt.\n\nSkriv 'KONFIRMATION' + "
-                   "dato, så holder vi pladsen."),
-         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Festligt konfirmations-kagebord"},
+         "tekst": ("Konfirmation til foråret? 💐 Nu er tiden at booke. Vi "
+                   "forudbager wienerbrød, boller og kager til kaffebordet, så den "
+                   "store dag er klaret — og de populære datoer i maj går hurtigt.\n\n"
+                   "Skriv 'KONFIRMATION' + dato."),
+         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Kaffebord med wienerbrød og kager"},
     3:  {"type": "saeson-paaske",
-         "tekst": ("Påskefrokost for familien eller kontoret? 🐣 Vi pakker "
-                   "friskbagt brød, sødt og det salte klar til jeres bord.\n\n"
-                   "Skriv 'PÅSKE' + antal, så står det klar til afhentning."),
-         "cta": "Skriv 'PÅSKE' + antal", "billede_hint": "Påskefrokostbord med bagværk"},
+         "tekst": ("Påskefrokost for familien eller kontoret? 🐣 Forudbestil "
+                   "friskbagt surdejsbrød, boller, wienerbrød og juice, klar til "
+                   "afhentning.\n\nSkriv 'PÅSKE' + antal."),
+         "cta": "Skriv 'PÅSKE' + antal", "billede_hint": "Påskefrokostbord med surdejsbrød og boller"},
     4:  {"type": "saeson-konfirmation",
-         "tekst": ("Konfirmationssæsonen er her 💐 Skal vi stå for kagebordet, så I "
-                   "kan nyde dagen med familien? Lagkager, boller og det hele — "
-                   "friskbagt og økologisk.\n\nSkriv 'KONFIRMATION' + dato, så laver "
-                   "vi et tilbud."),
-         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Konfirmations-kagebord, forårsstemning"},
+         "tekst": ("Konfirmationssæsonen er her 💐 Skal vi stå for det friskbagte "
+                   "til kaffebordet? Wienerbrød, boller og kager, klar til "
+                   "afhentning — økologisk og bagt fra bunden.\n\n"
+                   "Skriv 'KONFIRMATION' + dato."),
+         "cta": "Skriv 'KONFIRMATION' + dato", "billede_hint": "Kaffebord til konfirmation med wienerbrød og kager"},
     5:  {"type": "saeson-fest-forening",
-         "tekst": ("Maj og juni er fyldt med konfirmationer, studenterfester og "
-                   "runde fødselsdage 🎓🎉 Skal vi bage til jeres? De gode "
-                   "weekender bookes lige nu.\n\nSkriv 'FEST' + dato, så holder vi "
-                   "pladsen."),
-         "cta": "Skriv 'FEST' + dato", "billede_hint": "Studenterfest/konfirmation med kagebord"},
+         "tekst": ("Maj og juni er fyldt med konfirmationer og studenterfester 🎓 "
+                   "Til studenten har vi studenterbrød (halv plade) + friskbagt "
+                   "wienerbrød og boller til bordet.\n\nSkriv 'FEST' + dato."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Studenterbrød og friskbagt til studenterfest"},
     6:  {"type": "saeson-sommerfest",
-         "tekst": ("Sommerfest, bryllup eller havefest på vej? ☀️🎉 Vi laver "
-                   "kagebord og catering, der holder til en lang sommeraften — "
-                   "friskt og økologisk.\n\nSkriv 'FEST' + antal, så snakker vi menu."),
-         "cta": "Skriv 'FEST' + antal", "billede_hint": "Sommerhavefest med cateringbord"},
+         "tekst": ("Sommerfest eller havefest på vej? ☀️ Forudbestil friskbagt "
+                   "surdejsbrød, wienerbrød og kager — og en tapaskasse til det "
+                   "salte.\n\nSkriv 'FEST' + antal."),
+         "cta": "Skriv 'FEST' + antal", "billede_hint": "Havefest med brød, wienerbrød og tapaskasse"},
     7:  {"type": "saeson-sommer-arrangement",
-         "tekst": ("Firmaskovtur, familiefest eller sommer-sammenkomst? 🌳 Vi "
-                   "pakker friskbagt og catering klar til jeres udflugt eller fest.\n\n"
-                   "Skriv 'ARRANGEMENT' + antal, så er I klar."),
-         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Cateringkurve til sommerudflugt"},
+         "tekst": ("Firmaskovtur eller sommer-sammenkomst? 🌳 Vi pakker friskbagt "
+                   "surdejsbrød, boller og wienerbrød klar — plus en tapaskasse "
+                   "eller burgerpose.\n\nSkriv 'ARRANGEMENT' + antal."),
+         "cta": "Skriv 'ARRANGEMENT' + antal", "billede_hint": "Kurve med brød, boller og tapaskasse til udflugt"},
     8:  {"type": "saeson-opstart",
-         "tekst": ("Ny sæson på kontoret? 🍂 Start op med friskbagt til møderne "
-                   "eller en lille firmafrokost. Og planlægger I allerede "
-                   "julefrokosten — så er det nu, de gode datoer findes.\n\nSkriv "
-                   "'FIRMA', så laver vi en aftale."),
-         "cta": "Skriv 'FIRMA'", "billede_hint": "Kontor-opstart med friskbagt forplejning"},
+         "tekst": ("Ny sæson på kontoret? 🍂 Start op med friskbagt til møderne — "
+                   "surdejsbrød, boller og wienerbrød. Og planlægger I allerede "
+                   "julefrokosten, er det nu de gode datoer findes.\n\nSkriv 'FIRMA'."),
+         "cta": "Skriv 'FIRMA'", "billede_hint": "Kontor-forplejning med surdejsbrød og wienerbrød"},
     9:  {"type": "saeson-hoestfest",
-         "tekst": ("Høstfest, firmaevent eller rund fødselsdag i efteråret? 🍂🎉 "
-                   "Vi står for kagebord og catering, så I kan hygge jer med "
-                   "gæsterne.\n\nSkriv 'FEST' + dato, så finder vi ud af det."),
-         "cta": "Skriv 'FEST' + dato", "billede_hint": "Efterårsfest med kagebord"},
+         "tekst": ("Efterårsfest eller rund fødselsdag? 🍂 Forudbestil friskbagt "
+                   "wienerbrød, kager og surdejsbrød til gæsterne, klar til "
+                   "afhentning.\n\nSkriv 'FEST' + dato."),
+         "cta": "Skriv 'FEST' + dato", "billede_hint": "Efterårsbord med wienerbrød og kager"},
     10: {"type": "saeson-julefrokost-booking",
-         "tekst": ("Julefrokosten planlægges nu 🎄 Skal vi stå for det søde og det "
-                   "salte til jeres firma- eller familiejulefrokost? De bedste "
-                   "december-datoer bookes allerede.\n\nSkriv 'JULEFROKOST' + antal, "
-                   "så holder vi pladsen."),
-         "cta": "Skriv 'JULEFROKOST' + antal", "billede_hint": "Julefrokostbord med bagværk og kransekage"},
+         "tekst": ("Julefrokosten planlægges nu 🎄 Skal vi stå for det friskbagte "
+                   "— surdejsbrød, wienerbrød og kager — til jeres firma- eller "
+                   "familiejulefrokost? De bedste december-datoer bookes allerede.\n\n"
+                   "Skriv 'JULEFROKOST' + antal."),
+         "cta": "Skriv 'JULEFROKOST' + antal", "billede_hint": "Julefrokostbord med surdejsbrød og wienerbrød"},
     11: {"type": "saeson-jul-tidlig",
-         "tekst": ("December fylder hurtigt op 🎄 Julefrokoster, receptioner og "
-                   "kagebord til de søde juledage — book jeres nu, så vi kan bage "
-                   "det perfekt til jer.\n\nSkriv 'JUL' + hvad I skal bruge."),
-         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julehygge med kransekage og bagværk"},
+         "tekst": ("December fylder hurtigt op 🎄 Skal I have gæster i julen? "
+                   "Forudbestil friskbagt surdejsbrød, wienerbrød og kager i god "
+                   "tid.\n\nSkriv 'JUL' + hvad I skal bruge."),
+         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julehygge med wienerbrød og friskbagt brød"},
     12: {"type": "saeson-jul",
-         "tekst": ("Julen er lig med godt bagværk 🎄 Kransekage til nytår, "
-                   "kagebord til juledagene, brød til den store frokost — bestil i "
-                   "god tid, så det står klar når I skal bruge det.\n\nSkriv 'JUL' + "
-                   "ønske, så klarer vi resten."),
-         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julebord med kransekage og friskbagt"},
+         "tekst": ("Julen er lig med godt bagværk 🎄 Friskbagt surdejsbrød til "
+                   "frokosten, wienerbrød og kager til de søde juledage — bestil i "
+                   "god tid, så det står klar når I skal bruge det.\n\n"
+                   "Skriv 'JUL' + ønske."),
+         "cta": "Skriv 'JUL' + ønske", "billede_hint": "Julebord med surdejsbrød og wienerbrød"},
 }
 
-_HASHTAGS = ("#OrganicMarketGreve #Greve #kagebord #catering #fødselsdag "
-             "#konfirmation #økologisk #festienemmere")
+_HASHTAGS = ("#OrganicMarketGreve #Greve #friskbagt #wienerbrød #økologisk "
+             "#fødselsdag #konfirmation #forudbestilling")
 
 
 # ── Deterministisk variant-valg ───────────────────────────────────────────────

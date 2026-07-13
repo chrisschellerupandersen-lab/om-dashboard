@@ -6711,18 +6711,42 @@ def auto_prisopdater_fra_bestilling(uge: int, aar: int, linjer: List[Dict]) -> D
 
 def hent_prisaendringer() -> List[Dict]:
     """Alle prisændringer på bagværk/kager: for hver daterede pris (vare_pris_periode)
-    findes før-prisen (den forrige daterede pris, ellers den tidløse varestamdata-pris)
-    og %-stigningen beregnes. Alle priser er indkøbspris ex moms. Nyeste ændring først."""
+    findes før-prisen og %-stigningen beregnes. Alle priser er indkøbspris ex moms.
+
+    Før-pris findes i denne rækkefølge (bagerens varer ligger ikke i varestamdata,
+    så den historiske bestilling er den vigtigste kilde):
+      1. Forrige daterede pris for varen (kæde af ændringer)
+      2. Seneste tidligere ugebestilling med en pris på samme vare (før gyldig_fra)
+      3. Den tidløse varestamdata-pris
+    Nyeste ændring først."""
     from collections import defaultdict
+    from datetime import date as _d
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         stam = {}
         for r in conn.execute("SELECT varenavn, pris_ex_moms, type FROM varestamdata"):
             stam[str(r["varenavn"]).strip().lower()] = (r["pris_ex_moms"], r["type"])
+        # Historiske bestillingspriser pr. vare (mandag-dato → pris), sorteret
+        best = defaultdict(list)
+        for r in conn.execute(
+            "SELECT varenavn, uge, aar, pris_ex_moms FROM ugebestillinger WHERE pris_ex_moms > 0"
+        ):
+            try:
+                mon = _d.fromisocalendar(int(r["aar"]), int(r["uge"]), 1).isoformat()
+            except Exception:
+                continue
+            best[str(r["varenavn"]).strip().lower()].append((mon, float(r["pris_ex_moms"])))
+        for k in best:
+            best[k].sort()
         rows = conn.execute(
             "SELECT varenavn, pris_ex_moms, gyldig_fra, kilde FROM vare_pris_periode "
             "ORDER BY LOWER(TRIM(varenavn)), gyldig_fra"
         ).fetchall()
+
+    def _best_foer(k, gfra):
+        """Seneste bestillingspris på varen fra FØR gyldig_fra."""
+        kand = [pris for (mon, pris) in best.get(k, []) if gfra and mon < gfra]
+        return kand[-1] if kand else None
 
     grupper = defaultdict(list)
     for r in rows:
@@ -6731,16 +6755,22 @@ def hent_prisaendringer() -> List[Dict]:
     ud = []
     for k, perioder in grupper.items():
         base = stam.get(k)
-        prev = float(base[0]) if base and base[0] not in (None, 0) else None
+        stam_pris = float(base[0]) if base and base[0] not in (None, 0) else None
         vtype = base[1] if base else ""
-        for p in perioder:
+        prev = None
+        for p in perioder:  # sorteret efter gyldig_fra stigende
             efter = float(p["pris_ex_moms"] or 0)
+            gfra = p["gyldig_fra"]
             foer = prev
+            if foer is None:
+                foer = _best_foer(k, gfra)
+            if foer is None:
+                foer = stam_pris
             pct = ((efter - foer) / foer * 100) if (foer and foer > 0) else None
             ud.append({
                 "varenavn":   p["varenavn"],
                 "type":       vtype or "",
-                "gyldig_fra": p["gyldig_fra"],
+                "gyldig_fra": gfra,
                 "foer":       round(foer, 2) if foer is not None else None,
                 "efter":      round(efter, 2),
                 "diff":       round(efter - foer, 2) if foer is not None else None,

@@ -2845,6 +2845,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p>Dækningsbidrag (DB, kr) og dækningsgrad (DG, %) for de varer vi sælger i Shopbox · MobilePay og faktura-B2B er IKKE med · omsætning ex moms</p>
         </div>
 
+        <!-- Indeværende måned — resultat (DB − løn − omk) -->
+        <div class="card" id="dbs-maaned-card" style="margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <span id="dbs-maaned-titel" style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Indeværende måned — resultat</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr tir+ons · omk 500 kr/dag · resultat = DB − løn − omk</span>
+          </div>
+          <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
+          </div>
+        </div>
+
         <!-- KPI-fliser: seneste dag / uge / måned -->
         <div class="aar2-top" id="dbs-kpi" style="margin-bottom:16px;"></div>
 
@@ -3703,11 +3715,62 @@ function _dbsPct(n){ return (n==null)?'—':(Math.round(n*10)/10).toLocaleString
 
 async function loadDbShopbox(){
   const kpi = document.getElementById('dbs-kpi');
+  loadDbsMaaned();
   try {
     _dbsData = await fetch('/api/db-shopbox').then(r=>r.json());
   } catch(e){ if(kpi) kpi.innerHTML = '<div class="empty">Kunne ikke hente data.</div>'; return; }
   dbsRenderKpi();
   dbsSetMode(_dbsMode);
+}
+
+async function loadDbsMaaned(){
+  let d;
+  try { d = await fetch('/api/db-shopbox/maaned').then(r=>r.json()); }
+  catch(e){ return; }
+  const t = d.total || {};
+  document.getElementById('dbs-maaned-titel').textContent =
+    (d.maaned_navn ? (d.maaned_navn + ' ' + d.aar) : 'Indeværende måned') + ' — resultat';
+  // Totaler i toppen
+  const tile=(lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${lbl}</div>
+      <div style="font-size:20px;font-weight:700;line-height:1;color:${clr||'var(--forest)'};">${_dbsKr(val)}</div></div>`;
+  const resClr = (t.resultat>=0)?'var(--moss)':'var(--danger)';
+  document.getElementById('dbs-maaned-tot').innerHTML =
+      tile('DB i alt', t.db_kr)
+    + tile('Løn i alt', t.loen, '#8a3a3a')
+    + tile('Omk i alt', t.omk, '#8a3a3a')
+    + tile('Resultat', t.resultat, resClr)
+    + tile('Omsætning', t.oms_ex, 'var(--ash)');
+  // Dag-tabel
+  const tbl = document.getElementById('dbs-maaned-tabel');
+  let html = `<thead><tr>
+    <th style="text-align:left;">Dato</th><th style="text-align:left;">Dag</th>
+    <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
+    <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
+    <th style="text-align:right;">Omk</th><th style="text-align:right;">Resultat</th></tr></thead><tbody>`;
+  (d.dage||[]).forEach(x=>{
+    const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
+    const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
+    html += `<tr${weekend?' style="background:rgba(0,0,0,.02);"':''}>
+      <td style="text-align:left;">${fmtDato(x.dato)}</td>
+      <td style="text-align:left;color:var(--ash);">${x.ugedag}</td>
+      <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
+      <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
+      <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
+      <td style="text-align:right;color:${x.loen>0?'#8a3a3a':'var(--ash)'};">${x.loen>0?_dbsKr(x.loen):'—'}</td>
+      <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
+      <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
+  });
+  html += `</tbody>
+    <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+      <td style="text-align:left;">I alt</td><td></td>
+      <td style="text-align:right;">${_dbsKr(t.oms_ex)}</td>
+      <td style="text-align:right;">${_dbsKr(t.db_kr)}</td>
+      <td style="text-align:right;">${t.oms_ex>0?_dbsPct(t.dg_pct):'—'}</td>
+      <td style="text-align:right;">${_dbsKr(t.loen)}</td>
+      <td style="text-align:right;">${_dbsKr(t.omk)}</td>
+      <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td></tr></tfoot>`;
+  tbl.innerHTML = html;
 }
 
 function dbsRenderKpi(){

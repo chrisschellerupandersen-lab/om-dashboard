@@ -7705,6 +7705,67 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
     return {"dage": dage, "uger": uger, "maaneder": maaneder}
 
 
+def hent_db_shopbox_maaned(loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
+    """Indeværende måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
+    Løn på tirsdage+onsdage, omk hver dag. Alle kalenderdage fra den 1. til seneste
+    dato med data tages med (0 i DB hvor der ikke er salg). Beløb ex moms."""
+    from datetime import date as _d, timedelta as _td
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        r = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
+        if not r or not r["d"]:
+            return {"aar": None, "maaned": None, "maaned_navn": "", "dage": [], "total": {}}
+        sidste = _d.fromisoformat(str(r["d"])[:10])
+        foerste = sidste.replace(day=1)
+        rows = conn.execute("""
+            SELECT dato,
+                   COALESCE(SUM(omsaetning_ex_moms),0) AS oms_ex,
+                   COALESCE(SUM(db_korrekt),0)         AS db_kr
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY dato
+        """, (foerste.isoformat(), sidste.isoformat())).fetchall()
+    per = {str(x["dato"])[:10]: x for x in rows}
+
+    dage = []
+    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0}
+    d = foerste
+    while d <= sidste:
+        iso = d.isoformat()
+        x = per.get(iso)
+        oms = float(x["oms_ex"]) if x else 0.0
+        db = float(x["db_kr"]) if x else 0.0
+        loen = loen_tir_ons if d.weekday() in (1, 2) else 0.0   # 1=tir, 2=ons
+        omk = omk_pr_dag
+        res = db - loen - omk
+        dage.append({
+            "dato":     iso,
+            "ugedag":   _DK_DAGE[d.weekday()],
+            "oms_ex":   round(oms),
+            "db_kr":    round(db),
+            "dg_pct":   round(db / oms * 100, 1) if oms > 0 else 0.0,
+            "loen":     round(loen),
+            "omk":      round(omk),
+            "resultat": round(res),
+        })
+        tot["oms_ex"] += oms; tot["db_kr"] += db
+        tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res
+        d += _td(days=1)
+
+    total = {
+        "oms_ex":   round(tot["oms_ex"]),
+        "db_kr":    round(tot["db_kr"]),
+        "loen":     round(tot["loen"]),
+        "omk":      round(tot["omk"]),
+        "resultat": round(tot["resultat"]),
+        "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
+        "antal_dage": len(dage),
+    }
+    return {"aar": foerste.year, "maaned": foerste.month,
+            "maaned_navn": _DK_MDR[foerste.month].capitalize(),
+            "dage": dage, "total": total}
+
+
 def hent_db_shopbox_poster(slags: str, periode: str) -> dict:
     """Drill-down: de enkelte varer/poster bag DB for én periode (Shopbox).
     slags: 'dag' | 'uge' | 'maaned' · periode: matcher periode-nøglen fra

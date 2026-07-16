@@ -2156,10 +2156,12 @@ async def api_db_shopbox(request: Request, aar: Optional[int] = None):
 
 
 @app.get("/api/db-shopbox/maaned")
-async def api_db_shopbox_maaned(request: Request, loen: float = 300.0, omk: float = 500.0):
-    """Indeværende måned dag-for-dag med resultat = DB − løn − omk."""
+async def api_db_shopbox_maaned(request: Request, aar: Optional[int] = None,
+                                maaned: Optional[int] = None,
+                                loen: float = 300.0, omk: float = 500.0):
+    """Én måned dag-for-dag med resultat = DB − løn − omk (løn fra juni 2026)."""
     _kræv_login(request)
-    return database.hent_db_shopbox_maaned(loen_tir_ons=loen, omk_pr_dag=omk)
+    return database.hent_db_shopbox_maaned(aar=aar, maaned=maaned, loen_tir_ons=loen, omk_pr_dag=omk)
 
 
 @app.get("/api/db-shopbox/poster")

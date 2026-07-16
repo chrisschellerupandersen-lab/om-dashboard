@@ -7705,18 +7705,45 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
     return {"dage": dage, "uger": uger, "maaneder": maaneder}
 
 
-def hent_db_shopbox_maaned(loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
-    """Indeværende måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
-    Løn på tirsdage+onsdage, omk hver dag. Alle kalenderdage fra den 1. til seneste
-    dato med data tages med (0 i DB hvor der ikke er salg). Beløb ex moms."""
+# Løn (bemanding) startede juni 2026 — gælder IKKE måneder før dette.
+_LOEN_START = (2026, 6)
+
+
+def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
+                           loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
+    """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
+    Løn på tirsdage+onsdage (kun fra juni 2026 og frem), omk hver dag. Uden
+    (aar, maaned) vælges seneste måned med data. Beløb ex moms. Returnerer også
+    listen af tilgængelige måneder til vælgeren."""
+    import calendar as _cal
     from datetime import date as _d, timedelta as _td
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
-        r = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
-        if not r or not r["d"]:
-            return {"aar": None, "maaned": None, "maaned_navn": "", "dage": [], "total": {}}
-        sidste = _d.fromisoformat(str(r["d"])[:10])
-        foerste = sidste.replace(day=1)
+        mrows = conn.execute("""
+            SELECT DISTINCT CAST(strftime('%Y', dato) AS INTEGER) AS y,
+                            CAST(strftime('%m', dato) AS INTEGER) AS m
+            FROM v_transaktioner ORDER BY y DESC, m DESC
+        """).fetchall()
+        maaneder = [{"aar": r["y"], "maaned": r["m"],
+                     "label": f"{_DK_MDR[r['m']].capitalize()} {r['y']}"} for r in mrows]
+        if not maaneder:
+            return {"aar": None, "maaned": None, "maaned_navn": "", "dage": [],
+                    "total": {}, "maaneder": [], "loen_aktiv": False}
+
+        if aar and maaned:
+            y, m = int(aar), int(maaned)
+        else:
+            y, m = maaneder[0]["aar"], maaneder[0]["maaned"]
+
+        seneste = _d.fromisoformat(str(
+            conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()["d"])[:10])
+        foerste = _d(y, m, 1)
+        # Seneste måned: vis til seneste data-dato. Ældre måned: hele kalendermåneden.
+        if (seneste.year, seneste.month) == (y, m):
+            sidste = seneste
+        else:
+            sidste = _d(y, m, _cal.monthrange(y, m)[1])
+
         rows = conn.execute("""
             SELECT dato,
                    COALESCE(SUM(omsaetning_ex_moms),0) AS oms_ex,
@@ -7727,6 +7754,8 @@ def hent_db_shopbox_maaned(loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.
         """, (foerste.isoformat(), sidste.isoformat())).fetchall()
     per = {str(x["dato"])[:10]: x for x in rows}
 
+    loen_aktiv = (y, m) >= _LOEN_START
+
     dage = []
     tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0}
     d = foerste
@@ -7735,7 +7764,7 @@ def hent_db_shopbox_maaned(loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.
         x = per.get(iso)
         oms = float(x["oms_ex"]) if x else 0.0
         db = float(x["db_kr"]) if x else 0.0
-        loen = loen_tir_ons if d.weekday() in (1, 2) else 0.0   # 1=tir, 2=ons
+        loen = loen_tir_ons if (loen_aktiv and d.weekday() in (1, 2)) else 0.0  # 1=tir, 2=ons
         omk = omk_pr_dag
         res = db - loen - omk
         dage.append({
@@ -7763,6 +7792,8 @@ def hent_db_shopbox_maaned(loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.
     }
     return {"aar": foerste.year, "maaned": foerste.month,
             "maaned_navn": _DK_MDR[foerste.month].capitalize(),
+            "loen_aktiv": loen_aktiv,
+            "maaneder": maaneder,
             "dage": dage, "total": total}
 
 

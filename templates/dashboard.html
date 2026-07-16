@@ -2848,8 +2848,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <!-- Indeværende måned — resultat (DB − løn − omk) -->
         <div class="card" id="dbs-maaned-card" style="margin-bottom:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-            <span id="dbs-maaned-titel" style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Indeværende måned — resultat</span>
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr tir+ons · omk 500 kr/dag · resultat = DB − løn − omk</span>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span id="dbs-maaned-titel" style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Månedsresultat</span>
+              <select id="dbs-maaned-vaelg" onchange="loadDbsMaaned(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;"></select>
+            </div>
+            <span id="dbs-maaned-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr tir+ons · omk 500 kr/dag · resultat = DB − løn − omk</span>
           </div>
           <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
           <div style="overflow-x:auto;">
@@ -3723,13 +3726,25 @@ async function loadDbShopbox(){
   dbsSetMode(_dbsMode);
 }
 
-async function loadDbsMaaned(){
+async function loadDbsMaaned(val){
+  let url = '/api/db-shopbox/maaned';
+  if (val) { const [a,m] = String(val).split('-'); url += `?aar=${a}&maaned=${m}`; }
   let d;
-  try { d = await fetch('/api/db-shopbox/maaned').then(r=>r.json()); }
+  try { d = await fetch(url).then(r=>r.json()); }
   catch(e){ return; }
   const t = d.total || {};
-  document.getElementById('dbs-maaned-titel').textContent =
-    (d.maaned_navn ? (d.maaned_navn + ' ' + d.aar) : 'Indeværende måned') + ' — resultat';
+  // Måneds-vælger (populér / bevar valg)
+  const sel = document.getElementById('dbs-maaned-vaelg');
+  if (sel && (d.maaneder||[]).length) {
+    const cur = val || (d.aar + '-' + d.maaned);
+    sel.innerHTML = d.maaneder.map(mm =>
+      `<option value="${mm.aar}-${mm.maaned}"${(mm.aar+'-'+mm.maaned)===cur?' selected':''}>${mm.label}</option>`).join('');
+  }
+  document.getElementById('dbs-maaned-titel').textContent = d.maaned_navn ? (d.maaned_navn + ' ' + d.aar) : 'Månedsresultat';
+  const hint = document.getElementById('dbs-maaned-hint');
+  if (hint) hint.textContent = d.loen_aktiv
+    ? 'Løn 300 kr tir+ons · omk 500 kr/dag · resultat = DB − løn − omk'
+    : 'Ingen løn (før juni 2026) · omk 500 kr/dag · resultat = DB − omk';
   // Totaler i toppen
   const tile=(lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
       <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${lbl}</div>

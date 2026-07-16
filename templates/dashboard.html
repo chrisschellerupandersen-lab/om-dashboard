@@ -3748,7 +3748,7 @@ async function loadDbsMaaned(){
     <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
     <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
     <th style="text-align:right;">Omk</th><th style="text-align:right;">Resultat</th></tr></thead><tbody>`;
-  (d.dage||[]).forEach(x=>{
+  (d.dage||[]).slice().reverse().forEach(x=>{
     const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
     const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
     html += `<tr${weekend?' style="background:rgba(0,0,0,.02);"':''}>

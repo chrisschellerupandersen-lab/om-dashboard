@@ -28,12 +28,7 @@
       "gyldig_fra": "2026-07-06"
     },
     {
-      "varenavn": "ØKO - Foccacia",
-      "pris_ex_moms": 187.2,
-      "gyldig_fra": "2026-07-06"
-    },
-    {
-      "varenavn": "ØKO - Signaturbrød",
+      "varenavn": "ØKO - Signatur Brød",
       "pris_ex_moms": 28.93,
       "gyldig_fra": "2026-07-06"
     },
@@ -45,6 +40,11 @@
     {
       "varenavn": "ØKO - Softkernerugbrød 1400g",
       "pris_ex_moms": 35.29,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Foccacia",
+      "pris_ex_moms": 187.2,
       "gyldig_fra": "2026-07-06"
     },
     {
@@ -133,7 +133,7 @@
       "gyldig_fra": "2026-07-06"
     },
     {
-      "varenavn": "ØKO - Høj Kanel snegl",
+      "varenavn": "ØKO - Høj Kanel snegl med creme og hvid glasur",
       "pris_ex_moms": 12.72,
       "gyldig_fra": "2026-07-06"
     },
@@ -155,6 +155,11 @@
     {
       "varenavn": "ØKO - Spandauer m. hindbær",
       "pris_ex_moms": 12.24,
+      "gyldig_fra": "2026-07-06"
+    },
+    {
+      "varenavn": "ØKO - Studenterbrød - halv plade",
+      "pris_ex_moms": 60.6,
       "gyldig_fra": "2026-07-06"
     },
     {
@@ -183,8 +188,8 @@
       "gyldig_fra": "2026-07-06"
     },
     {
-      "varenavn": "ØKO - Studenterbrød - halv plade",
-      "pris_ex_moms": 60.5,
+      "varenavn": "ØKO - Romkugler m. kokos",
+      "pris_ex_moms": 8.8,
       "gyldig_fra": "2026-07-06"
     },
     {
@@ -203,7 +208,7 @@
       "gyldig_fra": "2026-07-06"
     },
     {
-      "varenavn": "ØKO - Æble/kanel muffin",
+      "varenavn": "ØKO - Æble-kanel muffin",
       "pris_ex_moms": 17.02,
       "gyldig_fra": "2026-07-06"
     }

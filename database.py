@@ -6718,8 +6718,10 @@ def hent_prisaendringer() -> List[Dict]:
     from collections import defaultdict
     from datetime import date as _d
 
+    import re as _re
     def _norm(s):
-        return " ".join(str(s or "").split()).lower()
+        s = _re.sub(r"[‒–—]", "-", str(s or ""))   # ensret bindestreger
+        return " ".join(s.split()).lower()
 
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
@@ -6734,26 +6736,31 @@ def hent_prisaendringer() -> List[Dict]:
             "FROM vare_pris_periode WHERE pris_ex_moms > 0"
         ).fetchall()
 
-    # Byg tidslinje pr. nøgle (SKU hvis muligt, ellers normaliseret navn)
-    tidslinje = defaultdict(list)     # key -> [(dato, pris, varenavn)]
-    navn2key = {}                     # normaliseret navn -> key (til at folde perioder ind)
+    # Saml alle prispunkter (bestillinger + daterede priser) i én liste
+    punkter_alle = []   # (dato, pris, varenavn, sku|'')
     for r in best:
-        sku = str(r["varenummer"] or "").strip()
-        navn = str(r["varenavn"] or "").strip()
         try:
             dato = _d.fromisocalendar(int(r["aar"]), int(r["uge"]), 1).isoformat()
         except Exception:
             continue
-        key = sku if sku else "NAVN:" + _norm(navn)
-        tidslinje[key].append((dato, float(r["pris_ex_moms"]), navn))
-        if navn:
-            navn2key.setdefault(_norm(navn), key)
-
-    # Fold daterede priser ind — matchet navn→SKU, ellers på eget navn
+        punkter_alle.append((dato, float(r["pris_ex_moms"]),
+                             str(r["varenavn"] or "").strip(),
+                             str(r["varenummer"] or "").strip()))
     for r in perioder:
-        navn = str(r["varenavn"] or "").strip()
-        key = navn2key.get(_norm(navn), "NAVN:" + _norm(navn))
-        tidslinje[key].append((str(r["gyldig_fra"]), float(r["pris_ex_moms"]), navn))
+        punkter_alle.append((str(r["gyldig_fra"]), float(r["pris_ex_moms"]),
+                             str(r["varenavn"] or "").strip(), ""))
+
+    # Pas 1: byg navn→SKU fra alle punkter der HAR et SKU
+    navn2sku = {}
+    for _dato, _pris, navn, sku in punkter_alle:
+        if sku and navn:
+            navn2sku.setdefault(_norm(navn), sku)
+
+    # Pas 2: nøgle hvert punkt på SKU (eget, ellers via navn), ellers navn
+    tidslinje = defaultdict(list)     # key -> [(dato, pris, varenavn)]
+    for dato, pris, navn, sku in punkter_alle:
+        key = sku or navn2sku.get(_norm(navn)) or ("NAVN:" + _norm(navn))
+        tidslinje[key].append((dato, pris, navn))
 
     ud = []
     for key, punkter in tidslinje.items():

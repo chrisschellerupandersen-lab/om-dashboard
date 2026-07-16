@@ -1,0 +1,252 @@
+{
+  "gyldig_fra": "2026-07-06",
+  "kilde": "bager uge 28 2026",
+  "linjer": [
+    {
+      "varenavn": "ØKO - Hvedebrød",
+      "gyldig_fra": "2026-07-06",
+      "efter": 24.2,
+      "foer": 23.27
+    },
+    {
+      "varenavn": "ØKO - Landbrød",
+      "gyldig_fra": "2026-07-06",
+      "efter": 27.3,
+      "foer": 26.66
+    },
+    {
+      "varenavn": "ØKO - Kernebrød",
+      "gyldig_fra": "2026-07-06",
+      "efter": 24.96,
+      "foer": 23.99
+    },
+    {
+      "varenavn": "ØKO - Hvedebrød, m/ birkes",
+      "gyldig_fra": "2026-07-06",
+      "efter": 25.58,
+      "foer": 23.58
+    },
+    {
+      "varenavn": "ØKO - Ciabattaflute",
+      "gyldig_fra": "2026-07-06",
+      "efter": 20.04,
+      "foer": 19.27
+    },
+    {
+      "varenavn": "ØKO - Foccacia",
+      "gyldig_fra": "2026-07-06",
+      "efter": 187.2,
+      "foer": 180.0
+    },
+    {
+      "varenavn": "ØKO - Signaturbrød",
+      "gyldig_fra": "2026-07-06",
+      "efter": 28.93,
+      "foer": 27.21
+    },
+    {
+      "varenavn": "ØKO - Softkernerugbrød 1000g",
+      "gyldig_fra": "2026-07-06",
+      "efter": 24.96,
+      "foer": 23.99
+    },
+    {
+      "varenavn": "ØKO - Softkernerugbrød 1400g",
+      "gyldig_fra": "2026-07-06",
+      "efter": 35.29,
+      "foer": 33.93
+    },
+    {
+      "varenavn": "ØKO - Hvedeboller m/Birkes",
+      "gyldig_fra": "2026-07-06",
+      "efter": 6.92,
+      "foer": 6.78
+    },
+    {
+      "varenavn": "ØKO - Hvedeboller",
+      "gyldig_fra": "2026-07-06",
+      "efter": 6.13,
+      "foer": 6.0
+    },
+    {
+      "varenavn": "ØKO - Müslibolle",
+      "gyldig_fra": "2026-07-06",
+      "efter": 6.92,
+      "foer": 6.78
+    },
+    {
+      "varenavn": "ØKO - Kernebolle",
+      "gyldig_fra": "2026-07-06",
+      "efter": 6.55,
+      "foer": 6.42
+    },
+    {
+      "varenavn": "ØKO - Græskarstykke",
+      "gyldig_fra": "2026-07-06",
+      "efter": 7.42,
+      "foer": 7.27
+    },
+    {
+      "varenavn": "ØKO - Teboller plain",
+      "gyldig_fra": "2026-07-06",
+      "efter": 6.13,
+      "foer": 6.0
+    },
+    {
+      "varenavn": "ØKO - Teboller rosin",
+      "gyldig_fra": "2026-07-06",
+      "efter": 7.3,
+      "foer": 7.15
+    },
+    {
+      "varenavn": "ØKO - Teboller choko",
+      "gyldig_fra": "2026-07-06",
+      "efter": 7.79,
+      "foer": 7.63
+    },
+    {
+      "varenavn": "ØKO - Tebirkes",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.48,
+      "foer": 12.12
+    },
+    {
+      "varenavn": "ØKO - Grovbirkes",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.24,
+      "foer": 11.87
+    },
+    {
+      "varenavn": "ØKO - Croissant",
+      "gyldig_fra": "2026-07-06",
+      "efter": 11.11,
+      "foer": 10.78
+    },
+    {
+      "varenavn": "ØKO - Crossaint Marcipan & Chok",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.36,
+      "foer": 11.99
+    },
+    {
+      "varenavn": "ØKO - Kanel snegl",
+      "gyldig_fra": "2026-07-06",
+      "efter": 11.23,
+      "foer": 10.9
+    },
+    {
+      "varenavn": "ØKO - HØJ Romsnegle",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.85,
+      "foer": 12.48
+    },
+    {
+      "varenavn": "ØKO - Kanelsnurrer",
+      "gyldig_fra": "2026-07-06",
+      "efter": 11.6,
+      "foer": 11.27
+    },
+    {
+      "varenavn": "ØKO - Kardemommesnurrer in form, sugar on top",
+      "gyldig_fra": "2026-07-06",
+      "efter": 13.98,
+      "foer": 13.57
+    },
+    {
+      "varenavn": "ØKO - Frøsnapper",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.42,
+      "foer": 12.05
+    },
+    {
+      "varenavn": "ØKO - Høj Kanel snegl",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.72,
+      "foer": 13.51
+    },
+    {
+      "varenavn": "ØKO - Wienerstang",
+      "gyldig_fra": "2026-07-06",
+      "efter": 35.65,
+      "foer": 34.6
+    },
+    {
+      "varenavn": "ØKO - Kanelstang med choko",
+      "gyldig_fra": "2026-07-06",
+      "efter": 35.65,
+      "foer": 34.6
+    },
+    {
+      "varenavn": "ØKO - Spandauer m. vanilje",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.11,
+      "foer": 11.75
+    },
+    {
+      "varenavn": "ØKO - Spandauer m. hindbær",
+      "gyldig_fra": "2026-07-06",
+      "efter": 12.24,
+      "foer": 11.87
+    },
+    {
+      "varenavn": "ØKO - Træstammer",
+      "gyldig_fra": "2026-07-06",
+      "efter": 15.77,
+      "foer": 14.14
+    },
+    {
+      "varenavn": "ØKO - Napoleonshat",
+      "gyldig_fra": "2026-07-06",
+      "efter": 20.17,
+      "foer": 17.77
+    },
+    {
+      "varenavn": "ØKO - Cookies",
+      "gyldig_fra": "2026-07-06",
+      "efter": 15.37,
+      "foer": 13.08
+    },
+    {
+      "varenavn": "ØKO - Kokostoppe",
+      "gyldig_fra": "2026-07-06",
+      "efter": 15.12,
+      "foer": 13.08
+    },
+    {
+      "varenavn": "ØKO - Romkugler m. choko",
+      "gyldig_fra": "2026-07-06",
+      "efter": 8.8,
+      "foer": 8.11
+    },
+    {
+      "varenavn": "ØKO - Studenterbrød - halv plade",
+      "gyldig_fra": "2026-07-06",
+      "efter": 60.5,
+      "foer": 60.0
+    },
+    {
+      "varenavn": "ØKO - Hindbærsnitter",
+      "gyldig_fra": "2026-07-06",
+      "efter": 15.0,
+      "foer": 13.58
+    },
+    {
+      "varenavn": "ØKO - Banan muffin",
+      "gyldig_fra": "2026-07-06",
+      "efter": 17.03,
+      "foer": 16.2
+    },
+    {
+      "varenavn": "ØKO - Brownie",
+      "gyldig_fra": "2026-07-06",
+      "efter": 18.09,
+      "foer": 17.4
+    },
+    {
+      "varenavn": "ØKO - Æble/kanel muffin",
+      "gyldig_fra": "2026-07-06",
+      "efter": 17.02,
+      "foer": 16.36
+    }
+  ]
+}

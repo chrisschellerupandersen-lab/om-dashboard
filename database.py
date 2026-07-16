@@ -315,6 +315,21 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_social_dato ON social_opslag(dato);
 
+            -- Prisændringer (bagværk/kager): eksplicit før/efter pris fra bager-ark.
+            -- Autoritativ kilde til Prisændringer-siden (ex moms).
+            CREATE TABLE IF NOT EXISTS prisaendring (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                varenavn   TEXT NOT NULL,
+                gyldig_fra TEXT NOT NULL,
+                foer       REAL,
+                efter      REAL NOT NULL DEFAULT 0,
+                pct        REAL,
+                kilde      TEXT DEFAULT 'manuel',
+                oprettet   TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(varenavn, gyldig_fra) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_prisaendring_dato ON prisaendring(gyldig_fra);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -6709,8 +6724,72 @@ def auto_prisopdater_fra_bestilling(uge: int, aar: int, linjer: List[Dict]) -> D
     return {"nye_varer": nye_varer, "prisaendringer": len(prisaendringer)}
 
 
+def gem_prisaendringer_bulk(linjer: List[Dict], kilde: str = "manuel") -> int:
+    """Gem eksplicitte prisændringer (før/efter) fra bager-ark. Idempotent via
+    UNIQUE(varenavn, gyldig_fra) ON CONFLICT REPLACE."""
+    n = 0
+    with _conn() as conn:
+        for r in linjer:
+            navn = str(r.get("varenavn", "")).strip()
+            gfra = str(r.get("gyldig_fra", "")).strip()
+            if not navn or not gfra:
+                continue
+            try:
+                efter = float(r.get("efter", 0) or 0)
+            except (ValueError, TypeError):
+                continue
+            foer = r.get("foer", None)
+            try:
+                foer = float(foer) if foer not in (None, "") else None
+            except (ValueError, TypeError):
+                foer = None
+            pct = r.get("pct", None)
+            if pct in (None, "") and foer and foer > 0:
+                pct = (efter - foer) / foer * 100
+            pct = round(float(pct), 1) if pct not in (None, "") else None
+            conn.execute(
+                "INSERT INTO prisaendring (varenavn, gyldig_fra, foer, efter, pct, kilde) "
+                "VALUES (?,?,?,?,?,?)",
+                (navn, gfra, round(foer, 2) if foer is not None else None,
+                 round(efter, 2), pct, str(r.get("kilde", kilde))),
+            )
+            n += 1
+    return n
+
+
 def hent_prisaendringer() -> List[Dict]:
-    """Prisændringer på bagværk/kager fundet i bestillingshistorikken + de daterede
+    """Prisændringer på bagværk/kager. Bruger den autoritative tabel (prisaendring)
+    når den har data — ellers rekonstrueres fra bestillingshistorikken. Nyeste først."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT varenavn, gyldig_fra, foer, efter, pct, kilde FROM prisaendring "
+            "ORDER BY gyldig_fra DESC, varenavn"
+        ).fetchall()
+    if rows:
+        ud = []
+        for r in rows:
+            foer = r["foer"]
+            efter = r["efter"]
+            pct = r["pct"]
+            if pct is None and foer and foer > 0:
+                pct = round((efter - foer) / foer * 100, 1)
+            ud.append({
+                "varenavn":   r["varenavn"],
+                "type":       "",
+                "gyldig_fra": r["gyldig_fra"],
+                "foer":       round(foer, 2) if foer is not None else None,
+                "efter":      round(efter, 2) if efter is not None else None,
+                "diff":       round(efter - foer, 2) if (foer is not None and efter is not None) else None,
+                "pct":        pct,
+                "kilde":      r["kilde"],
+            })
+        return ud
+    return _hent_prisaendringer_rekonstrueret()
+
+
+def _hent_prisaendringer_rekonstrueret() -> List[Dict]:
+    """Fallback: prisændringer rekonstrueret fra bestillingshistorikken + de daterede
     priser. Grupperes på VARENUMMER (SKU) — stabilt på tværs af skabeloner — så
     bagerens nye varenavn parres korrekt med den gamle pris via SKU'en. En ændring
     opstår hver gang indkøbsprisen (ex moms) skifter fra én dato til den næste.

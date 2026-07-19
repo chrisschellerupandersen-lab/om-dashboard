@@ -2929,6 +2929,22 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
             <div style="position:relative;height:210px;"><canvas id="c-boek-db"></canvas></div>
           </div>
+          <!-- Simulation: hvad nu hvis? -->
+          <div class="card" style="margin-bottom:14px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Simulation — hvad nu hvis?</span>
+              <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ash);">
+                <label>Avance <input id="boek-sim-avance" type="number" value="25" step="1" oninput="boekSimuler()" style="width:62px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;"> %</label>
+                <label>TGTG <input id="boek-sim-tgtg" type="number" value="15" step="1" oninput="boekSimuler()" style="width:62px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;"> %</label>
+              </div>
+            </div>
+            <div id="boek-sim-tiles" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;"></div>
+            <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:420px;" id="boek-sim-tabel"></table></div>
+            <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:8px;line-height:1.6;">
+              Model: DB simuleret = (DB − TGTG) × (1 + avance%) + TGTG × (1 + TGTG%)<br>
+              TGTG krediteres på bagerfakturaen, så mere TGTG løfter DB direkte. Avance-forbedringen regnes på handels-marginen (uden TGTG), så der ikke dobbelttælles.
+            </div>
+          </div>
           <!-- Korrelationer -->
           <div class="card" style="margin-bottom:14px;">
             <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">Hvad hænger sammen med høj DB? <span id="boek-korr-n" style="color:var(--ash);"></span></div>
@@ -5381,6 +5397,43 @@ function spildDagDrill(uge, aar) {
 function lukSpildDag() { document.getElementById('spild-dag-modal').style.display = 'none'; }
 
 // ── BAGVÆRKS-ØKONOMI & OPTIMERING ─────────────────────────────────────────────
+let _boekUger = [];
+function boekSimuler(){
+  const el = id => document.getElementById(id);
+  if (!el('boek-sim-tiles')) return;
+  const a = (parseFloat(el('boek-sim-avance').value) || 0) / 100;
+  const t = (parseFloat(el('boek-sim-tgtg').value)   || 0) / 100;
+  const u = (_boekUger || []).filter(x => x.db != null);
+  if (!u.length) { el('boek-sim-tiles').innerHTML = ''; el('boek-sim-tabel').innerHTML = ''; return; }
+  const dk = v => Math.round(v).toLocaleString('da-DK') + ' kr';
+  let sumF = 0, sumS = 0, rows = '';
+  u.slice().reverse().forEach(x => {
+    const tg  = x.tgtg_kr || 0;
+    const sim = (x.db - tg) * (1 + a) + tg * (1 + t);   // avance på handels-margin, TGTG separat
+    const diff = sim - x.db;
+    sumF += x.db; sumS += sim;
+    rows += `<tr>
+      <td style="text-align:left;">U${x.uge}</td>
+      <td style="text-align:right;">${dk(x.db)}</td>
+      <td style="text-align:right;font-weight:600;">${dk(sim)}</td>
+      <td style="text-align:right;font-weight:600;color:${diff>=0?'var(--moss)':'var(--danger)'};">${diff>=0?'+':''}${dk(diff)}</td></tr>`;
+  });
+  const n = u.length, snitF = sumF/n, snitS = sumS/n, dSnit = snitS - snitF;
+  const loeft = snitF > 0 ? (dSnit / snitF * 100) : 0;
+  const tile = (l,v,c) => `<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);margin-bottom:5px;">${l}</div>
+      <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
+  const pos = dSnit >= 0;
+  el('boek-sim-tiles').innerHTML =
+      tile('Snit DB/uge i dag', dk(snitF))
+    + tile('Snit DB/uge simuleret', dk(snitS), 'var(--moss)')
+    + tile('Forskel pr. uge', (pos?'+':'') + dk(dSnit) + ` (${pos?'+':''}${loeft.toFixed(1)} %)`, pos?'var(--moss)':'var(--danger)')
+    + tile('Effekt pr. år (×52)', (pos?'+':'') + dk(dSnit*52), pos?'var(--moss)':'var(--danger)');
+  el('boek-sim-tabel').innerHTML =
+    `<thead><tr><th style="text-align:left;">Uge</th><th style="text-align:right;">DB i dag</th>
+      <th style="text-align:right;">DB simuleret</th><th style="text-align:right;">Forskel</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
 async function loadBagvaerkOek() {
   buildBestillingOptimering();   // uafhængig af faktura-data — vis altid
   let d;
@@ -5394,6 +5447,8 @@ async function loadBagvaerkOek() {
   }
   document.getElementById('boek-no-data').style.display = 'none';
   document.getElementById('boek-content').style.display = '';
+  _boekUger = uger;
+  boekSimuler();
   const dk  = v => v == null ? '—' : Math.round(v).toLocaleString('da-DK');
   const num = v => v == null ? '—' : Number(v).toLocaleString('da-DK');
   const K = d.korrelationer || {}, O = d.opsummering || {};

@@ -359,6 +359,9 @@ def init_db():
             SELECT tc.*,
                    tc.omsætning_korr / 1.25 AS omsaetning_ex_moms,
                    CASE
+                       -- Frost er teknisk afregnet ved køb → 0 i vareforbrug,
+                       -- så salget går ind med 100 % DB på salgsdagen.
+                       WHEN LOWER(tc.varenavn) LIKE '%frost%' THEN 0
                        WHEN pp.pris_ex_moms IS NOT NULL AND pp.pris_ex_moms > 0
                            THEN tc.antal * pp.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                        WHEN s.pris_ex_moms > 0
@@ -369,6 +372,7 @@ def init_db():
                    END AS vf_korrekt,
                    tc.omsætning_korr / 1.25
                        - CASE
+                             WHEN LOWER(tc.varenavn) LIKE '%frost%' THEN 0
                              WHEN pp.pris_ex_moms IS NOT NULL AND pp.pris_ex_moms > 0
                                  THEN tc.antal * pp.pris_ex_moms / COALESCE(NULLIF(s.portioner,0), 1)
                              WHEN s.pris_ex_moms > 0

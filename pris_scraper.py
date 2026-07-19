@@ -118,7 +118,9 @@ def hent_priser(vis_browser: bool = False) -> dict:
         side.goto(f"{BASIS_URL}/account/login", wait_until="domcontentloaded")
         side.fill('input[name="customer[email]"]', BRUGER)
         side.fill('input[name="customer[password]"]', KODE)
-        side.click('button[type="submit"], input[type="submit"]')
+        # Temaets knap er et <button> UDEN type="submit" — Enter i kodefeltet
+        # indsender formularen uanset opmærkning.
+        side.press('input[name="customer[password]"]', "Enter")
         side.wait_for_load_state("networkidle")
         if side.locator('input[name="customer[password]"]').count() > 0:
             browser.close()

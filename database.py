@@ -4290,6 +4290,49 @@ def gem_stamdata_bulk(linjer: List[Dict]) -> int:
     return len(linjer)
 
 
+def udfyld_manglende_kostpris(linjer: List[Dict]) -> Dict:
+    """Udfyld kostpris i varestamdata KUN hvor den mangler (0/NULL) eller varen
+    ikke findes. Eksisterende priser røres ALDRIG — så vi ikke overskriver
+    korrekte værdier. Matcher på sku, ellers varenavn.
+
+    Bemærk: varestamdata er tidløs, så en udfyldt pris gælder også historikken —
+    det er netop meningen for varer der aldrig har haft en kostpris."""
+    oprettet = udfyldt = sprunget = 0
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        for r in linjer:
+            sku  = str(r.get("sku", "") or "").strip()
+            navn = str(r.get("varenavn", "") or "").strip()
+            try:
+                pris = float(r.get("pris_ex_moms") or 0)
+            except (ValueError, TypeError):
+                continue
+            if not navn or pris <= 0:
+                continue
+            row = None
+            if sku:
+                row = conn.execute(
+                    "SELECT id, pris_ex_moms FROM varestamdata WHERE sku=?", (sku,)).fetchone()
+            if row is None:
+                row = conn.execute(
+                    "SELECT id, pris_ex_moms FROM varestamdata "
+                    "WHERE LOWER(TRIM(varenavn))=LOWER(TRIM(?))", (navn,)).fetchone()
+            if row is None:
+                conn.execute(
+                    "INSERT INTO varestamdata (sku, varenavn, type, pris_ex_moms, portioner) "
+                    "VALUES (?,?,?,?,1)",
+                    (sku, navn, str(r.get("type", "") or ""), round(pris, 2)))
+                oprettet += 1
+            elif not row["pris_ex_moms"] or float(row["pris_ex_moms"]) <= 0:
+                conn.execute("UPDATE varestamdata SET pris_ex_moms=? WHERE id=?",
+                             (round(pris, 2), row["id"]))
+                udfyldt += 1
+            else:
+                sprunget += 1
+    return {"oprettet": oprettet, "udfyldt": udfyldt,
+            "sprunget_havde_pris": sprunget}
+
+
 def hent_varenummer_kontrol() -> Dict:
     """Kontrol: hvilke varenumre fra bestillinger matcher/mangler i transaktioner og vice versa."""
     with _conn() as conn:

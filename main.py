@@ -2012,6 +2012,22 @@ async def prisperiode_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.post("/api/stamdata/udfyld-manglende")
+async def stamdata_udfyld_manglende(request: Request):
+    """Udfyld kostpris KUN hvor den mangler. Overskriver aldrig eksisterende."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    return {"ok": True, **database.udfyld_manglende_kostpris(linjer)}
+
+
 @app.post("/api/prisaendring/bulk")
 async def prisaendring_bulk(request: Request):
     """Upload eksplicitte prisændringer (før/efter) — autoritativ kilde til siden."""

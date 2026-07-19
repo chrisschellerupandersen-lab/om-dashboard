@@ -7,18 +7,21 @@ Henter for alle varer:
   • salgspris    — den offentlige pris ("110,00 DKK")
   • SKU          — hentes fra det offentlige /products.json og matcher Shopbox
 
-Kør lokalt (login bliver på din maskine):
+Portalen har et sikkerhedstjek ved login, som skal løses af et menneske.
+Derfor logger DU ind manuelt én gang — sessionen gemmes i en lokal
+browserprofil (.portal_profil) og genbruges ved efterfølgende kørsler.
 
-    pip install playwright requests
-    playwright install chromium
+Kør lokalt:
 
-    set PORTAL_BRUGER=greve@organicmarket.dk
-    set PORTAL_KODE=dinkode
-    python pris_scraper.py                 # gemmer JSON lokalt
-    python pris_scraper.py --upload        # + sender til dashboardet
-    python pris_scraper.py --vis           # kør med synlig browser (fejlsøgning)
+    py -m playwright install chromium     # kun første gang
 
-Adgangskoden læses KUN fra miljøvariabler — den må aldrig skrives i denne fil.
+    py pris_scraper.py --login            # log ind manuelt (åbner browser)
+    py pris_scraper.py                    # hent priser → JSON lokalt
+    py pris_scraper.py --upload           # + send til dashboardet
+    py pris_scraper.py --vis              # synlig browser (fejlsøgning)
+
+Adgangskoden skrives kun i browservinduet — den gemmes hverken i koden,
+i git eller i miljøvariabler. Når sessionen udløber, køres --login igen.
 """
 import json
 import os
@@ -33,8 +36,8 @@ BASIS_URL      = "https://organicmarket-b2b.dk"
 RAILWAY_URL    = os.environ.get("RAILWAY_URL", "https://om-dashboard-production-0f3a.up.railway.app")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "OM-Greve-2026-Hemlig")
 
-BRUGER = os.environ.get("PORTAL_BRUGER", "")
-KODE   = os.environ.get("PORTAL_KODE", "")
+# Browserprofil hvor din login-session gemmes (må ALDRIG i git).
+PROFIL_DIR = Path(__file__).parent / ".portal_profil"
 
 UD_FIL = Path(__file__).parent / f"prissnapshot_{date.today().isoformat()}.json"
 
@@ -101,30 +104,41 @@ JS_UDTRÆK = r"""
 """
 
 
-def hent_priser(vis_browser: bool = False) -> dict:
-    """{handle: {indkoeb, salg}} — kræver login, kører rigtig browser."""
-    from playwright.sync_api import sync_playwright
+def _er_logget_ind(side) -> bool:
+    side.goto(f"{BASIS_URL}/account", wait_until="domcontentloaded")
+    return side.locator('input[name="customer[password]"]').count() == 0
 
-    if not BRUGER or not KODE:
-        sys.exit("FEJL: sæt miljøvariablerne PORTAL_BRUGER og PORTAL_KODE først.")
+
+def login_manuelt() -> bool:
+    """Åbner en browser hvor DU selv logger ind (inkl. portalens sikkerhedstjek).
+    Sessionen gemmes i browserprofilen og genbruges ved næste kørsel."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as pw:
+        ctx = pw.chromium.launch_persistent_context(str(PROFIL_DIR), headless=False)
+        side = ctx.pages[0] if ctx.pages else ctx.new_page()
+        side.goto(f"{BASIS_URL}/account/login", wait_until="domcontentloaded")
+        print("\n  → Log ind i browservinduet (også portalens sikkerhedstjek).")
+        input("  → Tryk derefter Enter her i terminalen … ")
+        ok = _er_logget_ind(side)
+        ctx.close()
+    print("  Login gemt ✔  — kør nu:  py pris_scraper.py" if ok
+          else "  Kunne ikke bekræfte login — prøv igen.")
+    return ok
+
+
+def hent_priser(vis_browser: bool = False) -> dict:
+    """{handle: {indkoeb, salg}} — genbruger den gemte login-session."""
+    from playwright.sync_api import sync_playwright
 
     priser: dict = {}
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=not vis_browser)
-        side = browser.new_page()
+        ctx = pw.chromium.launch_persistent_context(str(PROFIL_DIR), headless=not vis_browser)
+        side = ctx.pages[0] if ctx.pages else ctx.new_page()
 
-        # Login
-        print("Logger ind …", end=" ", flush=True)
-        side.goto(f"{BASIS_URL}/account/login", wait_until="domcontentloaded")
-        side.fill('input[name="customer[email]"]', BRUGER)
-        side.fill('input[name="customer[password]"]', KODE)
-        # Temaets knap er et <button> UDEN type="submit" — Enter i kodefeltet
-        # indsender formularen uanset opmærkning.
-        side.press('input[name="customer[password]"]', "Enter")
-        side.wait_for_load_state("networkidle")
-        if side.locator('input[name="customer[password]"]').count() > 0:
-            browser.close()
-            sys.exit("FEJL: login mislykkedes — tjek PORTAL_BRUGER / PORTAL_KODE.")
+        print("Tjekker login …", end=" ", flush=True)
+        if not _er_logget_ind(side):
+            ctx.close()
+            sys.exit("ikke logget ind.\n\nKør først:  py pris_scraper.py --login")
         print("ok")
 
         # Gennemgå kollektionssiderne
@@ -145,7 +159,7 @@ def hent_priser(vis_browser: bool = False) -> dict:
             med_ind = sum(1 for v in priser.values() if v.get("indkoeb") is not None)
             print(f"  side {n:>2}: +{len(nye):>3} varer  (i alt {len(priser)}, med indkøbspris {med_ind})")
 
-        browser.close()
+        ctx.close()
     return priser
 
 
@@ -154,6 +168,10 @@ def hent_priser(vis_browser: bool = False) -> dict:
 def main():
     vis    = "--vis" in sys.argv
     upload = "--upload" in sys.argv
+
+    if "--login" in sys.argv:
+        login_manuelt()
+        return
 
     print("Henter SKU-kort fra products.json …", end=" ", flush=True)
     sku_kort = hent_sku_kort()

@@ -20,3 +20,7 @@ replace_mgmt.py
 
 # Ordre-log (valgfrit – fjern linjen hvis du vil have den med)
 # ../bestilling-app/orders.json
+
+# Prisscraper: login-session og snapshots (må ikke i git)
+.portal_profil/
+prissnapshot_*.json

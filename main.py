@@ -2012,6 +2012,32 @@ async def prisperiode_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.post("/api/prissnapshot/bulk")
+async def prissnapshot_bulk(request: Request):
+    """Modtag prissnapshot fra pris_scraper.py."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    linjer = body.get("linjer", [])
+    if not linjer:
+        raise HTTPException(status_code=400, detail="Ingen linjer")
+    from datetime import date as _d
+    dato = str(body.get("dato") or _d.today().isoformat())
+    antal = database.gem_prissnapshot_bulk(dato, linjer, body.get("kilde", "portal"))
+    return {"ok": True, "dato": dato, "linjer": antal}
+
+
+@app.get("/api/prisvagt")
+async def api_prisvagt(request: Request):
+    """Hvad har leverandøren ændret siden sidste snapshot?"""
+    _kræv_login(request)
+    return database.hent_prisvagt()
+
+
 @app.post("/api/stamdata/udfyld-manglende")
 async def stamdata_udfyld_manglende(request: Request):
     """Udfyld kostpris KUN hvor den mangler. Overskriver aldrig eksisterende."""

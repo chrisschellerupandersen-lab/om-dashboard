@@ -330,6 +330,22 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_prisaendring_dato ON prisaendring(gyldig_fra);
 
+            -- Prisvagt: snapshot af leverandørportalens priser pr. dato.
+            -- Bruges til at opdage prisændringer vi ikke får besked om.
+            CREATE TABLE IF NOT EXISTS prissnapshot (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato          TEXT NOT NULL,
+                sku           TEXT NOT NULL,
+                varenavn      TEXT DEFAULT '',
+                indkoebspris  REAL,
+                salgspris     REAL,
+                kilde         TEXT DEFAULT 'portal',
+                oprettet      TEXT DEFAULT (datetime('now','localtime')),
+                UNIQUE(dato, sku) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_prissnap_dato ON prissnapshot(dato);
+            CREATE INDEX IF NOT EXISTS idx_prissnap_sku  ON prissnapshot(sku);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -4288,6 +4304,80 @@ def gem_stamdata_bulk(linjer: List[Dict]) -> int:
                r.get("portioner", 1) or 1)
               for r in linjer])
     return len(linjer)
+
+
+def gem_prissnapshot_bulk(dato: str, linjer: List[Dict], kilde: str = "portal") -> int:
+    """Gem et prissnapshot fra leverandørportalen. Idempotent pr. (dato, sku)."""
+    n = 0
+    with _conn() as conn:
+        for r in linjer:
+            sku = str(r.get("sku", "") or "").strip()
+            if not sku:
+                continue
+            def _f(v):
+                try:
+                    return float(v) if v not in (None, "") else None
+                except (ValueError, TypeError):
+                    return None
+            conn.execute(
+                "INSERT INTO prissnapshot (dato, sku, varenavn, indkoebspris, salgspris, kilde) "
+                "VALUES (?,?,?,?,?,?)",
+                (dato, sku, str(r.get("varenavn", "") or "").strip(),
+                 _f(r.get("indkoebspris")), _f(r.get("salgspris")), kilde))
+            n += 1
+    return n
+
+
+def hent_prisvagt() -> Dict:
+    """Sammenlign de to nyeste snapshots → hvad har leverandøren ændret?
+    Returnerer ændringer (indkøb + salg), nye og udgåede varer."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        datoer = [r["dato"] for r in conn.execute(
+            "SELECT DISTINCT dato FROM prissnapshot ORDER BY dato DESC LIMIT 2")]
+        if not datoer:
+            return {"ny_dato": None, "gammel_dato": None, "aendringer": [],
+                    "nye": [], "udgaaede": [], "antal_snapshots": 0}
+        antal = conn.execute("SELECT COUNT(DISTINCT dato) AS n FROM prissnapshot").fetchone()["n"]
+        ny = {r["sku"]: dict(r) for r in conn.execute(
+            "SELECT * FROM prissnapshot WHERE dato=?", (datoer[0],))}
+        gl = {}
+        if len(datoer) > 1:
+            gl = {r["sku"]: dict(r) for r in conn.execute(
+                "SELECT * FROM prissnapshot WHERE dato=?", (datoer[1],))}
+
+    aendringer, nye, udgaaede = [], [], []
+    for sku, n in ny.items():
+        g = gl.get(sku)
+        if g is None:
+            if gl:
+                nye.append({"sku": sku, "varenavn": n["varenavn"],
+                            "indkoebspris": n["indkoebspris"], "salgspris": n["salgspris"]})
+            continue
+        ind_ny, ind_gl = n["indkoebspris"], g["indkoebspris"]
+        sal_ny, sal_gl = n["salgspris"],   g["salgspris"]
+        ind_aendret = ind_ny is not None and ind_gl is not None and abs(ind_ny - ind_gl) > 0.005
+        sal_aendret = sal_ny is not None and sal_gl is not None and abs(sal_ny - sal_gl) > 0.005
+        if not (ind_aendret or sal_aendret):
+            continue
+        aendringer.append({
+            "sku": sku, "varenavn": n["varenavn"],
+            "indkoeb_gl": ind_gl, "indkoeb_ny": ind_ny,
+            "indkoeb_pct": round((ind_ny - ind_gl) / ind_gl * 100, 1) if ind_aendret and ind_gl else None,
+            "salg_gl": sal_gl, "salg_ny": sal_ny,
+            "salg_pct": round((sal_ny - sal_gl) / sal_gl * 100, 1) if sal_aendret and sal_gl else None,
+            # DG hvis salgsprisen bliver stående, men kostprisen er steget
+            "dg_foer": round((sal_gl - ind_gl) / sal_gl * 100, 1) if (sal_gl and ind_gl) else None,
+            "dg_efter": round((sal_gl - ind_ny) / sal_gl * 100, 1) if (sal_gl and ind_ny) else None,
+        })
+    for sku, g in gl.items():
+        if sku not in ny:
+            udgaaede.append({"sku": sku, "varenavn": g["varenavn"]})
+
+    aendringer.sort(key=lambda x: -(x["indkoeb_pct"] or 0))
+    return {"ny_dato": datoer[0], "gammel_dato": datoer[1] if len(datoer) > 1 else None,
+            "antal_snapshots": antal, "aendringer": aendringer,
+            "nye": nye[:100], "udgaaede": udgaaede[:100]}
 
 
 def udfyld_manglende_kostpris(linjer: List[Dict]) -> Dict:

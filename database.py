@@ -284,6 +284,14 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_pp_navn ON vare_pris_periode(varenavn, gyldig_fra);
 
+            -- Udtryks-indekser til v_transaktioner's navne-joins (LOWER(TRIM(...))).
+            -- Uden dem fuldskannes join-tabellerne pr. transaktionsrække → meget
+            -- langsomt når varestamdata/priser vokser (db_shopbox gik fra 11s → 0,6s).
+            CREATE INDEX IF NOT EXISTS idx_stam_navn_lower ON varestamdata(LOWER(TRIM(varenavn)));
+            CREATE INDEX IF NOT EXISTS idx_stam_sku        ON varestamdata(sku);
+            CREATE INDEX IF NOT EXISTS idx_pp_navn_lower   ON vare_pris_periode(LOWER(TRIM(varenavn)));
+            CREATE INDEX IF NOT EXISTS idx_kp_navn_lower   ON varekostpris(LOWER(TRIM(varenavn)));
+
             -- Fakturasalg (e-conomic) — B2B-salg der IKKE er i Shopbox.
             -- Beløb ex moms. Ren omsætning: vareforbruget ligger allerede i
             -- bagerfakturaen (typisk brød), så DB stiger med det fulde beløb.

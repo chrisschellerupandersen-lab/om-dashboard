@@ -2012,6 +2012,24 @@ async def prisperiode_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.post("/api/salg/ingest")
+async def salg_ingest(request: Request):
+    """Inkrementel salgs-indlæsning fra shopbox_sync.py (direkte API, ingen fil).
+    Erstatter kun de medsendte datoer — resten af historikken bevares."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    trans = body.get("transaktioner", [])
+    if not trans:
+        raise HTTPException(status_code=400, detail="Ingen transaktioner")
+    res = database.gem_transaktioner_dage(trans)
+    return {"ok": True, **res}
+
+
 @app.post("/api/prissnapshot/bulk")
 async def prissnapshot_bulk(request: Request):
     """Modtag prissnapshot fra pris_scraper.py."""

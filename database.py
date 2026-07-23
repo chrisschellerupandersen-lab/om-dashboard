@@ -568,6 +568,33 @@ def _opdater_kostpris_historik(conn, transaktioner: List[Dict], import_dato: str
                 )
 
 
+def gem_transaktioner_dage(transaktioner: List[Dict]) -> Dict:
+    """Inkrementel indlæsning til dagligt API-sync (Shopbox):
+    erstat KUN de datoer der optræder i transaktioner (slet + indsæt pr. dato).
+    Resten af historikken røres IKKE — modsat gem_transaktioner der nulstiller alt."""
+    trans = [t for t in transaktioner if t.get("dato")]
+    if not trans:
+        return {"raekker": 0, "dage": []}
+    datoer = sorted({t["dato"][:10] for t in trans})
+    with _conn() as conn:
+        _opdater_kostpris_historik(conn, trans, datoer[-1])
+        for d in datoer:
+            conn.execute("DELETE FROM transaktioner WHERE dato = ?", (d,))
+        conn.executemany("""
+            INSERT INTO transaktioner
+                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, [(
+            t["dato"][:10], t.get("varenummer", ""), t.get("varenavn", ""),
+            t.get("kategori", ""), t.get("antal", 0), t.get("omsætning", 0),
+            t.get("kostpris", 0), t.get("avance", 0), t.get("avance_pct", 0),
+            t.get("time_start", -1), t.get("bon_nr", ""),
+        ) for t in trans])
+        # Opdatér "sidst indlæst"-markør uden at nulstille uploads-historik
+        conn.execute("INSERT INTO uploads (rapport_dato) VALUES (?)", (datoer[-1],))
+    return {"raekker": len(trans), "dage": datoer}
+
+
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
     with _conn() as conn:
         # Opdater kostpris-historik FØR sletning — bevar historisk korrekthed

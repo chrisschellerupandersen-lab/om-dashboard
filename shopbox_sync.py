@@ -11,7 +11,7 @@ Auth: accessToken som query-param + client (butiks-id, heltal).
 OPSÆTNING (miljøvariabler — token må ALDRIG stå i koden/git):
     setx SHOPBOX_TOKEN   "din-api-token"
     setx SHOPBOX_CLIENT  "dit-butiks-id"      (heltal)
-    setx SHOPBOX_BASE    "https://api.shopbox.com/api/v3"   (valgfri; default = dev)
+    setx SHOPBOX_BASE    "https://api-dev.shopbox.com/api/v3"  (valgfri; default = produktion)
 
 BRUG:
     py shopbox_sync.py --inspect          # 1) vis dataformat (kør denne FØRST)
@@ -31,7 +31,7 @@ import requests
 RAILWAY_URL    = os.environ.get("RAILWAY_URL", "https://om-dashboard-production-0f3a.up.railway.app")
 WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "OM-Greve-2026-Hemlig")
 
-BASE    = os.environ.get("SHOPBOX_BASE", "https://api-dev.shopbox.com/api/v3").rstrip("/")
+BASE    = os.environ.get("SHOPBOX_BASE", "https://api.shopbox.com/api/v3").rstrip("/")
 TOKEN   = os.environ.get("SHOPBOX_TOKEN", "")
 CLIENT  = os.environ.get("SHOPBOX_CLIENT", "")
 # Beløb i basket-linjer er heltal (typisk øre). Divideres med denne. Bekræft med --inspect.

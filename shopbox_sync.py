@@ -46,11 +46,19 @@ def _tjek_konfig():
 def api_get(path: str, **params) -> dict:
     params.setdefault("accessToken", TOKEN)
     params.setdefault("client", CLIENT)
+    # Token lægges i URL'en af API'et — sørg for at den ALDRIG havner i en
+    # fejlbesked/traceback (ellers lækkes den). Derfor egne, rene fejl.
     r = requests.get(f"{BASE}{path}", params=params, timeout=60)
     if r.status_code == 401:
-        sys.exit("FEJL: 401 — token afvist. Er SHOPBOX_TOKEN gyldig og client-id korrekt?")
-    r.raise_for_status()
-    return r.json()
+        sys.exit("FEJL: 401 — token afvist (ugyldig token, forkert miljø, eller dev-token mod produktion).")
+    if r.status_code == 404:
+        sys.exit(f"FEJL: 404 — '{path}' findes ikke på {BASE} (typisk: dev-token mod prod, eller ingen data).")
+    if not r.ok:
+        sys.exit(f"FEJL: HTTP {r.status_code} på '{path}'.")
+    try:
+        return r.json()
+    except Exception:
+        sys.exit(f"FEJL: uventet svar fra '{path}' (ikke JSON).")
 
 
 # ── Hjælpere til at gætte struktur robust ─────────────────────────────────────

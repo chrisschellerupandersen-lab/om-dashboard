@@ -2023,7 +2023,9 @@ async def shopbox_inspect(request: Request):
     if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
         raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
     try:
-        import importlib, shopbox_sync
+        import importlib, os as _os, shopbox_sync
+        if body.get("base"):
+            _os.environ["SHOPBOX_BASE"] = str(body["base"])
         importlib.reload(shopbox_sync)
         return {"ok": True, **shopbox_sync.inspect_data()}
     except SystemExit as e:

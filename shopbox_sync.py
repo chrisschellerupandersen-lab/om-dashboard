@@ -92,7 +92,45 @@ def _f(v, div=1.0):
 
 # ── Inspektion: vis det rigtige dataformat ────────────────────────────────────
 
+def inspect_data() -> dict:
+    """Returnér dataformatet som dict (bruges af CLI og af Railway-endpointet).
+    Ingen token/kunde-data lækkes."""
+    _tjek_konfig()
+    out = {"base": BASE, "client": CLIENT}
+    j = api_get("/baskets", page=1)
+    out["top_keys"] = list(j.keys()) if isinstance(j, dict) else "liste"
+    data = (j.get("data") if isinstance(j, dict) else j) or []
+    out["antal_side1"] = len(data)
+    if data:
+        b = data[0]
+        out["basket_keys"] = list(b.keys())
+        out["gaettet_dato"] = _dato_af_basket(b)
+        out["gaettet_tid"] = _tid_af_basket(b)
+        linjer = _linjer_i_basket(b)
+        out["antal_linjer_i_basket"] = len(linjer)
+        if linjer:
+            out["linje_keys"] = list(linjer[0].keys())
+            out["linje_eksempel"] = linjer[0]
+        out["basket_eksempel"] = {k: v for k, v in b.items()
+                                  if k not in ("customer", "account")}
+    i_gaar = (date.today() - timedelta(days=1)).isoformat()
+    tests = {}
+    for p in ("from", "to", "date", "dateFrom", "startDate", "crdate_from", "created_from"):
+        try:
+            jj = api_get("/baskets", page=1, **{p: i_gaar})
+            tests[p] = len((jj.get("data") if isinstance(jj, dict) else jj) or [])
+        except Exception as e:
+            tests[p] = "fejl:" + str(e)[:40]
+    out["dato_filtre_test"] = tests
+    return out
+
+
 def inspect():
+    d = inspect_data()
+    print(json.dumps(d, ensure_ascii=False, indent=1)[:2500])
+
+
+def _inspect_gammel():
     _tjek_konfig()
     print(f"Base: {BASE}  ·  client: {CLIENT}\n")
     j = api_get("/baskets", page=1)

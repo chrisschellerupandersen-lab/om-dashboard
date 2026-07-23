@@ -2012,6 +2012,26 @@ async def prisperiode_bulk(request: Request):
     return {"ok": True, "linjer": antal}
 
 
+@app.post("/api/shopbox/inspect")
+async def shopbox_inspect(request: Request):
+    """Diagnose: hent Shopbox-dataformatet via Railway's env-token (uden at lække den)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    try:
+        import importlib, shopbox_sync
+        importlib.reload(shopbox_sync)
+        return {"ok": True, **shopbox_sync.inspect_data()}
+    except SystemExit as e:
+        return {"ok": False, "fejl": str(e)}
+    except Exception as e:
+        return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
+
+
 @app.post("/api/salg/ingest")
 async def salg_ingest(request: Request):
     """Inkrementel salgs-indlæsning fra shopbox_sync.py (direkte API, ingen fil).

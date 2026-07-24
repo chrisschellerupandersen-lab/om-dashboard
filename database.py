@@ -2365,6 +2365,82 @@ def hent_tgtg_spec(uge: int, aar: int) -> Dict:
     }
 
 
+def hent_solgt_pivot(gran: str = "maaned", antal: int = 12) -> Dict:
+    """Solgte enheder pr. kategori → produkt, med tidsperioder som kolonner.
+    gran: 'dag' | 'uge' | 'maaned' | 'aar'. Nyeste periode først."""
+    from datetime import date as _d, timedelta as _td
+    bucket = {"dag": "dato",
+              "uge": "strftime('%Y-%W', dato)",
+              "maaned": "strftime('%Y-%m', dato)",
+              "aar": "strftime('%Y', dato)"}.get(gran, "strftime('%Y-%m', dato)")
+    vindue = {"dag": antal + 2, "uge": antal * 7 + 7,
+              "maaned": antal * 31 + 31, "aar": antal * 366 + 366}.get(gran, 400)
+
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        mx = conn.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()
+        if not mx or not mx["d"]:
+            return {"gran": gran, "perioder": [], "kategorier": [],
+                    "total_pr_periode": {}, "total_sum": 0}
+        sidste = _d.fromisoformat(str(mx["d"])[:10])
+        fra = (sidste - _td(days=vindue)).isoformat()
+        rows = conn.execute(f"""
+            SELECT COALESCE(NULLIF(TRIM(kategori),''),'(uden kategori)') AS kat,
+                   varenavn, varenummer,
+                   {bucket} AS periode,
+                   COALESCE(SUM(antal),0) AS antal
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY kat, varenavn, periode
+        """, (fra, sidste.isoformat())).fetchall()
+
+    # Vælg de nyeste N perioder som kolonner
+    alle_p = sorted({r["periode"] for r in rows}, reverse=True)[:antal]
+    p_set = set(alle_p)
+
+    def _label(p):
+        try:
+            if gran == "dag":
+                d = _d.fromisoformat(p); return f"{d.day}/{d.month}"
+            if gran == "uge":
+                y, w = p.split("-"); return f"U{int(w)}"
+            if gran == "maaned":
+                y, m = p.split("-"); return f"{_DK_MDR[int(m)][:3].capitalize()} {y[2:]}"
+        except Exception:
+            pass
+        return p
+
+    perioder = [{"key": p, "label": _label(p)} for p in alle_p]
+
+    # Byg kategori → produkt struktur
+    kat_map: Dict = {}
+    tot_p: Dict = {p: 0 for p in alle_p}
+    for r in rows:
+        if r["periode"] not in p_set:
+            continue
+        a = int(r["antal"] or 0)
+        k = kat_map.setdefault(r["kat"], {"navn": r["kat"], "sum": 0,
+                                          "pr_periode": {p: 0 for p in alle_p}, "_prod": {}})
+        pr = k["_prod"].setdefault(r["varenavn"] or "(ukendt)",
+                                   {"varenavn": r["varenavn"] or "(ukendt)",
+                                    "varenummer": r["varenummer"] or "", "sum": 0,
+                                    "pr_periode": {p: 0 for p in alle_p}})
+        pr["pr_periode"][r["periode"]] += a
+        pr["sum"] += a
+        k["pr_periode"][r["periode"]] += a
+        k["sum"] += a
+        tot_p[r["periode"]] += a
+
+    kategorier = []
+    for k in sorted(kat_map.values(), key=lambda x: -x["sum"]):
+        produkter = sorted(k["_prod"].values(), key=lambda x: -x["sum"])
+        kategorier.append({"navn": k["navn"], "sum": k["sum"],
+                           "pr_periode": k["pr_periode"], "produkter": produkter})
+
+    return {"gran": gran, "perioder": perioder, "kategorier": kategorier,
+            "total_pr_periode": tot_p, "total_sum": sum(tot_p.values())}
+
+
 def hent_svind_data(aar: int = None) -> List[Dict]:
     """Kombinerer bestilling, bager_regnskab og kassesalg per uge.
     Effektivt solgt = kassesalg_stk + KW-kombostk + TGTG_stk.

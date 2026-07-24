@@ -2230,6 +2230,13 @@ async def api_social_slet(request: Request, id_: int):
     return {"ok": True}
 
 
+@app.get("/api/solgt-pivot")
+async def api_solgt_pivot(request: Request, gran: str = "maaned", antal: int = 12):
+    """Solgte enheder pr. kategori → produkt med tidsperioder som kolonner."""
+    _kræv_login(request)
+    return database.hent_solgt_pivot(gran, int(antal))
+
+
 @app.get("/api/db-shopbox")
 async def api_db_shopbox(request: Request, aar: Optional[int] = None):
     """DB (kr) + DG (%) for kun Shopbox-salg, pr. dag/uge/måned."""

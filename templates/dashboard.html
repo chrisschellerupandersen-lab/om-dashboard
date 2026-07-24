@@ -2860,6 +2860,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <div class="panel" id="p-solgtpivot">
+        <div class="page-hdr">
+          <h2>Solgte enheder — kategori &amp; produkt</h2>
+          <p>Antal solgte enheder pr. kategori (klik for at folde produkterne ud) · tidsperioder som kolonner · nyeste først</p>
+        </div>
+        <div class="card">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <div id="sp-toggle" style="display:flex;gap:4px;">
+              <button class="sp-tab" data-g="dag"    onclick="spSetGran('dag')">Dag</button>
+              <button class="sp-tab" data-g="uge"    onclick="spSetGran('uge')">Uge</button>
+              <button class="sp-tab" data-g="maaned" onclick="spSetGran('maaned')">Måned</button>
+              <button class="sp-tab" data-g="aar"    onclick="spSetGran('aar')">År</button>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+              <button onclick="spFoldAlle(true)"  style="background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;padding:5px 10px;color:var(--ash);">Fold alle ind</button>
+              <button onclick="spFoldAlle(false)" style="background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;padding:5px 10px;color:var(--ash);">Fold alle ud</button>
+              <input id="sp-soeg" type="text" placeholder="Søg produkt…" oninput="spRender()"
+                     style="padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:160px;">
+            </div>
+          </div>
+          <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;" id="sp-tabel"></table></div>
+        </div>
+      </div>
+
       <div class="panel" id="p-dbshopbox">
         <div class="page-hdr">
           <h2>DB — kun Shopbox-salg</h2>
@@ -3682,6 +3706,7 @@ function showPanel(id, el) {
   if (id === 'basis') loadBasis();
   if (id === 'social') loadSocial();
   if (id === 'dbshopbox') loadDbShopbox();
+  if (id === 'solgtpivot') loadSolgtPivot();
   if (id === 'prisaendring') loadPrisaendring();
   if (id === 'prisvagt') loadPrisvagt();
   closeSidebar();
@@ -3821,6 +3846,65 @@ function paRender(){
       <td style="text-align:right;font-weight:700;color:${pctClr};">${_paPct(x.pct)}</td></tr>`;
   });
   html += `</tbody>`;
+  t.innerHTML = html;
+}
+
+// ── SOLGTE ENHEDER (pivot: kategori → produkt × tid) ──────────────────────────
+let _spData = null, _spGran = 'maaned';
+const _spFoldet = {};   // kategorinavn → false = udfoldet
+
+function _spGranStyle(){
+  document.querySelectorAll('#sp-toggle .sp-tab').forEach(b=>{
+    const on = b.dataset.g === _spGran;
+    b.style.cssText = 'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;'
+      + (on ? 'background:var(--forest);color:#fff;border:1px solid var(--forest);' : 'background:#fff;color:var(--ash);border:1px solid var(--border);');
+  });
+}
+async function loadSolgtPivot(){
+  _spGranStyle();
+  const antal = _spGran==='dag'?14 : _spGran==='aar'?6 : 12;
+  try { _spData = await fetch(`/api/solgt-pivot?gran=${_spGran}&antal=${antal}`).then(r=>r.json()); }
+  catch(e){ document.getElementById('sp-tabel').innerHTML='<tbody><tr><td style="padding:12px;">Kunne ikke hente data.</td></tr></tbody>'; return; }
+  spRender();
+}
+function spSetGran(g){ _spGran=g; loadSolgtPivot(); }
+function spFold(kat){ _spFoldet[kat] = (_spFoldet[kat] === false); spRender(); }
+function spFoldAlle(ind){ (_spData&&_spData.kategorier||[]).forEach(k=>_spFoldet[k.navn]=ind); spRender(); }
+
+function spRender(){
+  _spGranStyle();
+  const t = document.getElementById('sp-tabel'); if(!_spData) return;
+  const P = _spData.perioder||[];
+  const q = (document.getElementById('sp-soeg').value||'').trim().toLowerCase();
+  const num = n => n ? Number(n).toLocaleString('da-DK') : '—';
+  const stick = 'position:sticky;left:0;';
+  let html = `<thead><tr>
+    <th style="text-align:left;${stick}background:#eef2ee;min-width:200px;">Kategori / produkt</th>
+    ${P.map(p=>`<th style="text-align:right;">${p.label}</th>`).join('')}
+    <th style="text-align:right;">I alt</th></tr></thead><tbody>`;
+  if(!(_spData.kategorier||[]).length)
+    html += `<tr><td colspan="${P.length+2}" style="text-align:center;color:var(--ash);padding:14px;">Ingen salgsdata</td></tr>`;
+  (_spData.kategorier||[]).forEach(k=>{
+    let prods = k.produkter||[];
+    if(q) prods = prods.filter(p=>(p.varenavn||'').toLowerCase().includes(q));
+    if(q && !prods.length) return;
+    const foldet = q ? false : (_spFoldet[k.navn] !== false);
+    const pil = foldet ? '▸' : '▾';
+    html += `<tr style="cursor:pointer;font-weight:600;" onclick="spFold('${(k.navn||'').replace(/'/g,"\\'")}')">
+      <td style="text-align:left;${stick}background:#eef2ee;">${pil} ${k.navn} <span style="color:var(--ash);font-weight:400;">(${prods.length})</span></td>
+      ${P.map(p=>`<td style="text-align:right;background:rgba(30,58,30,.04);">${num(k.pr_periode[p.key])}</td>`).join('')}
+      <td style="text-align:right;background:rgba(30,58,30,.04);">${num(k.sum)}</td></tr>`;
+    if(!foldet) prods.forEach(pr=>{
+      html += `<tr>
+        <td style="text-align:left;padding-left:26px;${stick}background:var(--card,#fff);">${pr.varenavn}</td>
+        ${P.map(p=>`<td style="text-align:right;color:${pr.pr_periode[p.key]?'inherit':'var(--ash)'};">${num(pr.pr_periode[p.key])}</td>`).join('')}
+        <td style="text-align:right;font-weight:600;">${num(pr.sum)}</td></tr>`;
+    });
+  });
+  html += `</tbody><tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+    <td style="text-align:left;${stick}background:#eef2ee;">I alt</td>
+    ${P.map(p=>`<td style="text-align:right;background:#eef2ee;">${num(_spData.total_pr_periode[p.key])}</td>`).join('')}
+    <td style="text-align:right;background:#eef2ee;">${num(_spData.total_sum)}</td></tr></tfoot>`;
   t.innerHTML = html;
 }
 
@@ -4204,6 +4288,7 @@ const NAV_SVG = {
   bagvaerkoek:  '<path d="M2 13h12v1H2zm1-2h10l-1-5H4l-1 5zm5-8a2 2 0 012 2H6a2 2 0 012-2z"/>',
   social:       '<path d="M13 2H3a1 1 0 00-1 1v8a1 1 0 001 1h2v3l3-3h5a1 1 0 001-1V3a1 1 0 00-1-1zM5 6h6v1H5V6zm0 3h4v1H5V9z"/>',
   dbshopbox:    '<path d="M2 13h12v1H2zm1-5h2v4H3zm3-3h2v7H6zm3 4h2v3H9zm3-6h2v9h-2z"/>',
+  solgtpivot:   '<path d="M2 2h12v2H2zm0 4h5v8H2zm7 0h5v8H9z"/>',
   prisaendring: '<path d="M8 1l2.5 4.5L8 4 5.5 5.5 8 1zM2 7h12v1H2zm1 3h10v1H3zm1 3h8v1H4z"/>',
   prisvagt:     '<path d="M8 1L2 3.5v4c0 3.5 2.6 6.4 6 7.5 3.4-1.1 6-4 6-7.5v-4L8 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V5h1.5v3.5z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
@@ -4222,6 +4307,7 @@ const NAV_DEFAULT = [
   {id:'uge',         label:'Ugeoversigt',           group:'Salg & økonomi',      hidden:false},
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
+  {id:'solgtpivot',  label:'Solgte enheder',        group:'Salg & økonomi',      hidden:false},
   {id:'margin',      label:'Margin Analyse',        group:'Salg & økonomi',      hidden:false},
   {id:'dbshopbox',   label:'DB (Shopbox)',          group:'Salg & økonomi',      hidden:false},
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},

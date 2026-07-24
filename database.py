@@ -2365,31 +2365,42 @@ def hent_tgtg_spec(uge: int, aar: int) -> Dict:
     }
 
 
-def hent_solgt_pivot(gran: str = "maaned", antal: int = 12) -> Dict:
-    """Solgte enheder pr. kategori → produkt, med tidsperioder som kolonner.
-    gran: 'dag' | 'uge' | 'maaned' | 'aar'. Nyeste periode først."""
+def hent_solgt_pivot(gran: str = "maaned", antal: int = 12, maal: str = "antal") -> Dict:
+    """Pivot pr. kategori → produkt, med tidsperioder som kolonner.
+    gran: 'dag' | 'uge' | 'maaned' | 'aar' · maal: 'antal' | 'omsaetning' | 'db'.
+    Omsætning/DB er ex moms (samme konvention som v_transaktioner). Nyeste først."""
     from datetime import date as _d, timedelta as _td
-    bucket = {"dag": "dato",
-              "uge": "strftime('%Y-%W', dato)",
-              "maaned": "strftime('%Y-%m', dato)",
-              "aar": "strftime('%Y', dato)"}.get(gran, "strftime('%Y-%m', dato)")
+    bucket_kol = {"dag": "dato",
+                  "uge": "strftime('%Y-%W', dato)",
+                  "maaned": "strftime('%Y-%m', dato)",
+                  "aar": "strftime('%Y', dato)"}.get(gran, "strftime('%Y-%m', dato)")
     vindue = {"dag": antal + 2, "uge": antal * 7 + 7,
               "maaned": antal * 31 + 31, "aar": antal * 366 + 366}.get(gran, 400)
+
+    # Måltal: enheder, omsætning ex moms, eller DB (dækningsbidrag) ex moms.
+    # Omsætning/DB tages fra v_transaktioner så frost/kostpris-reglerne gælder.
+    if maal == "omsaetning":
+        vaerdi, kilde, er_kr = "COALESCE(SUM(omsaetning_ex_moms),0)", "v_transaktioner", True
+    elif maal == "db":
+        vaerdi, kilde, er_kr = "COALESCE(SUM(db_korrekt),0)", "v_transaktioner", True
+    else:
+        maal = "antal"
+        vaerdi, kilde, er_kr = "COALESCE(SUM(antal),0)", "transaktioner", False
 
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         mx = conn.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()
         if not mx or not mx["d"]:
-            return {"gran": gran, "perioder": [], "kategorier": [],
-                    "total_pr_periode": {}, "total_sum": 0}
+            return {"gran": gran, "maal": maal, "er_kr": er_kr, "perioder": [],
+                    "kategorier": [], "total_pr_periode": {}, "total_sum": 0}
         sidste = _d.fromisoformat(str(mx["d"])[:10])
         fra = (sidste - _td(days=vindue)).isoformat()
         rows = conn.execute(f"""
             SELECT COALESCE(NULLIF(TRIM(kategori),''),'(uden kategori)') AS kat,
                    varenavn, varenummer,
-                   {bucket} AS periode,
-                   COALESCE(SUM(antal),0) AS antal
-            FROM transaktioner
+                   {bucket_kol} AS periode,
+                   {vaerdi} AS antal
+            FROM {kilde}
             WHERE dato >= ? AND dato <= ?
             GROUP BY kat, varenavn, periode
         """, (fra, sidste.isoformat())).fetchall()
@@ -2412,19 +2423,21 @@ def hent_solgt_pivot(gran: str = "maaned", antal: int = 12) -> Dict:
 
     perioder = [{"key": p, "label": _label(p)} for p in alle_p]
 
-    # Byg kategori → produkt struktur
+    _rund = (lambda x: round(x)) if er_kr else (lambda x: int(round(x)))
+
+    # Byg kategori → produkt struktur (akkumulér som float, rund til sidst)
     kat_map: Dict = {}
-    tot_p: Dict = {p: 0 for p in alle_p}
+    tot_p: Dict = {p: 0.0 for p in alle_p}
     for r in rows:
         if r["periode"] not in p_set:
             continue
-        a = int(r["antal"] or 0)
-        k = kat_map.setdefault(r["kat"], {"navn": r["kat"], "sum": 0,
-                                          "pr_periode": {p: 0 for p in alle_p}, "_prod": {}})
+        a = float(r["antal"] or 0)
+        k = kat_map.setdefault(r["kat"], {"navn": r["kat"], "sum": 0.0,
+                                          "pr_periode": {p: 0.0 for p in alle_p}, "_prod": {}})
         pr = k["_prod"].setdefault(r["varenavn"] or "(ukendt)",
                                    {"varenavn": r["varenavn"] or "(ukendt)",
-                                    "varenummer": r["varenummer"] or "", "sum": 0,
-                                    "pr_periode": {p: 0 for p in alle_p}})
+                                    "varenummer": r["varenummer"] or "", "sum": 0.0,
+                                    "pr_periode": {p: 0.0 for p in alle_p}})
         pr["pr_periode"][r["periode"]] += a
         pr["sum"] += a
         k["pr_periode"][r["periode"]] += a
@@ -2433,12 +2446,18 @@ def hent_solgt_pivot(gran: str = "maaned", antal: int = 12) -> Dict:
 
     kategorier = []
     for k in sorted(kat_map.values(), key=lambda x: -x["sum"]):
-        produkter = sorted(k["_prod"].values(), key=lambda x: -x["sum"])
-        kategorier.append({"navn": k["navn"], "sum": k["sum"],
-                           "pr_periode": k["pr_periode"], "produkter": produkter})
+        produkter = [{"varenavn": pr["varenavn"], "varenummer": pr["varenummer"],
+                      "sum": _rund(pr["sum"]),
+                      "pr_periode": {p: _rund(v) for p, v in pr["pr_periode"].items()}}
+                     for pr in sorted(k["_prod"].values(), key=lambda x: -x["sum"])]
+        kategorier.append({"navn": k["navn"], "sum": _rund(k["sum"]),
+                           "pr_periode": {p: _rund(v) for p, v in k["pr_periode"].items()},
+                           "produkter": produkter})
 
-    return {"gran": gran, "perioder": perioder, "kategorier": kategorier,
-            "total_pr_periode": tot_p, "total_sum": sum(tot_p.values())}
+    return {"gran": gran, "maal": maal, "er_kr": er_kr, "perioder": perioder,
+            "kategorier": kategorier,
+            "total_pr_periode": {p: _rund(v) for p, v in tot_p.items()},
+            "total_sum": _rund(sum(tot_p.values()))}
 
 
 def hent_svind_data(aar: int = None) -> List[Dict]:

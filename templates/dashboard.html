@@ -2867,11 +2867,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-            <div id="sp-toggle" style="display:flex;gap:4px;">
-              <button class="sp-tab" data-g="dag"    onclick="spSetGran('dag')">Dag</button>
-              <button class="sp-tab" data-g="uge"    onclick="spSetGran('uge')">Uge</button>
-              <button class="sp-tab" data-g="maaned" onclick="spSetGran('maaned')">Måned</button>
-              <button class="sp-tab" data-g="aar"    onclick="spSetGran('aar')">År</button>
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+              <div id="sp-maal" style="display:flex;gap:4px;">
+                <button class="sp-mtab" data-m="antal"      onclick="spSetMaal('antal')">Antal</button>
+                <button class="sp-mtab" data-m="omsaetning" onclick="spSetMaal('omsaetning')">Omsætning</button>
+                <button class="sp-mtab" data-m="db"         onclick="spSetMaal('db')">DB</button>
+              </div>
+              <div id="sp-toggle" style="display:flex;gap:4px;">
+                <button class="sp-tab" data-g="dag"    onclick="spSetGran('dag')">Dag</button>
+                <button class="sp-tab" data-g="uge"    onclick="spSetGran('uge')">Uge</button>
+                <button class="sp-tab" data-g="maaned" onclick="spSetGran('maaned')">Måned</button>
+                <button class="sp-tab" data-g="aar"    onclick="spSetGran('aar')">År</button>
+              </div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
               <button onclick="spFoldAlle(true)"  style="background:#fff;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;padding:5px 10px;color:var(--ash);">Fold alle ind</button>
@@ -3850,24 +3857,31 @@ function paRender(){
 }
 
 // ── SOLGTE ENHEDER (pivot: kategori → produkt × tid) ──────────────────────────
-let _spData = null, _spGran = 'maaned';
+let _spData = null, _spGran = 'maaned', _spMaal = 'antal';
 const _spFoldet = {};   // kategorinavn → false = udfoldet
 
-function _spGranStyle(){
-  document.querySelectorAll('#sp-toggle .sp-tab').forEach(b=>{
-    const on = b.dataset.g === _spGran;
+function _spTabStyle(sel, attr, aktiv){
+  document.querySelectorAll(sel).forEach(b=>{
+    const on = b.dataset[attr] === aktiv;
     b.style.cssText = 'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;'
       + (on ? 'background:var(--forest);color:#fff;border:1px solid var(--forest);' : 'background:#fff;color:var(--ash);border:1px solid var(--border);');
   });
 }
+function _spGranStyle(){ _spTabStyle('#sp-toggle .sp-tab','g',_spGran); _spTabStyle('#sp-maal .sp-mtab','m',_spMaal); }
+function _spFmt(v){
+  if(!v) return '—';
+  return _spData && _spData.er_kr ? Math.round(v).toLocaleString('da-DK')+' kr'
+                                  : Number(v).toLocaleString('da-DK');
+}
 async function loadSolgtPivot(){
   _spGranStyle();
   const antal = _spGran==='dag'?14 : _spGran==='aar'?6 : 12;
-  try { _spData = await fetch(`/api/solgt-pivot?gran=${_spGran}&antal=${antal}`).then(r=>r.json()); }
+  try { _spData = await fetch(`/api/solgt-pivot?gran=${_spGran}&antal=${antal}&maal=${_spMaal}`).then(r=>r.json()); }
   catch(e){ document.getElementById('sp-tabel').innerHTML='<tbody><tr><td style="padding:12px;">Kunne ikke hente data.</td></tr></tbody>'; return; }
   spRender();
 }
 function spSetGran(g){ _spGran=g; loadSolgtPivot(); }
+function spSetMaal(m){ _spMaal=m; loadSolgtPivot(); }
 function spFold(kat){ _spFoldet[kat] = (_spFoldet[kat] === false); spRender(); }
 function spFoldAlle(ind){ (_spData&&_spData.kategorier||[]).forEach(k=>_spFoldet[k.navn]=ind); spRender(); }
 
@@ -3876,7 +3890,7 @@ function spRender(){
   const t = document.getElementById('sp-tabel'); if(!_spData) return;
   const P = _spData.perioder||[];
   const q = (document.getElementById('sp-soeg').value||'').trim().toLowerCase();
-  const num = n => n ? Number(n).toLocaleString('da-DK') : '—';
+  const num = _spFmt;
   const stick = 'position:sticky;left:0;';
   let html = `<thead><tr>
     <th style="text-align:left;${stick}background:#eef2ee;min-width:200px;">Kategori / produkt</th>

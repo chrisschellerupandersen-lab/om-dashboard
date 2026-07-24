@@ -2231,10 +2231,11 @@ async def api_social_slet(request: Request, id_: int):
 
 
 @app.get("/api/solgt-pivot")
-async def api_solgt_pivot(request: Request, gran: str = "maaned", antal: int = 12):
-    """Solgte enheder pr. kategori → produkt med tidsperioder som kolonner."""
+async def api_solgt_pivot(request: Request, gran: str = "maaned", antal: int = 12,
+                          maal: str = "antal"):
+    """Pivot pr. kategori → produkt. maal: antal | omsaetning | db."""
     _kræv_login(request)
-    return database.hent_solgt_pivot(gran, int(antal))
+    return database.hent_solgt_pivot(gran, int(antal), maal)
 
 
 @app.get("/api/db-shopbox")

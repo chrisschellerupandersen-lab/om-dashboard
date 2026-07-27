@@ -2192,8 +2192,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         <!-- Graf: dagssalg -->
         <div class="card" style="margin-bottom:14px;">
-          <div class="aar2-chart-hdr">
-            <span class="aar2-chart-ttl">Poser solgt per dag · seneste 60 dage</span>
+          <div class="aar2-chart-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+            <span class="aar2-chart-ttl" id="tgtg-graf-ttl">Poser solgt per dag · seneste 60 dage</span>
+            <div id="tgtg-graf-toggle" style="display:flex;gap:4px;">
+              <button class="tg-tab" data-g="dag"    onclick="tgtgSetGran('dag')">Dag</button>
+              <button class="tg-tab" data-g="uge"    onclick="tgtgSetGran('uge')">Uge</button>
+              <button class="tg-tab" data-g="maaned" onclick="tgtgSetGran('maaned')">Måned</button>
+            </div>
           </div>
           <div style="position:relative;height:160px;"><canvas id="c-tgtg-dage"></canvas></div>
         </div>
@@ -8443,6 +8448,46 @@ function lukTgtgSpec() {
   document.getElementById('tgtg-spec-modal').style.display = 'none';
 }
 
+let _tgtgDage = [], _tgtgGran = 'dag';
+const _TG_MDR = ['','jan','feb','mar','apr','maj','jun','jul','aug','sep','okt','nov','dec'];
+function _tgIsoUge(iso){
+  const dt = new Date(iso + 'T00:00:00');
+  const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+  const dag = (d.getUTCDay() + 6) % 7;      // mandag = 0
+  d.setUTCDate(d.getUTCDate() - dag + 3);   // torsdag i ugen
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const week = 1 + Math.round(((d - firstThu) / 864e5 - 3 + ((firstThu.getUTCDay() + 6) % 7)) / 7);
+  return { aar: d.getUTCFullYear(), uge: week };
+}
+function tgtgSetGran(g){ _tgtgGran = g; tgtgRenderGraf(); }
+function tgtgRenderGraf(){
+  document.querySelectorAll('#tgtg-graf-toggle .tg-tab').forEach(b=>{
+    const on = b.dataset.g === _tgtgGran;
+    b.style.cssText = 'padding:5px 12px;border-radius:6px;cursor:pointer;font-size:11px;font-family:inherit;'
+      + (on ? 'background:var(--forest);color:#fff;border:1px solid var(--forest);' : 'background:#fff;color:var(--ash);border:1px solid var(--border);');
+  });
+  const ttl = document.getElementById('tgtg-graf-ttl');
+  if(ttl) ttl.textContent = _tgtgGran==='dag' ? 'Poser solgt per dag · seneste 60 dage'
+                          : _tgtgGran==='uge' ? 'Poser solgt per uge'
+                          : 'Poser solgt per måned';
+  const buckets = new Map();
+  _tgtgDage.forEach(r=>{
+    let key, label, sort;
+    if(_tgtgGran==='dag'){ key=r.dato; label=r.dato.slice(5).replace('-','/'); sort=r.dato; }
+    else if(_tgtgGran==='uge'){ const w=_tgIsoUge(r.dato); key=w.aar+'-'+String(w.uge).padStart(2,'0'); label='U'+w.uge; sort=key; }
+    else { const p=r.dato.split('-'); key=p[0]+'-'+p[1]; label=_TG_MDR[+p[1]]+' '+p[0].slice(2); sort=key; }
+    const b = buckets.get(key) || { label, sort, sum:0 };
+    b.sum += (r.total_antal || 0);
+    buckets.set(key, b);
+  });
+  const arr = [...buckets.values()].sort((a,b)=> a.sort < b.sort ? -1 : 1);
+  mk('c-tgtg-dage', 'bar', arr.map(x=>x.label),
+    [{ data: arr.map(x=>x.sum), backgroundColor:'rgba(74,124,74,.55)',
+       borderColor:'#4a7c4a', borderWidth:1, borderRadius:2 }],
+    { scales:{ x:{ ticks:{ font:{size:10}, maxRotation:45 }},
+               y:{ ticks:{ font:{size:10}}, beginAtZero:true }}});
+}
+
 async function loadTgtg() {
   if (_tgtgLoaded) return;
   _tgtgLoaded = true;
@@ -8478,15 +8523,9 @@ async function loadTgtg() {
     diffSub.textContent = 'ingen fakturaer endnu';
   }
 
-  // Dagsgraf
-  if (d.dage && d.dage.length) {
-    const dage = [...d.dage].reverse();
-    mk('c-tgtg-dage', 'bar', dage.map(r => r.dato.slice(5).replace('-','/')),
-      [{ data: dage.map(r => r.total_antal), backgroundColor: 'rgba(74,124,74,.55)',
-         borderColor: '#4a7c4a', borderWidth:1, borderRadius:2 }],
-      { scales: { x: { ticks: { font:{ size:10 }, maxRotation:45 }},
-                  y: { ticks: { font:{ size:10 }}, beginAtZero:true }}});
-  }
+  // Dagsgraf (grupperbar: dag/uge/måned)
+  _tgtgDage = (d.dage && d.dage.length) ? [...d.dage].reverse() : [];  // ældst→nyest
+  tgtgRenderGraf();
 
   // Per pose-type tabel
   const poserPriser = {};

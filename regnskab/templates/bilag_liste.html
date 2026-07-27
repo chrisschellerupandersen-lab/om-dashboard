@@ -1,13 +1,19 @@
 {% extends "base.html" %}
-{% block title %}Bilag — Regnskab{% endblock %}
+{% block title %}Bilag — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-  <h1>Bilag</h1>
-  <a class="btn" href="/bilag/upload">+ Upload bilag</a>
+<div class="page-head">
+  <div>
+    <h1>Bilag</h1>
+    <div class="sub">Leverandørfakturaer og kvitteringer</div>
+  </div>
+  <a class="btn" href="/bilag/upload">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Upload bilag
+  </a>
 </div>
 <div class="card">
 <table>
-  <thead><tr><th>#</th><th>Leverandør</th><th>Fakturanr</th><th>Dato</th><th>Beløb i alt</th><th>Status</th><th></th></tr></thead>
+  <thead><tr><th>#</th><th>Leverandør</th><th>Fakturanr</th><th>Dato</th><th class="num">Beløb i alt</th><th>Status</th><th></th></tr></thead>
   <tbody>
   {% for b in bilag %}
     <tr>
@@ -15,9 +21,9 @@
       <td>{{ b.leverandoer_navn or "—" }}</td>
       <td>{{ b.fakturanr or "—" }}</td>
       <td>{{ b.fakturadato or "—" }}</td>
-      <td>{{ "%.2f"|format(b.beloeb_total) }} kr</td>
+      <td class="num">{{ "%.2f"|format(b.beloeb_total) }} kr</td>
       <td><span class="badge {{ b.status }}">{{ b.status }}</span></td>
-      <td><a href="/bilag/{{ b.id }}">Åbn</a></td>
+      <td><a href="/bilag/{{ b.id }}">Åbn →</a></td>
     </tr>
   {% else %}
     <tr><td colspan="7" class="muted">Ingen bilag uploadet endnu.</td></tr>

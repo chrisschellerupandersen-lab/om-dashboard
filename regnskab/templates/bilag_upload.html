@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Upload bilag — Regnskab{% endblock %}
+{% block title %}Upload bilag — Nimbo Regnskab{% endblock %}
 {% block content %}
-<h1>Upload leverandørfaktura</h1>
+<div class="page-head"><div><h1>Upload leverandørfaktura</h1><div class="sub">PDF eller billede — AI foreslår kontering</div></div></div>
 <div class="card" style="max-width:480px;">
   {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
   <form method="post" action="/bilag/upload" enctype="multipart/form-data">

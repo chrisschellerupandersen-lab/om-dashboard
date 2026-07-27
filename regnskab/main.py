@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Regnskab", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
+templates.env.globals["bruger_fra_session"] = lambda request: (get_session(request) or {}).get("brugernavn")
 
 SECRET_KEY   = os.environ.get("SECRET_KEY", "skift-mig-i-railway-variables")
 REGNSKAB_USER = os.environ.get("REGNSKAB_USERNAME", "admin")
@@ -85,7 +86,28 @@ async def logout():
 async def root(request: Request):
     if not get_session(request):
         return RedirectResponse("/login", status_code=302)
-    return RedirectResponse("/bilag", status_code=302)
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+_DAGE = ["mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag", "søndag"]
+_MAANEDER = ["januar", "februar", "marts", "april", "maj", "juni", "juli",
+             "august", "september", "oktober", "november", "december"]
+
+
+def _dansk_dato(d: date) -> str:
+    return f"{_DAGE[d.weekday()].capitalize()} {d.day}. {_MAANEDER[d.month - 1]} {d.year}"
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard_side(request: Request):
+    bruger = _kræv_login(request)
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "bruger": bruger,
+        "idag": _dansk_dato(date.today()),
+        "kpi": database.hent_dashboard_kpi(),
+        "posteringer": database.hent_posteringer(limit=6),
+    })
 
 
 @app.get("/bilag", response_class=HTMLResponse)

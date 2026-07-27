@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Kreditor — Regnskab{% endblock %}
+{% block title %}Kreditor — Nimbo Regnskab{% endblock %}
 {% block content %}
-<h1>Kreditor — åbne leverandørposter</h1>
+<div class="page-head"><div><h1>Kreditor</h1><div class="sub">Åbne leverandørposter</div></div></div>
 <div class="card">
 <table>
-  <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th>Restbeløb</th><th>Alder</th></tr></thead>
+  <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Restbeløb</th><th>Alder</th></tr></thead>
   <tbody>
   {% for p in aabne_poster %}
     <tr>
       <td>{{ p.kreditor_navn }}</td>
       <td>{{ p.fakturanr or "—" }}</td>
       <td>{{ p.forfaldsdato or "—" }}</td>
-      <td>{{ "%.2f"|format(p.restbeloeb) }} kr</td>
+      <td class="num">{{ "%.2f"|format(p.restbeloeb) }} kr</td>
       <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
     </tr>
   {% else %}
@@ -20,5 +20,5 @@
   </tbody>
 </table>
 </div>
-<p class="muted">Betalingsfil-generering (pain.001) og automatisk bankmatch kommer i fase 2/3.</p>
+<p class="muted">Betalingsfil-generering (pain.001) mod bank kommer i en senere fase.</p>
 {% endblock %}

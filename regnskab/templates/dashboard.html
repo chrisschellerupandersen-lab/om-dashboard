@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Godmorgen, {{ bruger }}</h1>
+    <div class="sub">{{ idag }} · alt er synkroniseret</div>
+  </div>
+  <a class="btn" href="/bilag/upload">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Upload bilag
+  </a>
+</div>
+
+<div class="kpis">
+  <div class="kpi">
+    <div class="k-top">
+      <span class="k-label">Åbne kreditorposter</span>
+      <span class="k-icon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2.5 5.5 7.5 2 12.5 5.5v7h-10z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+    </div>
+    <div class="k-val">{{ "%.0f"|format(kpi.kreditor_sum) }} kr</div>
+    <div class="k-meta">{{ kpi.kreditor_antal }} {{ "faktura" if kpi.kreditor_antal == 1 else "fakturaer" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="k-top">
+      <span class="k-label">Åbne debitorposter</span>
+      <span class="k-icon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><circle cx="7.5" cy="5" r="2.2" stroke="currentColor" stroke-width="1.4"/><path d="M3 13c0-2.6 2-4.5 4.5-4.5S12 10.4 12 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg></span>
+    </div>
+    <div class="k-val">{{ "%.0f"|format(kpi.debitor_sum) }} kr</div>
+    <div class="k-meta">{{ kpi.debitor_antal }} {{ "faktura" if kpi.debitor_antal == 1 else "fakturaer" }}</div>
+  </div>
+  <div class="kpi">
+    <div class="k-top">
+      <span class="k-label">Bank (simuleret)</span>
+      <span class="k-icon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M2 5 7.5 1.5 13 5" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M3 5v6.5h9V5" stroke="currentColor" stroke-width="1.4"/></svg></span>
+    </div>
+    <div class="k-val">{{ "%.0f"|format(kpi.banksaldo) }} kr</div>
+    <div class="k-meta">Sum af indlæste transaktioner</div>
+  </div>
+  <div class="kpi">
+    <div class="k-top">
+      <span class="k-label">Bilag til godkendelse</span>
+      <span class="k-icon"><svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M4 2h5l2.5 2.5V13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></span>
+    </div>
+    <div class="k-val">{{ kpi.bilag_afventer }}</div>
+    <div class="k-meta">{{ "Ingen venter" if kpi.bilag_afventer == 0 else "Venter på gennemgang" }}</div>
+  </div>
+</div>
+
+<div class="row" style="align-items: stretch;">
+  <div class="card" style="flex: 1.2; margin-bottom: 0;">
+    <h2 style="font-size:14px; margin:0 0 3px;">Seneste posteringer</h2>
+    <p class="muted" style="margin:0 0 14px;">Bogført fra bilag og bankmatch</p>
+    {% for p in posteringer %}
+    <div style="display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);">
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:12.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ p.tekst }}</div>
+        <div class="muted">{{ p.dato }} · {{ p.bruger }}</div>
+      </div>
+    </div>
+    {% else %}
+    <p class="muted">Ingen posteringer bogført endnu — <a href="/bilag/upload">upload et bilag</a> for at komme i gang.</p>
+    {% endfor %}
+    {% if posteringer %}
+    <div style="margin-top:12px;"><a href="/posteringer" class="muted">Se alle posteringer →</a></div>
+    {% endif %}
+  </div>
+
+  <div class="card" style="flex: 0.8; margin-bottom: 0;">
+    <h2 style="font-size:14px; margin:0 0 3px;">Bogført denne måned</h2>
+    <p class="muted" style="margin:0 0 14px;">{{ kpi.maaned_antal }} {{ "bilag" }}</p>
+    <div style="font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 700; letter-spacing: -.02em;">
+      {{ "%.0f"|format(kpi.maaned_sum) }} kr
+    </div>
+    <p class="muted" style="margin-top:14px;">Automatisk bogført via AI-læsning af leverandørfakturaer og manuel debitorregistrering.</p>
+  </div>
+</div>
+{% endblock %}

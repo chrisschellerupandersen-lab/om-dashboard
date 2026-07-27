@@ -497,6 +497,29 @@ def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
         return out
 
 
+def hent_dashboard_kpi() -> Dict[str, Any]:
+    with _conn() as conn:
+        kred = conn.execute(
+            "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM kreditor_poster WHERE status != 'udlignet'"
+        ).fetchone()
+        deb = conn.execute(
+            "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM debitor_poster WHERE status != 'udlignet'"
+        ).fetchone()
+        afventer = conn.execute("SELECT COUNT(*) c FROM bilag WHERE status = 'afventer'").fetchone()
+        bank = conn.execute("SELECT COALESCE(SUM(beloeb),0) s FROM banktransaktioner").fetchone()
+        maaned = conn.execute("""
+            SELECT COALESCE(SUM(beloeb_total),0) s, COUNT(*) c FROM bilag
+            WHERE status = 'bogfoert' AND strftime('%Y-%m', godkendt_ts) = strftime('%Y-%m','now','localtime')
+        """).fetchone()
+        return {
+            "kreditor_sum": kred["s"], "kreditor_antal": kred["c"],
+            "debitor_sum": deb["s"], "debitor_antal": deb["c"],
+            "bilag_afventer": afventer["c"],
+            "banksaldo": bank["s"],
+            "maaned_sum": maaned["s"], "maaned_antal": maaned["c"],
+        }
+
+
 # ── Banktransaktioner (simuleret indlæsning) + match ────────────────────
 
 def indlæs_banktransaktioner(linjer: List[Dict[str, Any]], kilde: str = "simulation") -> int:

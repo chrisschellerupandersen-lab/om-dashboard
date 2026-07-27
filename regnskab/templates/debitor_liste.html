@@ -1,21 +1,24 @@
 {% extends "base.html" %}
-{% block title %}Debitor — Regnskab{% endblock %}
+{% block title %}Debitor — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-  <h1>Debitor</h1>
-  <a class="btn" href="/debitorer/ny">+ Ny debitor / faktura</a>
+<div class="page-head">
+  <div><h1>Debitor</h1><div class="sub">Kunder og åbne fakturaposter</div></div>
+  <a class="btn" href="/debitorer/ny">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Ny debitor / faktura
+  </a>
 </div>
 <div class="card">
-<h2 style="font-size:15px;">Åbne poster</h2>
+<h2 style="font-size:14px; margin:0 0 12px;">Åbne poster</h2>
 <table>
-  <thead><tr><th>Kunde</th><th>Fakturanr</th><th>Forfald</th><th>Restbeløb</th><th>Alder</th></tr></thead>
+  <thead><tr><th>Kunde</th><th>Fakturanr</th><th>Forfald</th><th class="num">Restbeløb</th><th>Alder</th></tr></thead>
   <tbody>
   {% for p in aabne_poster %}
     <tr>
       <td>{{ p.debitor_navn }}</td>
       <td>{{ p.fakturanr or "—" }}</td>
       <td>{{ p.forfaldsdato or "—" }}</td>
-      <td>{{ "%.2f"|format(p.restbeloeb) }} kr</td>
+      <td class="num">{{ "%.2f"|format(p.restbeloeb) }} kr</td>
       <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
     </tr>
   {% else %}
@@ -25,7 +28,7 @@
 </table>
 </div>
 <div class="card">
-<h2 style="font-size:15px;">Kunder</h2>
+<h2 style="font-size:14px; margin:0 0 12px;">Kunder</h2>
 <table>
   <thead><tr><th>Navn</th><th>CVR</th><th>Email</th></tr></thead>
   <tbody>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Bilag #{{ bilag.id }} — Regnskab{% endblock %}
+{% block title %}Bilag #{{ bilag.id }} — Nimbo Regnskab{% endblock %}
 {% block content %}
-<h1>Bilag #{{ bilag.id }} <span class="badge {{ bilag.status }}">{{ bilag.status }}</span></h1>
+<div class="page-head"><div><h1>Bilag #{{ bilag.id }} <span class="badge {{ bilag.status }}">{{ bilag.status }}</span></h1><div class="sub">{{ bilag.leverandoer_navn or "Endnu ikke navngivet" }}</div></div></div>
 <div class="card">
   {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
   {% if bilag.status == 'afventer' %}

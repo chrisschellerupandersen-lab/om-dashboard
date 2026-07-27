@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Ny debitor — Regnskab{% endblock %}
+{% block title %}Ny debitor — Nimbo Regnskab{% endblock %}
 {% block content %}
-<h1>Ny debitor</h1>
+<div class="page-head"><div><h1>Ny debitor</h1><div class="sub">Kunde og evt. fakturapost</div></div></div>
 <div class="card" style="max-width:520px;">
   {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
   <form method="post" action="/debitorer/ny">

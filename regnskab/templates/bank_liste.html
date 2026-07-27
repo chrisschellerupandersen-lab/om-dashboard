@@ -1,37 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Bank — Regnskab{% endblock %}
+{% block title %}Bank — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-  <h1>Bank</h1>
-  <a class="btn" href="/bank/indlaes">+ Indlæs banktransaktioner</a>
+<div class="page-head">
+  <div><h1>Bank</h1><div class="sub">Indlæste transaktioner og matchforslag</div></div>
+  <a class="btn" href="/bank/indlaes">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Indlæs banktransaktioner
+  </a>
 </div>
 
 {% for tx in transaktioner %}
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
-      <strong>{{ tx.dato }} — {{ "%.2f"|format(tx.beloeb) }} kr</strong>
+      <strong style="font-variant-numeric: tabular-nums;">{{ tx.dato }} — {{ "%.2f"|format(tx.beloeb) }} kr</strong>
       <div class="muted">{{ tx.tekst or "(ingen tekst)" }}</div>
     </div>
-    <span class="badge {{ 'bogfoert' if tx.match_status == 'godkendt' else ('afvist' if tx.match_status == 'ignoreret' else 'afventer') }}">{{ tx.match_status }}</span>
+    <span class="badge {{ 'godkendt' if tx.match_status == 'godkendt' else ('ignoreret' if tx.match_status == 'ignoreret' else 'uafklaret') }}">{{ tx.match_status }}</span>
   </div>
 
   {% if tx.match_status == 'uafklaret' %}
     {% if tx.forslag %}
-    <table style="margin-top:12px;">
-      <thead><tr><th>Modpart</th><th>Fakturanr</th><th>Beløb</th><th>Begrundelse</th><th></th></tr></thead>
+    <table style="margin-top:14px;">
+      <thead><tr><th>Modpart</th><th>Fakturanr</th><th class="num">Beløb</th><th>Begrundelse</th><th></th></tr></thead>
       <tbody>
       {% for f in tx.forslag %}
         <tr>
           <td>{{ f.navn }} <span class="muted">({{ f.modpart_type }})</span></td>
           <td>{{ f.fakturanr or "—" }}</td>
-          <td>{{ "%.2f"|format(f.restbeloeb) }} kr</td>
+          <td class="num">{{ "%.2f"|format(f.restbeloeb) }} kr</td>
           <td class="muted">{{ f.begrundelse }}</td>
           <td>
             <form method="post" action="/bank/{{ tx.id }}/match" style="display:inline;">
               <input type="hidden" name="modpart_type" value="{{ f.modpart_type }}">
               <input type="hidden" name="post_id" value="{{ f.post_id }}">
-              <button class="btn" type="submit" style="padding:4px 10px; font-size:13px;">Bekræft match</button>
+              <button class="btn" type="submit" style="padding:5px 12px; font-size:12.5px;">Bekræft match</button>
             </form>
           </td>
         </tr>
@@ -41,8 +44,8 @@
     {% else %}
     <p class="muted" style="margin-top:12px;">Ingen forslag fundet — intet åbent debitor-/kreditorbeløb matcher præcist.</p>
     {% endif %}
-    <form method="post" action="/bank/{{ tx.id }}/ignorer" style="margin-top:8px;">
-      <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:13px;">Ignorér</button>
+    <form method="post" action="/bank/{{ tx.id }}/ignorer" style="margin-top:10px;">
+      <button class="btn secondary" type="submit" style="padding:5px 12px; font-size:12.5px;">Ignorér</button>
     </form>
   {% endif %}
 </div>

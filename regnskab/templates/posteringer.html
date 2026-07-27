@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Posteringer — Regnskab{% endblock %}
+{% block title %}Posteringer — Nimbo Regnskab{% endblock %}
 {% block content %}
-<h1>Posteringer (ledger)</h1>
+<div class="page-head"><div><h1>Posteringer</h1><div class="sub">Dobbelt bogholderi — append-only revisionsspor</div></div></div>
 <div class="card">
 <table>
   <thead><tr><th>#</th><th>Dato</th><th>Tekst</th><th>Bruger</th><th>Linjer</th></tr></thead>
@@ -14,7 +14,7 @@
       <td>{{ p.bruger }}</td>
       <td>
         {% for l in p.linjer %}
-          <div class="muted">{{ l.kontonr }} — debet {{ "%.2f"|format(l.debet) }} / kredit {{ "%.2f"|format(l.kredit) }}</div>
+          <div class="muted" style="font-variant-numeric: tabular-nums;">{{ l.kontonr }} — debet {{ "%.2f"|format(l.debet) }} / kredit {{ "%.2f"|format(l.kredit) }}</div>
         {% endfor %}
       </td>
     </tr>

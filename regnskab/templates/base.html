@@ -3,53 +3,172 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block title %}Regnskab{% endblock %}</title>
+<title>{% block title %}Nimbo — Regnskab{% endblock %}</title>
 <style>
-  :root { color-scheme: light dark; }
+  :root {
+    color-scheme: light;
+    --bg: #F6F7F9;
+    --surface: #FFFFFF;
+    --surface-alt: #F0F2F5;
+    --border: #E4E7EC;
+    --text: #14171C;
+    --muted: #6E7681;
+    --accent: #2F6FED;
+    --accent-soft: #EAF1FE;
+    --good: #1FA97F;
+    --good-soft: #E4F7EF;
+    --bad: #E5484D;
+    --bad-soft: #FCEAEA;
+    --warn: #B7791F;
+    --warn-soft: #FDF3DC;
+    --radius-card: 16px;
+    --radius-chip: 10px;
+    --shadow-card: 0 1px 2px rgba(20,23,28,.04), 0 10px 24px -14px rgba(20,23,28,.14);
+  }
   * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; background: #f4f5f7; color: #1a1a1a; }
-  header { background: #1f2937; color: #fff; padding: 12px 20px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-  header a { color: #d1d5db; text-decoration: none; padding: 6px 10px; border-radius: 6px; font-size: 14px; }
-  header a:hover, header a.active { background: #374151; color: #fff; }
-  header .logo { font-weight: 700; color: #fff; margin-right: 10px; }
-  main { max-width: 1000px; margin: 24px auto; padding: 0 20px; }
-  h1 { font-size: 22px; margin: 0 0 16px; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
-  th { background: #f9fafb; font-weight: 600; color: #4b5563; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: 14px;
+  }
+  .shell { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+
+  /* ---- sidebar ---- */
+  .side { background: var(--surface-alt); border-right: 1px solid var(--border); padding: 20px 14px; display: flex; flex-direction: column; gap: 22px; position: sticky; top: 0; height: 100vh; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 4px; text-decoration: none; color: inherit; }
+  .brand .name { font-size: 15px; font-weight: 700; letter-spacing: -.01em; line-height: 1.2; }
+  .brand .tag { font-size: 10.5px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+
+  nav { display: flex; flex-direction: column; gap: 2px; }
+  .grp-label { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; padding: 12px 10px 4px; }
+  nav a { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: var(--radius-chip); color: var(--muted); font-size: 13.5px; font-weight: 600; text-decoration: none; }
+  nav a svg { flex: none; opacity: .85; }
+  nav a:hover { background: #E9EBEF; color: var(--text); }
+  nav a.active { background: var(--accent-soft); color: var(--accent); }
+  nav a.active svg { opacity: 1; }
+
+  .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+  .user { display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: var(--radius-chip); }
+  .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: 700; }
+  .user .u-name { font-size: 12.5px; font-weight: 600; }
+  .user .u-role a { font-size: 11px; color: var(--muted); text-decoration: none; }
+  .user .u-role a:hover { color: var(--text); text-decoration: underline; }
+
+  /* ---- main ---- */
+  main { padding: 30px 34px 60px; max-width: 1180px; }
+  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -.01em; }
+  .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .page-head .sub { font-size: 12.5px; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius-card); overflow: hidden; box-shadow: var(--shadow-card); border: 1px solid var(--border); }
+  th, td { padding: 11px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px; }
+  th { background: var(--surface-alt); font-weight: 600; color: var(--muted); font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
   tr:last-child td { border-bottom: none; }
-  .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 20px; }
-  .btn { display: inline-block; background: #2563eb; color: #fff; padding: 8px 16px; border-radius: 6px; text-decoration: none; border: none; font-size: 14px; cursor: pointer; }
-  .btn:hover { background: #1d4ed8; }
-  .btn.secondary { background: #6b7280; }
-  .btn.danger { background: #dc2626; }
-  label { display: block; font-size: 13px; font-weight: 600; margin: 12px 0 4px; color: #374151; }
-  input, select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+  td.num, th.num { font-variant-numeric: tabular-nums; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 22px; box-shadow: var(--shadow-card); margin-bottom: 20px; }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: #fff; padding: 9px 16px; border-radius: var(--radius-chip); text-decoration: none; border: none; font: inherit; font-size: 13.5px; font-weight: 700; cursor: pointer; }
+  .btn:hover { background: #2A5FD1; }
+  .btn.secondary { background: var(--surface-alt); color: var(--text); border: 1px solid var(--border); }
+  .btn.secondary:hover { background: #E9EBEF; }
+  .btn.danger { background: var(--bad-soft); color: var(--bad); }
+  .btn.danger:hover { background: #F8D7D8; }
+
+  label { display: block; font-size: 12.5px; font-weight: 600; margin: 14px 0 5px; color: var(--muted); }
+  input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--radius-chip); font: inherit; font-size: 13.5px; background: var(--surface); color: var(--text); }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
   .row { display: flex; gap: 16px; flex-wrap: wrap; }
   .row > div { flex: 1; min-width: 180px; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
-  .badge.afventer { background: #fef3c7; color: #92400e; }
-  .badge.bogfoert { background: #d1fae5; color: #065f46; }
-  .badge.afvist { background: #fee2e2; color: #991b1b; }
-  .badge.aaben { background: #dbeafe; color: #1e40af; }
-  .badge.forfalden { background: #fee2e2; color: #991b1b; }
-  .fejl { background: #fee2e2; color: #991b1b; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; font-size: 14px; }
-  .muted { color: #6b7280; font-size: 13px; }
+
+  .badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 700; }
+  .badge.afventer, .badge.forfalden { background: var(--warn-soft); color: var(--warn); }
+  .badge.bogfoert, .badge.godkendt, .badge.udlignet { background: var(--good-soft); color: var(--good); }
+  .badge.afvist, .badge.ignoreret { background: var(--bad-soft); color: var(--bad); }
+  .badge.aaben, .badge.uafklaret { background: var(--accent-soft); color: var(--accent); }
+
+  .fejl { background: var(--bad-soft); color: #9A1E22; padding: 11px 15px; border-radius: var(--radius-chip); margin-bottom: 16px; font-size: 13.5px; }
+  .muted { color: var(--muted); font-size: 12.5px; }
+
+  /* ---- KPI cards (dashboard + summary rows) ---- */
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 20px; }
+  .kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 18px 18px 16px; box-shadow: var(--shadow-card); }
+  .kpi .k-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+  .kpi .k-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .kpi .k-icon { width: 30px; height: 30px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; flex: none; }
+  .kpi .k-val { font-variant-numeric: tabular-nums; font-size: 24px; font-weight: 700; letter-spacing: -.02em; margin-bottom: 4px; }
+  .kpi .k-meta { font-size: 12px; color: var(--muted); }
+
+  @media (max-width: 880px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; align-items: center; overflow-x: auto; }
+    .side nav { flex-direction: row; }
+    .side .side-foot { margin-top: 0; }
+    .side .user .u-name, .side .user .u-role { display: none; }
+    main { padding: 20px 16px 40px; }
+    .kpis { grid-template-columns: repeat(2, 1fr); }
+  }
 </style>
 </head>
 <body>
-<header>
-  <span class="logo">📒 Regnskab</span>
-  <a href="/bilag">Bilag</a>
-  <a href="/debitorer">Debitor</a>
-  <a href="/kreditorer">Kreditor</a>
-  <a href="/bank">Bank</a>
-  <a href="/posteringer">Posteringer</a>
-  <span style="flex:1"></span>
-  <a href="/logout">Log ud</a>
-</header>
-<main>
-{% block content %}{% endblock %}
-</main>
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="/dashboard">
+      <svg width="32" height="32" viewBox="0 0 34 34" fill="none">
+        <circle cx="17" cy="6.5" r="2.1" fill="#2F6FED"/>
+        <path d="M7 15c0-3.5 3-6 7-6h6c4 0 7 2.5 7 6 0 3.6-3.2 6.5-7.2 6.5H14.2C10.2 21.5 7 18.6 7 15z" stroke="#2F6FED" stroke-width="1.8" fill="#EAF1FE"/>
+        <text x="17" y="18.5" font-family="-apple-system,Segoe UI,sans-serif" font-size="9" font-weight="700" fill="#2F6FED" text-anchor="middle">N</text>
+      </svg>
+      <span>
+        <div class="name">Nimbo</div>
+        <div class="tag">Regnskab</div>
+      </span>
+    </a>
+
+    <nav>
+      <div class="grp-label">Oversigt</div>
+      <a href="/dashboard" class="{{ 'active' if request.url.path.startswith('/dashboard') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><rect x="1.5" y="1.5" width="6" height="6" rx="1.6" stroke="currentColor" stroke-width="1.5"/><rect x="9.5" y="1.5" width="6" height="6" rx="1.6" stroke="currentColor" stroke-width="1.5"/><rect x="1.5" y="9.5" width="6" height="6" rx="1.6" stroke="currentColor" stroke-width="1.5"/><rect x="9.5" y="9.5" width="6" height="6" rx="1.6" stroke="currentColor" stroke-width="1.5"/></svg>
+        Dashboard
+      </a>
+      <div class="grp-label">Regnskab</div>
+      <a href="/bilag" class="{{ 'active' if request.url.path.startswith('/bilag') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M4 2h6l3 3v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h5M6 11h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Bilag
+      </a>
+      <a href="/debitorer" class="{{ 'active' if request.url.path.startswith('/debitorer') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.5" r="2.6" stroke="currentColor" stroke-width="1.5"/><path d="M3 15c0-3 2.5-5 5.5-5s5.5 2 5.5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Debitor
+      </a>
+      <a href="/kreditorer" class="{{ 'active' if request.url.path.startswith('/kreditorer') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3 14V6l5.5-3L14 6v8" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 14v-4h4v4" stroke="currentColor" stroke-width="1.5"/></svg>
+        Kreditor
+      </a>
+      <a href="/bank" class="{{ 'active' if request.url.path.startswith('/bank') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2 6.5 8.5 2 15 6.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3.5 6.5V14h11V6.5" stroke="currentColor" stroke-width="1.5"/><path d="M6.5 14v-3.5h4V14" stroke="currentColor" stroke-width="1.5"/></svg>
+        Bank
+      </a>
+      <a href="/posteringer" class="{{ 'active' if request.url.path.startswith('/posteringer') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5h12M2.5 8.5h12M2.5 12.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Posteringer
+      </a>
+    </nav>
+
+    <div class="side-foot">
+      {% set bruger = bruger_fra_session(request) %}
+      <div class="user">
+        <div class="avatar">{{ (bruger or "?")[0]|upper }}</div>
+        <div>
+          <div class="u-name">{{ bruger or "Ukendt" }}</div>
+          <div class="u-role"><a href="/logout">Log ud</a></div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+  {% block content %}{% endblock %}
+  </main>
+</div>
 </body>
 </html>

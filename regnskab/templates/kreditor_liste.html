@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Kreditor — Regnskab{% endblock %}
+{% block content %}
+<h1>Kreditor — åbne leverandørposter</h1>
+<div class="card">
+<table>
+  <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th>Restbeløb</th><th>Alder</th></tr></thead>
+  <tbody>
+  {% for p in aabne_poster %}
+    <tr>
+      <td>{{ p.kreditor_navn }}</td>
+      <td>{{ p.fakturanr or "—" }}</td>
+      <td>{{ p.forfaldsdato or "—" }}</td>
+      <td>{{ "%.2f"|format(p.restbeloeb) }} kr</td>
+      <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Ingen åbne kreditorposter — upload et bilag for at komme i gang.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted">Betalingsfil-generering (pain.001) og automatisk bankmatch kommer i fase 2/3.</p>
+{% endblock %}

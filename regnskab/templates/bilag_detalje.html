@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Bilag #{{ bilag.id }} — Regnskab{% endblock %}
+{% block content %}
+<h1>Bilag #{{ bilag.id }} <span class="badge {{ bilag.status }}">{{ bilag.status }}</span></h1>
+<div class="card">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  {% if bilag.status == 'afventer' %}
+  <form method="post" action="/bilag/{{ bilag.id }}/godkend">
+    <div class="row">
+      <div>
+        <label>Leverandør</label>
+        <input name="leverandoer_navn" value="{{ bilag.leverandoer_navn or '' }}" required>
+      </div>
+      <div>
+        <label>CVR</label>
+        <input name="leverandoer_cvr" value="{{ bilag.leverandoer_cvr or '' }}">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Fakturanr</label>
+        <input name="fakturanr" value="{{ bilag.fakturanr or '' }}">
+      </div>
+      <div>
+        <label>Fakturadato (YYYY-MM-DD)</label>
+        <input name="fakturadato" value="{{ bilag.fakturadato or '' }}">
+      </div>
+      <div>
+        <label>Forfaldsdato (YYYY-MM-DD)</label>
+        <input name="forfaldsdato" value="{{ bilag.forfaldsdato or '' }}">
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Beløb ekskl. moms</label>
+        <input name="beloeb_ex_moms" type="number" step="0.01" value="{{ bilag.beloeb_ex_moms }}" required>
+      </div>
+      <div>
+        <label>Moms</label>
+        <input name="moms_beloeb" type="number" step="0.01" value="{{ bilag.moms_beloeb }}">
+      </div>
+      <div>
+        <label>Beløb i alt</label>
+        <input name="beloeb_total" type="number" step="0.01" value="{{ bilag.beloeb_total }}" required>
+      </div>
+    </div>
+    <label>Konteres på</label>
+    <select name="kontonr">
+      {% for k in kontoplan if k.kontotype == 'omkostning' %}
+      <option value="{{ k.kontonr }}" {% if k.kontonr == bilag.kontonr %}selected{% endif %}>{{ k.kontonr }} — {{ k.navn }}</option>
+      {% endfor %}
+    </select>
+    <div style="margin-top:20px; display:flex; gap:10px;">
+      <button class="btn" type="submit">Godkend &amp; bogfør</button>
+    </div>
+  </form>
+  <form method="post" action="/bilag/{{ bilag.id }}/afvis" style="margin-top:10px;">
+    <button class="btn danger" type="submit">Afvis bilag</button>
+  </form>
+  {% else %}
+  <table>
+    <tr><th>Leverandør</th><td>{{ bilag.leverandoer_navn }} ({{ bilag.leverandoer_cvr or "intet CVR" }})</td></tr>
+    <tr><th>Fakturanr</th><td>{{ bilag.fakturanr }}</td></tr>
+    <tr><th>Dato / forfald</th><td>{{ bilag.fakturadato }} / {{ bilag.forfaldsdato }}</td></tr>
+    <tr><th>Beløb i alt</th><td>{{ "%.2f"|format(bilag.beloeb_total) }} kr (moms {{ "%.2f"|format(bilag.moms_beloeb) }} kr)</td></tr>
+    <tr><th>Konto</th><td>{{ bilag.kontonr }}</td></tr>
+    <tr><th>Godkendt af</th><td>{{ bilag.godkendt_af }} — {{ bilag.godkendt_ts }}</td></tr>
+  </table>
+  {% endif %}
+</div>
+<a href="/bilag" class="muted">&larr; Tilbage til bilag</a>
+{% endblock %}

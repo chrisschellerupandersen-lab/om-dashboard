@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Posteringer — Regnskab{% endblock %}
+{% block content %}
+<h1>Posteringer (ledger)</h1>
+<div class="card">
+<table>
+  <thead><tr><th>#</th><th>Dato</th><th>Tekst</th><th>Bruger</th><th>Linjer</th></tr></thead>
+  <tbody>
+  {% for p in posteringer %}
+    <tr>
+      <td>{{ p.id }}</td>
+      <td>{{ p.dato }}</td>
+      <td>{{ p.tekst }}</td>
+      <td>{{ p.bruger }}</td>
+      <td>
+        {% for l in p.linjer %}
+          <div class="muted">{{ l.kontonr }} — debet {{ "%.2f"|format(l.debet) }} / kredit {{ "%.2f"|format(l.kredit) }}</div>
+        {% endfor %}
+      </td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Ingen posteringer bogført endnu.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

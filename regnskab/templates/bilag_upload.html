@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Upload bilag — Regnskab{% endblock %}
+{% block content %}
+<h1>Upload leverandørfaktura</h1>
+<div class="card" style="max-width:480px;">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <form method="post" action="/bilag/upload" enctype="multipart/form-data">
+    <label>Faktura (PDF eller billede)</label>
+    <input type="file" name="fil" accept="application/pdf,image/*" required>
+    <p class="muted">AI læser automatisk leverandør, beløb, moms og forfaldsdato — du godkender/retter på næste side.</p>
+    <button class="btn" type="submit">Upload &amp; læs med AI</button>
+  </form>
+</div>
+{% endblock %}

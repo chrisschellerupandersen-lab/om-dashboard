@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Ny debitor — Regnskab{% endblock %}
+{% block content %}
+<h1>Ny debitor</h1>
+<div class="card" style="max-width:520px;">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <form method="post" action="/debitorer/ny">
+    <div class="row">
+      <div><label>Navn</label><input name="navn" required></div>
+      <div><label>CVR</label><input name="cvr"></div>
+    </div>
+    <label>Adresse</label>
+    <input name="adresse">
+    <label>Email</label>
+    <input name="email" type="email">
+
+    <label style="margin-top:20px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" name="opret_faktura" style="width:auto;"> Opret fakturapost med det samme
+    </label>
+    <div class="row">
+      <div><label>Fakturanr</label><input name="fakturanr"></div>
+      <div><label>Fakturadato</label><input name="dato_str" placeholder="YYYY-MM-DD"></div>
+      <div><label>Forfaldsdato</label><input name="forfaldsdato" placeholder="YYYY-MM-DD"></div>
+    </div>
+    <div class="row">
+      <div><label>Beløb ekskl. moms</label><input name="beloeb_ex_moms" type="number" step="0.01" value="0"></div>
+      <div><label>Moms</label><input name="moms_beloeb" type="number" step="0.01" value="0"></div>
+    </div>
+    <div style="margin-top:20px;">
+      <button class="btn" type="submit">Opret</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

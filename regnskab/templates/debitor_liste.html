@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Debitor — Regnskab{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+  <h1>Debitor</h1>
+  <a class="btn" href="/debitorer/ny">+ Ny debitor / faktura</a>
+</div>
+<div class="card">
+<h2 style="font-size:15px;">Åbne poster</h2>
+<table>
+  <thead><tr><th>Kunde</th><th>Fakturanr</th><th>Forfald</th><th>Restbeløb</th><th>Alder</th></tr></thead>
+  <tbody>
+  {% for p in aabne_poster %}
+    <tr>
+      <td>{{ p.debitor_navn }}</td>
+      <td>{{ p.fakturanr or "—" }}</td>
+      <td>{{ p.forfaldsdato or "—" }}</td>
+      <td>{{ "%.2f"|format(p.restbeloeb) }} kr</td>
+      <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5" class="muted">Ingen åbne debitorposter.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="card">
+<h2 style="font-size:15px;">Kunder</h2>
+<table>
+  <thead><tr><th>Navn</th><th>CVR</th><th>Email</th></tr></thead>
+  <tbody>
+  {% for d in debitorer %}
+    <tr><td>{{ d.navn }}</td><td>{{ d.cvr or "—" }}</td><td>{{ d.email or "—" }}</td></tr>
+  {% else %}
+    <tr><td colspan="3" class="muted">Ingen debitorer oprettet endnu.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

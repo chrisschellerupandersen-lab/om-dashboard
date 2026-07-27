@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Bilag — Regnskab{% endblock %}
+{% block content %}
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+  <h1>Bilag</h1>
+  <a class="btn" href="/bilag/upload">+ Upload bilag</a>
+</div>
+<div class="card">
+<table>
+  <thead><tr><th>#</th><th>Leverandør</th><th>Fakturanr</th><th>Dato</th><th>Beløb i alt</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for b in bilag %}
+    <tr>
+      <td>{{ b.id }}</td>
+      <td>{{ b.leverandoer_navn or "—" }}</td>
+      <td>{{ b.fakturanr or "—" }}</td>
+      <td>{{ b.fakturadato or "—" }}</td>
+      <td>{{ "%.2f"|format(b.beloeb_total) }} kr</td>
+      <td><span class="badge {{ b.status }}">{{ b.status }}</span></td>
+      <td><a href="/bilag/{{ b.id }}">Åbn</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="7" class="muted">Ingen bilag uploadet endnu.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

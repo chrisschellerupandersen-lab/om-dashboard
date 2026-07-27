@@ -93,12 +93,12 @@
     <tr><th>Konto</th><td>{{ bilag.kontonr }}</td></tr>
     <tr><th>Godkendt af</th><td>{{ bilag.godkendt_af }} — {{ bilag.godkendt_ts }}</td></tr>
   </table>
-  {% if bilag.status == 'bogfoert' %}
+  {% if bilag.status in ('bogfoert', 'afvist') %}
     {% if kreditor_post and kreditor_post.status == 'udlignet' %}
     <p class="muted" style="margin-top:16px;">Bilaget er matchet mod en banktransaktion og kan ikke slettes — fjern først bankmatchet under Bank.</p>
     {% else %}
-    <form method="post" action="/bilag/{{ bilag.id }}/slet" style="margin-top:16px;" onsubmit="return confirm('Dette annullerer bogføringen med en korrektionspostering. Fortsæt?');">
-      <button class="btn danger" type="submit">Slet bilag (annullér bogføring)</button>
+    <form method="post" action="/bilag/{{ bilag.id }}/slet" style="margin-top:16px;" onsubmit="return confirm('{{ 'Dette annullerer bogføringen med en korrektionspostering. Fortsæt?' if bilag.status == 'bogfoert' else 'Slet dette bilag permanent? Det kan ikke fortrydes.' }}');">
+      <button class="btn danger" type="submit">{{ "Slet bilag (annullér bogføring)" if bilag.status == 'bogfoert' else "Slet bilag" }}</button>
     </form>
     {% endif %}
   {% endif %}

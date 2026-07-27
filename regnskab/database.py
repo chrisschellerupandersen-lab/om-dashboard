@@ -764,6 +764,8 @@ def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bru
             ).fetchone()
             if not post:
                 raise ValueError("Kreditorpost findes ikke")
+            if post["status"] in ("udlignet", "annulleret"):
+                raise ValueError("Kreditorposten er ikke længere åben (allerede udlignet eller annulleret)")
             beloeb = post["restbeloeb"]
             linjer = [
                 {"kontonr": "6800", "debet": beloeb, "kredit": 0,
@@ -778,6 +780,8 @@ def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bru
             ).fetchone()
             if not post:
                 raise ValueError("Debitorpost findes ikke")
+            if post["status"] in ("udlignet", "annulleret"):
+                raise ValueError("Debitorposten er ikke længere åben (allerede udlignet eller annulleret)")
             beloeb = post["restbeloeb"]
             linjer = [
                 {"kontonr": "6750", "debet": beloeb, "kredit": 0},

@@ -540,7 +540,10 @@ async def bank_indlaes_post(request: Request, linjer: str = Form(...)):
 async def bank_match_post(request: Request, transaktion_id: int,
                            modpart_type: str = Form(...), post_id: int = Form(...)):
     bruger = _kræv_login(request)
-    database.godkend_bank_match(transaktion_id, modpart_type, post_id, bruger)
+    try:
+        database.godkend_bank_match(transaktion_id, modpart_type, post_id, bruger)
+    except ValueError:
+        pass  # forslaget var forældet (posten blev fx annulleret i mellemtiden) — siden genindlæses uden
     return RedirectResponse("/bank", status_code=303)
 
 

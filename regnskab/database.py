@@ -5,6 +5,8 @@ import hashlib
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 
+from rapidfuzz import fuzz
+
 DB_PATH = os.environ.get("DB_PATH", "regnskab.db")
 
 
@@ -493,3 +495,159 @@ def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
         for r in out:
             r["aldersgruppe"] = _aldersgruppe(r["forfaldsdato"])
         return out
+
+
+# ── Banktransaktioner (simuleret indlæsning) + match ────────────────────
+
+def indlæs_banktransaktioner(linjer: List[Dict[str, Any]], kilde: str = "simulation") -> int:
+    """linjer: [{"dato": "YYYY-MM-DD", "beloeb": float, "tekst": str}, ...]
+    Positivt beløb = indbetaling, negativt = udbetaling. Returnerer antal indlæst."""
+    antal = 0
+    with _conn() as conn:
+        for l in linjer:
+            conn.execute(
+                "INSERT INTO banktransaktioner (dato, beloeb, tekst, match_status) "
+                "VALUES (?, ?, ?, 'uafklaret')",
+                (l["dato"], l["beloeb"], l.get("tekst", "")),
+            )
+            antal += 1
+        _log(conn, "system", "indlaes_banktransaktioner", "banktransaktion", None,
+             {"antal": antal, "kilde": kilde})
+    return antal
+
+
+def hent_banktransaktioner(match_status: Optional[str] = None) -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        if match_status:
+            rows = conn.execute(
+                "SELECT * FROM banktransaktioner WHERE match_status = ? ORDER BY dato DESC, id DESC",
+                (match_status,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM banktransaktioner ORDER BY dato DESC, id DESC"
+            ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def _dage_mellem(a: str, b: str) -> Optional[int]:
+    try:
+        return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+    except (ValueError, TypeError):
+        return None
+
+
+def foreslaa_matches(transaktion: Dict[str, Any], maks: int = 3) -> List[Dict[str, Any]]:
+    """Foreslår kandidater fra åbne debitor-/kreditorposter til en banktransaktion.
+    Kræver altid præcist beløbsmatch (0 kr tolerance); score afgør rækkefølgen.
+    Udligner aldrig automatisk — kalder skal selv godkende via godkend_bank_match()."""
+    beloeb = transaktion["beloeb"]
+    tekst_norm = (transaktion.get("tekst") or "").lower()
+    dato = transaktion["dato"]
+
+    if beloeb < 0:
+        modpart_type = "kreditor"
+        kandidater = hent_aabne_kreditor_poster()
+        navn_felt = "kreditor_navn"
+    else:
+        modpart_type = "debitor"
+        kandidater = hent_aabne_debitor_poster()
+        navn_felt = "debitor_navn"
+
+    forslag = []
+    for k in kandidater:
+        if round(abs(beloeb) - k["restbeloeb"], 2) != 0:
+            continue
+        score = 0
+        begrundelser = []
+
+        if k.get("fakturanr") and k["fakturanr"].lower() in tekst_norm:
+            score += 100
+            begrundelser.append(f"fakturanr '{k['fakturanr']}' fundet i posteringsteksten")
+
+        navn_score = fuzz.token_sort_ratio(tekst_norm, (k.get(navn_felt) or "").lower())
+        if navn_score >= 70:
+            score += navn_score
+            begrundelser.append(f"navnematch {navn_score:.0f}%")
+
+        dage = _dage_mellem(dato, k.get("forfaldsdato")) if k.get("forfaldsdato") else None
+        if dage is not None and dage <= 45:
+            score += max(0, 30 - dage)
+            begrundelser.append(f"{dage} dage fra forfaldsdato")
+
+        if score > 0:
+            forslag.append({
+                "modpart_type": modpart_type,
+                "post_id": k["id"],
+                "navn": k.get(navn_felt),
+                "fakturanr": k.get("fakturanr"),
+                "restbeloeb": k["restbeloeb"],
+                "score": score,
+                "begrundelse": "; ".join(begrundelser) or "beløb matcher",
+            })
+
+    forslag.sort(key=lambda f: -f["score"])
+    return forslag[:maks]
+
+
+def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bruger: str) -> int:
+    """Bruger har bekræftet et matchforslag — bogfør udligningspostering og luk posten.
+    Returnerer postering_id."""
+    with _conn() as conn:
+        tx = conn.execute("SELECT * FROM banktransaktioner WHERE id = ?", (transaktion_id,)).fetchone()
+        if not tx:
+            raise ValueError("Banktransaktion findes ikke")
+        if tx["match_status"] == "godkendt":
+            raise ValueError("Banktransaktionen er allerede matchet")
+
+        if modpart_type == "kreditor":
+            post = conn.execute(
+                "SELECT kp.*, k.navn AS navn FROM kreditor_poster kp JOIN kreditorer k ON k.id = kp.kreditor_id "
+                "WHERE kp.id = ?", (post_id,),
+            ).fetchone()
+            if not post:
+                raise ValueError("Kreditorpost findes ikke")
+            beloeb = post["restbeloeb"]
+            linjer = [
+                {"kontonr": "6800", "debet": beloeb, "kredit": 0,
+                 "modpart_type": "kreditor", "modpart_id": post["kreditor_id"]},
+                {"kontonr": "6750", "debet": 0, "kredit": beloeb},
+            ]
+            tekst = f"Betaling til {post['navn']} — faktura {post['fakturanr'] or post_id}"
+        elif modpart_type == "debitor":
+            post = conn.execute(
+                "SELECT dp.*, d.navn AS navn FROM debitor_poster dp JOIN debitorer d ON d.id = dp.debitor_id "
+                "WHERE dp.id = ?", (post_id,),
+            ).fetchone()
+            if not post:
+                raise ValueError("Debitorpost findes ikke")
+            beloeb = post["restbeloeb"]
+            linjer = [
+                {"kontonr": "6750", "debet": beloeb, "kredit": 0},
+                {"kontonr": "6900", "debet": 0, "kredit": beloeb,
+                 "modpart_type": "debitor", "modpart_id": post["debitor_id"]},
+            ]
+            tekst = f"Indbetaling fra {post['navn']} — faktura {post['fakturanr'] or post_id}"
+        else:
+            raise ValueError("Ukendt modpart_type")
+
+    postering_id = bogfoer_postering(tx["dato"], tekst, bruger, linjer)
+
+    with _conn() as conn:
+        tabel = "kreditor_poster" if modpart_type == "kreditor" else "debitor_poster"
+        conn.execute(f"UPDATE {tabel} SET status = 'udlignet', restbeloeb = 0 WHERE id = ?", (post_id,))
+        conn.execute(
+            "UPDATE banktransaktioner SET match_status = 'godkendt', matchet_type = ?, matchet_id = ? WHERE id = ?",
+            (modpart_type, post_id, transaktion_id),
+        )
+        _log(conn, bruger, "godkend_bank_match", "banktransaktion", transaktion_id,
+             {"modpart_type": modpart_type, "post_id": post_id, "postering_id": postering_id})
+    return postering_id
+
+
+def ignorer_banktransaktion(transaktion_id: int, bruger: str):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE banktransaktioner SET match_status = 'ignoreret' WHERE id = ?", (transaktion_id,)
+        )
+        _log(conn, bruger, "ignorer_banktransaktion", "banktransaktion", transaktion_id, {})

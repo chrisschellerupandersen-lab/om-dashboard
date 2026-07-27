@@ -104,7 +104,7 @@ async def bilag_upload_side(request: Request):
 
 
 @app.post("/bilag/upload")
-async def bilag_upload_post(request: Request, fil: UploadFile = File(...)):
+async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_bogfoer: str = Form("")):
     bruger = _kræv_login(request)
     indhold = await fil.read()
     sha256 = hashlib.sha256(indhold).hexdigest()
@@ -134,6 +134,13 @@ async def bilag_upload_post(request: Request, fil: UploadFile = File(...)):
             "request": request,
             "fejl": f"Denne fil er allerede uploadet (bilag #{eksisterende['id'] if eksisterende else '?'})",
         })
+
+    if auto_bogfoer == "on" and felter.get("beloeb_total") and felter.get("leverandoer_navn"):
+        try:
+            database.godkend_og_bogfoer_bilag(bilag_id, bruger, {**felter, "kontonr": felter.get("kontonr", "4000")})
+            return RedirectResponse("/bilag", status_code=303)
+        except ValueError:
+            pass  # AI-forslaget var ufuldstændigt — falder tilbage til manuel gennemgang
     return RedirectResponse(f"/bilag/{bilag_id}", status_code=303)
 
 
@@ -281,3 +288,71 @@ async def posteringer_side(request: Request):
         "request": request,
         "posteringer": database.hent_posteringer(),
     })
+
+
+# ── Bank (simuleret indlæsning + match) ─────────────────────────────────
+
+@app.get("/bank", response_class=HTMLResponse)
+async def bank_side(request: Request):
+    _kræv_login(request)
+    transaktioner = database.hent_banktransaktioner()
+    for tx in transaktioner:
+        tx["forslag"] = database.foreslaa_matches(tx) if tx["match_status"] == "uafklaret" else []
+    return templates.TemplateResponse("bank_liste.html", {"request": request, "transaktioner": transaktioner})
+
+
+@app.get("/bank/indlaes", response_class=HTMLResponse)
+async def bank_indlaes_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("bank_indlaes.html", {"request": request, "fejl": None})
+
+
+@app.post("/bank/indlaes")
+async def bank_indlaes_post(request: Request, linjer: str = Form(...)):
+    _kræv_login(request)
+    parsed = []
+    fejl_linjer = []
+    for i, raw in enumerate(linjer.splitlines(), start=1):
+        raw = raw.strip()
+        if not raw:
+            continue
+        dele = [d.strip() for d in raw.split(";")]
+        if len(dele) < 2:
+            fejl_linjer.append(f"linje {i}: for få felter (forventet dato;beløb;tekst)")
+            continue
+        dato_str, beloeb_str = dele[0], dele[1]
+        tekst = dele[2] if len(dele) > 2 else ""
+        try:
+            beloeb = float(beloeb_str.replace(",", "."))
+        except ValueError:
+            fejl_linjer.append(f"linje {i}: ugyldigt beløb '{beloeb_str}'")
+            continue
+        try:
+            date.fromisoformat(dato_str)
+        except ValueError:
+            fejl_linjer.append(f"linje {i}: ugyldig dato '{dato_str}' (brug YYYY-MM-DD)")
+            continue
+        parsed.append({"dato": dato_str, "beloeb": beloeb, "tekst": tekst})
+
+    if fejl_linjer:
+        return templates.TemplateResponse("bank_indlaes.html", {
+            "request": request, "fejl": "Kunne ikke indlæse: " + "; ".join(fejl_linjer),
+        }, status_code=400)
+
+    database.indlæs_banktransaktioner(parsed)
+    return RedirectResponse("/bank", status_code=303)
+
+
+@app.post("/bank/{transaktion_id}/match")
+async def bank_match_post(request: Request, transaktion_id: int,
+                           modpart_type: str = Form(...), post_id: int = Form(...)):
+    bruger = _kræv_login(request)
+    database.godkend_bank_match(transaktion_id, modpart_type, post_id, bruger)
+    return RedirectResponse("/bank", status_code=303)
+
+
+@app.post("/bank/{transaktion_id}/ignorer")
+async def bank_ignorer_post(request: Request, transaktion_id: int):
+    bruger = _kræv_login(request)
+    database.ignorer_banktransaktion(transaktion_id, bruger)
+    return RedirectResponse("/bank", status_code=303)

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Indlæs banktransaktioner — Regnskab{% endblock %}
+{% block content %}
+<h1>Indlæs banktransaktioner (simulation)</h1>
+<div class="card" style="max-width:640px;">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <p class="muted">
+    Én linje pr. transaktion: <code>dato;beløb;tekst</code> — YYYY-MM-DD, positivt beløb = indbetaling,
+    negativt = udbetaling. Dette simulerer den automatiske bankhentning, der kommer i en senere fase.
+  </p>
+  <form method="post" action="/bank/indlaes">
+    <label>Transaktioner</label>
+    <textarea name="linjer" rows="8" placeholder="2026-08-05;-1500;Betaling GROENTTORVET REF F-4711
+2026-08-12;3200;Indbetaling KUNDE ApS FAKT DF-1" required></textarea>
+    <button class="btn" type="submit" style="margin-top:16px;">Indlæs</button>
+  </form>
+</div>
+{% endblock %}

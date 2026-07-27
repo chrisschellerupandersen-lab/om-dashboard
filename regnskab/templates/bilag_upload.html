@@ -7,8 +7,12 @@
   <form method="post" action="/bilag/upload" enctype="multipart/form-data">
     <label>Faktura (PDF eller billede)</label>
     <input type="file" name="fil" accept="application/pdf,image/*" required>
-    <p class="muted">AI læser automatisk leverandør, beløb, moms og forfaldsdato — du godkender/retter på næste side.</p>
-    <button class="btn" type="submit">Upload &amp; læs med AI</button>
+    <p class="muted">AI læser automatisk leverandør, beløb, moms og forfaldsdato.</p>
+    <label style="display:flex; align-items:center; gap:8px; font-weight:400;">
+      <input type="checkbox" name="auto_bogfoer" style="width:auto;">
+      Bogfør automatisk ud fra AI-forslaget (spring manuel godkendelse over — til simulation/test)
+    </label>
+    <button class="btn" type="submit" style="margin-top:16px;">Upload &amp; læs med AI</button>
   </form>
 </div>
 {% endblock %}

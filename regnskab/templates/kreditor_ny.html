@@ -1,47 +1,47 @@
 {% extends "base.html" %}
-{% block title %}Ny kreditor — Nimbo Regnskab{% endblock %}
+{% block title %}{{ "Rediger kreditor" if kreditor else "Ny kreditor" }} — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Ny kreditor</h1><div class="sub">Leverandør</div></div></div>
+<div class="page-head"><div><h1>{{ "Rediger kreditor" if kreditor else "Ny kreditor" }}</h1><div class="sub">{{ "Opdatér leverandøroplysninger" if kreditor else "Leverandør" }}</div></div></div>
 <div class="card" style="max-width:520px;">
   {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
-  <form method="post" action="/kreditorer/ny">
-    <div class="row">
-      <div><label>Navn</label><input name="navn" id="navn" required></div>
-      <div>
-        <label>CVR</label>
-        <div style="display:flex; gap:8px;">
-          <input name="cvr" id="cvr" placeholder="8 cifre">
-          <button type="button" class="btn secondary" id="cvr-slaa-op" style="white-space:nowrap;">Slå op</button>
-        </div>
-      </div>
+  <form method="post" action="{{ ('/kreditorer/%d/rediger'|format(kreditor.id)) if kreditor else '/kreditorer/ny' }}">
+    <label>CVR eller firmanavn (til opslag)</label>
+    <div style="display:flex; gap:8px;">
+      <input id="cvr-soeg" placeholder="fx 29123456 eller Grønttorvet Grossist">
+      <button type="button" class="btn secondary" id="cvr-slaa-op" style="white-space:nowrap;">Slå op</button>
     </div>
-    <div id="cvr-status" class="muted" style="min-height:16px; margin-top:2px;"></div>
+    <div id="cvr-status" class="muted" style="min-height:16px; margin-top:4px;"></div>
+
+    <div class="row" style="margin-top:10px;">
+      <div><label>Navn</label><input name="navn" id="navn" value="{{ kreditor.navn if kreditor else '' }}" required></div>
+      <div><label>CVR</label><input name="cvr" id="cvr" value="{{ kreditor.cvr or '' if kreditor else '' }}"></div>
+    </div>
     <label>Adresse</label>
-    <input name="adresse" id="adresse">
+    <input name="adresse" id="adresse" value="{{ kreditor.adresse or '' if kreditor else '' }}">
     <label>Email</label>
-    <input name="email" type="email">
+    <input name="email" type="email" value="{{ kreditor.email or '' if kreditor else '' }}">
     <div class="row">
-      <div><label>IBAN</label><input name="iban" placeholder="Til betalingsfil, valgfrit"></div>
-      <div><label>BIC/SWIFT</label><input name="bic" placeholder="Valgfrit"></div>
+      <div><label>IBAN</label><input name="iban" value="{{ kreditor.iban or '' if kreditor else '' }}" placeholder="Til betalingsfil, valgfrit"></div>
+      <div><label>BIC/SWIFT</label><input name="bic" value="{{ kreditor.bic or '' if kreditor else '' }}" placeholder="Valgfrit"></div>
     </div>
     <div style="margin-top:20px;">
-      <button class="btn" type="submit">Opret</button>
+      <button class="btn" type="submit">{{ "Gem" if kreditor else "Opret" }}</button>
     </div>
   </form>
 </div>
 <script>
 document.getElementById('cvr-slaa-op').addEventListener('click', async function () {
-  var cvrInput = document.getElementById('cvr');
+  var q = document.getElementById('cvr-soeg').value.trim();
   var status = document.getElementById('cvr-status');
-  var cvr = cvrInput.value.replace(/\D/g, '');
-  if (cvr.length !== 8) { status.textContent = 'CVR skal være 8 cifre'; status.style.color = 'var(--bad)'; return; }
+  if (q.length < 2) { status.textContent = 'Skriv et CVR-nummer eller firmanavn'; status.style.color = 'var(--bad)'; return; }
   status.textContent = 'Slår op…'; status.style.color = 'var(--muted)';
   try {
-    var r = await fetch('/api/cvr/' + cvr);
+    var r = await fetch('/api/cvr-opslag?q=' + encodeURIComponent(q));
     var data = await r.json();
-    if (!data.ok) { status.textContent = data.fejl || 'Kunne ikke finde CVR'; status.style.color = 'var(--bad)'; return; }
+    if (!data.ok) { status.textContent = data.fejl || 'Kunne ikke finde noget'; status.style.color = 'var(--bad)'; return; }
     document.getElementById('navn').value = data.navn;
     document.getElementById('adresse').value = data.adresse;
+    if (data.cvr) { document.getElementById('cvr').value = data.cvr; }
     status.textContent = 'Fundet: ' + data.navn; status.style.color = 'var(--good)';
   } catch (e) {
     status.textContent = 'Fejl ved opslag'; status.style.color = 'var(--bad)';

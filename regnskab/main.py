@@ -8,7 +8,7 @@ from typing import Optional
 
 import requests
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -160,7 +160,8 @@ async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_
 
     if auto_bogfoer == "on" and felter.get("beloeb_total") and felter.get("leverandoer_navn"):
         try:
-            database.godkend_og_bogfoer_bilag(bilag_id, bruger, {**felter, "kontonr": felter.get("kontonr", "4000")})
+            beriget = _berig_kreditor_felter_ved_behov(felter)
+            database.godkend_og_bogfoer_bilag(bilag_id, bruger, {**beriget, "kontonr": beriget.get("kontonr", "4000")})
             return RedirectResponse("/bilag", status_code=303)
         except ValueError:
             pass  # AI-forslaget var ufuldstændigt — falder tilbage til manuel gennemgang
@@ -229,6 +230,15 @@ async def bilag_detalje(request: Request, bilag_id: int):
     })
 
 
+@app.get("/bilag/{bilag_id}/fil")
+async def bilag_fil(request: Request, bilag_id: int):
+    _kræv_login(request)
+    bilag = database.hent_et_bilag(bilag_id)
+    if not bilag or not os.path.exists(bilag["fil_sti"]):
+        raise HTTPException(404, "Bilagsfil findes ikke")
+    return FileResponse(bilag["fil_sti"])
+
+
 @app.post("/bilag/{bilag_id}/godkend")
 async def bilag_godkend(
     request: Request, bilag_id: int,
@@ -239,13 +249,14 @@ async def bilag_godkend(
 ):
     bruger = _kræv_login(request)
     try:
-        database.godkend_og_bogfoer_bilag(bilag_id, bruger, {
+        felter = _berig_kreditor_felter_ved_behov({
             "leverandoer_navn": leverandoer_navn, "leverandoer_cvr": leverandoer_cvr or None,
             "fakturanr": fakturanr, "fakturadato": fakturadato or date.today().isoformat(),
             "forfaldsdato": forfaldsdato or None,
             "beloeb_ex_moms": beloeb_ex_moms, "moms_beloeb": moms_beloeb, "beloeb_total": beloeb_total,
             "kontonr": kontonr,
         })
+        database.godkend_og_bogfoer_bilag(bilag_id, bruger, felter)
     except ValueError as exc:
         bilag = database.hent_et_bilag(bilag_id)
         return templates.TemplateResponse("bilag_detalje.html", {
@@ -274,7 +285,7 @@ async def debitorer_side(request: Request):
 @app.get("/debitorer/ny", response_class=HTMLResponse)
 async def debitor_ny_side(request: Request):
     _kræv_login(request)
-    return templates.TemplateResponse("debitor_ny.html", {"request": request, "fejl": None})
+    return templates.TemplateResponse("debitor_ny.html", {"request": request, "fejl": None, "debitor": None})
 
 
 @app.post("/debitorer/ny")
@@ -295,6 +306,25 @@ async def debitor_ny_post(
     return RedirectResponse("/debitorer", status_code=303)
 
 
+@app.get("/debitorer/{debitor_id}/rediger", response_class=HTMLResponse)
+async def debitor_rediger_side(request: Request, debitor_id: int):
+    _kræv_login(request)
+    debitor = database.hent_en_debitor(debitor_id)
+    if not debitor:
+        raise HTTPException(404, "Debitor findes ikke")
+    return templates.TemplateResponse("debitor_ny.html", {"request": request, "fejl": None, "debitor": debitor})
+
+
+@app.post("/debitorer/{debitor_id}/rediger")
+async def debitor_rediger_post(
+    request: Request, debitor_id: int,
+    navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
+):
+    bruger = _kræv_login(request)
+    database.opdater_debitor(debitor_id, bruger, navn, cvr or None, adresse or None, email or None)
+    return RedirectResponse("/debitorer", status_code=303)
+
+
 @app.get("/kreditorer", response_class=HTMLResponse)
 async def kreditorer_side(request: Request):
     _kræv_login(request)
@@ -308,7 +338,7 @@ async def kreditorer_side(request: Request):
 @app.get("/kreditorer/ny", response_class=HTMLResponse)
 async def kreditor_ny_side(request: Request):
     _kræv_login(request)
-    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None})
+    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None, "kreditor": None})
 
 
 @app.post("/kreditorer/ny")
@@ -322,31 +352,99 @@ async def kreditor_ny_post(
     return RedirectResponse("/kreditorer", status_code=303)
 
 
+@app.get("/kreditorer/{kreditor_id}/rediger", response_class=HTMLResponse)
+async def kreditor_rediger_side(request: Request, kreditor_id: int):
+    _kræv_login(request)
+    kreditor = database.hent_en_kreditor(kreditor_id)
+    if not kreditor:
+        raise HTTPException(404, "Kreditor findes ikke")
+    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None, "kreditor": kreditor})
+
+
+@app.post("/kreditorer/{kreditor_id}/rediger")
+async def kreditor_rediger_post(
+    request: Request, kreditor_id: int,
+    navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
+    iban: str = Form(""), bic: str = Form(""),
+):
+    bruger = _kræv_login(request)
+    database.opdater_kreditor(kreditor_id, bruger, navn, cvr or None, adresse or None, email or None, iban or None, bic or None)
+    return RedirectResponse("/kreditorer", status_code=303)
+
+
 CVR_API_USER_AGENT = "Nimbo Regnskab (regnskab-app; kontakt via Railway-projektejer)"
 
 
-@app.get("/api/cvr/{cvr}")
-async def api_cvr_opslag(request: Request, cvr: str):
-    _kræv_login(request)
-    cifre = "".join(ch for ch in cvr if ch.isdigit())
-    if len(cifre) != 8:
-        return JSONResponse({"ok": False, "fejl": "CVR skal være 8 cifre"}, status_code=400)
+def _cvr_opslag(q: str) -> Optional[dict]:
+    """Slår op i cvrapi.dk (cvr-nummer, p-nummer eller firmanavn). Returnerer None ved
+    fejl/ingen match/kvote-overskredet — kaldere skal falde tilbage til andre kilder, ikke fejle."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return None
     try:
         svar = requests.get(
             "https://cvrapi.dk/api",
-            params={"search": cifre, "country": "dk"},
+            params={"search": q, "country": "dk"},
             headers={"User-Agent": CVR_API_USER_AGENT},
             timeout=8,
         )
     except requests.RequestException:
-        return JSONResponse({"ok": False, "fejl": "Kunne ikke kontakte CVR-registeret"}, status_code=502)
+        return None
     if svar.status_code == 404:
-        return JSONResponse({"ok": False, "fejl": "Intet CVR-nummer fundet"}, status_code=404)
-    if svar.status_code != 200:
-        return JSONResponse({"ok": False, "fejl": f"CVR-opslag fejlede ({svar.status_code})"}, status_code=502)
-    data = svar.json()
+        return None
+    try:
+        data = svar.json()
+    except ValueError:
+        return None
+    # cvrapi.dk svarer med HTTP 200 selv ved kvote-overskridelse — fejlen ligger i "error"-feltet.
+    if isinstance(data, dict) and data.get("error"):
+        return None
     adresse_dele = [d for d in [data.get("address"), f"{data.get('zipcode', '')} {data.get('city', '')}".strip()] if d]
-    return {"ok": True, "navn": data.get("name") or "", "adresse": ", ".join(adresse_dele)}
+    navn = data.get("name") or ""
+    if not navn:
+        return None
+    return {"navn": navn, "cvr": data.get("vat") or "", "adresse": ", ".join(adresse_dele)}
+
+
+def _cvr_opslag_med_fejlbesked(q: str) -> tuple:
+    """Som _cvr_opslag, men med en menneskelæselig fejlbesked til UI'en når intet findes."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return None, "Skriv et CVR-nummer eller firmanavn"
+    resultat = _cvr_opslag(q)
+    if resultat:
+        return resultat, None
+    return None, "Ingen match fundet (eller dagligt opslagsloft hos CVR-registeret er nået — udfyld evt. manuelt)"
+
+
+@app.get("/api/cvr-opslag")
+async def api_cvr_opslag(request: Request, q: str = ""):
+    _kræv_login(request)
+    resultat, fejl = _cvr_opslag_med_fejlbesked(q)
+    if not resultat:
+        return JSONResponse({"ok": False, "fejl": fejl}, status_code=404)
+    return {"ok": True, **resultat}
+
+
+def _berig_kreditor_felter_ved_behov(felter: dict) -> dict:
+    """Del af upload-flowet: hvis bilagets CVR ikke matcher en eksisterende kreditor,
+    slås CVR'et op i registeret så den nye kreditor oprettes med det officielle navn/adresse
+    i stedet for AI'ens rå OCR-tekst. Matcher CVR'et allerede en kreditor, spares opslaget."""
+    cvr_raw = (felter.get("leverandoer_cvr") or "").strip()
+    cvr_cifre = "".join(ch for ch in cvr_raw if ch.isdigit())
+    if len(cvr_cifre) != 8:
+        return felter
+    if database.find_kreditor_by_cvr(cvr_cifre):
+        return felter  # matcher eksisterende kreditor — intet opslag nødvendigt
+    opslag = _cvr_opslag(cvr_cifre)
+    if not opslag:
+        return felter  # opslag fejlede/ingen match — behold AI-forslaget som det er
+    return {
+        **felter,
+        "leverandoer_navn": opslag["navn"],
+        "leverandoer_cvr": cvr_cifre,
+        "leverandoer_adresse": opslag["adresse"],
+    }
 
 
 @app.get("/posteringer", response_class=HTMLResponse)

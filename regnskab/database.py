@@ -343,7 +343,13 @@ def afvis_bilag(bilag_id: int, bruger: str):
         _log(conn, bruger, "afvis_bilag", "bilag", bilag_id, {})
 
 
-def find_or_create_kreditor(navn: str, cvr: Optional[str] = None) -> int:
+def find_kreditor_by_cvr(cvr: str) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM kreditorer WHERE cvr = ?", (cvr,)).fetchone()
+        return dict(r) if r else None
+
+
+def find_or_create_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] = None) -> int:
     with _conn() as conn:
         if cvr:
             r = conn.execute("SELECT id FROM kreditorer WHERE cvr = ?", (cvr,)).fetchone()
@@ -353,7 +359,7 @@ def find_or_create_kreditor(navn: str, cvr: Optional[str] = None) -> int:
         if r:
             return r["id"]
         cur = conn.execute(
-            "INSERT INTO kreditorer (navn, cvr) VALUES (?, ?)", (navn, cvr)
+            "INSERT INTO kreditorer (navn, cvr, adresse) VALUES (?, ?, ?)", (navn, cvr, adresse)
         )
         return cur.lastrowid
 
@@ -373,6 +379,23 @@ def hent_kreditorer() -> List[Dict[str, Any]]:
         return [dict(r) for r in conn.execute("SELECT * FROM kreditorer ORDER BY navn").fetchall()]
 
 
+def hent_en_kreditor(kreditor_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM kreditorer WHERE id = ?", (kreditor_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def opdater_kreditor(kreditor_id: int, bruger: str, navn: str, cvr: Optional[str] = None,
+                      adresse: Optional[str] = None, email: Optional[str] = None,
+                      iban: Optional[str] = None, bic: Optional[str] = None):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE kreditorer SET navn = ?, cvr = ?, adresse = ?, email = ?, iban = ?, bic = ? WHERE id = ?",
+            (navn, cvr, adresse, email, iban, bic, kreditor_id),
+        )
+        _log(conn, bruger, "opdater_kreditor", "kreditor", kreditor_id, {"navn": navn, "cvr": cvr})
+
+
 def godkend_og_bogfoer_bilag(bilag_id: int, bruger: str, felter: Dict[str, Any]) -> int:
     """Godkend et bilag (med evt. rettede felter fra brugeren), opret/find kreditor,
     bogfør balanceret postering og åbn en kreditorpost. Returnerer postering_id."""
@@ -388,8 +411,9 @@ def godkend_og_bogfoer_bilag(bilag_id: int, bruger: str, felter: Dict[str, Any])
     kontonr = felter.get("kontonr") or "4000"
     navn = felter.get("leverandoer_navn") or "Ukendt leverandør"
     cvr = felter.get("leverandoer_cvr") or None
+    adresse = felter.get("leverandoer_adresse") or None
 
-    kreditor_id = find_or_create_kreditor(navn, cvr)
+    kreditor_id = find_or_create_kreditor(navn, cvr, adresse)
 
     linjer = [{"kontonr": kontonr, "debet": beloeb_ex_moms, "kredit": 0}]
     if moms_beloeb:
@@ -436,6 +460,22 @@ def opret_debitor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] =
 def hent_debitorer() -> List[Dict[str, Any]]:
     with _conn() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM debitorer ORDER BY navn").fetchall()]
+
+
+def hent_en_debitor(debitor_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM debitorer WHERE id = ?", (debitor_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def opdater_debitor(debitor_id: int, bruger: str, navn: str, cvr: Optional[str] = None,
+                     adresse: Optional[str] = None, email: Optional[str] = None):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE debitorer SET navn = ?, cvr = ?, adresse = ?, email = ? WHERE id = ?",
+            (navn, cvr, adresse, email, debitor_id),
+        )
+        _log(conn, bruger, "opdater_debitor", "debitor", debitor_id, {"navn": navn, "cvr": cvr})
 
 
 def opret_debitor_faktura(debitor_id: int, bruger: str, fakturanr: str, dato: str,

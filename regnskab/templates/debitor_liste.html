@@ -30,12 +30,12 @@
 <div class="card">
 <h2 style="font-size:14px; margin:0 0 12px;">Kunder</h2>
 <table>
-  <thead><tr><th>Navn</th><th>CVR</th><th>Email</th></tr></thead>
+  <thead><tr><th>Navn</th><th>CVR</th><th>Email</th><th></th></tr></thead>
   <tbody>
   {% for d in debitorer %}
-    <tr><td>{{ d.navn }}</td><td>{{ d.cvr or "—" }}</td><td>{{ d.email or "—" }}</td></tr>
+    <tr><td>{{ d.navn }}</td><td>{{ d.cvr or "—" }}</td><td>{{ d.email or "—" }}</td><td><a href="/debitorer/{{ d.id }}/rediger">Rediger →</a></td></tr>
   {% else %}
-    <tr><td colspan="3" class="muted">Ingen debitorer oprettet endnu.</td></tr>
+    <tr><td colspan="4" class="muted">Ingen debitorer oprettet endnu.</td></tr>
   {% endfor %}
   </tbody>
 </table>

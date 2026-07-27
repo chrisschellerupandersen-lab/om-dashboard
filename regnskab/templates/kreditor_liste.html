@@ -1,8 +1,15 @@
 {% extends "base.html" %}
 {% block title %}Kreditor — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Kreditor</h1><div class="sub">Åbne leverandørposter</div></div></div>
+<div class="page-head">
+  <div><h1>Kreditor</h1><div class="sub">Leverandører og åbne fakturaposter</div></div>
+  <a class="btn" href="/kreditorer/ny">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Ny kreditor
+  </a>
+</div>
 <div class="card">
+<h2 style="font-size:14px; margin:0 0 12px;">Åbne poster</h2>
 <table>
   <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Restbeløb</th><th>Alder</th></tr></thead>
   <tbody>
@@ -15,7 +22,20 @@
       <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
     </tr>
   {% else %}
-    <tr><td colspan="5" class="muted">Ingen åbne kreditorposter — upload et bilag for at komme i gang.</td></tr>
+    <tr><td colspan="5" class="muted">Ingen åbne kreditorposter — upload et bilag eller opret en kreditor for at komme i gang.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<div class="card">
+<h2 style="font-size:14px; margin:0 0 12px;">Leverandører</h2>
+<table>
+  <thead><tr><th>Navn</th><th>CVR</th><th>Email</th></tr></thead>
+  <tbody>
+  {% for k in kreditorer %}
+    <tr><td>{{ k.navn }}</td><td>{{ k.cvr or "—" }}</td><td>{{ k.email or "—" }}</td></tr>
+  {% else %}
+    <tr><td colspan="3" class="muted">Ingen kreditorer oprettet endnu.</td></tr>
   {% endfor %}
   </tbody>
 </table>

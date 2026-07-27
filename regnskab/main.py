@@ -6,6 +6,7 @@ from datetime import date
 from contextlib import asynccontextmanager
 from typing import Optional
 
+import requests
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -300,7 +301,52 @@ async def kreditorer_side(request: Request):
     return templates.TemplateResponse("kreditor_liste.html", {
         "request": request,
         "aabne_poster": database.hent_aabne_kreditor_poster(),
+        "kreditorer": database.hent_kreditorer(),
     })
+
+
+@app.get("/kreditorer/ny", response_class=HTMLResponse)
+async def kreditor_ny_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None})
+
+
+@app.post("/kreditorer/ny")
+async def kreditor_ny_post(
+    request: Request,
+    navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
+    iban: str = Form(""), bic: str = Form(""),
+):
+    _kræv_login(request)
+    database.opret_kreditor(navn, cvr or None, adresse or None, email or None, iban or None, bic or None)
+    return RedirectResponse("/kreditorer", status_code=303)
+
+
+CVR_API_USER_AGENT = "Nimbo Regnskab (regnskab-app; kontakt via Railway-projektejer)"
+
+
+@app.get("/api/cvr/{cvr}")
+async def api_cvr_opslag(request: Request, cvr: str):
+    _kræv_login(request)
+    cifre = "".join(ch for ch in cvr if ch.isdigit())
+    if len(cifre) != 8:
+        return JSONResponse({"ok": False, "fejl": "CVR skal være 8 cifre"}, status_code=400)
+    try:
+        svar = requests.get(
+            "https://cvrapi.dk/api",
+            params={"search": cifre, "country": "dk"},
+            headers={"User-Agent": CVR_API_USER_AGENT},
+            timeout=8,
+        )
+    except requests.RequestException:
+        return JSONResponse({"ok": False, "fejl": "Kunne ikke kontakte CVR-registeret"}, status_code=502)
+    if svar.status_code == 404:
+        return JSONResponse({"ok": False, "fejl": "Intet CVR-nummer fundet"}, status_code=404)
+    if svar.status_code != 200:
+        return JSONResponse({"ok": False, "fejl": f"CVR-opslag fejlede ({svar.status_code})"}, status_code=502)
+    data = svar.json()
+    adresse_dele = [d for d in [data.get("address"), f"{data.get('zipcode', '')} {data.get('city', '')}".strip()] if d]
+    return {"ok": True, "navn": data.get("name") or "", "adresse": ", ".join(adresse_dele)}
 
 
 @app.get("/posteringer", response_class=HTMLResponse)

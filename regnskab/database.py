@@ -358,6 +358,21 @@ def find_or_create_kreditor(navn: str, cvr: Optional[str] = None) -> int:
         return cur.lastrowid
 
 
+def opret_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] = None,
+                    email: Optional[str] = None, iban: Optional[str] = None, bic: Optional[str] = None) -> int:
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO kreditorer (navn, cvr, adresse, email, iban, bic) VALUES (?, ?, ?, ?, ?, ?)",
+            (navn, cvr, adresse, email, iban, bic),
+        )
+        return cur.lastrowid
+
+
+def hent_kreditorer() -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM kreditorer ORDER BY navn").fetchall()]
+
+
 def godkend_og_bogfoer_bilag(bilag_id: int, bruger: str, felter: Dict[str, Any]) -> int:
     """Godkend et bilag (med evt. rettede felter fra brugeren), opret/find kreditor,
     bogfør balanceret postering og åbn en kreditorpost. Returnerer postering_id."""

@@ -225,8 +225,13 @@ async def bilag_detalje(request: Request, bilag_id: int):
     bilag = database.hent_et_bilag(bilag_id)
     if not bilag:
         raise HTTPException(404, "Bilag findes ikke")
+    kreditor_post = database.hent_kreditor_post_for_bilag(bilag_id)
+    bank_match = None
+    if kreditor_post and kreditor_post["status"] == "udlignet":
+        bank_match = database.hent_banktransaktion_for_match("kreditor", kreditor_post["id"])
     return templates.TemplateResponse("bilag_detalje.html", {
         "request": request, "bilag": bilag, "kontoplan": database.hent_kontoplan(), "fejl": None,
+        "kreditor_post": kreditor_post, "bank_match": bank_match,
     })
 
 
@@ -269,6 +274,28 @@ async def bilag_godkend(
 async def bilag_afvis(request: Request, bilag_id: int):
     bruger = _kræv_login(request)
     database.afvis_bilag(bilag_id, bruger)
+    return RedirectResponse("/bilag", status_code=303)
+
+
+@app.post("/bilag/{bilag_id}/slet")
+async def bilag_slet(request: Request, bilag_id: int):
+    bruger = _kræv_login(request)
+    try:
+        resultat = database.slet_bilag(bilag_id, bruger)
+    except ValueError as exc:
+        bilag = database.hent_et_bilag(bilag_id)
+        if not bilag:
+            raise HTTPException(404, "Bilag findes ikke")
+        kreditor_post = database.hent_kreditor_post_for_bilag(bilag_id)
+        bank_match = None
+        if kreditor_post and kreditor_post["status"] == "udlignet":
+            bank_match = database.hent_banktransaktion_for_match("kreditor", kreditor_post["id"])
+        return templates.TemplateResponse("bilag_detalje.html", {
+            "request": request, "bilag": bilag, "kontoplan": database.hent_kontoplan(), "fejl": str(exc),
+            "kreditor_post": kreditor_post, "bank_match": bank_match,
+        }, status_code=400)
+    if resultat.get("fil_sti") and os.path.exists(resultat["fil_sti"]):
+        os.remove(resultat["fil_sti"])
     return RedirectResponse("/bilag", status_code=303)
 
 

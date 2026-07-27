@@ -11,6 +11,21 @@
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2h5.5v5.5M9.5 2 2 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>
   </div>
+
+  {% if kreditor_post %}
+  <div style="margin-bottom:18px; padding:12px 14px; background:{{ 'var(--good-soft)' if kreditor_post.status == 'udlignet' else 'var(--surface-alt)' }}; border-radius:var(--radius-chip); display:flex; justify-content:space-between; align-items:center;">
+    {% if kreditor_post.status == 'udlignet' and bank_match %}
+      <span style="color:var(--good); font-weight:600; font-size:13px;">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="vertical-align:-2px; margin-right:4px;"><path d="M2 6.5 6.5 2 11 6.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 6.5v4.5h7V6.5" stroke="currentColor" stroke-width="1.5"/></svg>
+        Matchet mod banktransaktion {{ bank_match.dato }} — {{ "%.2f"|format(bank_match.beloeb) }} kr
+      </span>
+      <a href="/bank" class="muted">Se i Bank →</a>
+    {% else %}
+      <span class="muted">Endnu ikke matchet mod en banktransaktion</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
   {% if bilag.status == 'afventer' %}
   <form method="post" action="/bilag/{{ bilag.id }}/godkend">
     <div class="row">
@@ -61,9 +76,14 @@
       <button class="btn" type="submit">Godkend &amp; bogfør</button>
     </div>
   </form>
-  <form method="post" action="/bilag/{{ bilag.id }}/afvis" style="margin-top:10px;">
-    <button class="btn danger" type="submit">Afvis bilag</button>
-  </form>
+  <div style="margin-top:10px; display:flex; gap:10px;">
+    <form method="post" action="/bilag/{{ bilag.id }}/afvis">
+      <button class="btn secondary" type="submit">Afvis bilag</button>
+    </form>
+    <form method="post" action="/bilag/{{ bilag.id }}/slet" onsubmit="return confirm('Slet dette bilag permanent? Det kan ikke fortrydes.');">
+      <button class="btn danger" type="submit">Slet bilag</button>
+    </form>
+  </div>
   {% else %}
   <table>
     <tr><th>Leverandør</th><td>{{ bilag.leverandoer_navn }} ({{ bilag.leverandoer_cvr or "intet CVR" }})</td></tr>
@@ -73,6 +93,15 @@
     <tr><th>Konto</th><td>{{ bilag.kontonr }}</td></tr>
     <tr><th>Godkendt af</th><td>{{ bilag.godkendt_af }} — {{ bilag.godkendt_ts }}</td></tr>
   </table>
+  {% if bilag.status == 'bogfoert' %}
+    {% if kreditor_post and kreditor_post.status == 'udlignet' %}
+    <p class="muted" style="margin-top:16px;">Bilaget er matchet mod en banktransaktion og kan ikke slettes — fjern først bankmatchet under Bank.</p>
+    {% else %}
+    <form method="post" action="/bilag/{{ bilag.id }}/slet" style="margin-top:16px;" onsubmit="return confirm('Dette annullerer bogføringen med en korrektionspostering. Fortsæt?');">
+      <button class="btn danger" type="submit">Slet bilag (annullér bogføring)</button>
+    </form>
+    {% endif %}
+  {% endif %}
   {% endif %}
 </div>
 <a href="/bilag" class="muted">&larr; Tilbage til bilag</a>

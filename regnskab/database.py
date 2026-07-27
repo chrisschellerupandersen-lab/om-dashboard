@@ -343,6 +343,85 @@ def afvis_bilag(bilag_id: int, bruger: str):
         _log(conn, bruger, "afvis_bilag", "bilag", bilag_id, {})
 
 
+def hent_kreditor_post_for_bilag(bilag_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM kreditor_poster WHERE bilag_id = ?", (bilag_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def hent_banktransaktion_for_match(modpart_type: str, post_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT * FROM banktransaktioner WHERE matchet_type = ? AND matchet_id = ?",
+            (modpart_type, post_id),
+        ).fetchone()
+        return dict(r) if r else None
+
+
+def _hent_postering_med_linjer(postering_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        p = conn.execute("SELECT * FROM posteringer WHERE id = ?", (postering_id,)).fetchone()
+        if not p:
+            return None
+        linjer = conn.execute(
+            "SELECT * FROM posteringslinjer WHERE postering_id = ?", (postering_id,)
+        ).fetchall()
+        return {**dict(p), "linjer": [dict(l) for l in linjer]}
+
+
+def slet_bilag(bilag_id: int, bruger: str) -> Dict[str, Any]:
+    """Fjern et fejlagtigt uploadet bilag.
+    - afventer/afvist (intet bogført endnu): hård sletning af bilag-rækken.
+    - bogfoert og IKKE bankmatchet: annulleres via en korrektionspostering der modsvarer
+      den oprindelige postering 1:1, kreditorposten lukkes, bilaget markeres 'slettet'
+      (selve bilags-rækken og filen bevares — bogføringssporet må ikke forsvinde).
+    - bogfoert og bankmatchet: nægtes.
+    Returnerer {"fil_sti": <str eller None>} — main.py sletter filen fra disk kun når den er sat
+    (dvs. når intet bogføringsspor skal bevare den)."""
+    bilag = hent_et_bilag(bilag_id)
+    if not bilag:
+        raise ValueError("Bilag findes ikke")
+
+    if bilag["status"] in ("afventer", "afvist"):
+        with _conn() as conn:
+            conn.execute("DELETE FROM bilag_linjer WHERE bilag_id = ?", (bilag_id,))
+            conn.execute("DELETE FROM bilag WHERE id = ?", (bilag_id,))
+            _log(conn, bruger, "slet_bilag", "bilag", bilag_id, {"status_foer": bilag["status"]})
+        return {"fil_sti": bilag["fil_sti"]}
+
+    if bilag["status"] != "bogfoert":
+        raise ValueError(f"Bilag har status '{bilag['status']}' — kan ikke slettes")
+
+    kp = hent_kreditor_post_for_bilag(bilag_id)
+    if kp and kp["status"] == "udlignet":
+        raise ValueError("Bilaget er matchet mod en banktransaktion og kan ikke slettes — fjern først bankmatchet.")
+
+    with _conn() as conn:
+        original = conn.execute(
+            "SELECT id FROM posteringer WHERE bilag_id = ? ORDER BY id ASC LIMIT 1", (bilag_id,)
+        ).fetchone()
+
+    if original:
+        postering = _hent_postering_med_linjer(original["id"])
+        modsat_linjer = [
+            {"kontonr": l["kontonr"], "debet": l["kredit"], "kredit": l["debet"],
+             "modpart_type": l["modpart_type"], "modpart_id": l["modpart_id"]}
+            for l in postering["linjer"]
+        ]
+        bogfoer_postering(
+            date.today().isoformat(),
+            f"Annullering af bilag #{bilag_id} — {bilag.get('leverandoer_navn') or ''}".strip(" —"),
+            bruger, modsat_linjer, bilag_id=bilag_id, korrigerer_id=postering["id"],
+        )
+
+    with _conn() as conn:
+        if kp:
+            conn.execute("UPDATE kreditor_poster SET status = 'annulleret', restbeloeb = 0 WHERE id = ?", (kp["id"],))
+        conn.execute("UPDATE bilag SET status = 'slettet' WHERE id = ?", (bilag_id,))
+        _log(conn, bruger, "annuller_bilag", "bilag", bilag_id, {})
+    return {"fil_sti": None}
+
+
 def find_kreditor_by_cvr(cvr: str) -> Optional[Dict[str, Any]]:
     with _conn() as conn:
         r = conn.execute("SELECT * FROM kreditorer WHERE cvr = ?", (cvr,)).fetchone()
@@ -543,7 +622,7 @@ def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
         rows = conn.execute("""
             SELECT kp.*, k.navn AS kreditor_navn
             FROM kreditor_poster kp JOIN kreditorer k ON k.id = kp.kreditor_id
-            WHERE kp.status != 'udlignet'
+            WHERE kp.status NOT IN ('udlignet', 'annulleret')
             ORDER BY kp.forfaldsdato
         """).fetchall()
         out = [dict(r) for r in rows]
@@ -555,7 +634,7 @@ def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
 def hent_dashboard_kpi() -> Dict[str, Any]:
     with _conn() as conn:
         kred = conn.execute(
-            "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM kreditor_poster WHERE status != 'udlignet'"
+            "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM kreditor_poster WHERE status NOT IN ('udlignet', 'annulleret')"
         ).fetchone()
         deb = conn.execute(
             "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM debitor_poster WHERE status != 'udlignet'"

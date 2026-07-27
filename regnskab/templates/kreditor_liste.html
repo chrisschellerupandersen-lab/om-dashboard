@@ -11,7 +11,7 @@
 <div class="card">
 <h2 style="font-size:14px; margin:0 0 12px;">Åbne poster</h2>
 <table>
-  <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Restbeløb</th><th>Alder</th></tr></thead>
+  <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Restbeløb</th><th>Alder</th><th></th></tr></thead>
   <tbody>
   {% for p in aabne_poster %}
     <tr>
@@ -20,9 +20,10 @@
       <td>{{ p.forfaldsdato or "—" }}</td>
       <td class="num">{{ "%.2f"|format(p.restbeloeb) }} kr</td>
       <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
+      <td>{% if p.bilag_id %}<a href="/bilag/{{ p.bilag_id }}">Se bilag →</a>{% endif %}</td>
     </tr>
   {% else %}
-    <tr><td colspan="5" class="muted">Ingen åbne kreditorposter — upload et bilag eller opret en kreditor for at komme i gang.</td></tr>
+    <tr><td colspan="6" class="muted">Ingen åbne kreditorposter — upload et bilag eller opret en kreditor for at komme i gang.</td></tr>
   {% endfor %}
   </tbody>
 </table>

@@ -302,17 +302,18 @@ def hent_kontoplan() -> List[Dict[str, Any]]:
 # ── Bilag ────────────────────────────────────────────────────────────────
 
 def opret_bilag(fil_sti: str, fil_sha256: str, ai_raw_json: Optional[str] = None,
-                 ai_model: Optional[str] = None, felter: Optional[Dict[str, Any]] = None) -> Optional[int]:
+                 ai_model: Optional[str] = None, felter: Optional[Dict[str, Any]] = None,
+                 kilde: str = "upload") -> Optional[int]:
     felter = felter or {}
     with _conn() as conn:
         try:
             cur = conn.execute(
-                "INSERT INTO bilag (type, fil_sti, fil_sha256, ai_raw_json, ai_model, "
+                "INSERT INTO bilag (type, fil_sti, fil_sha256, ai_raw_json, ai_model, kilde, "
                 "leverandoer_cvr, leverandoer_navn, fakturanr, fakturadato, forfaldsdato, "
                 "beloeb_ex_moms, moms_beloeb, beloeb_total, kontonr) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
-                    felter.get("type", "leverandoerfaktura"), fil_sti, fil_sha256, ai_raw_json, ai_model,
+                    felter.get("type", "leverandoerfaktura"), fil_sti, fil_sha256, ai_raw_json, ai_model, kilde,
                     felter.get("leverandoer_cvr"), felter.get("leverandoer_navn"),
                     felter.get("fakturanr"), felter.get("fakturadato"), felter.get("forfaldsdato"),
                     felter.get("beloeb_ex_moms", 0), felter.get("moms_beloeb", 0),

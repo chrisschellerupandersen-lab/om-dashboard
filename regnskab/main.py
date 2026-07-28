@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import hashlib
+import secrets
 from datetime import date
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -151,13 +152,11 @@ async def bilag_upload_side(request: Request):
     return templates.TemplateResponse("bilag_upload.html", {"request": request, "fejl": None})
 
 
-@app.post("/bilag/upload")
-async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_bogfoer: str = Form("")):
-    bruger = _kræv_login(request)
-    indhold = await fil.read()
+def _behandl_bilag_upload(indhold: bytes, filename: str, content_type: str, bruger: str, kilde: str = "upload"):
+    """Delt mellem manuel upload og mail-indbakke-upload: gem fil, AI-læs, opret bilag.
+    Returnerer (bilag_id, felter, fejlbesked) — bilag_id er None ved dublet (fejlbesked sat)."""
     sha256 = hashlib.sha256(indhold).hexdigest()
-
-    ext = os.path.splitext(fil.filename or "")[1].lower() or ".bin"
+    ext = os.path.splitext(filename or "")[1].lower() or ".bin"
     fil_sti = os.path.join(UPLOAD_DIR, f"{sha256}{ext}")
     if not os.path.exists(fil_sti):
         with open(fil_sti, "wb") as f:
@@ -167,21 +166,28 @@ async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if api_key:
         try:
-            felter, ai_raw, ai_model = _læs_faktura_med_ai(indhold, fil.content_type or "", api_key)
+            felter, ai_raw, ai_model = _læs_faktura_med_ai(indhold, content_type or "", api_key)
         except Exception as exc:
             felter = {}
             ai_raw = json.dumps({"fejl": str(exc)})
 
     bilag_id = database.opret_bilag(
         fil_sti=fil_sti, fil_sha256=sha256, ai_raw_json=ai_raw, ai_model=ai_model,
-        felter={**felter, "bruger": bruger},
+        felter={**felter, "bruger": bruger}, kilde=kilde,
     )
     if bilag_id is None:
         eksisterende = next((b for b in database.hent_bilag() if b["fil_sha256"] == sha256), None)
-        return templates.TemplateResponse("bilag_upload.html", {
-            "request": request,
-            "fejl": f"Denne fil er allerede uploadet (bilag #{eksisterende['id'] if eksisterende else '?'})",
-        })
+        return None, felter, f"Denne fil er allerede uploadet (bilag #{eksisterende['id'] if eksisterende else '?'})"
+    return bilag_id, felter, None
+
+
+@app.post("/bilag/upload")
+async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_bogfoer: str = Form("")):
+    bruger = _kræv_login(request)
+    indhold = await fil.read()
+    bilag_id, felter, fejl = _behandl_bilag_upload(indhold, fil.filename, fil.content_type, bruger)
+    if bilag_id is None:
+        return templates.TemplateResponse("bilag_upload.html", {"request": request, "fejl": fejl})
 
     if auto_bogfoer == "on" and felter.get("beloeb_total") and felter.get("leverandoer_navn"):
         try:
@@ -191,6 +197,26 @@ async def bilag_upload_post(request: Request, fil: UploadFile = File(...), auto_
         except ValueError:
             pass  # AI-forslaget var ufuldstændigt — falder tilbage til manuel gennemgang
     return RedirectResponse(f"/bilag/{bilag_id}", status_code=303)
+
+
+INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "")
+
+
+@app.post("/api/indbakke/upload")
+async def api_indbakke_upload(request: Request, fil: UploadFile = File(...)):
+    """Modtager PDF-fakturaer fra det eksterne mail-videresendelses-script (Google Apps
+    Script). Autentificeres via en delt token, ikke login-session. Bogfører ALDRIG
+    automatisk — lander altid som 'afventer' til manuel gennemgang."""
+    token = request.headers.get("X-Ingest-Token", "")
+    if not INGEST_TOKEN or not secrets.compare_digest(token, INGEST_TOKEN):
+        raise HTTPException(401, "Ugyldig eller manglende token")
+    indhold = await fil.read()
+    bilag_id, felter, fejl = _behandl_bilag_upload(
+        indhold, fil.filename, fil.content_type, bruger="mail-indbakke", kilde="mail",
+    )
+    if bilag_id is None:
+        return JSONResponse({"ok": False, "fejl": fejl}, status_code=409)
+    return {"ok": True, "bilag_id": bilag_id}
 
 
 def _læs_faktura_med_ai(indhold: bytes, content_type: str, api_key: str):

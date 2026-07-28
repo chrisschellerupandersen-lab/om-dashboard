@@ -17,12 +17,12 @@
     <thead><tr><th>Konto</th><th class="num">Beløb</th></tr></thead>
     <tbody>
     {% for r in rapport.omsaetning %}
-      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ "%.2f"|format(r.beloeb) }} kr</td></tr>
+      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ r.beloeb|dkk }} kr</td></tr>
     {% else %}
       <tr><td colspan="2" class="muted">Ingen omsætning i perioden.</td></tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ "%.2f"|format(rapport.sum_omsaetning) }} kr</td></tr></tfoot>
+    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ rapport.sum_omsaetning|dkk }} kr</td></tr></tfoot>
   </table>
 </div>
 
@@ -32,18 +32,18 @@
     <thead><tr><th>Konto</th><th class="num">Beløb</th></tr></thead>
     <tbody>
     {% for r in rapport.omkostning %}
-      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ "%.2f"|format(r.beloeb) }} kr</td></tr>
+      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ r.beloeb|dkk }} kr</td></tr>
     {% else %}
       <tr><td colspan="2" class="muted">Ingen omkostninger i perioden.</td></tr>
     {% endfor %}
     </tbody>
-    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ "%.2f"|format(rapport.sum_omkostning) }} kr</td></tr></tfoot>
+    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ rapport.sum_omkostning|dkk }} kr</td></tr></tfoot>
   </table>
 </div>
 
 <div class="kpi" style="max-width:320px;">
   <div class="k-top"><span class="k-label">Resultat</span></div>
-  <div class="k-val" style="color:{{ 'var(--good)' if rapport.resultat >= 0 else 'var(--bad)' }};">{{ "%.2f"|format(rapport.resultat) }} kr</div>
+  <div class="k-val" style="color:{{ 'var(--good)' if rapport.resultat >= 0 else 'var(--bad)' }};">{{ rapport.resultat|dkk }} kr</div>
   <div class="k-meta">{{ rapport.fra }} – {{ rapport.til }}</div>
 </div>
 {% endblock %}

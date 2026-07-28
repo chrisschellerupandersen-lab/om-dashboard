@@ -18,7 +18,7 @@
       <td>{{ p.debitor_navn }}</td>
       <td>{{ p.fakturanr or "—" }}</td>
       <td>{{ p.forfaldsdato or "—" }}</td>
-      <td class="num">{{ "%.2f"|format(p.restbeloeb) }} kr</td>
+      <td class="num">{{ p.restbeloeb|dkk }} kr</td>
       <td><span class="badge {{ 'forfalden' if p.aldersgruppe not in ['ikke forfalden','ukendt'] else 'aaben' }}">{{ p.aldersgruppe }}</span></td>
     </tr>
   {% else %}

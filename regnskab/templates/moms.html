@@ -21,14 +21,19 @@
 
 <div class="card" style="max-width:420px;">
   <table>
-    <tr><td>Salgsmoms (udgående)</td><td class="num">{{ "%.2f"|format(rapport.salgsmoms) }} kr</td></tr>
-    <tr><td>Købsmoms (indgående)</td><td class="num">{{ "%.2f"|format(rapport.koebsmoms) }} kr</td></tr>
+    <tr><td>Salgsmoms (udgående)</td><td class="num">{{ rapport.salgsmoms|dkk }} kr</td></tr>
+    <tr><td>Købsmoms (indgående)</td><td class="num">{{ rapport.koebsmoms|dkk }} kr</td></tr>
   </table>
 </div>
 
 <div class="kpi" style="max-width:340px;">
   <div class="k-top"><span class="k-label">Momstilsvar</span></div>
-  <div class="k-val" style="color:{{ 'var(--bad)' if rapport.momstilsvar > 0 else 'var(--good)' }};">{{ "%.2f"|format(rapport.momstilsvar|abs) }} kr</div>
+  <div class="k-val" style="color:{{ 'var(--bad)' if rapport.momstilsvar > 0 else 'var(--good)' }};">{{ (rapport.momstilsvar|abs)|dkk }} kr</div>
   <div class="k-meta">{{ "Skal betales til SKAT" if rapport.momstilsvar > 0 else ("Til gode hos SKAT" if rapport.momstilsvar < 0 else "Går i nul") }}</div>
 </div>
+
+<p class="muted" style="max-width:420px;">
+  Betalingsfrist (angivelse og betaling): <strong style="color:var(--text);">{{ rapport.betalingsfrist|dato }}</strong>.
+  Standardreglen for kvartalsafregnende virksomheder — falder datoen i en weekend eller på en helligdag, rykker SKAT fristen til næste bankdag.
+</p>
 {% endblock %}

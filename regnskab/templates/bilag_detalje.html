@@ -17,7 +17,7 @@
     {% if kreditor_post.status == 'udlignet' and bank_match %}
       <span style="color:var(--good); font-weight:600; font-size:13px;">
         <svg width="13" height="13" viewBox="0 0 13 13" fill="none" style="vertical-align:-2px; margin-right:4px;"><path d="M2 6.5 6.5 2 11 6.5" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M3 6.5v4.5h7V6.5" stroke="currentColor" stroke-width="1.5"/></svg>
-        Matchet mod banktransaktion {{ bank_match.dato }} — {{ "%.2f"|format(bank_match.beloeb) }} kr
+        Matchet mod banktransaktion {{ bank_match.dato }} — {{ bank_match.beloeb|dkk }} kr
       </span>
       <a href="/bank" class="muted">Se i Bank →</a>
     {% else %}
@@ -89,7 +89,7 @@
     <tr><th>Leverandør</th><td>{{ bilag.leverandoer_navn }} ({{ bilag.leverandoer_cvr or "intet CVR" }})</td></tr>
     <tr><th>Fakturanr</th><td>{{ bilag.fakturanr }}</td></tr>
     <tr><th>Dato / forfald</th><td>{{ bilag.fakturadato }} / {{ bilag.forfaldsdato }}</td></tr>
-    <tr><th>Beløb i alt</th><td>{{ "%.2f"|format(bilag.beloeb_total) }} kr (moms {{ "%.2f"|format(bilag.moms_beloeb) }} kr)</td></tr>
+    <tr><th>Beløb i alt</th><td>{{ bilag.beloeb_total|dkk }} kr (moms {{ bilag.moms_beloeb|dkk }} kr)</td></tr>
     <tr><th>Konto</th><td>{{ bilag.kontonr }}</td></tr>
     <tr><th>Godkendt af</th><td>{{ bilag.godkendt_af }} — {{ bilag.godkendt_ts }}</td></tr>
   </table>

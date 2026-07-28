@@ -215,15 +215,19 @@ def _seed_kontoplan(conn: sqlite3.Connection):
         ("4000", "Diverse driftsomkostninger",     "omkostning", "koebsmoms"),
         ("6750", "Bank",                           "aktiv",      None),
         ("6900", "Debitorer (tilgodehavender)",    "aktiv",      None),
-        ("6800", "Kreditorer (leverandoergaeld)",  "passiv",     None),
-        ("6960", "Koebsmoms",                      "moms",       None),
+        ("6800", "Kreditorer (leverandørgæld)",    "passiv",     None),
+        ("6960", "Købsmoms",                       "moms",       None),
         ("6961", "Salgsmoms",                      "moms",       None),
-        ("9999", "Egenkapital / aabningsbalance",  "status",     None),
+        ("9999", "Egenkapital / åbningsbalance",   "status",     None),
     ]
     for kontonr, navn, kontotype, moms_kode in konti:
         conn.execute(
             "INSERT OR IGNORE INTO kontoplan (kontonr, navn, kontotype, moms_kode) VALUES (?, ?, ?, ?)",
             (kontonr, navn, kontotype, moms_kode),
+        )
+        conn.execute(
+            "UPDATE kontoplan SET navn = ? WHERE kontonr = ? AND navn != ?",
+            (navn, kontonr, navn),
         )
 
 
@@ -894,12 +898,25 @@ def hent_balance(til: str) -> Dict[str, Any]:
     }
 
 
+def _moms_betalingsfrist(aar: int, m_til: int) -> str:
+    """Standardfristen for kvartalsafregnende virksomheder: den 1. i den 3. måned efter
+    afgiftsperiodens udløb (fx Q1 der slutter 31. marts -> frist 1. juni). Rykkes IKKE
+    automatisk for weekend/helligdag her — SKAT flytter i så fald til næste bankdag."""
+    frist_maaned = m_til + 3
+    frist_aar = aar
+    if frist_maaned > 12:
+        frist_maaned -= 12
+        frist_aar += 1
+    return f"{frist_aar}-{frist_maaned:02d}-01"
+
+
 def hent_momsopgoerelse(aar: int, kvartal: int) -> Dict[str, Any]:
     maaneder = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
     m_fra, m_til = maaneder[kvartal]
     fra = f"{aar}-{m_fra:02d}-01"
     sidste_dag = calendar.monthrange(aar, m_til)[1]
     til = f"{aar}-{m_til:02d}-{sidste_dag:02d}"
+    betalingsfrist = _moms_betalingsfrist(aar, m_til)
 
     with _conn() as conn:
         salgsmoms = conn.execute("""
@@ -917,4 +934,5 @@ def hent_momsopgoerelse(aar: int, kvartal: int) -> Dict[str, Any]:
         "aar": aar, "kvartal": kvartal, "fra": fra, "til": til,
         "salgsmoms": round(salgsmoms, 2), "koebsmoms": round(koebsmoms, 2),
         "momstilsvar": round(salgsmoms - koebsmoms, 2),
+        "betalingsfrist": betalingsfrist,
     }

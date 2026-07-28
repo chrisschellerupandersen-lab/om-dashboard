@@ -14,7 +14,7 @@
       <td>{{ p.bruger }}</td>
       <td>
         {% for l in p.linjer %}
-          <div class="muted" style="font-variant-numeric: tabular-nums;">{{ l.kontonr }} — debet {{ "%.2f"|format(l.debet) }} / kredit {{ "%.2f"|format(l.kredit) }}</div>
+          <div class="muted" style="font-variant-numeric: tabular-nums;">{{ l.kontonr }} — debet {{ l.debet|dkk }} / kredit {{ l.kredit|dkk }}</div>
         {% endfor %}
       </td>
     </tr>

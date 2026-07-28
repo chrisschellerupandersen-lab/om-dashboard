@@ -28,6 +28,31 @@ app = FastAPI(title="Regnskab", lifespan=lifespan)
 templates = Jinja2Templates(directory="templates")
 templates.env.globals["bruger_fra_session"] = lambda request: (get_session(request) or {}).get("brugernavn")
 
+
+def _dkk(value) -> str:
+    """Dansk talformat: punktum som tusindtalsseparator, komma som decimal — 1.234,56."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    tekst = f"{value:,.2f}"
+    return tekst.translate(str.maketrans({",": "X", ".": ","})).replace("X", ".")
+
+
+templates.env.filters["dkk"] = _dkk
+
+
+def _dato_dk(value) -> str:
+    """Formatér en ISO-dato (YYYY-MM-DD) som '1. juni 2026'."""
+    try:
+        d = date.fromisoformat(str(value))
+    except ValueError:
+        return str(value)
+    return f"{d.day}. {_MAANEDER[d.month - 1]} {d.year}"
+
+
+templates.env.filters["dato"] = _dato_dk
+
 SECRET_KEY   = os.environ.get("SECRET_KEY", "skift-mig-i-railway-variables")
 REGNSKAB_USER = os.environ.get("REGNSKAB_USERNAME", "admin")
 REGNSKAB_PASS = os.environ.get("REGNSKAB_PASSWORD", "")

@@ -21,7 +21,7 @@
       <td>{{ b.leverandoer_navn or "—" }}</td>
       <td>{{ b.fakturanr or "—" }}</td>
       <td>{{ b.fakturadato or "—" }}</td>
-      <td class="num">{{ "%.2f"|format(b.beloeb_total) }} kr</td>
+      <td class="num">{{ b.beloeb_total|dkk }} kr</td>
       <td><span class="badge {{ b.status }}">{{ b.status }}</span></td>
       <td><a href="/bilag/{{ b.id }}">Åbn →</a></td>
     </tr>

@@ -13,7 +13,7 @@
 <div class="card">
   <div style="display:flex; justify-content:space-between; align-items:flex-start;">
     <div>
-      <strong style="font-variant-numeric: tabular-nums;">{{ tx.dato }} — {{ "%.2f"|format(tx.beloeb) }} kr</strong>
+      <strong style="font-variant-numeric: tabular-nums;">{{ tx.dato }} — {{ tx.beloeb|dkk }} kr</strong>
       <div class="muted">{{ tx.tekst or "(ingen tekst)" }}</div>
     </div>
     <span class="badge {{ 'godkendt' if tx.match_status == 'godkendt' else ('ignoreret' if tx.match_status == 'ignoreret' else 'uafklaret') }}">{{ tx.match_status }}</span>
@@ -28,7 +28,7 @@
         <tr>
           <td>{{ f.navn }} <span class="muted">({{ f.modpart_type }})</span></td>
           <td>{{ f.fakturanr or "—" }}</td>
-          <td class="num">{{ "%.2f"|format(f.restbeloeb) }} kr</td>
+          <td class="num">{{ f.restbeloeb|dkk }} kr</td>
           <td class="muted">{{ f.begrundelse }}</td>
           <td>
             <form method="post" action="/bank/{{ tx.id }}/match" style="display:inline;">

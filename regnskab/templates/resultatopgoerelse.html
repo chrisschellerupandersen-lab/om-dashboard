@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Resultatopgørelse — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Resultatopgørelse</h1><div class="sub">Omsætning og omkostninger for perioden</div></div></div>
+
+<div class="card">
+  <form method="get" action="/rapporter/resultatopgoerelse" class="row" style="align-items:flex-end;">
+    <div><label>Fra</label><input type="date" name="fra" value="{{ rapport.fra }}"></div>
+    <div><label>Til</label><input type="date" name="til" value="{{ rapport.til }}"></div>
+    <div style="flex:none;"><button class="btn" type="submit" style="margin-top:14px;">Opdatér</button></div>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="font-size:14px; margin:0 0 12px;">Omsætning</h2>
+  <table>
+    <thead><tr><th>Konto</th><th class="num">Beløb</th></tr></thead>
+    <tbody>
+    {% for r in rapport.omsaetning %}
+      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ "%.2f"|format(r.beloeb) }} kr</td></tr>
+    {% else %}
+      <tr><td colspan="2" class="muted">Ingen omsætning i perioden.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ "%.2f"|format(rapport.sum_omsaetning) }} kr</td></tr></tfoot>
+  </table>
+</div>
+
+<div class="card">
+  <h2 style="font-size:14px; margin:0 0 12px;">Omkostninger</h2>
+  <table>
+    <thead><tr><th>Konto</th><th class="num">Beløb</th></tr></thead>
+    <tbody>
+    {% for r in rapport.omkostning %}
+      <tr><td>{{ r.kontonr }} — {{ r.navn }}</td><td class="num">{{ "%.2f"|format(r.beloeb) }} kr</td></tr>
+    {% else %}
+      <tr><td colspan="2" class="muted">Ingen omkostninger i perioden.</td></tr>
+    {% endfor %}
+    </tbody>
+    <tfoot><tr><td style="font-weight:700;">I alt</td><td class="num" style="font-weight:700;">{{ "%.2f"|format(rapport.sum_omkostning) }} kr</td></tr></tfoot>
+  </table>
+</div>
+
+<div class="kpi" style="max-width:320px;">
+  <div class="k-top"><span class="k-label">Resultat</span></div>
+  <div class="k-val" style="color:{{ 'var(--good)' if rapport.resultat >= 0 else 'var(--bad)' }};">{{ "%.2f"|format(rapport.resultat) }} kr</div>
+  <div class="k-meta">{{ rapport.fra }} – {{ rapport.til }}</div>
+</div>
+{% endblock %}

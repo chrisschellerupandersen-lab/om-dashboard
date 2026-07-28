@@ -483,6 +483,39 @@ async def posteringer_side(request: Request):
     })
 
 
+# ── Rapporter ────────────────────────────────────────────────────────────
+
+@app.get("/rapporter/resultatopgoerelse", response_class=HTMLResponse)
+async def resultatopgoerelse_side(request: Request, fra: str = "", til: str = ""):
+    _kræv_login(request)
+    i_dag = date.today()
+    fra = fra or date(i_dag.year, 1, 1).isoformat()
+    til = til or i_dag.isoformat()
+    return templates.TemplateResponse("resultatopgoerelse.html", {
+        "request": request, "rapport": database.hent_resultatopgoerelse(fra, til),
+    })
+
+
+@app.get("/rapporter/balance", response_class=HTMLResponse)
+async def balance_side(request: Request, til: str = ""):
+    _kræv_login(request)
+    til = til or date.today().isoformat()
+    return templates.TemplateResponse("balance.html", {
+        "request": request, "rapport": database.hent_balance(til),
+    })
+
+
+@app.get("/rapporter/moms", response_class=HTMLResponse)
+async def moms_side(request: Request, aar: Optional[int] = None, kvartal: Optional[int] = None):
+    _kræv_login(request)
+    i_dag = date.today()
+    aar = aar or i_dag.year
+    kvartal = kvartal or ((i_dag.month - 1) // 3 + 1)
+    return templates.TemplateResponse("moms.html", {
+        "request": request, "rapport": database.hent_momsopgoerelse(aar, kvartal),
+    })
+
+
 # ── Bank (simuleret indlæsning + match) ─────────────────────────────────
 
 @app.get("/bank", response_class=HTMLResponse)

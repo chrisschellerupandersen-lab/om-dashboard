@@ -2,6 +2,7 @@ import sqlite3
 import os
 import json
 import hashlib
+import calendar
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
 
@@ -812,3 +813,108 @@ def ignorer_banktransaktion(transaktion_id: int, bruger: str):
             "UPDATE banktransaktioner SET match_status = 'ignoreret' WHERE id = ?", (transaktion_id,)
         )
         _log(conn, bruger, "ignorer_banktransaktion", "banktransaktion", transaktion_id, {})
+
+
+# ── Rapporter: resultatopgørelse, balance, moms ─────────────────────────
+
+def hent_resultatopgoerelse(fra: str, til: str) -> Dict[str, Any]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT pl.kontonr, k.navn, k.kontotype,
+                   COALESCE(SUM(pl.debet), 0) sum_debet, COALESCE(SUM(pl.kredit), 0) sum_kredit
+            FROM posteringslinjer pl
+            JOIN posteringer p ON p.id = pl.postering_id
+            JOIN kontoplan k ON k.kontonr = pl.kontonr
+            WHERE p.dato BETWEEN ? AND ? AND k.kontotype IN ('omsaetning', 'omkostning')
+            GROUP BY pl.kontonr
+            ORDER BY k.kontotype DESC, pl.kontonr
+        """, (fra, til)).fetchall()
+
+    omsaetning, omkostning = [], []
+    sum_omsaetning = sum_omkostning = 0.0
+    for r in rows:
+        if r["kontotype"] == "omsaetning":
+            beloeb = round(r["sum_kredit"] - r["sum_debet"], 2)
+            if beloeb:
+                omsaetning.append({"kontonr": r["kontonr"], "navn": r["navn"], "beloeb": beloeb})
+                sum_omsaetning += beloeb
+        else:
+            beloeb = round(r["sum_debet"] - r["sum_kredit"], 2)
+            if beloeb:
+                omkostning.append({"kontonr": r["kontonr"], "navn": r["navn"], "beloeb": beloeb})
+                sum_omkostning += beloeb
+
+    return {
+        "fra": fra, "til": til,
+        "omsaetning": omsaetning, "sum_omsaetning": round(sum_omsaetning, 2),
+        "omkostning": omkostning, "sum_omkostning": round(sum_omkostning, 2),
+        "resultat": round(sum_omsaetning - sum_omkostning, 2),
+    }
+
+
+def hent_balance(til: str) -> Dict[str, Any]:
+    """Aktiver = Passiver + Egenkapital. Egenkapital vises som en beregnet, balancerende
+    post (akkumuleret resultat inkl. indeværende periode), da systemet ikke (endnu) laver
+    formelle periodeafslutninger til en bogført egenkapitalkonto."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT pl.kontonr, k.navn, k.kontotype,
+                   COALESCE(SUM(pl.debet), 0) sum_debet, COALESCE(SUM(pl.kredit), 0) sum_kredit
+            FROM posteringslinjer pl
+            JOIN posteringer p ON p.id = pl.postering_id
+            JOIN kontoplan k ON k.kontonr = pl.kontonr
+            WHERE p.dato <= ? AND k.kontotype IN ('aktiv', 'passiv', 'moms')
+            GROUP BY pl.kontonr
+            ORDER BY pl.kontonr
+        """, (til,)).fetchall()
+
+    aktiver, passiver = [], []
+    sum_aktiver = sum_passiver = 0.0
+    for r in rows:
+        # 6960 Købsmoms er et tilgodehavende hos SKAT (aktiv), 6961 Salgsmoms er en gæld til SKAT (passiv)
+        er_aktiv = r["kontotype"] == "aktiv" or r["kontonr"] == "6960"
+        if er_aktiv:
+            beloeb = round(r["sum_debet"] - r["sum_kredit"], 2)
+            if beloeb:
+                aktiver.append({"kontonr": r["kontonr"], "navn": r["navn"], "beloeb": beloeb})
+                sum_aktiver += beloeb
+        else:
+            beloeb = round(r["sum_kredit"] - r["sum_debet"], 2)
+            if beloeb:
+                passiver.append({"kontonr": r["kontonr"], "navn": r["navn"], "beloeb": beloeb})
+                sum_passiver += beloeb
+
+    egenkapital = round(sum_aktiver - sum_passiver, 2)
+    passiver.append({"kontonr": None, "navn": "Egenkapital (akkumuleret resultat)", "beloeb": egenkapital})
+
+    return {
+        "til": til,
+        "aktiver": aktiver, "sum_aktiver": round(sum_aktiver, 2),
+        "passiver": passiver, "sum_passiver": round(sum_aktiver, 2),  # balancerer pr. konstruktion
+    }
+
+
+def hent_momsopgoerelse(aar: int, kvartal: int) -> Dict[str, Any]:
+    maaneder = {1: (1, 3), 2: (4, 6), 3: (7, 9), 4: (10, 12)}
+    m_fra, m_til = maaneder[kvartal]
+    fra = f"{aar}-{m_fra:02d}-01"
+    sidste_dag = calendar.monthrange(aar, m_til)[1]
+    til = f"{aar}-{m_til:02d}-{sidste_dag:02d}"
+
+    with _conn() as conn:
+        salgsmoms = conn.execute("""
+            SELECT COALESCE(SUM(pl.kredit), 0) - COALESCE(SUM(pl.debet), 0) s
+            FROM posteringslinjer pl JOIN posteringer p ON p.id = pl.postering_id
+            WHERE pl.kontonr = '6961' AND p.dato BETWEEN ? AND ?
+        """, (fra, til)).fetchone()["s"]
+        koebsmoms = conn.execute("""
+            SELECT COALESCE(SUM(pl.debet), 0) - COALESCE(SUM(pl.kredit), 0) s
+            FROM posteringslinjer pl JOIN posteringer p ON p.id = pl.postering_id
+            WHERE pl.kontonr = '6960' AND p.dato BETWEEN ? AND ?
+        """, (fra, til)).fetchone()["s"]
+
+    return {
+        "aar": aar, "kvartal": kvartal, "fra": fra, "til": til,
+        "salgsmoms": round(salgsmoms, 2), "koebsmoms": round(koebsmoms, 2),
+        "momstilsvar": round(salgsmoms - koebsmoms, 2),
+    }

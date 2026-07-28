@@ -152,6 +152,19 @@
         <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 4.5h12M2.5 8.5h12M2.5 12.5h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         Posteringer
       </a>
+      <div class="grp-label">Rapporter</div>
+      <a href="/rapporter/resultatopgoerelse" class="{{ 'active' if request.url.path.startswith('/rapporter/resultatopgoerelse') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3 13.5V3.5M3 13.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 11V8.5M8.5 11V6M11.5 11V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Resultatopgørelse
+      </a>
+      <a href="/rapporter/balance" class="{{ 'active' if request.url.path.startswith('/rapporter/balance') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v13M2.5 5.5h5M9.5 5.5h5M4 5.5l-2 4h4l-2-4zM13 5.5l-2 4h4l-2-4z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Balance
+      </a>
+      <a href="/rapporter/moms" class="{{ 'active' if request.url.path.startswith('/rapporter/moms') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M6 11 11 6M6.3 6.8h.01M10.7 10.3h.01" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        Moms
+      </a>
     </nav>
 
     <div class="side-foot">

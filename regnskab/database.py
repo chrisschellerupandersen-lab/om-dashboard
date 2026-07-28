@@ -23,6 +23,30 @@ def _conn() -> sqlite3.Connection:
 
 def init_db():
     with _conn() as conn:
+        # Migration: bank_forbindelser skal understøtte flere konti pr. requisition
+        # (én GoCardless-requisition kan pege på flere konti hos samme bank) — derfor
+        # er kontoen, ikke requisitionen, den unikke nøgle.
+        _bf = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='bank_forbindelser'"
+        ).fetchone()
+        if _bf and "account_id" not in (_bf["sql"] or ""):
+            conn.executescript("""
+                ALTER TABLE bank_forbindelser RENAME TO bank_forbindelser_gl;
+                CREATE TABLE bank_forbindelser (
+                    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                    institution_id     TEXT,
+                    institution_navn   TEXT,
+                    account_id         TEXT UNIQUE,
+                    iban               TEXT,
+                    requisition_id     TEXT,
+                    consent_expires_ts TEXT,
+                    status             TEXT DEFAULT 'aktiv'
+                );
+                INSERT INTO bank_forbindelser (id, institution_id, iban, requisition_id, consent_expires_ts, status)
+                    SELECT id, institution_id, iban, requisition_id, consent_expires_ts, status FROM bank_forbindelser_gl;
+                DROP TABLE bank_forbindelser_gl;
+            """)
+
         conn.executescript("""
             CREATE TABLE IF NOT EXISTS kontoplan (
                 kontonr   TEXT PRIMARY KEY,
@@ -135,10 +159,20 @@ def init_db():
             CREATE TABLE IF NOT EXISTS bank_forbindelser (
                 id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                 institution_id     TEXT,
+                institution_navn   TEXT,
+                account_id         TEXT UNIQUE,
                 iban               TEXT,
-                requisition_id     TEXT UNIQUE,
+                requisition_id     TEXT,
                 consent_expires_ts TEXT,
-                status             TEXT DEFAULT 'aktiv'
+                status             TEXT DEFAULT 'aktiv'   -- aktiv|udloebet|tilbagekaldt
+            );
+
+            CREATE TABLE IF NOT EXISTS gocardless_token (
+                id                  INTEGER PRIMARY KEY CHECK (id = 1),
+                access_token        TEXT,
+                access_expires_ts   TEXT,
+                refresh_token       TEXT,
+                refresh_expires_ts  TEXT
             );
 
             CREATE TABLE IF NOT EXISTS banktransaktioner (
@@ -767,6 +801,66 @@ def hent_banktransaktioner(match_status: Optional[str] = None) -> List[Dict[str,
                 "SELECT * FROM banktransaktioner ORDER BY dato DESC, id DESC"
             ).fetchall()
         return [dict(r) for r in rows]
+
+
+def indlæs_gocardless_transaktioner(bank_forbindelse_id: int, transaktioner: List[Dict[str, Any]]) -> int:
+    """transaktioner: [{"ekstern_id": str, "dato": "YYYY-MM-DD", "beloeb": float, "tekst": str}, ...]
+    Dubletter (samme ekstern_id) springes stille over. Returnerer antal NYE transaktioner indlæst."""
+    antal = 0
+    with _conn() as conn:
+        for t in transaktioner:
+            try:
+                conn.execute(
+                    "INSERT INTO banktransaktioner (bank_forbindelse_id, ekstern_id, dato, beloeb, tekst, match_status) "
+                    "VALUES (?, ?, ?, ?, ?, 'uafklaret')",
+                    (bank_forbindelse_id, t["ekstern_id"], t["dato"], t["beloeb"], t.get("tekst", "")),
+                )
+                antal += 1
+            except sqlite3.IntegrityError:
+                pass  # allerede indlæst tidligere (samme ekstern_id)
+        if antal:
+            _log(conn, "system", "indlaes_gocardless_transaktioner", "bank_forbindelse", bank_forbindelse_id, {"antal": antal})
+    return antal
+
+
+def gem_gocardless_token(access_token: str, access_expires_ts: str, refresh_token: str, refresh_expires_ts: str):
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO gocardless_token (id, access_token, access_expires_ts, refresh_token, refresh_expires_ts)
+            VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                access_token = excluded.access_token, access_expires_ts = excluded.access_expires_ts,
+                refresh_token = excluded.refresh_token, refresh_expires_ts = excluded.refresh_expires_ts
+        """, (access_token, access_expires_ts, refresh_token, refresh_expires_ts))
+
+
+def hent_gocardless_token() -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM gocardless_token WHERE id = 1").fetchone()
+        return dict(r) if r else None
+
+
+def opret_bank_forbindelse(institution_id: str, institution_navn: str, account_id: str, iban: Optional[str],
+                            requisition_id: str, consent_expires_ts: str) -> int:
+    with _conn() as conn:
+        conn.execute("""
+            INSERT INTO bank_forbindelser (institution_id, institution_navn, account_id, iban, requisition_id, consent_expires_ts, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'aktiv')
+            ON CONFLICT(account_id) DO UPDATE SET
+                requisition_id = excluded.requisition_id, consent_expires_ts = excluded.consent_expires_ts, status = 'aktiv'
+        """, (institution_id, institution_navn, account_id, iban, requisition_id, consent_expires_ts))
+        return conn.execute("SELECT id FROM bank_forbindelser WHERE account_id = ?", (account_id,)).fetchone()["id"]
+
+
+def hent_bank_forbindelser() -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        return [dict(r) for r in conn.execute("SELECT * FROM bank_forbindelser ORDER BY id").fetchall()]
+
+
+def luk_bank_forbindelse(forbindelse_id: int, bruger: str):
+    with _conn() as conn:
+        conn.execute("UPDATE bank_forbindelser SET status = 'tilbagekaldt' WHERE id = ?", (forbindelse_id,))
+        _log(conn, bruger, "luk_bank_forbindelse", "bank_forbindelse", forbindelse_id, {})
 
 
 def _dage_mellem(a: str, b: str) -> Optional[int]:

@@ -2,12 +2,53 @@
 {% block title %}Bank — Nimbo Regnskab{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><h1>Bank</h1><div class="sub">Indlæste transaktioner og matchforslag</div></div>
-  <a class="btn" href="/bank/indlaes">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    Indlæs banktransaktioner
-  </a>
+  <div><h1>Bank</h1><div class="sub">Bankforbindelser, indlæste transaktioner og matchforslag</div></div>
+  <div style="display:flex; gap:10px;">
+    {% if forbindelser %}
+    <form method="post" action="/bank/synkroniser"><button class="btn secondary" type="submit">Synkronisér nu</button></form>
+    {% endif %}
+    <a class="btn secondary" href="/bank/indlaes">Indlæs manuelt</a>
+    <a class="btn" href="/bank/forbind">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      Forbind bankkonto
+    </a>
+  </div>
 </div>
+
+{% if forbindelser %}
+<div class="card">
+  <h2 style="font-size:14px; margin:0 0 12px;">Bankforbindelser</h2>
+  <table>
+    <thead><tr><th>Bank</th><th>IBAN</th><th>Status</th><th>Samtykke udløber</th><th></th></tr></thead>
+    <tbody>
+    {% for f in forbindelser %}
+      {% set dage = f.consent_expires_ts|dage_til %}
+      <tr>
+        <td>{{ f.institution_navn or f.institution_id }}</td>
+        <td>{{ f.iban or "—" }}</td>
+        <td><span class="badge {{ 'godkendt' if f.status == 'aktiv' else 'afvist' }}">{{ f.status }}</span></td>
+        <td>
+          {% if f.consent_expires_ts %}
+            <span {% if dage is not none and dage <= 14 %}style="color:var(--bad); font-weight:600;"{% endif %}>
+              {{ f.consent_expires_ts|dato }}{% if dage is not none and dage <= 14 %} ({{ dage }} dage){% endif %}
+            </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {% if f.status == 'aktiv' %}
+          <form method="post" action="/bank/forbindelse/{{ f.id }}/luk" onsubmit="return confirm('Luk denne bankforbindelse?');">
+            <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">Luk</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% elif not gocardless_konfigureret %}
+<div class="card muted">Ingen bankforbindelse endnu. <a href="/bank/forbind">Forbind en bankkonto</a> for automatisk at hente transaktioner, eller indlæs dem manuelt nedenfor.</div>
+{% endif %}
 
 {% for tx in transaktioner %}
 <div class="card">

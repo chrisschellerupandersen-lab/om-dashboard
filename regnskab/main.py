@@ -534,6 +534,68 @@ async def posteringer_side(request: Request):
     })
 
 
+# ── Kontoplan ────────────────────────────────────────────────────────────
+
+KONTOTYPE_LABELS = {
+    "omsaetning": "Omsætning", "omkostning": "Omkostning", "aktiv": "Aktiv",
+    "passiv": "Passiv", "moms": "Moms", "status": "Status/egenkapital",
+}
+MOMS_KODE_LABELS = {"salgsmoms": "Salgsmoms", "koebsmoms": "Købsmoms"}
+templates.env.globals["kontotype_label"] = lambda kt: KONTOTYPE_LABELS.get(kt, kt)
+templates.env.globals["moms_kode_label"] = lambda mk: MOMS_KODE_LABELS.get(mk, "Ingen") if mk else "Ingen"
+templates.env.globals["kontotype_valg"] = list(KONTOTYPE_LABELS.items())
+templates.env.globals["moms_kode_valg"] = list(MOMS_KODE_LABELS.items())
+
+
+@app.get("/kontoplan", response_class=HTMLResponse)
+async def kontoplan_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("kontoplan.html", {
+        "request": request, "konti": database.hent_kontoplan(kun_aktive=False),
+    })
+
+
+@app.get("/kontoplan/ny", response_class=HTMLResponse)
+async def konto_ny_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("konto_form.html", {"request": request, "fejl": None, "konto": None})
+
+
+@app.post("/kontoplan/ny")
+async def konto_ny_post(
+    request: Request,
+    kontonr: str = Form(...), navn: str = Form(...), kontotype: str = Form(...), moms_kode: str = Form(""),
+):
+    bruger = _kræv_login(request)
+    try:
+        database.opret_konto(kontonr.strip(), navn.strip(), kontotype, moms_kode or None, bruger)
+    except ValueError as exc:
+        return templates.TemplateResponse("konto_form.html", {
+            "request": request, "fejl": str(exc),
+            "konto": {"kontonr": kontonr, "navn": navn, "kontotype": kontotype, "moms_kode": moms_kode, "aktiv": 1},
+        }, status_code=400)
+    return RedirectResponse("/kontoplan", status_code=303)
+
+
+@app.get("/kontoplan/{kontonr}/rediger", response_class=HTMLResponse)
+async def konto_rediger_side(request: Request, kontonr: str):
+    _kræv_login(request)
+    konto = database.hent_en_konto(kontonr)
+    if not konto:
+        raise HTTPException(404, "Konto findes ikke")
+    return templates.TemplateResponse("konto_form.html", {"request": request, "fejl": None, "konto": konto})
+
+
+@app.post("/kontoplan/{kontonr}/rediger")
+async def konto_rediger_post(
+    request: Request, kontonr: str,
+    navn: str = Form(...), kontotype: str = Form(...), moms_kode: str = Form(""), aktiv: str = Form(""),
+):
+    bruger = _kræv_login(request)
+    database.opdater_konto(kontonr, navn.strip(), kontotype, moms_kode or None, aktiv == "on", bruger)
+    return RedirectResponse("/kontoplan", status_code=303)
+
+
 # ── Rapporter ────────────────────────────────────────────────────────────
 
 @app.get("/rapporter/resultatopgoerelse", response_class=HTMLResponse)

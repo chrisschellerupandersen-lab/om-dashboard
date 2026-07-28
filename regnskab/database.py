@@ -292,11 +292,41 @@ def hent_posteringer(limit: int = 200) -> List[Dict[str, Any]]:
         return out
 
 
-def hent_kontoplan() -> List[Dict[str, Any]]:
+def hent_kontoplan(kun_aktive: bool = True) -> List[Dict[str, Any]]:
     with _conn() as conn:
-        return [dict(r) for r in conn.execute(
-            "SELECT * FROM kontoplan WHERE aktiv = 1 ORDER BY kontonr"
-        ).fetchall()]
+        if kun_aktive:
+            rows = conn.execute("SELECT * FROM kontoplan WHERE aktiv = 1 ORDER BY kontonr").fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM kontoplan ORDER BY kontonr").fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_en_konto(kontonr: str) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM kontoplan WHERE kontonr = ?", (kontonr,)).fetchone()
+        return dict(r) if r else None
+
+
+def opret_konto(kontonr: str, navn: str, kontotype: str, moms_kode: Optional[str], bruger: str) -> None:
+    with _conn() as conn:
+        try:
+            conn.execute(
+                "INSERT INTO kontoplan (kontonr, navn, kontotype, moms_kode, aktiv) VALUES (?, ?, ?, ?, 1)",
+                (kontonr, navn, kontotype, moms_kode),
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Kontonummer {kontonr} findes allerede")
+        _log(conn, bruger, "opret_konto", "kontoplan", None, {"kontonr": kontonr, "navn": navn})
+
+
+def opdater_konto(kontonr: str, navn: str, kontotype: str, moms_kode: Optional[str],
+                   aktiv: bool, bruger: str) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE kontoplan SET navn = ?, kontotype = ?, moms_kode = ?, aktiv = ? WHERE kontonr = ?",
+            (navn, kontotype, moms_kode, 1 if aktiv else 0, kontonr),
+        )
+        _log(conn, bruger, "opdater_konto", "kontoplan", None, {"kontonr": kontonr, "navn": navn})
 
 
 # ── Bilag ────────────────────────────────────────────────────────────────

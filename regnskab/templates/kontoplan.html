@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Kontoplan — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Kontoplan</h1><div class="sub">Konti brugt til bogføring</div></div>
+  <a class="btn" href="/kontoplan/ny">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2.5v9M2.5 7h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    Ny konto
+  </a>
+</div>
+<div class="card">
+<table>
+  <thead><tr><th>Kontonr</th><th>Navn</th><th>Type</th><th>Momskode</th><th>Status</th><th></th></tr></thead>
+  <tbody>
+  {% for k in konti %}
+    <tr>
+      <td>{{ k.kontonr }}</td>
+      <td>{{ k.navn }}</td>
+      <td>{{ kontotype_label(k.kontotype) }}</td>
+      <td>{{ moms_kode_label(k.moms_kode) }}</td>
+      <td><span class="badge {{ 'bogfoert' if k.aktiv else 'afvist' }}">{{ "aktiv" if k.aktiv else "inaktiv" }}</span></td>
+      <td><a href="/kontoplan/{{ k.kontonr }}/rediger">Rediger →</a></td>
+    </tr>
+  {% else %}
+    <tr><td colspan="6" class="muted">Ingen konti oprettet.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endblock %}

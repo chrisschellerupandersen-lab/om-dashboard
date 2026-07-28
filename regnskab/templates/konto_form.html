@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}{{ "Rediger konto" if konto else "Ny konto" }} — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ "Rediger konto" if konto else "Ny konto" }}</h1><div class="sub">Kontoplan</div></div></div>
+<div class="card" style="max-width:480px;">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <form method="post" action="{{ ('/kontoplan/%s/rediger'|format(konto.kontonr)) if konto else '/kontoplan/ny' }}">
+    <div class="row">
+      <div>
+        <label>Kontonummer</label>
+        {% if konto %}
+          <input value="{{ konto.kontonr }}" disabled>
+        {% else %}
+          <input name="kontonr" placeholder="fx 3600" required>
+        {% endif %}
+      </div>
+      <div><label>Navn</label><input name="navn" value="{{ konto.navn if konto else '' }}" required></div>
+    </div>
+    <div class="row">
+      <div>
+        <label>Type</label>
+        <select name="kontotype">
+          {% for value, label in kontotype_valg %}
+          <option value="{{ value }}" {% if konto and konto.kontotype == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Momskode</label>
+        <select name="moms_kode">
+          <option value="" {% if not konto or not konto.moms_kode %}selected{% endif %}>Ingen</option>
+          {% for value, label in moms_kode_valg %}
+          <option value="{{ value }}" {% if konto and konto.moms_kode == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if konto %}
+    <label style="margin-top:20px; display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" name="aktiv" style="width:auto;" {% if konto.aktiv %}checked{% endif %}> Aktiv (vis i kontovalg ved bogføring)
+    </label>
+    {% endif %}
+    <div style="margin-top:20px;">
+      <button class="btn" type="submit">{{ "Gem" if konto else "Opret" }}</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

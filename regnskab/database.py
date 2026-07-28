@@ -207,27 +207,73 @@ def init_db():
 
 def _seed_kontoplan(conn: sqlite3.Connection):
     konti = [
-        ("1000", "Varesalg",                      "omsaetning", "salgsmoms"),
-        ("2000", "Vareforbrug",                    "omkostning", "koebsmoms"),
-        ("3000", "Lokaleomkostninger",             "omkostning", "koebsmoms"),
-        ("3400", "Personaleomkostninger",          "omkostning", None),
-        ("3500", "Kontorhold & administration",    "omkostning", "koebsmoms"),
-        ("4000", "Diverse driftsomkostninger",     "omkostning", "koebsmoms"),
-        ("6750", "Bank",                           "aktiv",      None),
-        ("6900", "Debitorer (tilgodehavender)",    "aktiv",      None),
-        ("6800", "Kreditorer (leverandørgæld)",    "passiv",     None),
-        ("6960", "Købsmoms",                       "moms",       None),
-        ("6961", "Salgsmoms",                      "moms",       None),
-        ("9999", "Egenkapital / åbningsbalance",   "status",     None),
+        # ── Omsætning ──
+        ("1000", "Varesalg",                        "omsaetning", "salgsmoms"),
+        ("1100", "Andet salg og serviceydelser",     "omsaetning", "salgsmoms"),
+        # ── Vareforbrug ──
+        ("2000", "Vareforbrug",                      "omkostning", "koebsmoms"),
+        ("2100", "Fragt og distribution ved varekøb", "omkostning", "koebsmoms"),
+        # ── Lokaleomkostninger ──
+        ("3000", "Husleje",                           "omkostning", "momsfri"),
+        ("3010", "El, vand og varme",                 "omkostning", "koebsmoms"),
+        ("3020", "Rengøring",                         "omkostning", "koebsmoms"),
+        ("3030", "Ejendomsforsikring",                "omkostning", "momsfri"),
+        # ── Salg og marketing ──
+        ("3100", "Reklame og marketing",              "omkostning", "koebsmoms"),
+        ("3110", "Repræsentation",                    "omkostning", "reduceret"),
+        ("3150", "Autodrift og transport",            "omkostning", "koebsmoms"),
+        # ── Administration ──
+        ("3200", "Kontorartikler og tryksager",       "omkostning", "koebsmoms"),
+        ("3210", "Telefon og internet",                "omkostning", "koebsmoms"),
+        ("3220", "IT og softwareabonnementer",         "omkostning", "koebsmoms"),
+        ("3230", "Porto og gebyrer",                   "omkostning", "momsfri"),
+        ("3240", "Revisor og bogholderi",              "omkostning", "koebsmoms"),
+        ("3250", "Forsikringer, erhverv",              "omkostning", "momsfri"),
+        # ── Personaleomkostninger ──
+        ("3400", "Gager og lønninger",                 "omkostning", None),
+        ("3410", "ATP og pension",                     "omkostning", None),
+        ("3420", "Personaleforsikringer",              "omkostning", "momsfri"),
+        ("3430", "Kurser og personalegoder",           "omkostning", "koebsmoms"),
+        # ── Diverse / afskrivninger ──
+        ("4000", "Diverse driftsomkostninger",         "omkostning", "koebsmoms"),
+        ("4100", "Afskrivninger, inventar og maskiner", "omkostning", None),
+        # ── Finansielle poster ──
+        ("5000", "Renteindtægter",                     "omsaetning", "momsfri"),
+        ("5100", "Renteomkostninger",                   "omkostning", None),
+        ("5200", "Gebyrer, finansielle",                "omkostning", "momsfri"),
+        # ── Balance: aktiver ──
+        ("6700", "Kasse",                               "aktiv",  None),
+        ("6750", "Bank",                                "aktiv",  None),
+        ("6900", "Debitorer (tilgodehavender)",         "aktiv",  None),
+        ("6910", "Andre tilgodehavender",               "aktiv",  None),
+        # ── Balance: passiver ──
+        ("6800", "Kreditorer (leverandørgæld)",         "passiv", None),
+        ("6970", "Skyldig A-skat og AM-bidrag",         "passiv", None),
+        ("6980", "Skyldig løn og feriepenge",           "passiv", None),
+        ("6990", "Anden gæld",                          "passiv", None),
+        # ── Moms ──
+        ("6960", "Købsmoms",                            "moms",   None),
+        ("6961", "Salgsmoms",                           "moms",   None),
+        # ── Egenkapital ──
+        ("9999", "Egenkapital / åbningsbalance",        "status", None),
     ]
     for kontonr, navn, kontotype, moms_kode in konti:
         conn.execute(
             "INSERT OR IGNORE INTO kontoplan (kontonr, navn, kontotype, moms_kode) VALUES (?, ?, ?, ?)",
             (kontonr, navn, kontotype, moms_kode),
         )
+
+    # Engangsrettelse af tidligere ASCII-erstatninger for æøå (ramte kun disse tre konti).
+    # Matcher kun den PRÆCISE gamle tekst, så brugerens egne rettelser via kontoplan-siden
+    # aldrig bliver overskrevet igen ved næste opstart.
+    for kontonr, gammel, ny in [
+        ("6960", "Koebsmoms", "Købsmoms"),
+        ("6800", "Kreditorer (leverandoergaeld)", "Kreditorer (leverandørgæld)"),
+        ("9999", "Egenkapital / aabningsbalance", "Egenkapital / åbningsbalance"),
+    ]:
         conn.execute(
-            "UPDATE kontoplan SET navn = ? WHERE kontonr = ? AND navn != ?",
-            (navn, kontonr, navn),
+            "UPDATE kontoplan SET navn = ? WHERE kontonr = ? AND navn = ?",
+            (ny, kontonr, gammel),
         )
 
 

@@ -540,7 +540,14 @@ KONTOTYPE_LABELS = {
     "omsaetning": "Omsætning", "omkostning": "Omkostning", "aktiv": "Aktiv",
     "passiv": "Passiv", "moms": "Moms", "status": "Status/egenkapital",
 }
-MOMS_KODE_LABELS = {"salgsmoms": "Salgsmoms", "koebsmoms": "Købsmoms"}
+MOMS_KODE_LABELS = {
+    "salgsmoms": "Salgsmoms (25%)",
+    "koebsmoms": "Købsmoms (25%)",
+    "momsfri": "Momsfri leverance",
+    "reduceret": "Delvis fradrag (fx repræsentation)",
+    "eu_vare": "EU-varehandel (omvendt betalingspligt)",
+    "eu_ydelse": "EU-ydelseskøb (omvendt betalingspligt)",
+}
 templates.env.globals["kontotype_label"] = lambda kt: KONTOTYPE_LABELS.get(kt, kt)
 templates.env.globals["moms_kode_label"] = lambda mk: MOMS_KODE_LABELS.get(mk, "Ingen") if mk else "Ingen"
 templates.env.globals["kontotype_valg"] = list(KONTOTYPE_LABELS.items())

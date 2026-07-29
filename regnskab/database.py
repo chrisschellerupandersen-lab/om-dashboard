@@ -23,6 +23,10 @@ def _conn() -> sqlite3.Connection:
 
 def init_db():
     with _conn() as conn:
+        # GoCardless Bank Account Data lukkede for nye tilmeldinger i juli 2025 — erstattet
+        # af Enable Banking, som ikke bruger et server-cachet token (JWT signeres pr. kald).
+        conn.execute("DROP TABLE IF EXISTS gocardless_token")
+
         # Migration: bank_forbindelser skal understøtte flere konti pr. requisition
         # (én GoCardless-requisition kan pege på flere konti hos samme bank) — derfor
         # er kontoen, ikke requisitionen, den unikke nøgle.
@@ -165,14 +169,6 @@ def init_db():
                 requisition_id     TEXT,
                 consent_expires_ts TEXT,
                 status             TEXT DEFAULT 'aktiv'   -- aktiv|udloebet|tilbagekaldt
-            );
-
-            CREATE TABLE IF NOT EXISTS gocardless_token (
-                id                  INTEGER PRIMARY KEY CHECK (id = 1),
-                access_token        TEXT,
-                access_expires_ts   TEXT,
-                refresh_token       TEXT,
-                refresh_expires_ts  TEXT
             );
 
             CREATE TABLE IF NOT EXISTS banktransaktioner (
@@ -803,7 +799,7 @@ def hent_banktransaktioner(match_status: Optional[str] = None) -> List[Dict[str,
         return [dict(r) for r in rows]
 
 
-def indlæs_gocardless_transaktioner(bank_forbindelse_id: int, transaktioner: List[Dict[str, Any]]) -> int:
+def indlæs_eksterne_banktransaktioner(bank_forbindelse_id: int, transaktioner: List[Dict[str, Any]]) -> int:
     """transaktioner: [{"ekstern_id": str, "dato": "YYYY-MM-DD", "beloeb": float, "tekst": str}, ...]
     Dubletter (samme ekstern_id) springes stille over. Returnerer antal NYE transaktioner indlæst."""
     antal = 0
@@ -819,25 +815,8 @@ def indlæs_gocardless_transaktioner(bank_forbindelse_id: int, transaktioner: Li
             except sqlite3.IntegrityError:
                 pass  # allerede indlæst tidligere (samme ekstern_id)
         if antal:
-            _log(conn, "system", "indlaes_gocardless_transaktioner", "bank_forbindelse", bank_forbindelse_id, {"antal": antal})
+            _log(conn, "system", "indlaes_eksterne_banktransaktioner", "bank_forbindelse", bank_forbindelse_id, {"antal": antal})
     return antal
-
-
-def gem_gocardless_token(access_token: str, access_expires_ts: str, refresh_token: str, refresh_expires_ts: str):
-    with _conn() as conn:
-        conn.execute("""
-            INSERT INTO gocardless_token (id, access_token, access_expires_ts, refresh_token, refresh_expires_ts)
-            VALUES (1, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                access_token = excluded.access_token, access_expires_ts = excluded.access_expires_ts,
-                refresh_token = excluded.refresh_token, refresh_expires_ts = excluded.refresh_expires_ts
-        """, (access_token, access_expires_ts, refresh_token, refresh_expires_ts))
-
-
-def hent_gocardless_token() -> Optional[Dict[str, Any]]:
-    with _conn() as conn:
-        r = conn.execute("SELECT * FROM gocardless_token WHERE id = 1").fetchone()
-        return dict(r) if r else None
 
 
 def opret_bank_forbindelse(institution_id: str, institution_navn: str, account_id: str, iban: Optional[str],

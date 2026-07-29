@@ -15,7 +15,7 @@ from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 import database
-import gocardless_klient
+import enable_banking_klient
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
@@ -667,7 +667,7 @@ async def bank_side(request: Request):
         "request": request,
         "transaktioner": transaktioner,
         "forbindelser": database.hent_bank_forbindelser(),
-        "gocardless_konfigureret": gocardless_klient.konfigureret(),
+        "bank_api_konfigureret": enable_banking_klient.konfigureret(),
     })
 
 
@@ -731,18 +731,18 @@ async def bank_ignorer_post(request: Request, transaktion_id: int):
     return RedirectResponse("/bank", status_code=303)
 
 
-# ── Bankforbindelse (GoCardless) ─────────────────────────────────────────
+# ── Bankforbindelse (Enable Banking) ─────────────────────────────────────
 
 @app.get("/bank/forbind", response_class=HTMLResponse)
 async def bank_forbind_side(request: Request):
     _kræv_login(request)
-    if not gocardless_klient.konfigureret():
+    if not enable_banking_klient.konfigureret():
         return templates.TemplateResponse("bank_forbind.html", {
             "request": request, "institutioner": [], "fejl": None,
             "ikke_konfigureret": True,
         })
     try:
-        institutioner = gocardless_klient.hent_institutioner()
+        institutioner = enable_banking_klient.hent_banker()
     except requests.RequestException as exc:
         return templates.TemplateResponse("bank_forbind.html", {
             "request": request, "institutioner": [], "ikke_konfigureret": False,
@@ -754,40 +754,44 @@ async def bank_forbind_side(request: Request):
 
 
 @app.post("/bank/forbind")
-async def bank_forbind_post(request: Request, institution_id: str = Form(...)):
+async def bank_forbind_post(request: Request, aspsp_navn: str = Form(...)):
     _kræv_login(request)
-    reference = secrets.token_urlsafe(16)
-    redirect_url = str(request.base_url).rstrip("/") + f"/bank/forbind/callback?ref={reference}"
+    state = secrets.token_urlsafe(16)
+    redirect_url = str(request.base_url).rstrip("/") + "/bank/forbind/callback"
     try:
-        agreement_id = gocardless_klient.opret_aftale(institution_id)
-        req = gocardless_klient.opret_requisition(institution_id, agreement_id, redirect_url, reference)
+        session = enable_banking_klient.start_session(aspsp_navn, "DK", redirect_url, state)
     except requests.RequestException as exc:
-        institutioner = gocardless_klient.hent_institutioner() if gocardless_klient.konfigureret() else []
+        institutioner = enable_banking_klient.hent_banker() if enable_banking_klient.konfigureret() else []
         return templates.TemplateResponse("bank_forbind.html", {
             "request": request, "institutioner": institutioner, "ikke_konfigureret": False,
             "fejl": f"Kunne ikke starte godkendelsen hos banken: {exc}",
         }, status_code=502)
-    return RedirectResponse(req["link"], status_code=303)
+    return RedirectResponse(session["url"], status_code=303)
 
 
 @app.get("/bank/forbind/callback", response_class=HTMLResponse)
-async def bank_forbind_callback(request: Request, ref: str = ""):
+async def bank_forbind_callback(request: Request, code: str = "", state: str = "",
+                                 error: str = "", error_description: str = ""):
     _kræv_login(request)
+    if error:
+        return templates.TemplateResponse("bank_forbind.html", {
+            "request": request, "institutioner": [], "ikke_konfigureret": False,
+            "fejl": f"Banken afviste godkendelsen: {error_description or error}",
+        }, status_code=400)
     try:
-        alle = gocardless_klient.hent_alle_requisitioner()
-        match = next((r for r in alle if r.get("reference") == ref), None)
-        if not match:
-            raise ValueError("Kunne ikke genfinde den forbindelse du lige godkendte")
-        req = gocardless_klient.hent_requisition(match["id"])
-        institutioner = {i["id"]: i["name"] for i in gocardless_klient.hent_institutioner()}
-        institution_navn = institutioner.get(req["institution_id"], req["institution_id"])
+        session = enable_banking_klient.afslut_session(code)
+        institution_navn = (session.get("aspsp") or {}).get("name") or "Ukendt bank"
         consent_expires_ts = (date.today() + timedelta(days=90)).isoformat()
-        for account_id in req.get("accounts", []):
-            iban = gocardless_klient.hent_konto_iban(account_id)
+        for konto in session.get("accounts", []):
+            account_uid = konto.get("uid")
+            if not account_uid:
+                continue
+            iban = (konto.get("account_id") or {}).get("iban")
             database.opret_bank_forbindelse(
-                req["institution_id"], institution_navn, account_id, iban, req["id"], consent_expires_ts,
+                institution_navn, institution_navn, account_uid, iban,
+                session.get("session_id"), consent_expires_ts,
             )
-    except (requests.RequestException, ValueError) as exc:
+    except requests.RequestException as exc:
         return templates.TemplateResponse("bank_forbind.html", {
             "request": request, "institutioner": [], "ikke_konfigureret": False,
             "fejl": f"Bankforbindelsen kunne ikke fuldføres: {exc}",
@@ -812,15 +816,15 @@ async def bank_forbindelse_luk_post(request: Request, forbindelse_id: int):
 def _synkroniser_bankforbindelser() -> int:
     """Henter nye transaktioner for alle aktive bankforbindelser. Fejl på én forbindelse
     stopper ikke synkronisering af de øvrige. Returnerer samlet antal nye transaktioner."""
-    if not gocardless_klient.konfigureret():
+    if not enable_banking_klient.konfigureret():
         return 0
     antal_nye = 0
     for forbindelse in database.hent_bank_forbindelser():
         if forbindelse["status"] != "aktiv" or not forbindelse["account_id"]:
             continue
         try:
-            transaktioner = gocardless_klient.hent_transaktioner(forbindelse["account_id"])
-            antal_nye += database.indlæs_gocardless_transaktioner(forbindelse["id"], transaktioner)
+            transaktioner = enable_banking_klient.hent_transaktioner(forbindelse["account_id"])
+            antal_nye += database.indlæs_eksterne_banktransaktioner(forbindelse["id"], transaktioner)
         except requests.RequestException:
             continue
     return antal_nye

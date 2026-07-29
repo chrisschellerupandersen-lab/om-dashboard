@@ -1,30 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Forbind bankkonto — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Forbind bankkonto</h1><div class="sub">Automatisk hentning af banktransaktioner via GoCardless</div></div></div>
+<div class="page-head"><div><h1>Forbind bankkonto</h1><div class="sub">Automatisk hentning af banktransaktioner via Enable Banking</div></div></div>
 
 {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
 
 {% if ikke_konfigureret %}
 <div class="card" style="max-width:560px;">
-  <p>GoCardless er ikke sat op endnu. For at hente banktransaktioner automatisk skal du:</p>
+  <p>Enable Banking er ikke sat op endnu. For at hente banktransaktioner automatisk skal du:</p>
   <ol style="padding-left:20px; font-size:13.5px; line-height:1.7;">
-    <li>Opret en gratis konto på <a href="https://bankaccountdata.gocardless.com/" target="_blank" rel="noopener">bankaccountdata.gocardless.com</a></li>
-    <li>Generér et <strong>Secret ID</strong> og <strong>Secret Key</strong> under "Developers"</li>
-    <li>Sæt dem som <code>GOCARDLESS_SECRET_ID</code> og <code>GOCARDLESS_SECRET_KEY</code> i Railway → regnskab → Variables</li>
+    <li>Opret en gratis konto på <a href="https://enablebanking.com/" target="_blank" rel="noopener">enablebanking.com</a></li>
+    <li>Registrér en "application" og upload det certifikat, jeg har genereret til dig</li>
+    <li>Sæt <code>ENABLEBANKING_APP_ID</code> og <code>ENABLEBANKING_PRIVATE_KEY</code> i Railway → regnskab → Variables</li>
   </ol>
-  <p class="muted">Indtil da kan du fortsat indlæse banktransaktioner manuelt under "Indlæs banktransaktioner".</p>
+  <p class="muted">Indtil da kan du fortsat indlæse banktransaktioner manuelt under "Indlæs manuelt".</p>
 </div>
 {% else %}
 <div class="card" style="max-width:560px;">
   <form method="post" action="/bank/forbind">
     <label>Vælg din bank</label>
-    <select name="institution_id" required>
+    <select name="aspsp_navn" required>
       {% for i in institutioner %}
-      <option value="{{ i.id }}">{{ i.name }}</option>
+      <option value="{{ i.name }}">{{ i.name }}</option>
       {% endfor %}
     </select>
-    <p class="muted" style="margin-top:10px;">Du sendes videre til din bank for at godkende adgangen — Nimbo får kun læseadgang til transaktioner, aldrig mulighed for at flytte penge.</p>
+    <p class="muted" style="margin-top:10px;">Du sendes videre til din bank og godkender med MitID — Nimbo får kun læseadgang til transaktioner, aldrig mulighed for at flytte penge.</p>
     <button class="btn" type="submit" style="margin-top:16px;">Fortsæt til banken</button>
   </form>
 </div>

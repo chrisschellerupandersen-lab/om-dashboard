@@ -22,6 +22,7 @@ BRUG:
 ────────────────────────────────────────────────────────────────────────────
 """
 import os
+import re
 import sys
 import json
 from datetime import date, datetime, timedelta
@@ -82,18 +83,20 @@ def _access_token() -> str:
     return TOKEN
 
 
+def _saniter(s: str) -> str:
+    return re.sub(r"accessToken=[^&\s\"']+", "accessToken=***", str(s))
+
+
 def api_get(path: str, **params) -> dict:
     params.setdefault("accessToken", _access_token())
     params.setdefault("client", CLIENT)
     # Token lægges i URL'en af API'et — sørg for at den ALDRIG havner i en
-    # fejlbesked/traceback (ellers lækkes den). Derfor egne, rene fejl.
+    # fejlbesked/traceback (ellers lækkes den). Derfor egne, sanerede fejl.
     r = requests.get(f"{BASE}{path}", params=params, timeout=60)
     if r.status_code == 401:
-        sys.exit("FEJL: 401 — token afvist (ugyldig token, forkert miljø, eller dev-token mod produktion).")
-    if r.status_code == 404:
-        sys.exit(f"FEJL: 404 — '{path}' findes ikke på {BASE} (typisk: dev-token mod prod, eller ingen data).")
+        sys.exit("FEJL: 401 — token afvist (ugyldig token eller forkert miljø).")
     if not r.ok:
-        sys.exit(f"FEJL: HTTP {r.status_code} på '{path}'.")
+        sys.exit(f"FEJL: HTTP {r.status_code} på '{path}'. Svar: {_saniter(r.text[:250])}")
     try:
         return r.json()
     except Exception:

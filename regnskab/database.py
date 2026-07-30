@@ -30,13 +30,17 @@ def init_db():
         # Migration: bank_forbindelser skal understøtte flere konti pr. requisition
         # (én GoCardless-requisition kan pege på flere konti hos samme bank) — derfor
         # er kontoen, ikke requisitionen, den unikke nøgle.
+        # OBS: bygget som "opret under nyt navn, drop det gamle, omdøb til det rigtige
+        # navn" — IKKE "omdøb det gamle, opret nyt, drop det gamle". SQLite omskriver
+        # automatisk andre tabellers REFERENCES-klausuler ved ALTER TABLE RENAME, så den
+        # oprindelige rækkefølge fik banktransaktioner.bank_forbindelse_id til varigt at
+        # pege på det midlertidige (senere droppede) tabelnavn — se rettelsen nedenfor.
         _bf = conn.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='bank_forbindelser'"
         ).fetchone()
         if _bf and "account_id" not in (_bf["sql"] or ""):
             conn.executescript("""
-                ALTER TABLE bank_forbindelser RENAME TO bank_forbindelser_gl;
-                CREATE TABLE bank_forbindelser (
+                CREATE TABLE bank_forbindelser_ny (
                     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
                     institution_id     TEXT,
                     institution_navn   TEXT,
@@ -46,9 +50,37 @@ def init_db():
                     consent_expires_ts TEXT,
                     status             TEXT DEFAULT 'aktiv'
                 );
-                INSERT INTO bank_forbindelser (id, institution_id, iban, requisition_id, consent_expires_ts, status)
-                    SELECT id, institution_id, iban, requisition_id, consent_expires_ts, status FROM bank_forbindelser_gl;
-                DROP TABLE bank_forbindelser_gl;
+                INSERT INTO bank_forbindelser_ny (id, institution_id, iban, requisition_id, consent_expires_ts, status)
+                    SELECT id, institution_id, iban, requisition_id, consent_expires_ts, status FROM bank_forbindelser;
+                DROP TABLE bank_forbindelser;
+                ALTER TABLE bank_forbindelser_ny RENAME TO bank_forbindelser;
+            """)
+
+        # Rettelse: banktransaktioner.bank_forbindelse_id fik (via ovenstående migrations
+        # oprindelige, forkerte rækkefølge) en varig REFERENCES-klausul til det droppede
+        # midlertidige tabelnavn "bank_forbindelser_gl" — genopbyg tabellen så referencen
+        # peger korrekt på "bank_forbindelser" igen. Rammer kun databaser der allerede har
+        # kørt den gamle migration; ny-installationer ser aldrig dette.
+        _bt = conn.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='banktransaktioner'"
+        ).fetchone()
+        if _bt and "bank_forbindelser_gl" in (_bt["sql"] or ""):
+            conn.executescript("""
+                ALTER TABLE banktransaktioner RENAME TO banktransaktioner_gl;
+                CREATE TABLE banktransaktioner (
+                    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bank_forbindelse_id INTEGER REFERENCES bank_forbindelser(id),
+                    ekstern_id          TEXT UNIQUE,
+                    dato                TEXT NOT NULL,
+                    beloeb              REAL NOT NULL,
+                    tekst               TEXT,
+                    match_status        TEXT DEFAULT 'uafklaret',
+                    matchet_type        TEXT,
+                    matchet_id          INTEGER,
+                    importeret_ts       TEXT DEFAULT (datetime('now','localtime'))
+                );
+                INSERT INTO banktransaktioner SELECT * FROM banktransaktioner_gl;
+                DROP TABLE banktransaktioner_gl;
             """)
 
         conn.executescript("""

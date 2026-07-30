@@ -261,20 +261,31 @@ def inspect_data() -> dict:
         except Exception as e:
             return {"fejl": str(e)[:100]}
 
+    def _raw_base(base, _endpoint, **p):
+        try:
+            r = requests.get(f"{base}{_endpoint}",
+                             params={"accessToken": _access_token(), "client": CLIENT, **p},
+                             timeout=40, allow_redirects=False)
+            return {"status": r.status_code,
+                    "ctype": r.headers.get("content-type", "")[:40],
+                    "location": _saniter(r.headers.get("location", ""))[:200],
+                    "krop": _saniter(r.text[:250])}
+        except Exception as e:
+            return {"fejl": str(e)[:100]}
+
     if uid:
         navn = out.get("valgt_rapport", "")
         res = {}
-        for pn in ("id", "path", "file", "name", "report", "filename",
-                   "report_id", "saved_report", "saved_report_id", "fileName"):
-            r1 = _raw("/saved-reports/download-path", **{pn: uid})
-            res[f"{pn}=uid"] = r1.get("status")
-            if r1.get("status") == 200:
-                res[f"{pn}=uid FULD"] = r1
-        for pn in ("path", "file", "name", "filename", "fileName"):
-            r2 = _raw("/saved-reports/download-path", **{pn: navn})
-            res[f"{pn}=navn"] = r2.get("status")
-            if r2.get("status") == 200:
-                res[f"{pn}=navn FULD"] = r2
+        # Prøv BÅDE api.shopbox.com og api-prod.shopbox.com (mail-links bruger api-prod)
+        for label, base in (("api", "https://api.shopbox.com/api/v3"),
+                            ("prod", "https://api-prod.shopbox.com/api/v3")):
+            for pn in ("id", "uid", "path", "file", "name", "report_id"):
+                r1 = _raw_base(base, "/saved-reports/download-path", **{pn: uid})
+                res[f"{label} {pn}=uid"] = f'{r1.get("status")} {r1.get("ctype","")}'
+                if r1.get("status") == 200:
+                    res[f"{label} {pn}=uid FULD"] = r1
+            rn = _raw_base(base, "/saved-reports/download-path", name=navn)
+            res[f"{label} name=navn"] = f'{rn.get("status")} {rn.get("krop","")[:80]}'
         out["download_param_test"] = res
     return out
 

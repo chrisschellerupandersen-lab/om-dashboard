@@ -2022,16 +2022,17 @@ async def shopbox_inspect(request: Request):
     header_secret = request.headers.get("X-Webhook-Secret", "")
     if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
         raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    import importlib, os as _os, shopbox_sync
+    if body.get("base"):
+        _os.environ["SHOPBOX_BASE"] = str(body["base"])
+    importlib.reload(shopbox_sync)
+    cfg = shopbox_sync.config_status()
     try:
-        import importlib, os as _os, shopbox_sync
-        if body.get("base"):
-            _os.environ["SHOPBOX_BASE"] = str(body["base"])
-        importlib.reload(shopbox_sync)
-        return {"ok": True, **shopbox_sync.inspect_data()}
+        return {"ok": True, "konfig": cfg, **shopbox_sync.inspect_data()}
     except SystemExit as e:
-        return {"ok": False, "fejl": str(e)}
+        return {"ok": False, "konfig": cfg, "fejl": str(e)}
     except Exception as e:
-        return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
+        return {"ok": False, "konfig": cfg, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
 
 
 @app.post("/api/salg/ingest")

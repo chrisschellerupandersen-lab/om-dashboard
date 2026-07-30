@@ -49,6 +49,18 @@ def _tjek_konfig():
         sys.exit("FEJL: sæt enten SHOPBOX_TOKEN, eller SHOPBOX_USER + SHOPBOX_PASS.")
 
 
+def config_status() -> dict:
+    """Diagnose uden at lække værdier: hvilke variabler er sat?"""
+    return {
+        "base": BASE,
+        "har_fast_token": bool(os.environ.get("SHOPBOX_TOKEN", "").strip()),
+        "har_login": bool(USER and PASS),
+        "har_client": bool(CLIENT),
+        "bruger": "fast token" if os.environ.get("SHOPBOX_TOKEN", "").strip()
+                  else ("login" if (USER and PASS) else "INTET"),
+    }
+
+
 def _access_token() -> str:
     """Fast token hvis sat, ellers log ind mod BASE og få en frisk token.
     Login mod produktions-BASE giver automatisk en produktions-token."""

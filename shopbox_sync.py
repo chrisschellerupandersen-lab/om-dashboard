@@ -234,10 +234,38 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
-    # GENNEMBRUD: mailen bruger /saved-reports/download-path — Varesalgsrapporten.
-    # Prøv at liste gemte rapporter direkte via API (så slipper vi for mail).
-    for p in ("/saved-reports", "/reports", "/report-templates", "/saved-reports/list"):
-        out["probe " + p] = _dump(p)
+    # GENNEMBRUD: /saved-reports viser Varesalgsrapporten. Find download-stien.
+    liste = _dump("/saved-reports")
+    out["saved_reports"] = liste
+    # find nyeste Varesalgsrapport-uid
+    uid = None
+    try:
+        jj = requests.get(f"{BASE}/saved-reports",
+                          params={"accessToken": _access_token(), "client": CLIENT},
+                          timeout=40).json()
+        for it in (jj.get("data") or []):
+            if "varesalg" in str(it.get("name", "")).lower():
+                uid = it.get("uid"); out["valgt_rapport"] = it.get("name"); break
+    except Exception as e:
+        out["uid_fejl"] = str(e)[:100]
+
+    def _raw(path, **p):
+        try:
+            r = requests.get(f"{BASE}{path}",
+                             params={"accessToken": _access_token(), "client": CLIENT, **p},
+                             timeout=40, allow_redirects=False)
+            return {"status": r.status_code,
+                    "ctype": r.headers.get("content-type", "")[:40],
+                    "location": _saniter(r.headers.get("location", ""))[:200],
+                    "krop": _saniter(r.text[:200])}
+        except Exception as e:
+            return {"fejl": str(e)[:100]}
+
+    if uid:
+        out["dl /download-path/{uid}"]   = _raw(f"/saved-reports/download-path/{uid}")
+        out["dl /{uid}/download-path"]    = _raw(f"/saved-reports/{uid}/download-path")
+        out["dl ?uid"]                    = _raw("/saved-reports/download-path", uid=uid)
+        out["dl /{uid}"]                  = _raw(f"/saved-reports/{uid}")
     return out
 
 

@@ -234,46 +234,16 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
-    # Afgørende: find en basket-detalje MED varelinjer i "sales"
-    if data:
-        tok = _access_token()
-        oversigt = []
-        fundet = False
-        for b in data[:12]:
-            try:
-                det = requests.get(f"{BASE}/baskets/{b.get('uid')}",
-                                   params={"accessToken": tok, "client": CLIENT},
-                                   timeout=40).json()
-                s = det.get("sales") if isinstance(det, dict) else None
-                n = len(s) if isinstance(s, list) else 0
-                oversigt.append({"uid": b.get("uid"), "type": det.get("type"),
-                                 "total": det.get("total"), "sales_n": n,
-                                 "sales_type": type(s).__name__})
-                if n and not fundet:
-                    fundet = True
-                    out["linje_keys"] = list(s[0].keys())
-                    out["linje_eksempel"] = s[0]
-            except Exception as e:
-                oversigt.append({"uid": b.get("uid"), "fejl": str(e)[:80]})
-        out["basket_oversigt"] = oversigt
-
-    import datetime as _dt
-    ig = date.today() - timedelta(days=1)          # i går
-    for7 = date.today() - timedelta(days=7)
-    ig_iso, ig_dk = ig.isoformat(), ig.strftime("%d/%m/%Y")
-    ts_start = int(_dt.datetime(ig.year, ig.month, ig.day).timestamp())
-    ts_end   = int(_dt.datetime(ig.year, ig.month, ig.day, 23, 59, 59).timestamp())
-    tests = {"ingen_filter": _antal_items()}
-    # dato-range i går (skal give andet tal end i dag hvis filteret virker)
-    for fn, tn in (("from", "to"), ("from_date", "to_date"), ("dateFrom", "dateTo"),
-                   ("start_date", "end_date"), ("date_from", "date_to")):
-        tests[f"{fn}=igår_iso"] = _antal_items(**{fn: ig_iso, tn: ig_iso})
-        tests[f"{fn}=igår_dk"]  = _antal_items(**{fn: ig_dk,  tn: ig_dk})
-    tests["from/to=unix_igår"] = _antal_items(**{"from": ts_start, "to": ts_end})
-    tests["period=yesterday"]  = _antal_items(period="yesterday")
-    tests["range=yesterday"]   = _antal_items(range="yesterday")
-    tests["from/to=uge_iso"]   = _antal_items(**{"from": for7.isoformat(), "to": date.today().isoformat()})
-    out["datofilter_test"] = tests
+    # HYPOTESE: /sales er selve varelinje-hovedbogen (basket.sales = ANTAL linjer).
+    out["sales_liste"] = _dump("/sales")
+    ig = date.today() - timedelta(days=1)
+    ig_iso = ig.isoformat()
+    out["sales_igår_from_to"] = _dump("/sales", **{"from": ig_iso, "to": ig_iso})
+    # Kan top-item-sales' 5-loft hæves? (så er det bare et default-limit)
+    tests = {"ingen": _antal_items()}
+    for pn in ("limit", "per_page", "per-page", "count", "top", "size"):
+        tests[pn] = _antal_items(**{pn: 100})
+    out["top_item_limit_test"] = tests
     return out
 
 

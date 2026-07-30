@@ -34,17 +34,42 @@ WEBHOOK_SECRET = os.environ.get("WEBHOOK_SECRET", "OM-Greve-2026-Hemlig")
 BASE    = os.environ.get("SHOPBOX_BASE", "https://api.shopbox.com/api/v3").rstrip("/")
 TOKEN   = os.environ.get("SHOPBOX_TOKEN", "")
 CLIENT  = os.environ.get("SHOPBOX_CLIENT", "")
+# Alternativ til en fast token: log ind mod den valgte server (BASE) og få en
+# frisk accessToken hver gang — så er den ALTID for det rigtige miljø.
+USER    = os.environ.get("SHOPBOX_USER", "")
+PASS    = os.environ.get("SHOPBOX_PASS", "")
 # Beløb i basket-linjer er heltal (typisk øre). Divideres med denne. Bekræft med --inspect.
 BELOEB_DIVISOR = float(os.environ.get("SHOPBOX_AMOUNT_DIVISOR", "100"))
 
 
 def _tjek_konfig():
-    if not TOKEN or not CLIENT:
-        sys.exit("FEJL: sæt SHOPBOX_TOKEN og SHOPBOX_CLIENT som miljøvariabler først.")
+    if not CLIENT:
+        sys.exit("FEJL: sæt SHOPBOX_CLIENT (butiks-id) først.")
+    if not TOKEN and not (USER and PASS):
+        sys.exit("FEJL: sæt enten SHOPBOX_TOKEN, eller SHOPBOX_USER + SHOPBOX_PASS.")
+
+
+def _access_token() -> str:
+    """Fast token hvis sat, ellers log ind mod BASE og få en frisk token.
+    Login mod produktions-BASE giver automatisk en produktions-token."""
+    global TOKEN
+    if TOKEN:
+        return TOKEN
+    r = requests.post(f"{BASE}/authenticate/credentials",
+                      json={"username": USER, "password": PASS}, timeout=60)
+    if r.status_code not in (200, 201):
+        sys.exit(f"FEJL: login mislykkedes (HTTP {r.status_code}) mod {BASE} — tjek SHOPBOX_USER/PASS.")
+    try:
+        TOKEN = r.json().get("accessToken", "")
+    except Exception:
+        TOKEN = ""
+    if not TOKEN:
+        sys.exit("FEJL: intet accessToken i login-svaret.")
+    return TOKEN
 
 
 def api_get(path: str, **params) -> dict:
-    params.setdefault("accessToken", TOKEN)
+    params.setdefault("accessToken", _access_token())
     params.setdefault("client", CLIENT)
     # Token lægges i URL'en af API'et — sørg for at den ALDRIG havner i en
     # fejlbesked/traceback (ellers lækkes den). Derfor egne, rene fejl.

@@ -234,17 +234,22 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
-    idag = date.today()
-    iso = idag.isoformat()
-    dk = idag.strftime("%d/%m/%Y")
-    dk2 = idag.strftime("%d-%m-%Y")
-    tests = {}
+    import datetime as _dt
+    ig = date.today() - timedelta(days=1)          # i går
+    for7 = date.today() - timedelta(days=7)
+    ig_iso, ig_dk = ig.isoformat(), ig.strftime("%d/%m/%Y")
+    ts_start = int(_dt.datetime(ig.year, ig.month, ig.day).timestamp())
+    ts_end   = int(_dt.datetime(ig.year, ig.month, ig.day, 23, 59, 59).timestamp())
+    tests = {"ingen_filter": _antal_items()}
+    # dato-range i går (skal give andet tal end i dag hvis filteret virker)
     for fn, tn in (("from", "to"), ("from_date", "to_date"), ("dateFrom", "dateTo"),
-                   ("start", "end"), ("start_date", "end_date"), ("date_from", "date_to")):
-        tests[f"{fn}/{tn}=iso"] = _antal_items(**{fn: iso, tn: iso})
-        tests[f"{fn}/{tn}=dk"]  = _antal_items(**{fn: dk,  tn: dk})
-    tests["dk2 from/to"] = _antal_items(**{"from": dk2, "to": dk2})
-    tests["ingen_filter"] = _antal_items()
+                   ("start_date", "end_date"), ("date_from", "date_to")):
+        tests[f"{fn}=igår_iso"] = _antal_items(**{fn: ig_iso, tn: ig_iso})
+        tests[f"{fn}=igår_dk"]  = _antal_items(**{fn: ig_dk,  tn: ig_dk})
+    tests["from/to=unix_igår"] = _antal_items(**{"from": ts_start, "to": ts_end})
+    tests["period=yesterday"]  = _antal_items(period="yesterday")
+    tests["range=yesterday"]   = _antal_items(range="yesterday")
+    tests["from/to=uge_iso"]   = _antal_items(**{"from": for7.isoformat(), "to": date.today().isoformat()})
     out["datofilter_test"] = tests
     return out
 

@@ -68,9 +68,11 @@ def _access_token() -> str:
     if TOKEN:
         return TOKEN
     r = requests.post(f"{BASE}/authenticate/credentials",
-                      json={"username": USER, "password": PASS}, timeout=60)
+                      json={"username": USER.strip(), "password": PASS}, timeout=60)
     if r.status_code not in (200, 201):
-        sys.exit(f"FEJL: login mislykkedes (HTTP {r.status_code}) mod {BASE} — tjek SHOPBOX_USER/PASS.")
+        # Svaret er Shopbox' egen fejl (indeholder ikke vores kodeord) — vis det,
+        # så vi kan se hvad der er galt.
+        sys.exit(f"FEJL: login HTTP {r.status_code} mod {BASE}. Shopbox svar: {r.text[:250]}")
     try:
         TOKEN = r.json().get("accessToken", "")
     except Exception:

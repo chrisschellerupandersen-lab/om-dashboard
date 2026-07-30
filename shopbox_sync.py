@@ -184,14 +184,28 @@ def inspect_data() -> dict:
         out["basket_keys"] = list(b.keys())
         out["gaettet_dato"] = _dato_af_basket(b)
         out["gaettet_tid"] = _tid_af_basket(b)
-        # Find den FØRSTE basket der har varelinjer (nogle er rene betalinger)
-        med_linjer = next((x for x in data if _linjer_i_basket(x)), None)
-        out["baskets_med_linjer_paa_side"] = sum(1 for x in data if _linjer_i_basket(x))
-        if med_linjer:
-            linjer = _linjer_i_basket(med_linjer)
-            out["antal_linjer"] = len(linjer)
-            out["linje_keys"] = list(linjer[0].keys())
-            out["linje_eksempel"] = linjer[0]
+        out["sales_type_paa_liste"] = type(b.get("sales")).__name__
+        out["sales_vaerdi"] = str(b.get("sales"))[:120]
+        # Hent basket i detaljer — linjerne ligger måske kun dér
+        det = api_try(f"/baskets/{b.get('uid')}")
+        out["detalje_status"] = det["status"]
+        try:
+            dj = requests.get(f"{BASE}/baskets/{b.get('uid')}",
+                              params={"accessToken": _access_token(), "client": CLIENT},
+                              timeout=40).json()
+            db = dj.get("data") if isinstance(dj, dict) else dj
+            if isinstance(db, list):
+                db = db[0] if db else {}
+            out["detalje_keys"] = list(db.keys()) if isinstance(db, dict) else str(type(db))
+            dl = _linjer_i_basket(db) if isinstance(db, dict) else []
+            out["detalje_antal_linjer"] = len(dl)
+            if dl:
+                out["linje_keys"] = list(dl[0].keys())
+                out["linje_eksempel"] = dl[0]
+            elif isinstance(db, dict) and isinstance(db.get("sales"), (list, dict)):
+                out["sales_i_detalje"] = str(db.get("sales"))[:300]
+        except Exception as e:
+            out["detalje_fejl"] = str(e)[:100]
     i_gaar = (date.today() - timedelta(days=1)).isoformat()
     tests = {}
     for p in ("from", "to", "date", "dateFrom", "startDate", "date_from", "created_from"):

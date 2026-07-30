@@ -234,6 +234,25 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
+    # Afgørende: har basket-DETALJEN varelinjer? (objektet er top-level, ikke i "data")
+    if data:
+        try:
+            det = requests.get(f"{BASE}/baskets/{data[0].get('uid')}",
+                               params={"accessToken": _access_token(), "client": CLIENT},
+                               timeout=40).json()
+            out["detail_keys"] = list(det.keys()) if isinstance(det, dict) else str(type(det))
+            for felt in ("sales", "products", "items", "lines", "basket_products"):
+                v = det.get(felt) if isinstance(det, dict) else None
+                if isinstance(v, list) and v:
+                    out["linje_felt"] = felt
+                    out["linje_keys"] = list(v[0].keys())
+                    out["linje_eksempel"] = v[0]
+                    break
+                elif v is not None:
+                    out[f"detail_{felt}"] = str(v)[:200]
+        except Exception as e:
+            out["detail_fejl"] = str(e)[:120]
+
     import datetime as _dt
     ig = date.today() - timedelta(days=1)          # i går
     for7 = date.today() - timedelta(days=7)

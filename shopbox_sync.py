@@ -262,10 +262,20 @@ def inspect_data() -> dict:
             return {"fejl": str(e)[:100]}
 
     if uid:
-        out["dl /download-path/{uid}"]   = _raw(f"/saved-reports/download-path/{uid}")
-        out["dl /{uid}/download-path"]    = _raw(f"/saved-reports/{uid}/download-path")
-        out["dl ?uid"]                    = _raw("/saved-reports/download-path", uid=uid)
-        out["dl /{uid}"]                  = _raw(f"/saved-reports/{uid}")
+        navn = out.get("valgt_rapport", "")
+        res = {}
+        for pn in ("id", "path", "file", "name", "report", "filename",
+                   "report_id", "saved_report", "saved_report_id", "fileName"):
+            r1 = _raw("/saved-reports/download-path", **{pn: uid})
+            res[f"{pn}=uid"] = r1.get("status")
+            if r1.get("status") == 200:
+                res[f"{pn}=uid FULD"] = r1
+        for pn in ("path", "file", "name", "filename", "fileName"):
+            r2 = _raw("/saved-reports/download-path", **{pn: navn})
+            res[f"{pn}=navn"] = r2.get("status")
+            if r2.get("status") == 200:
+                res[f"{pn}=navn FULD"] = r2
+        out["download_param_test"] = res
     return out
 
 

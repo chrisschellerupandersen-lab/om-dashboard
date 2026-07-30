@@ -273,20 +273,19 @@ def inspect_data() -> dict:
         except Exception as e:
             return {"fejl": str(e)[:100]}
 
-    if uid:
-        navn = out.get("valgt_rapport", "")
-        res = {}
-        # Prøv BÅDE api.shopbox.com og api-prod.shopbox.com (mail-links bruger api-prod)
-        for label, base in (("api", "https://api.shopbox.com/api/v3"),
-                            ("prod", "https://api-prod.shopbox.com/api/v3")):
-            for pn in ("id", "uid", "path", "file", "name", "report_id"):
-                r1 = _raw_base(base, "/saved-reports/download-path", **{pn: uid})
-                res[f"{label} {pn}=uid"] = f'{r1.get("status")} {r1.get("ctype","")}'
-                if r1.get("status") == 200:
-                    res[f"{label} {pn}=uid FULD"] = r1
-            rn = _raw_base(base, "/saved-reports/download-path", name=navn)
-            res[f"{label} name=navn"] = f'{rn.get("status")} {rn.get("krop","")[:80]}'
-        out["download_param_test"] = res
+    ig = date.today()
+    fra = (ig - timedelta(days=7)).isoformat()
+    til = ig.isoformat()
+    rep = {}
+    # /reports med forskellige type+dato-kombinationer — leder efter varesalgs-data direkte
+    for t in ("item", "items", "item-sales", "product", "products", "varesalg", "sales", "1"):
+        r = _raw_base("https://api.shopbox.com/api/v3", "/reports",
+                      type=t, **{"from": fra, "to": til})
+        rep[f"type={t}"] = f'{r.get("status")} {r.get("ctype","")[:20]} :: {r.get("krop","")[:90]}'
+    # /reports helt uden ekstra params (vis fejl-krop)
+    r0 = _raw_base("https://api.shopbox.com/api/v3", "/reports")
+    rep["ingen"] = f'{r0.get("status")} :: {r0.get("krop","")[:120]}'
+    out["reports_test"] = rep
     return out
 
 

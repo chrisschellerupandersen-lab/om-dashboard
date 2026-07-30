@@ -206,11 +206,20 @@ def inspect_data() -> dict:
                 out["sales_i_detalje"] = str(db.get("sales"))[:300]
         except Exception as e:
             out["detalje_fejl"] = str(e)[:100]
-    i_gaar = (date.today() - timedelta(days=1)).isoformat()
-    tests = {}
-    for p in ("from", "to", "date", "dateFrom", "startDate", "date_from", "created_from"):
-        tests[p] = api_try("/baskets", **{p: i_gaar})["status"]
-    out["dato_filtre_test"] = tests
+    # Undersøg /sales — varelinjerne ligger sandsynligvis her
+    try:
+        sj = requests.get(f"{BASE}/sales",
+                          params={"accessToken": _access_token(), "client": CLIENT},
+                          timeout=40).json()
+        out["sales_top_keys"] = list(sj.keys()) if isinstance(sj, dict) else str(type(sj))
+        sd = (sj.get("data") if isinstance(sj, dict) else sj) or []
+        out["sales_antal"] = len(sd)
+        out["sales_pagination"] = {k: v for k, v in ((sj.get("meta") or {}).get("pagination") or {}).items() if k != "links"} if isinstance(sj, dict) else None
+        if sd:
+            out["sales_linje_keys"] = list(sd[0].keys())
+            out["sales_linje_eksempel"] = {k: v for k, v in sd[0].items() if k not in ("customer", "account")}
+    except Exception as e:
+        out["sales_fejl"] = str(e)[:100]
     return out
 
 

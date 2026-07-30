@@ -211,7 +211,7 @@ def inspect_data() -> dict:
             jj = requests.get(f"{BASE}{path}",
                               params={"accessToken": _access_token(), "client": CLIENT, **p},
                               timeout=40).json()
-            d = (jj.get("data") if isinstance(jj, dict) else jj)
+            d = (jj.get("data") or jj.get("collection") or jj.get("items")) if isinstance(jj, dict) else jj
             info = {"top_keys": list(jj.keys()) if isinstance(jj, dict) else str(type(jj))}
             if isinstance(d, list) and d:
                 info["antal"] = len(d); info["item_keys"] = list(d[0].keys())

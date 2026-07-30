@@ -206,20 +206,27 @@ def inspect_data() -> dict:
                 out["sales_i_detalje"] = str(db.get("sales"))[:300]
         except Exception as e:
             out["detalje_fejl"] = str(e)[:100]
-    # Undersøg /sales — varelinjerne ligger sandsynligvis her
-    try:
-        sj = requests.get(f"{BASE}/sales",
-                          params={"accessToken": _access_token(), "client": CLIENT},
-                          timeout=40).json()
-        out["sales_top_keys"] = list(sj.keys()) if isinstance(sj, dict) else str(type(sj))
-        sd = (sj.get("data") if isinstance(sj, dict) else sj) or []
-        out["sales_antal"] = len(sd)
-        out["sales_pagination"] = {k: v for k, v in ((sj.get("meta") or {}).get("pagination") or {}).items() if k != "links"} if isinstance(sj, dict) else None
-        if sd:
-            out["sales_linje_keys"] = list(sd[0].keys())
-            out["sales_linje_eksempel"] = {k: v for k, v in sd[0].items() if k not in ("customer", "account")}
-    except Exception as e:
-        out["sales_fejl"] = str(e)[:100]
+    def _dump(path, **p):
+        try:
+            jj = requests.get(f"{BASE}{path}",
+                              params={"accessToken": _access_token(), "client": CLIENT, **p},
+                              timeout=40).json()
+            d = (jj.get("data") if isinstance(jj, dict) else jj)
+            info = {"top_keys": list(jj.keys()) if isinstance(jj, dict) else str(type(jj))}
+            if isinstance(d, list) and d:
+                info["antal"] = len(d); info["item_keys"] = list(d[0].keys())
+                info["eksempel"] = {k: v for k, v in d[0].items() if k not in ("customer", "account")}
+            elif isinstance(d, dict):
+                info["keys"] = list(d.keys()); info["eksempel"] = str(d)[:400]
+            else:
+                info["data"] = str(d)[:200]
+            return info
+        except Exception as e:
+            return {"fejl": str(e)[:120]}
+
+    i_gaar = (date.today() - timedelta(days=1)).isoformat()
+    out["top_item_sales"] = _dump("/baskets/top-item-sales", from_date=i_gaar, to_date=i_gaar)
+    out["top_item_sales_from_to"] = _dump("/baskets/top-item-sales", **{"from": i_gaar, "to": i_gaar})
     return out
 
 

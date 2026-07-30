@@ -184,13 +184,14 @@ def inspect_data() -> dict:
         out["basket_keys"] = list(b.keys())
         out["gaettet_dato"] = _dato_af_basket(b)
         out["gaettet_tid"] = _tid_af_basket(b)
-        linjer = _linjer_i_basket(b)
-        out["antal_linjer_i_basket"] = len(linjer)
-        if linjer:
+        # Find den FØRSTE basket der har varelinjer (nogle er rene betalinger)
+        med_linjer = next((x for x in data if _linjer_i_basket(x)), None)
+        out["baskets_med_linjer_paa_side"] = sum(1 for x in data if _linjer_i_basket(x))
+        if med_linjer:
+            linjer = _linjer_i_basket(med_linjer)
+            out["antal_linjer"] = len(linjer)
             out["linje_keys"] = list(linjer[0].keys())
             out["linje_eksempel"] = linjer[0]
-        out["basket_eksempel"] = {k: v for k, v in b.items()
-                                  if k not in ("customer", "account")}
     i_gaar = (date.today() - timedelta(days=1)).isoformat()
     tests = {}
     for p in ("from", "to", "date", "dateFrom", "startDate", "date_from", "created_from"):

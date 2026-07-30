@@ -234,16 +234,10 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
-    # HYPOTESE: /sales er selve varelinje-hovedbogen (basket.sales = ANTAL linjer).
-    out["sales_liste"] = _dump("/sales")
-    ig = date.today() - timedelta(days=1)
-    ig_iso = ig.isoformat()
-    out["sales_igår_from_to"] = _dump("/sales", **{"from": ig_iso, "to": ig_iso})
-    # Kan top-item-sales' 5-loft hæves? (så er det bare et default-limit)
-    tests = {"ingen": _antal_items()}
-    for pn in ("limit", "per_page", "per-page", "count", "top", "size"):
-        tests[pn] = _antal_items(**{pn: 100})
-    out["top_item_limit_test"] = tests
+    # GENNEMBRUD: mailen bruger /saved-reports/download-path — Varesalgsrapporten.
+    # Prøv at liste gemte rapporter direkte via API (så slipper vi for mail).
+    for p in ("/saved-reports", "/reports", "/report-templates", "/saved-reports/list"):
+        out["probe " + p] = _dump(p)
     return out
 
 

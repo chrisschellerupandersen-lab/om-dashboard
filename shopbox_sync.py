@@ -224,9 +224,16 @@ def inspect_data() -> dict:
         except Exception as e:
             return {"fejl": str(e)[:120]}
 
-    i_gaar = (date.today() - timedelta(days=1)).isoformat()
-    out["top_item_sales"] = _dump("/baskets/top-item-sales", from_date=i_gaar, to_date=i_gaar)
-    out["top_item_sales_from_to"] = _dump("/baskets/top-item-sales", **{"from": i_gaar, "to": i_gaar})
+    def _raa(path, **p):
+        try:
+            r = requests.get(f"{BASE}{path}",
+                             params={"accessToken": _access_token(), "client": CLIENT, **p}, timeout=40)
+            return {"status": r.status_code, "raa": _saniter(r.text[:600])}
+        except Exception as e:
+            return {"fejl": str(e)[:120]}
+
+    out["top_item_raa"] = _raa("/baskets/top-item-sales")
+    out["basket_detalje_raa"] = _raa(f"/baskets/{data[0].get('uid')}") if data else None
     return out
 
 

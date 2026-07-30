@@ -234,24 +234,28 @@ def inspect_data() -> dict:
         except Exception as e:
             return "fejl:" + str(e)[:40]
 
-    # Afgørende: har basket-DETALJEN varelinjer? (objektet er top-level, ikke i "data")
+    # Afgørende: find en basket-detalje MED varelinjer i "sales"
     if data:
-        try:
-            det = requests.get(f"{BASE}/baskets/{data[0].get('uid')}",
-                               params={"accessToken": _access_token(), "client": CLIENT},
-                               timeout=40).json()
-            out["detail_keys"] = list(det.keys()) if isinstance(det, dict) else str(type(det))
-            for felt in ("sales", "products", "items", "lines", "basket_products"):
-                v = det.get(felt) if isinstance(det, dict) else None
-                if isinstance(v, list) and v:
-                    out["linje_felt"] = felt
-                    out["linje_keys"] = list(v[0].keys())
-                    out["linje_eksempel"] = v[0]
-                    break
-                elif v is not None:
-                    out[f"detail_{felt}"] = str(v)[:200]
-        except Exception as e:
-            out["detail_fejl"] = str(e)[:120]
+        tok = _access_token()
+        oversigt = []
+        fundet = False
+        for b in data[:12]:
+            try:
+                det = requests.get(f"{BASE}/baskets/{b.get('uid')}",
+                                   params={"accessToken": tok, "client": CLIENT},
+                                   timeout=40).json()
+                s = det.get("sales") if isinstance(det, dict) else None
+                n = len(s) if isinstance(s, list) else 0
+                oversigt.append({"uid": b.get("uid"), "type": det.get("type"),
+                                 "total": det.get("total"), "sales_n": n,
+                                 "sales_type": type(s).__name__})
+                if n and not fundet:
+                    fundet = True
+                    out["linje_keys"] = list(s[0].keys())
+                    out["linje_eksempel"] = s[0]
+            except Exception as e:
+                oversigt.append({"uid": b.get("uid"), "fejl": str(e)[:80]})
+        out["basket_oversigt"] = oversigt
 
     import datetime as _dt
     ig = date.today() - timedelta(days=1)          # i går

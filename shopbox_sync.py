@@ -224,16 +224,28 @@ def inspect_data() -> dict:
         except Exception as e:
             return {"fejl": str(e)[:120]}
 
-    def _raa(path, **p):
+    def _antal_items(**p):
         try:
-            r = requests.get(f"{BASE}{path}",
-                             params={"accessToken": _access_token(), "client": CLIENT, **p}, timeout=40)
-            return {"status": r.status_code, "raa": _saniter(r.text[:600])}
+            jj = requests.get(f"{BASE}/baskets/top-item-sales",
+                              params={"accessToken": _access_token(), "client": CLIENT, **p},
+                              timeout=40).json()
+            c = jj.get("collection") if isinstance(jj, dict) else None
+            return len(c) if isinstance(c, list) else "ingen collection"
         except Exception as e:
-            return {"fejl": str(e)[:120]}
+            return "fejl:" + str(e)[:40]
 
-    out["top_item_raa"] = _raa("/baskets/top-item-sales")
-    out["basket_detalje_raa"] = _raa(f"/baskets/{data[0].get('uid')}") if data else None
+    idag = date.today()
+    iso = idag.isoformat()
+    dk = idag.strftime("%d/%m/%Y")
+    dk2 = idag.strftime("%d-%m-%Y")
+    tests = {}
+    for fn, tn in (("from", "to"), ("from_date", "to_date"), ("dateFrom", "dateTo"),
+                   ("start", "end"), ("start_date", "end_date"), ("date_from", "date_to")):
+        tests[f"{fn}/{tn}=iso"] = _antal_items(**{fn: iso, tn: iso})
+        tests[f"{fn}/{tn}=dk"]  = _antal_items(**{fn: dk,  tn: dk})
+    tests["dk2 from/to"] = _antal_items(**{"from": dk2, "to": dk2})
+    tests["ingen_filter"] = _antal_items()
+    out["datofilter_test"] = tests
     return out
 
 

@@ -249,9 +249,9 @@ def inspect_data() -> dict:
     except Exception as e:
         out["uid_fejl"] = str(e)[:100]
 
-    def _raw(path, **p):
+    def _raw(_endpoint, **p):
         try:
-            r = requests.get(f"{BASE}{path}",
+            r = requests.get(f"{BASE}{_endpoint}",
                              params={"accessToken": _access_token(), "client": CLIENT, **p},
                              timeout=40, allow_redirects=False)
             return {"status": r.status_code,

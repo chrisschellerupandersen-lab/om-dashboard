@@ -142,6 +142,29 @@ def _f(v, div=1.0):
 
 # ── Inspektion: vis det rigtige dataformat ────────────────────────────────────
 
+def api_try(path: str, **params) -> dict:
+    """Rå GET uden at afbryde ved fejl — til diagnose."""
+    params.setdefault("accessToken", _access_token())
+    if "client" not in params:
+        params["client"] = CLIENT
+    try:
+        r = requests.get(f"{BASE}{path}", params=params, timeout=40)
+        return {"status": r.status_code, "svar": _saniter(r.text[:120])}
+    except Exception as e:
+        return {"status": "fejl", "svar": str(e)[:80]}
+
+
+def probe_endpoints() -> dict:
+    """Test flere endpoints så vi kan se om fejlen er /baskets-specifik
+    eller hele kontoen (forkert client-id)."""
+    _tjek_konfig()
+    out = {"base": BASE, "client": CLIENT}
+    for p in ("/branches", "/cash-registers", "/staff", "/products", "/baskets"):
+        out[p] = api_try(p)
+    out["/baskets uden client"] = api_try("/baskets", client=None)
+    return out
+
+
 def inspect_data() -> dict:
     """Returnér dataformatet som dict (bruges af CLI og af Railway-endpointet).
     Ingen token/kunde-data lækkes."""

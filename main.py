@@ -2027,6 +2027,11 @@ async def shopbox_inspect(request: Request):
         _os.environ["SHOPBOX_BASE"] = str(body["base"])
     importlib.reload(shopbox_sync)
     cfg = shopbox_sync.config_status()
+    if body.get("probe"):
+        try:
+            return {"ok": True, "konfig": cfg, "probe": shopbox_sync.probe_endpoints()}
+        except SystemExit as e:
+            return {"ok": False, "konfig": cfg, "fejl": str(e)}
     try:
         return {"ok": True, "konfig": cfg, **shopbox_sync.inspect_data()}
     except SystemExit as e:

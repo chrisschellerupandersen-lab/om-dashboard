@@ -126,7 +126,7 @@ def _tid_af_basket(b: dict) -> int:
 
 
 def _linjer_i_basket(b: dict) -> list:
-    for k in ("products", "items", "basketProducts", "lines", "basket_products"):
+    for k in ("sales", "products", "items", "basketProducts", "lines", "basket_products"):
         v = b.get(k)
         if isinstance(v, list):
             return v
@@ -172,7 +172,11 @@ def inspect_data() -> dict:
     out = {"base": BASE, "client": CLIENT}
     j = api_get("/baskets")   # UDEN page (page=1 giver 500 hos Shopbox)
     out["top_keys"] = list(j.keys()) if isinstance(j, dict) else "liste"
-    out["pagination"] = (j.get("meta") or {}).get("pagination") if isinstance(j, dict) else None
+    pag = (j.get("meta") or {}).get("pagination") if isinstance(j, dict) else None
+    if isinstance(pag, dict):
+        pag = {k: (v if k != "links" else {kk: _saniter(vv) for kk, vv in (v or {}).items()})
+               for k, v in pag.items()}
+    out["pagination"] = pag
     data = (j.get("data") if isinstance(j, dict) else j) or []
     out["antal_side1"] = len(data)
     if data:

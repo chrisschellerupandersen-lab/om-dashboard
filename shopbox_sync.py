@@ -170,8 +170,9 @@ def inspect_data() -> dict:
     Ingen token/kunde-data lækkes."""
     _tjek_konfig()
     out = {"base": BASE, "client": CLIENT}
-    j = api_get("/baskets", page=1)
+    j = api_get("/baskets")   # UDEN page (page=1 giver 500 hos Shopbox)
     out["top_keys"] = list(j.keys()) if isinstance(j, dict) else "liste"
+    out["pagination"] = (j.get("meta") or {}).get("pagination") if isinstance(j, dict) else None
     data = (j.get("data") if isinstance(j, dict) else j) or []
     out["antal_side1"] = len(data)
     if data:
@@ -188,12 +189,8 @@ def inspect_data() -> dict:
                                   if k not in ("customer", "account")}
     i_gaar = (date.today() - timedelta(days=1)).isoformat()
     tests = {}
-    for p in ("from", "to", "date", "dateFrom", "startDate", "crdate_from", "created_from"):
-        try:
-            jj = api_get("/baskets", page=1, **{p: i_gaar})
-            tests[p] = len((jj.get("data") if isinstance(jj, dict) else jj) or [])
-        except Exception as e:
-            tests[p] = "fejl:" + str(e)[:40]
+    for p in ("from", "to", "date", "dateFrom", "startDate", "date_from", "created_from"):
+        tests[p] = api_try("/baskets", **{p: i_gaar})["status"]
     out["dato_filtre_test"] = tests
     return out
 

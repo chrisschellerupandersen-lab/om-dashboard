@@ -71,6 +71,11 @@
     <div>
       <strong style="font-variant-numeric: tabular-nums;">{{ tx.dato }} — {{ tx.beloeb|dkk }} kr</strong>
       <div class="muted">{{ tx.tekst or "(ingen tekst)" }}</div>
+      {% if tx.match_status == 'godkendt' %}
+      <div class="muted" style="margin-top:4px;">
+        Konto: {{ tx.bogfoert_konti|join(", ") if tx.bogfoert_konti else "—" }}
+      </div>
+      {% endif %}
     </div>
     <span class="badge {{ 'godkendt' if tx.match_status == 'godkendt' else ('ignoreret' if tx.match_status == 'ignoreret' else 'uafklaret') }}">
       {{ {"godkendt": "bogført", "ignoreret": "ignoreret", "uafklaret": "uafklaret"}[tx.match_status] }}
@@ -85,12 +90,18 @@
       {% for f in tx.forslag %}
         <tr>
           <td>{{ f.navn }} <span class="muted">
-            ({{ {"kreditor": "kreditor", "debitor": "debitor", "bilag": "uploadet bilag, endnu ikke bogført"}[f.modpart_type] }})
+            ({{ {"kreditor": "kreditor", "debitor": "debitor", "bilag": "uploadet bilag, endnu ikke bogført", "regel": "lært regel"}[f.modpart_type] }})
           </span></td>
           <td>{{ f.fakturanr or "—" }}</td>
           <td class="num">{{ f.restbeloeb|dkk }} kr</td>
           <td class="muted">{{ f.begrundelse }}</td>
           <td>
+            {% if f.modpart_type == 'regel' %}
+            <form method="post" action="/bank/{{ tx.id }}/bogfoer-direkte" style="display:inline;">
+              <input type="hidden" name="kontonr" value="{{ f.post_id }}">
+              <button class="btn" type="submit" style="padding:5px 12px; font-size:12.5px;">Bogfør automatisk</button>
+            </form>
+            {% else %}
             <form method="post" action="/bank/{{ tx.id }}/match" style="display:inline;">
               <input type="hidden" name="modpart_type" value="{{ f.modpart_type }}">
               <input type="hidden" name="post_id" value="{{ f.post_id }}">
@@ -98,6 +109,7 @@
                 {{ "Bogfør bilag + bekræft match" if f.modpart_type == "bilag" else "Bekræft match" }}
               </button>
             </form>
+            {% endif %}
           </td>
         </tr>
       {% endfor %}
@@ -106,8 +118,9 @@
     {% else %}
     <p class="muted" style="margin-top:12px;">Ingen forslag fundet — intet åbent debitor-/kreditorbeløb eller uploadet bilag matcher præcist.</p>
     {% endif %}
-    <form method="post" action="/bank/{{ tx.id }}/bogfoer-direkte" style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+    <form method="post" action="/bank/{{ tx.id }}/bogfoer-direkte" style="margin-top:12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <input name="kontonr" list="konti-liste" placeholder="Søg konto (fx gebyr, renter)…" style="max-width:280px;" autocomplete="off" required>
+      <input name="opret_regel_noegleord" placeholder="Opret regel: fremtidige med dette i teksten (valgfrit)" style="max-width:320px;" autocomplete="off">
       <button class="btn secondary" type="submit" style="padding:7px 14px; font-size:12.5px; white-space:nowrap;">Bogfør direkte på konto</button>
     </form>
     <form method="post" action="/bank/{{ tx.id }}/ignorer" style="margin-top:10px;">
@@ -118,6 +131,57 @@
 {% else %}
 <div class="card muted">Ingen banktransaktioner indlæst endnu.</div>
 {% endfor %}
+
+<div class="card">
+  <h2 style="font-size:14px; margin:0 0 4px;">Auto-konteringsregler (bank)</h2>
+  <p class="muted" style="margin:0 0 14px;">Når en banktransaktions tekst indeholder et nøgleord herunder, foreslås den tilhørende konto automatisk ovenfor.</p>
+  <table>
+    <thead><tr><th>Nøgleord</th><th>Konto</th><th>Beskrivelse</th><th></th></tr></thead>
+    <tbody>
+    {% for r in bank_konteringsregler %}
+      <tr>
+        <td><input name="match_tekst" value="{{ r.match_tekst }}" form="regelform-{{ r.id }}" style="min-width:140px;"></td>
+        <td>
+          <select name="kontonr" form="regelform-{{ r.id }}">
+            {% for k in kontoplan %}
+            <option value="{{ k.kontonr }}" {% if k.kontonr == r.kontonr %}selected{% endif %}>{{ k.kontonr }} — {{ k.navn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input name="beskrivelse" value="{{ r.beskrivelse or '' }}" form="regelform-{{ r.id }}" style="min-width:140px;"></td>
+        <td style="white-space:nowrap;">
+          <button class="btn secondary" type="submit" form="regelform-{{ r.id }}" style="padding:4px 10px; font-size:12px;">Gem</button>
+          <form method="post" action="/bank-konteringsregler/{{ r.id }}/slet" style="display:inline;" onsubmit="return confirm('Slet denne regel?');">
+            <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">Slet</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">Ingen bank-konteringsregler endnu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% for r in bank_konteringsregler %}
+  <form id="regelform-{{ r.id }}" method="post" action="/bank-konteringsregler/{{ r.id }}/rediger"></form>
+  {% endfor %}
+
+  <form method="post" action="/bank-konteringsregler/ny" style="margin-top:16px;">
+    <div class="row">
+      <div><label>Nøgleord (skal findes i transaktionsteksten)</label><input name="match_tekst" placeholder="fx netbank gebyr" required></div>
+      <div>
+        <label>Konto</label>
+        <select name="kontonr">
+          {% for k in kontoplan %}
+          <option value="{{ k.kontonr }}">{{ k.kontonr }} — {{ k.navn }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <label>Beskrivelse (valgfri)</label>
+    <input name="beskrivelse" placeholder="fx Månedligt netbank-gebyr">
+    <button class="btn" type="submit" style="margin-top:14px;">Tilføj regel</button>
+  </form>
+</div>
 
 <datalist id="konti-liste">
   {% for k in kontoplan %}

@@ -776,17 +776,44 @@ async def bank_side(request: Request, aar: Optional[int] = None, maaned: Optiona
         "bank_api_konfigureret": enable_banking_klient.konfigureret(),
         "aar": aar, "maaned": maaned, "maaned_navne": MAANED_NAVNE,
         "kontoplan": database.hent_kontoplan(),
+        "bank_konteringsregler": database.hent_bank_konteringsregler(),
     })
 
 
 @app.post("/bank/{transaktion_id}/bogfoer-direkte")
-async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, kontonr: str = Form(...)):
+async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, kontonr: str = Form(...),
+                                     opret_regel_noegleord: str = Form("")):
     bruger = _kræv_login(request)
     kontonr = kontonr.split(" ")[0].strip()
     try:
         database.bogfoer_bank_direkte(transaktion_id, kontonr, bruger)
+        if opret_regel_noegleord.strip():
+            database.opret_bank_konteringsregel(opret_regel_noegleord.strip(), kontonr, None, bruger)
     except ValueError:
         pass  # ukendt konto eller allerede matchet — siden genindlæses uden ændring
+    return RedirectResponse("/bank", status_code=303)
+
+
+@app.post("/bank-konteringsregler/ny")
+async def bank_konteringsregel_ny_post(request: Request, match_tekst: str = Form(...),
+                                        kontonr: str = Form(...), beskrivelse: str = Form("")):
+    bruger = _kræv_login(request)
+    database.opret_bank_konteringsregel(match_tekst.strip(), kontonr, beskrivelse.strip() or None, bruger)
+    return RedirectResponse("/bank", status_code=303)
+
+
+@app.post("/bank-konteringsregler/{regel_id}/rediger")
+async def bank_konteringsregel_rediger_post(request: Request, regel_id: int, match_tekst: str = Form(...),
+                                             kontonr: str = Form(...), beskrivelse: str = Form("")):
+    bruger = _kræv_login(request)
+    database.opdater_bank_konteringsregel(regel_id, match_tekst.strip(), kontonr, beskrivelse.strip() or None, bruger)
+    return RedirectResponse("/bank", status_code=303)
+
+
+@app.post("/bank-konteringsregler/{regel_id}/slet")
+async def bank_konteringsregel_slet_post(request: Request, regel_id: int):
+    bruger = _kræv_login(request)
+    database.slet_bank_konteringsregel(regel_id, bruger)
     return RedirectResponse("/bank", status_code=303)
 
 

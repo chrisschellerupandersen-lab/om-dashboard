@@ -240,6 +240,14 @@ def init_db():
                 importeret_ts       TEXT DEFAULT (datetime('now','localtime'))
             );
 
+            CREATE TABLE IF NOT EXISTS bank_konteringsregler (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                match_tekst TEXT NOT NULL,   -- nøgleord der skal findes i banktransaktionens tekst
+                kontonr     TEXT NOT NULL REFERENCES kontoplan(kontonr),
+                beskrivelse TEXT,
+                oprettet_ts TEXT DEFAULT (datetime('now','localtime'))
+            );
+
             CREATE TABLE IF NOT EXISTS betalingsbatch (
                 id             INTEGER PRIMARY KEY AUTOINCREMENT,
                 oprettet_ts    TEXT DEFAULT (datetime('now','localtime')),
@@ -287,6 +295,13 @@ def init_db():
             BEFORE DELETE ON posteringslinjer
             BEGIN SELECT RAISE(ABORT, 'Posteringslinjer maa ikke slettes'); END;
         """)
+
+        # Migration: knyt banktransaktionen direkte til den postering den udløste, uanset om
+        # den blev bogført via kreditor/debitor-match, bilag-match eller direkte kontovalg —
+        # så vi altid entydigt kan slå op hvilken(e) konto(er) en bogført transaktion ramte.
+        _bt_kolonner = {r["name"] for r in conn.execute("PRAGMA table_info(banktransaktioner)").fetchall()}
+        if "postering_id" not in _bt_kolonner:
+            conn.execute("ALTER TABLE banktransaktioner ADD COLUMN postering_id INTEGER REFERENCES posteringer(id)")
 
         _seed_kontoplan(conn)
 
@@ -412,25 +427,30 @@ def _log(conn: sqlite3.Connection, bruger: str, handling: str, entitet: str,
 
 def nulstil_testdata():
     """Rydder alt regnskabsdata (bilag, posteringer, debitor/kreditor, konteringsregler,
-    betalingsbatch, audit-log) — til brug mens systemet stadig er under test. Rører IKKE
-    bank_forbindelser eller selve banktransaktionerne (bankhistorikken skal bevares), og
-    heller ikke kontoplan (kontoopsætningen er struktur, ikke testdata). Match-STATUSSEN på
-    banktransaktioner nulstilles derimod til 'uafklaret' — ellers ville en transaktion der
-    var matchet mod fx en kreditorpost stå tilbage som "godkendt" og pege på en post der
-    ikke længere findes, når alt andet er ryddet.
+    bank-konteringsregler, betalingsbatch, audit-log) — til brug mens systemet stadig er
+    under test. Rører IKKE bank_forbindelser eller selve banktransaktionerne (bankhistorikken
+    skal bevares), og heller ikke kontoplan (kontoopsætningen er struktur, ikke testdata).
+    Match-STATUSSEN og postering_id på banktransaktioner nulstilles derimod til hhv.
+    'uafklaret' og NULL — ellers ville en transaktion der var matchet mod fx en kreditorpost
+    stå tilbage som "godkendt" og pege på poster/posteringer der ikke længere findes, når alt
+    andet er ryddet.
 
     Posteringer/posteringslinjer er ellers append-only (håndhævet af triggers, som blokerer
     almindelig DELETE) — her omgås det bevidst via DROP+CREATE, som ikke udløser
     rækkebaserede triggers. Triggerne genskabes umiddelbart efter."""
     with _conn() as conn:
-        # debitor_poster/kreditor_poster har postering_id-FK'er ind i posteringer — med
-        # PRAGMA foreign_keys=ON udfører SQLite en implicit DELETE FROM posteringer, FØR den
-        # dropper tabellen, for at sikre fremmednøgle-integritet. Den implicitte DELETE
-        # rammer selvfølgelig vores egen forbyd_delete_posteringer-trigger og fejler. Derfor
-        # skal alt der peger på posteringer(id) ryddes FØR posteringer/posteringslinjer droppes.
+        # debitor_poster/kreditor_poster/banktransaktioner har postering_id-FK'er ind i
+        # posteringer — med PRAGMA foreign_keys=ON udfører SQLite en implicit DELETE FROM
+        # posteringer, FØR den dropper tabellen, for at sikre fremmednøgle-integritet. Den
+        # implicitte DELETE rammer selvfølgelig vores egen forbyd_delete_posteringer-trigger
+        # og fejler. Derfor skal alt der peger på posteringer(id) ryddes FØR
+        # posteringer/posteringslinjer droppes — banktransaktioner.postering_id nulstilles
+        # her (før DROP), match_status/matchet_type/matchet_id nulstilles til sidst i
+        # funktionen (der er ingen grund til at gøre det to gange).
         for tabel in ["betalingsbatch_linjer", "debitor_poster", "kreditor_poster"]:
             conn.execute(f"DELETE FROM {tabel}")
             conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tabel,))
+        conn.execute("UPDATE banktransaktioner SET postering_id = NULL")
 
         conn.executescript("""
             DROP TABLE IF EXISTS posteringslinjer;
@@ -477,7 +497,7 @@ def nulstil_testdata():
 
         # Resten: børn før forældre, så FK-håndhævelsen ikke fejler.
         for tabel in [
-            "betalingsbatch", "konteringsregler", "bilag_linjer", "bilag",
+            "betalingsbatch", "konteringsregler", "bank_konteringsregler", "bilag_linjer", "bilag",
             "debitorer", "kreditorer", "audit_log",
         ]:
             conn.execute(f"DELETE FROM {tabel}")
@@ -485,7 +505,8 @@ def nulstil_testdata():
         conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('posteringer', 'posteringslinjer')")
 
         conn.execute(
-            "UPDATE banktransaktioner SET match_status = 'uafklaret', matchet_type = NULL, matchet_id = NULL"
+            "UPDATE banktransaktioner SET match_status = 'uafklaret', matchet_type = NULL, "
+            "matchet_id = NULL, postering_id = NULL"
         )
 
 
@@ -1006,7 +1027,18 @@ def hent_banktransaktioner(match_status: Optional[str] = None, aar: Optional[int
         rows = conn.execute(
             f"SELECT * FROM banktransaktioner {where} ORDER BY dato DESC, id DESC", params
         ).fetchall()
-        return [dict(r) for r in rows]
+        out = [dict(r) for r in rows]
+        for r in out:
+            r["bogfoert_konti"] = []
+            if r.get("postering_id"):
+                linjer = conn.execute("""
+                    SELECT pl.kontonr, k.navn FROM posteringslinjer pl
+                    JOIN kontoplan k ON k.kontonr = pl.kontonr
+                    WHERE pl.postering_id = ? AND pl.kontonr != '6750'
+                    ORDER BY pl.id
+                """, (r["postering_id"],)).fetchall()
+                r["bogfoert_konti"] = [f"{l['kontonr']} — {l['navn']}" for l in linjer]
+        return out
 
 
 def indlæs_eksterne_banktransaktioner(bank_forbindelse_id: int, transaktioner: List[Dict[str, Any]]) -> int:
@@ -1075,6 +1107,22 @@ def foreslaa_matches(transaktion: Dict[str, Any], maks: int = 3) -> List[Dict[st
     tekst_norm = (transaktion.get("tekst") or "").lower()
     dato = transaktion["dato"]
 
+    forslag = []
+
+    # Brugerens egne lærte regler (fra tidligere "Bogfør direkte på konto") vejer tungest —
+    # det er et bevidst tilvalgt mønster, ikke bare et beløbssammenfald.
+    regel = foreslaa_bank_konto(transaktion.get("tekst"))
+    if regel:
+        forslag.append({
+            "modpart_type": "regel",
+            "post_id": regel["kontonr"],
+            "navn": f"{regel['kontonr']} — {regel['konto_navn']}",
+            "fakturanr": None,
+            "restbeloeb": abs(beloeb),
+            "score": 200,
+            "begrundelse": f"matcher din regel: \"{regel['match_tekst']}\"",
+        })
+
     if beloeb < 0:
         modpart_type = "kreditor"
         kandidater = hent_aabne_kreditor_poster()
@@ -1084,7 +1132,6 @@ def foreslaa_matches(transaktion: Dict[str, Any], maks: int = 3) -> List[Dict[st
         kandidater = hent_aabne_debitor_poster()
         navn_felt = "debitor_navn"
 
-    forslag = []
     for k in kandidater:
         if round(abs(beloeb) - k["restbeloeb"], 2) != 0:
             continue
@@ -1223,8 +1270,9 @@ def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bru
         tabel = "kreditor_poster" if modpart_type == "kreditor" else "debitor_poster"
         conn.execute(f"UPDATE {tabel} SET status = 'udlignet', restbeloeb = 0 WHERE id = ?", (post_id,))
         conn.execute(
-            "UPDATE banktransaktioner SET match_status = 'godkendt', matchet_type = ?, matchet_id = ? WHERE id = ?",
-            (modpart_type, post_id, transaktion_id),
+            "UPDATE banktransaktioner SET match_status = 'godkendt', matchet_type = ?, matchet_id = ?, "
+            "postering_id = ? WHERE id = ?",
+            (modpart_type, post_id, postering_id, transaktion_id),
         )
         _log(conn, bruger, "godkend_bank_match", "banktransaktion", transaktion_id,
              {"modpart_type": modpart_type, "post_id": post_id, "postering_id": postering_id})
@@ -1283,12 +1331,60 @@ def bogfoer_bank_direkte(transaktion_id: int, kontonr: str, bruger: str) -> int:
     with _conn() as conn:
         conn.execute(
             "UPDATE banktransaktioner SET match_status = 'godkendt', matchet_type = 'direkte', "
-            "matchet_id = ? WHERE id = ?",
-            (postering_id, transaktion_id),
+            "matchet_id = ?, postering_id = ? WHERE id = ?",
+            (postering_id, postering_id, transaktion_id),
         )
         _log(conn, bruger, "bogfoer_bank_direkte", "banktransaktion", transaktion_id,
              {"kontonr": kontonr, "postering_id": postering_id})
     return postering_id
+
+
+def opret_bank_konteringsregel(match_tekst: str, kontonr: str, beskrivelse: Optional[str], bruger: str) -> int:
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO bank_konteringsregler (match_tekst, kontonr, beskrivelse) VALUES (?, ?, ?)",
+            (match_tekst, kontonr, beskrivelse),
+        )
+        _log(conn, bruger, "opret_bank_konteringsregel", "bank_konteringsregel", cur.lastrowid,
+             {"match_tekst": match_tekst, "kontonr": kontonr})
+        return cur.lastrowid
+
+
+def hent_bank_konteringsregler() -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT r.*, k.navn AS konto_navn FROM bank_konteringsregler r
+            JOIN kontoplan k ON k.kontonr = r.kontonr
+            ORDER BY r.id
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def opdater_bank_konteringsregel(regel_id: int, match_tekst: str, kontonr: str,
+                                  beskrivelse: Optional[str], bruger: str):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE bank_konteringsregler SET match_tekst = ?, kontonr = ?, beskrivelse = ? WHERE id = ?",
+            (match_tekst, kontonr, beskrivelse, regel_id),
+        )
+        _log(conn, bruger, "opdater_bank_konteringsregel", "bank_konteringsregel", regel_id,
+             {"match_tekst": match_tekst, "kontonr": kontonr})
+
+
+def slet_bank_konteringsregel(regel_id: int, bruger: str):
+    with _conn() as conn:
+        conn.execute("DELETE FROM bank_konteringsregler WHERE id = ?", (regel_id,))
+        _log(conn, bruger, "slet_bank_konteringsregel", "bank_konteringsregel", regel_id, {})
+
+
+def foreslaa_bank_konto(tekst: Optional[str]) -> Optional[Dict[str, Any]]:
+    """Finder en matchende bank-konteringsregel for en banktransaktionstekst (case-insensitiv
+    substring-match, første ramte regel vinder)."""
+    tekst_norm = (tekst or "").lower()
+    for regel in hent_bank_konteringsregler():
+        if regel["match_tekst"].lower() in tekst_norm:
+            return regel
+    return None
 
 
 # ── Rapporter: resultatopgørelse, balance, moms ─────────────────────────

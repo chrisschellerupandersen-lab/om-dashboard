@@ -787,8 +787,10 @@ async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, konto
     kontonr = kontonr.split(" ")[0].strip()
     try:
         database.bogfoer_bank_direkte(transaktion_id, kontonr, bruger)
-        if opret_regel_noegleord.strip():
-            database.opret_bank_konteringsregel(opret_regel_noegleord.strip(), kontonr, None, bruger)
+        noegleord = opret_regel_noegleord.strip()
+        if noegleord:
+            database.opret_bank_konteringsregel(noegleord, kontonr, None, bruger)
+            database.anvend_bank_konteringsregel_paa_ventende(noegleord, kontonr, bruger)
     except ValueError:
         pass  # ukendt konto eller allerede matchet — siden genindlæses uden ændring
     return RedirectResponse("/bank", status_code=303)
@@ -798,7 +800,9 @@ async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, konto
 async def bank_konteringsregel_ny_post(request: Request, match_tekst: str = Form(...),
                                         kontonr: str = Form(...), beskrivelse: str = Form("")):
     bruger = _kræv_login(request)
-    database.opret_bank_konteringsregel(match_tekst.strip(), kontonr, beskrivelse.strip() or None, bruger)
+    match_tekst = match_tekst.strip()
+    database.opret_bank_konteringsregel(match_tekst, kontonr, beskrivelse.strip() or None, bruger)
+    database.anvend_bank_konteringsregel_paa_ventende(match_tekst, kontonr, bruger)
     return RedirectResponse("/bank", status_code=303)
 
 

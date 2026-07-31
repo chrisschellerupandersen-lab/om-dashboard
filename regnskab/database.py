@@ -1350,6 +1350,26 @@ def opret_bank_konteringsregel(match_tekst: str, kontonr: str, beskrivelse: Opti
         return cur.lastrowid
 
 
+def anvend_bank_konteringsregel_paa_ventende(match_tekst: str, kontonr: str, bruger: str) -> List[int]:
+    """Kaldes lige efter en ny (eller ændret) bank-konteringsregel er oprettet — bogfører
+    automatisk alle ANDRE uafklarede banktransaktioner hvis tekst allerede matcher reglen,
+    så man ikke selv skal finde og klikke dem igennem én for én. Returnerer id'erne på de
+    transaktioner der blev bogført."""
+    with _conn() as conn:
+        kandidater = conn.execute(
+            "SELECT id FROM banktransaktioner WHERE match_status = 'uafklaret' AND lower(tekst) LIKE ?",
+            (f"%{match_tekst.lower()}%",),
+        ).fetchall()
+    bogfoerte = []
+    for k in kandidater:
+        try:
+            bogfoer_bank_direkte(k["id"], kontonr, bruger)
+            bogfoerte.append(k["id"])
+        except ValueError:
+            continue
+    return bogfoerte
+
+
 def hent_bank_konteringsregler() -> List[Dict[str, Any]]:
     with _conn() as conn:
         rows = conn.execute("""

@@ -190,6 +190,8 @@ def _behandl_bilag_upload(indhold: bytes, filename: str, content_type: str, brug
             felter = {}
             ai_raw = json.dumps({"fejl": str(exc)})
 
+    felter = _foreslaa_kontonr_ved_behov(felter)
+
     bilag_id = database.opret_bilag(
         fil_sti=fil_sti, fil_sha256=sha256, ai_raw_json=ai_raw, ai_model=ai_model,
         felter={**felter, "bruger": bruger}, kilde=kilde,
@@ -435,17 +437,21 @@ async def kreditorer_side(request: Request):
 @app.get("/kreditorer/ny", response_class=HTMLResponse)
 async def kreditor_ny_side(request: Request):
     _kræv_login(request)
-    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None, "kreditor": None})
+    return templates.TemplateResponse("kreditor_ny.html", {
+        "request": request, "fejl": None, "kreditor": None,
+        "konteringsregler": [], "kontoplan": database.hent_kontoplan(),
+    })
 
 
 @app.post("/kreditorer/ny")
 async def kreditor_ny_post(
     request: Request,
     navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
-    iban: str = Form(""), bic: str = Form(""),
+    iban: str = Form(""), bic: str = Form(""), standard_kontonr: str = Form(""),
 ):
     _kræv_login(request)
-    database.opret_kreditor(navn, cvr or None, adresse or None, email or None, iban or None, bic or None)
+    database.opret_kreditor(navn, cvr or None, adresse or None, email or None, iban or None, bic or None,
+                             standard_kontonr or None)
     return RedirectResponse("/kreditorer", status_code=303)
 
 
@@ -455,18 +461,40 @@ async def kreditor_rediger_side(request: Request, kreditor_id: int):
     kreditor = database.hent_en_kreditor(kreditor_id)
     if not kreditor:
         raise HTTPException(404, "Kreditor findes ikke")
-    return templates.TemplateResponse("kreditor_ny.html", {"request": request, "fejl": None, "kreditor": kreditor})
+    return templates.TemplateResponse("kreditor_ny.html", {
+        "request": request, "fejl": None, "kreditor": kreditor,
+        "konteringsregler": database.hent_konteringsregler(kreditor_id),
+        "kontoplan": database.hent_kontoplan(),
+    })
 
 
 @app.post("/kreditorer/{kreditor_id}/rediger")
 async def kreditor_rediger_post(
     request: Request, kreditor_id: int,
     navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
-    iban: str = Form(""), bic: str = Form(""),
+    iban: str = Form(""), bic: str = Form(""), standard_kontonr: str = Form(""),
 ):
     bruger = _kræv_login(request)
-    database.opdater_kreditor(kreditor_id, bruger, navn, cvr or None, adresse or None, email or None, iban or None, bic or None)
-    return RedirectResponse("/kreditorer", status_code=303)
+    database.opdater_kreditor(kreditor_id, bruger, navn, cvr or None, adresse or None, email or None,
+                               iban or None, bic or None, standard_kontonr or None)
+    return RedirectResponse(f"/kreditorer/{kreditor_id}/rediger", status_code=303)
+
+
+@app.post("/kreditorer/{kreditor_id}/konteringsregel")
+async def konteringsregel_ny_post(
+    request: Request, kreditor_id: int,
+    match_tekst: str = Form(...), kontonr: str = Form(...), beskrivelse: str = Form(""),
+):
+    _kræv_login(request)
+    database.opret_konteringsregel(kreditor_id, match_tekst.strip(), kontonr, beskrivelse.strip() or None)
+    return RedirectResponse(f"/kreditorer/{kreditor_id}/rediger", status_code=303)
+
+
+@app.post("/konteringsregler/{regel_id}/slet")
+async def konteringsregel_slet_post(request: Request, regel_id: int, kreditor_id: int = Form(...)):
+    bruger = _kræv_login(request)
+    database.slet_konteringsregel(regel_id, bruger)
+    return RedirectResponse(f"/kreditorer/{kreditor_id}/rediger", status_code=303)
 
 
 CVR_API_USER_AGENT = "Nimbo Regnskab (regnskab-app; kontakt via Railway-projektejer)"
@@ -542,6 +570,27 @@ def _berig_kreditor_felter_ved_behov(felter: dict) -> dict:
         "leverandoer_cvr": cvr_cifre,
         "leverandoer_adresse": opslag["adresse"],
     }
+
+
+def _foreslaa_kontonr_ved_behov(felter: dict) -> dict:
+    """Del af upload-flowet: hvis fakturaens CVR matcher en kendt kreditor, foreslå en
+    kontonr ud fra (i prioriteret rækkefølge) leverandørens konteringsregler, dennes faste
+    standardkonto, eller den konto der historisk er brugt oftest — så gennemgangssiden
+    allerede har det rigtige valg forudfyldt i stedet for altid at falde tilbage til 4000."""
+    cvr_cifre = "".join(ch for ch in (felter.get("leverandoer_cvr") or "") if ch.isdigit())
+    if len(cvr_cifre) != 8:
+        return felter
+    kreditor = database.find_kreditor_by_cvr(cvr_cifre)
+    if not kreditor:
+        return felter
+    linjer_tekst = " ".join(
+        (l.get("beskrivelse") or "") for l in (felter.get("linjer") or []) if isinstance(l, dict)
+    )
+    soegetekst = " ".join(filter(None, [felter.get("fakturanr", ""), linjer_tekst]))
+    kontonr = database.foreslaa_kontering(kreditor["id"], soegetekst)
+    if kontonr:
+        return {**felter, "kontonr": kontonr}
+    return felter
 
 
 @app.get("/posteringer", response_class=HTMLResponse)

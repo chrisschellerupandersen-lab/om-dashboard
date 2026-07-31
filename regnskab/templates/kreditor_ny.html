@@ -24,11 +24,64 @@
       <div><label>IBAN</label><input name="iban" value="{{ kreditor.iban or '' if kreditor else '' }}" placeholder="Til betalingsfil, valgfrit"></div>
       <div><label>BIC/SWIFT</label><input name="bic" value="{{ kreditor.bic or '' if kreditor else '' }}" placeholder="Valgfrit"></div>
     </div>
+    <label>Standardkonto</label>
+    <select name="standard_kontonr">
+      <option value="">Ingen — brug automatisk forslag</option>
+      {% for k in kontoplan if k.kontotype == 'omkostning' %}
+      <option value="{{ k.kontonr }}" {% if kreditor and kreditor.standard_kontonr == k.kontonr %}selected{% endif %}>{{ k.kontonr }} — {{ k.navn }}</option>
+      {% endfor %}
+    </select>
+    <p class="muted" style="margin-top:4px;">Bilag fra denne leverandør foreslås automatisk konteret her, medmindre en regel nedenfor matcher fakturaen.</p>
     <div style="margin-top:20px;">
       <button class="btn" type="submit">{{ "Gem" if kreditor else "Opret" }}</button>
     </div>
   </form>
 </div>
+
+{% if kreditor %}
+<div class="card" style="max-width:520px;">
+  <h2 style="font-size:14px; margin:0 0 6px;">Konteringsregler</h2>
+  <p class="muted" style="margin:0 0 14px;">Til varianter — samme leverandør, men fakturaer der indeholder et bestemt nøgleord skal konteres på en anden konto end standardkontoen.</p>
+  <table>
+    <thead><tr><th>Nøgleord</th><th>Konto</th><th>Beskrivelse</th><th></th></tr></thead>
+    <tbody>
+    {% for r in konteringsregler %}
+      <tr>
+        <td>{{ r.match_tekst }}</td>
+        <td>{{ r.kontonr }} — {{ r.konto_navn }}</td>
+        <td>{{ r.beskrivelse or "—" }}</td>
+        <td>
+          <form method="post" action="/konteringsregler/{{ r.id }}/slet" onsubmit="return confirm('Slet denne regel?');">
+            <input type="hidden" name="kreditor_id" value="{{ kreditor.id }}">
+            <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">Slet</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">Ingen regler endnu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post" action="/kreditorer/{{ kreditor.id }}/konteringsregel" style="margin-top:16px;">
+    <div class="row">
+      <div><label>Nøgleord (skal findes i fakturaen)</label><input name="match_tekst" placeholder="fx rengøring" required></div>
+      <div>
+        <label>Konto</label>
+        <select name="kontonr">
+          {% for k in kontoplan if k.kontotype == 'omkostning' %}
+          <option value="{{ k.kontonr }}">{{ k.kontonr }} — {{ k.navn }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <label>Beskrivelse (valgfri)</label>
+    <input name="beskrivelse" placeholder="fx Rengøringsartikler">
+    <button class="btn" type="submit" style="margin-top:14px;">Tilføj regel</button>
+  </form>
+</div>
+{% endif %}
+
 <script>
 document.getElementById('cvr-slaa-op').addEventListener('click', async function () {
   var q = document.getElementById('cvr-soeg').value.trim();

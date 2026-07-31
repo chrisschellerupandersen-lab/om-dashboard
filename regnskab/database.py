@@ -179,6 +179,15 @@ def init_db():
                 bic  TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS konteringsregler (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                kreditor_id INTEGER NOT NULL REFERENCES kreditorer(id),
+                match_tekst TEXT NOT NULL,   -- nøgleord der skal findes i fakturaindholdet
+                kontonr     TEXT NOT NULL REFERENCES kontoplan(kontonr),
+                beskrivelse TEXT,
+                oprettet_ts TEXT DEFAULT (datetime('now','localtime'))
+            );
+
             CREATE TABLE IF NOT EXISTS kreditor_poster (
                 id           INTEGER PRIMARY KEY AUTOINCREMENT,
                 kreditor_id  INTEGER NOT NULL REFERENCES kreditorer(id),
@@ -588,11 +597,12 @@ def find_or_create_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optio
 
 
 def opret_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] = None,
-                    email: Optional[str] = None, iban: Optional[str] = None, bic: Optional[str] = None) -> int:
+                    email: Optional[str] = None, iban: Optional[str] = None, bic: Optional[str] = None,
+                    standard_kontonr: Optional[str] = None) -> int:
     with _conn() as conn:
         cur = conn.execute(
-            "INSERT INTO kreditorer (navn, cvr, adresse, email, iban, bic) VALUES (?, ?, ?, ?, ?, ?)",
-            (navn, cvr, adresse, email, iban, bic),
+            "INSERT INTO kreditorer (navn, cvr, adresse, email, iban, bic, standard_kontonr) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (navn, cvr, adresse, email, iban, bic, standard_kontonr),
         )
         return cur.lastrowid
 
@@ -610,13 +620,77 @@ def hent_en_kreditor(kreditor_id: int) -> Optional[Dict[str, Any]]:
 
 def opdater_kreditor(kreditor_id: int, bruger: str, navn: str, cvr: Optional[str] = None,
                       adresse: Optional[str] = None, email: Optional[str] = None,
-                      iban: Optional[str] = None, bic: Optional[str] = None):
+                      iban: Optional[str] = None, bic: Optional[str] = None,
+                      standard_kontonr: Optional[str] = None):
     with _conn() as conn:
         conn.execute(
-            "UPDATE kreditorer SET navn = ?, cvr = ?, adresse = ?, email = ?, iban = ?, bic = ? WHERE id = ?",
-            (navn, cvr, adresse, email, iban, bic, kreditor_id),
+            "UPDATE kreditorer SET navn = ?, cvr = ?, adresse = ?, email = ?, iban = ?, bic = ?, "
+            "standard_kontonr = ? WHERE id = ?",
+            (navn, cvr, adresse, email, iban, bic, standard_kontonr, kreditor_id),
         )
         _log(conn, bruger, "opdater_kreditor", "kreditor", kreditor_id, {"navn": navn, "cvr": cvr})
+
+
+# ── Kontering: regler + selvlærende forslag ─────────────────────────────
+
+def opret_konteringsregel(kreditor_id: int, match_tekst: str, kontonr: str,
+                           beskrivelse: Optional[str] = None) -> int:
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO konteringsregler (kreditor_id, match_tekst, kontonr, beskrivelse) VALUES (?, ?, ?, ?)",
+            (kreditor_id, match_tekst, kontonr, beskrivelse),
+        )
+        return cur.lastrowid
+
+
+def hent_konteringsregler(kreditor_id: Optional[int] = None) -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        if kreditor_id:
+            rows = conn.execute("""
+                SELECT r.*, k.navn AS konto_navn FROM konteringsregler r
+                JOIN kontoplan k ON k.kontonr = r.kontonr
+                WHERE r.kreditor_id = ? ORDER BY r.id
+            """, (kreditor_id,)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT r.*, k.navn AS konto_navn FROM konteringsregler r
+                JOIN kontoplan k ON k.kontonr = r.kontonr
+                ORDER BY r.kreditor_id, r.id
+            """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def slet_konteringsregel(regel_id: int, bruger: str):
+    with _conn() as conn:
+        conn.execute("DELETE FROM konteringsregler WHERE id = ?", (regel_id,))
+        _log(conn, bruger, "slet_konteringsregel", "konteringsregel", regel_id, {})
+
+
+def foreslaa_kontering(kreditor_id: int, soegetekst: str) -> Optional[str]:
+    """Foreslår en kontonr til et nyt bilag fra en kendt kreditor, i prioriteret rækkefølge:
+    1) En konteringsregel hvis nøgleord findes i fakturateksten (variant — samme leverandør,
+       forskellig konto afhængigt af hvad fakturaen indeholder).
+    2) Leverandørens faste standardkonto (kreditorer.standard_kontonr), hvis sat.
+    3) Den konto der historisk er brugt oftest for denne kreditor — selvlærende, kræver
+       ingen opsætning, bliver mere præcis jo flere bilag der bogføres."""
+    tekst = (soegetekst or "").lower()
+    for regel in hent_konteringsregler(kreditor_id):
+        if regel["match_tekst"].lower() in tekst:
+            return regel["kontonr"]
+
+    with _conn() as conn:
+        kreditor = conn.execute(
+            "SELECT standard_kontonr FROM kreditorer WHERE id = ?", (kreditor_id,)
+        ).fetchone()
+        if kreditor and kreditor["standard_kontonr"]:
+            return kreditor["standard_kontonr"]
+
+        hyppigst = conn.execute("""
+            SELECT kontonr, COUNT(*) c FROM bilag
+            WHERE kreditor_id = ? AND status = 'bogfoert' AND kontonr IS NOT NULL AND kontonr != ''
+            GROUP BY kontonr ORDER BY c DESC LIMIT 1
+        """, (kreditor_id,)).fetchone()
+        return hyppigst["kontonr"] if hyppigst else None
 
 
 def godkend_og_bogfoer_bilag(bilag_id: int, bruger: str, felter: Dict[str, Any]) -> int:

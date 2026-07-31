@@ -575,24 +575,41 @@ def gem_transaktioner_dage(transaktioner: List[Dict]) -> Dict:
     trans = [t for t in transaktioner if t.get("dato")]
     if not trans:
         return {"raekker": 0, "dage": []}
-    datoer = sorted({t["dato"][:10] for t in trans})
+    # Grupper indkommende rækker pr. dato (så vi kan vurdere hver dato for sig)
+    pr_dato: Dict[str, list] = {}
+    for t in trans:
+        pr_dato.setdefault(t["dato"][:10], []).append(t)
+    datoer = sorted(pr_dato)
+    opdateret, sprunget = [], []
     with _conn() as conn:
         _opdater_kostpris_historik(conn, trans, datoer[-1])
         for d in datoer:
+            ny_antal = len(pr_dato[d])
+            eksist = conn.execute(
+                "SELECT COUNT(*) FROM transaktioner WHERE dato = ?", (d,)
+            ).fetchone()[0]
+            # GUARD mod forældede øjebliksbilleder: en rapport der genudsendes
+            # (fx opdaterLøbende) må ALDRIG erstatte en dags data med FÆRRE rækker
+            # end der allerede findes — salg på en dag kan kun vokse i løbet af dagen.
+            if eksist and ny_antal < eksist:
+                sprunget.append({"dato": d, "ny": ny_antal, "eksist": eksist})
+                continue
             conn.execute("DELETE FROM transaktioner WHERE dato = ?", (d,))
-        conn.executemany("""
-            INSERT INTO transaktioner
-                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, [(
-            t["dato"][:10], t.get("varenummer", ""), t.get("varenavn", ""),
-            t.get("kategori", ""), t.get("antal", 0), t.get("omsætning", 0),
-            t.get("kostpris", 0), t.get("avance", 0), t.get("avance_pct", 0),
-            t.get("time_start", -1), t.get("bon_nr", ""),
-        ) for t in trans])
+            conn.executemany("""
+                INSERT INTO transaktioner
+                    (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, [(
+                t["dato"][:10], t.get("varenummer", ""), t.get("varenavn", ""),
+                t.get("kategori", ""), t.get("antal", 0), t.get("omsætning", 0),
+                t.get("kostpris", 0), t.get("avance", 0), t.get("avance_pct", 0),
+                t.get("time_start", -1), t.get("bon_nr", ""),
+            ) for t in pr_dato[d]])
+            opdateret.append(d)
         # Opdatér "sidst indlæst"-markør uden at nulstille uploads-historik
         conn.execute("INSERT INTO uploads (rapport_dato) VALUES (?)", (datoer[-1],))
-    return {"raekker": len(trans), "dage": datoer}
+    return {"raekker": sum(len(pr_dato[d]) for d in opdateret),
+            "dage": opdateret, "sprunget_forældet": sprunget}
 
 
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:

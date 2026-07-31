@@ -2528,8 +2528,13 @@ async def opdater_rapport(request: Request):
         if not transaktioner:
             raise HTTPException(status_code=422, detail="Ingen transaktioner fundet i filen")
 
-        upload_id = database.gem_transaktioner(rapport_dato, transaktioner)
-        return {"ok": True, "upload_id": upload_id, "rækker": len(transaktioner), "dato": rapport_dato}
+        # INKREMENTEL: erstat kun de datoer rapporten indeholder — bevar ældre
+        # historik. Så kan Shopbox-rapporten være et kort, rullende vindue
+        # (fx sidste 14 dage) uden at slette resten. En fuld rapport opdaterer
+        # blot alle sine datoer, som før.
+        res = database.gem_transaktioner_dage(transaktioner)
+        return {"ok": True, "rækker": res.get("raekker", len(transaktioner)),
+                "dage": res.get("dage", []), "dato": rapport_dato}
 
     except HTTPException:
         raise

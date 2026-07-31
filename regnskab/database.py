@@ -410,6 +410,69 @@ def _log(conn: sqlite3.Connection, bruger: str, handling: str, entitet: str,
     )
 
 
+def nulstil_testdata():
+    """Rydder alt regnskabsdata (bilag, posteringer, debitor/kreditor, konteringsregler,
+    betalingsbatch, audit-log) — til brug mens systemet stadig er under test. Rører IKKE
+    bank_forbindelser eller banktransaktioner (bankhistorikken skal bevares), og heller
+    ikke kontoplan (kontoopsætningen er struktur, ikke testdata).
+
+    Posteringer/posteringslinjer er ellers append-only (håndhævet af triggers, som blokerer
+    almindelig DELETE) — her omgås det bevidst via DROP+CREATE, som ikke udløser
+    rækkebaserede triggers. Triggerne genskabes umiddelbart efter."""
+    with _conn() as conn:
+        conn.executescript("""
+            DROP TABLE IF EXISTS posteringslinjer;
+            DROP TABLE IF EXISTS posteringer;
+
+            CREATE TABLE posteringer (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                dato          TEXT NOT NULL,
+                tekst         TEXT NOT NULL,
+                bilag_id      INTEGER REFERENCES bilag(id),
+                bruger        TEXT NOT NULL,
+                korrigerer_id INTEGER REFERENCES posteringer(id),
+                hash_prev     TEXT,
+                hash_self     TEXT NOT NULL,
+                oprettet_ts   TEXT DEFAULT (datetime('now','localtime'))
+            );
+
+            CREATE TABLE posteringslinjer (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                postering_id INTEGER NOT NULL REFERENCES posteringer(id),
+                kontonr      TEXT NOT NULL REFERENCES kontoplan(kontonr),
+                debet        REAL NOT NULL DEFAULT 0,
+                kredit       REAL NOT NULL DEFAULT 0,
+                modpart_type TEXT,
+                modpart_id   INTEGER
+            );
+
+            CREATE TRIGGER forbyd_update_posteringer
+            BEFORE UPDATE ON posteringer
+            BEGIN SELECT RAISE(ABORT, 'Posteringer er append-only — brug en korrektionspostering'); END;
+
+            CREATE TRIGGER forbyd_delete_posteringer
+            BEFORE DELETE ON posteringer
+            BEGIN SELECT RAISE(ABORT, 'Posteringer maa ikke slettes'); END;
+
+            CREATE TRIGGER forbyd_update_posteringslinjer
+            BEFORE UPDATE ON posteringslinjer
+            BEGIN SELECT RAISE(ABORT, 'Posteringslinjer er append-only'); END;
+
+            CREATE TRIGGER forbyd_delete_posteringslinjer
+            BEFORE DELETE ON posteringslinjer
+            BEGIN SELECT RAISE(ABORT, 'Posteringslinjer maa ikke slettes'); END;
+        """)
+
+        # Rækkefølge: børn før forældre, så FK-håndhævelsen (PRAGMA foreign_keys=ON) ikke fejler.
+        for tabel in [
+            "betalingsbatch_linjer", "debitor_poster", "kreditor_poster", "betalingsbatch",
+            "konteringsregler", "bilag_linjer", "bilag", "debitorer", "kreditorer", "audit_log",
+        ]:
+            conn.execute(f"DELETE FROM {tabel}")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tabel,))
+        conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('posteringer', 'posteringslinjer')")
+
+
 def hent_posteringer(limit: int = 200, aar: Optional[int] = None, maaned: Optional[int] = None) -> List[Dict[str, Any]]:
     with _conn() as conn:
         params: List[Any] = []

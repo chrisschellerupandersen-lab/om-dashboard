@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Nulstil testdata — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Nulstil testdata</h1><div class="sub">Ryd al regnskabsdata og start forfra</div></div></div>
+
+<div class="card" style="max-width:560px;">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <p>Dette sletter permanent:</p>
+  <ul style="margin:0 0 14px; padding-left:20px; font-size:13.5px;">
+    <li>Alle bilag</li>
+    <li>Alle posteringer (bogføring)</li>
+    <li>Alle debitorer og kreditorer med tilhørende poster</li>
+    <li>Alle konteringsregler</li>
+    <li>Alle betalingsbatches</li>
+    <li>Aktivitetsloggen</li>
+  </ul>
+  <p>Følgende <strong>bevares</strong>:</p>
+  <ul style="margin:0 0 18px; padding-left:20px; font-size:13.5px;">
+    <li>Kontoplanen (dine konti)</li>
+    <li>Bankforbindelsen og alle indlæste banktransaktioner</li>
+  </ul>
+  <p class="muted" style="margin-bottom:16px;">Kan ikke fortrydes. Skriv <strong>NULSTIL</strong> herunder for at bekræfte.</p>
+  <form method="post" action="/admin/nulstil-testdata" onsubmit="return confirm('Er du helt sikker? Alt regnskabsdata (undtagen bank) slettes permanent.');">
+    <input name="bekræft" placeholder="Skriv NULSTIL" autocomplete="off" required>
+    <button class="btn danger" type="submit" style="margin-top:16px;">Nulstil alt testdata</button>
+  </form>
+</div>
+{% endblock %}

@@ -129,6 +129,23 @@ async def logout():
     return svar
 
 
+@app.get("/admin/nulstil-testdata", response_class=HTMLResponse)
+async def nulstil_testdata_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("nulstil_testdata.html", {"request": request})
+
+
+@app.post("/admin/nulstil-testdata")
+async def nulstil_testdata_post(request: Request, bekræft: str = Form(...)):
+    _kræv_login(request)
+    if bekræft != "NULSTIL":
+        return templates.TemplateResponse("nulstil_testdata.html", {
+            "request": request, "fejl": "Du skal skrive NULSTIL for at bekræfte.",
+        }, status_code=400)
+    database.nulstil_testdata()
+    return RedirectResponse("/dashboard", status_code=303)
+
+
 # ── SIDER ────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)

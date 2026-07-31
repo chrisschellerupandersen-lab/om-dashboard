@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Auto-konteringsregler — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Auto-konteringsregler</h1><div class="sub">Lærte regler for automatisk kontering af banktransaktioner</div></div>
+  <a class="btn secondary" href="/bank">&larr; Tilbage til Bank</a>
+</div>
+
+<div class="card">
+  <p class="muted" style="margin:0 0 14px;">Når en banktransaktions tekst indeholder et nøgleord herunder, foreslås (og kan bogføres automatisk til) den tilhørende konto på Bank-siden. Nye regler bogfører også med det samme alle allerede indlæste, uafklarede transaktioner der matcher.</p>
+  <table>
+    <thead><tr><th>Nøgleord</th><th>Konto</th><th>Beskrivelse</th><th></th></tr></thead>
+    <tbody>
+    {% for r in bank_konteringsregler %}
+      <tr>
+        <td><input name="match_tekst" value="{{ r.match_tekst }}" form="regelform-{{ r.id }}" style="min-width:140px;"></td>
+        <td>
+          <select name="kontonr" form="regelform-{{ r.id }}">
+            {% for k in kontoplan %}
+            <option value="{{ k.kontonr }}" {% if k.kontonr == r.kontonr %}selected{% endif %}>{{ k.kontonr }} — {{ k.navn }}</option>
+            {% endfor %}
+          </select>
+        </td>
+        <td><input name="beskrivelse" value="{{ r.beskrivelse or '' }}" form="regelform-{{ r.id }}" style="min-width:140px;"></td>
+        <td style="white-space:nowrap;">
+          <button class="btn secondary" type="submit" form="regelform-{{ r.id }}" style="padding:4px 10px; font-size:12px;">Gem</button>
+          <form method="post" action="/bank-konteringsregler/{{ r.id }}/slet" style="display:inline;" onsubmit="return confirm('Slet denne regel?');">
+            <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">Slet</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="4" class="muted">Ingen bank-konteringsregler endnu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% for r in bank_konteringsregler %}
+  <form id="regelform-{{ r.id }}" method="post" action="/bank-konteringsregler/{{ r.id }}/rediger"></form>
+  {% endfor %}
+
+  <form method="post" action="/bank-konteringsregler/ny" style="margin-top:16px;">
+    <div class="row">
+      <div><label>Nøgleord (skal findes i transaktionsteksten)</label><input name="match_tekst" placeholder="fx netbank gebyr" required></div>
+      <div>
+        <label>Konto</label>
+        <select name="kontonr">
+          {% for k in kontoplan %}
+          <option value="{{ k.kontonr }}">{{ k.kontonr }} — {{ k.navn }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    <label>Beskrivelse (valgfri)</label>
+    <input name="beskrivelse" placeholder="fx Månedligt netbank-gebyr">
+    <button class="btn" type="submit" style="margin-top:14px;">Tilføj regel</button>
+  </form>
+</div>
+{% endblock %}

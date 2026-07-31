@@ -22,7 +22,7 @@
   <thead><tr><th>#</th><th>Dato</th><th>Tekst</th><th>Bruger</th><th>Linjer</th></tr></thead>
   <tbody>
   {% for p in posteringer %}
-    <tr>
+    <tr id="postering-{{ p.id }}">
       <td>{{ p.id }}</td>
       <td>{{ p.dato }}</td>
       <td>{{ p.tekst }}</td>

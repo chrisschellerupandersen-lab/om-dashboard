@@ -778,7 +778,16 @@ async def bank_side(request: Request, aar: Optional[int] = None, maaned: Optiona
         "bank_api_konfigureret": enable_banking_klient.konfigureret(),
         "aar": aar, "maaned": maaned, "maaned_navne": MAANED_NAVNE,
         "kontoplan": database.hent_kontoplan(),
+    })
+
+
+@app.get("/bank/regler", response_class=HTMLResponse)
+async def bank_regler_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("bank_regler.html", {
+        "request": request,
         "bank_konteringsregler": database.hent_bank_konteringsregler(),
+        "kontoplan": database.hent_kontoplan(),
     })
 
 
@@ -805,7 +814,7 @@ async def bank_konteringsregel_ny_post(request: Request, match_tekst: str = Form
     match_tekst = match_tekst.strip()
     database.opret_bank_konteringsregel(match_tekst, kontonr, beskrivelse.strip() or None, bruger)
     database.anvend_bank_konteringsregel_paa_ventende(match_tekst, kontonr, bruger)
-    return RedirectResponse("/bank", status_code=303)
+    return RedirectResponse("/bank/regler", status_code=303)
 
 
 @app.post("/bank-konteringsregler/{regel_id}/rediger")
@@ -813,14 +822,14 @@ async def bank_konteringsregel_rediger_post(request: Request, regel_id: int, mat
                                              kontonr: str = Form(...), beskrivelse: str = Form("")):
     bruger = _kræv_login(request)
     database.opdater_bank_konteringsregel(regel_id, match_tekst.strip(), kontonr, beskrivelse.strip() or None, bruger)
-    return RedirectResponse("/bank", status_code=303)
+    return RedirectResponse("/bank/regler", status_code=303)
 
 
 @app.post("/bank-konteringsregler/{regel_id}/slet")
 async def bank_konteringsregel_slet_post(request: Request, regel_id: int):
     bruger = _kræv_login(request)
     database.slet_bank_konteringsregel(regel_id, bruger)
-    return RedirectResponse("/bank", status_code=303)
+    return RedirectResponse("/bank/regler", status_code=303)
 
 
 @app.get("/bank/indlaes", response_class=HTMLResponse)

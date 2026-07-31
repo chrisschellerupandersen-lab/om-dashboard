@@ -742,6 +742,35 @@ async def rapport_status():
     }
 
 
+@app.get("/api/salg/friskhed")
+async def salg_friskhed(request: Request):
+    """Diagnose (webhook-sikret): dagens seneste transaktion — viser om
+    rapport-INDHOLDET er friskt, ikke bare om tidsstemplet opdateres."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and request.query_params.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    from datetime import date as _date
+    idag = _date.today().isoformat()
+    with database._conn() as conn:
+        r = conn.execute("""
+            SELECT COUNT(*) n, MAX(time_start) sidste_time,
+                   SUM(antal) enheder, ROUND(SUM(omsætning),2) oms
+            FROM transaktioner WHERE dato = ?
+        """, (idag,)).fetchone()
+        total = conn.execute("SELECT COUNT(*) n, MAX(dato) maxdato FROM transaktioner").fetchone()
+        seneste_boner = conn.execute("""
+            SELECT DISTINCT bon_nr FROM transaktioner
+            WHERE dato = ? AND bon_nr != '' ORDER BY bon_nr DESC LIMIT 3
+        """, (idag,)).fetchall()
+    return {
+        "ok": True, "idag": idag,
+        "idag_rækker": r["n"], "idag_sidste_time": r["sidste_time"],
+        "idag_enheder": r["enheder"], "idag_omsætning": r["oms"],
+        "db_total_rækker": total["n"], "db_max_dato": total["maxdato"],
+        "seneste_boner_idag": [b["bon_nr"] for b in seneste_boner],
+    }
+
+
 @app.get("/api/debug-ping")
 async def debug_ping(request: Request):
     """Diagnostik: tjek session + database uden login-krav på selve ping."""

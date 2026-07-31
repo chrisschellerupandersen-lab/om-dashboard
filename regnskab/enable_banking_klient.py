@@ -67,6 +67,25 @@ def afslut_session(code: str) -> Dict[str, Any]:
     return svar.json()
 
 
+def hent_saldo(account_uid: str) -> Optional[float]:
+    """Returnerer kontoens aktuelle saldo (foretrækker 'closingBooked'/'expected', ellers første
+    tilgængelige), eller None hvis banken ikke leverer nogen saldo for kontoen."""
+    svar = requests.get(f"{BASE_URL}/accounts/{account_uid}/balances", headers=_headers(), timeout=15)
+    svar.raise_for_status()
+    balances = svar.json().get("balances", [])
+    if not balances:
+        return None
+    prioritet = ["closingBooked", "expected", "interimAvailable", "openingBooked"]
+    balances_by_type = {b.get("balance_type"): b for b in balances}
+    for btype in prioritet:
+        if btype in balances_by_type:
+            beloeb = (balances_by_type[btype].get("balance_amount") or {}).get("amount")
+            if beloeb is not None:
+                return float(beloeb)
+    beloeb = (balances[0].get("balance_amount") or {}).get("amount")
+    return float(beloeb) if beloeb is not None else None
+
+
 def hent_transaktioner(account_uid: str, dage_tilbage: int = 90) -> List[Dict[str, Any]]:
     """Returnerer en normaliseret liste [{"ekstern_id","dato","beloeb","tekst"}]. Beløbets
     fortegn afledes af credit_debit_indicator (DBIT=negativ/udbetaling, CRDT=positiv/indbetaling),

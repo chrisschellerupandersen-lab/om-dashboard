@@ -56,6 +56,19 @@ def init_db():
                 ALTER TABLE bank_forbindelser_ny RENAME TO bank_forbindelser;
             """)
 
+        # Migration: saldo-visning pr. bankforbindelse (kun ADD COLUMN — ingen RENAME,
+        # så banktransaktioner.bank_forbindelse_id-referencen påvirkes ikke). Tabellen
+        # findes ikke endnu ved en helt frisk database — CREATE TABLE IF NOT EXISTS
+        # nedenfor opretter den allerede med saldo-kolonnerne i så fald.
+        if conn.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='bank_forbindelser'"
+        ).fetchone():
+            _bf_kolonner = {r["name"] for r in conn.execute("PRAGMA table_info(bank_forbindelser)").fetchall()}
+            if "saldo" not in _bf_kolonner:
+                conn.execute("ALTER TABLE bank_forbindelser ADD COLUMN saldo REAL")
+            if "saldo_ts" not in _bf_kolonner:
+                conn.execute("ALTER TABLE bank_forbindelser ADD COLUMN saldo_ts TEXT")
+
         # Rettelse: banktransaktioner.bank_forbindelse_id fik (via ovenstående migrations
         # oprindelige, forkerte rækkefølge) en varig REFERENCES-klausul til det droppede
         # midlertidige tabelnavn "bank_forbindelser_gl" — genopbyg tabellen så referencen
@@ -209,7 +222,9 @@ def init_db():
                 iban               TEXT,
                 requisition_id     TEXT,
                 consent_expires_ts TEXT,
-                status             TEXT DEFAULT 'aktiv'   -- aktiv|udloebet|tilbagekaldt
+                status             TEXT DEFAULT 'aktiv',   -- aktiv|udloebet|tilbagekaldt
+                saldo              REAL,
+                saldo_ts           TEXT
             );
 
             CREATE TABLE IF NOT EXISTS banktransaktioner (
@@ -395,10 +410,16 @@ def _log(conn: sqlite3.Connection, bruger: str, handling: str, entitet: str,
     )
 
 
-def hent_posteringer(limit: int = 200) -> List[Dict[str, Any]]:
+def hent_posteringer(limit: int = 200, aar: Optional[int] = None, maaned: Optional[int] = None) -> List[Dict[str, Any]]:
     with _conn() as conn:
+        params: List[Any] = []
+        where = ""
+        if aar is not None:
+            where = "WHERE dato LIKE ?"
+            params.append(f"{aar:04d}-{maaned:02d}-%" if maaned else f"{aar:04d}-%")
+        params.append(limit)
         rows = conn.execute(
-            "SELECT * FROM posteringer ORDER BY id DESC LIMIT ?", (limit,)
+            f"SELECT * FROM posteringer {where} ORDER BY id DESC LIMIT ?", params
         ).fetchall()
         out = []
         for r in rows:
@@ -940,6 +961,14 @@ def opret_bank_forbindelse(institution_id: str, institution_navn: str, account_i
 def hent_bank_forbindelser() -> List[Dict[str, Any]]:
     with _conn() as conn:
         return [dict(r) for r in conn.execute("SELECT * FROM bank_forbindelser ORDER BY id").fetchall()]
+
+
+def opdater_bank_saldo(forbindelse_id: int, saldo: Optional[float]):
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE bank_forbindelser SET saldo = ?, saldo_ts = datetime('now','localtime') WHERE id = ?",
+            (saldo, forbindelse_id),
+        )
 
 
 def luk_bank_forbindelse(forbindelse_id: int, bruger: str):

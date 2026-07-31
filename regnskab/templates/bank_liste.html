@@ -19,13 +19,16 @@
 <div class="card">
   <h2 style="font-size:14px; margin:0 0 12px;">Bankforbindelser</h2>
   <table>
-    <thead><tr><th>Bank</th><th>IBAN</th><th>Status</th><th>Samtykke udløber</th><th></th></tr></thead>
+    <thead><tr><th>Bank</th><th>IBAN</th><th class="num">Saldo</th><th>Status</th><th>Samtykke udløber</th><th></th></tr></thead>
     <tbody>
     {% for f in forbindelser %}
       {% set dage = f.consent_expires_ts|dage_til %}
       <tr>
         <td>{{ f.institution_navn or f.institution_id }}</td>
         <td>{{ f.iban or "—" }}</td>
+        <td class="num" style="font-variant-numeric: tabular-nums;">
+          {% if f.saldo is not none %}{{ f.saldo|dkk }} kr{% else %}—{% endif %}
+        </td>
         <td><span class="badge {{ 'godkendt' if f.status == 'aktiv' else 'afvist' }}">{{ f.status }}</span></td>
         <td>
           {% if f.consent_expires_ts %}

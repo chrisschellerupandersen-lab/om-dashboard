@@ -87,6 +87,11 @@
   .badge.afvist, .badge.ignoreret, .badge.slettet, .badge.annulleret { background: var(--bad-soft); color: var(--bad); }
   .badge.aaben, .badge.uafklaret { background: var(--accent-soft); color: var(--accent); }
 
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
+  .tabs a { padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--muted); text-decoration: none; border-radius: var(--radius-chip) var(--radius-chip) 0 0; margin-bottom: -1px; border: 1px solid transparent; }
+  .tabs a:hover { color: var(--text); background: var(--surface-alt); }
+  .tabs a.active { color: var(--accent); background: var(--surface); border-color: var(--border); border-bottom-color: var(--surface); }
+
   .fejl { background: var(--bad-soft); color: #9A1E22; padding: 11px 15px; border-radius: var(--radius-chip); margin-bottom: 16px; font-size: 13.5px; }
   .muted { color: var(--muted); font-size: 12.5px; }
 

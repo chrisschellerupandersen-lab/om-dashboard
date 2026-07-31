@@ -1,7 +1,22 @@
 {% extends "base.html" %}
 {% block title %}Posteringer — Nimbo Regnskab{% endblock %}
 {% block content %}
-<div class="page-head"><div><h1>Posteringer</h1><div class="sub">Dobbelt bogholderi — append-only revisionsspor</div></div></div>
+<div class="page-head">
+  <div><h1>Posteringer</h1><div class="sub">Dobbelt bogholderi — append-only revisionsspor</div></div>
+  <div style="display:flex; gap:6px; align-items:center;">
+    <a class="btn secondary" href="/posteringer?aar={{ aar - 1 }}&maaned={{ maaned }}" style="padding:7px 12px;">‹</a>
+    <strong style="min-width:44px; text-align:center;">{{ aar }}</strong>
+    <a class="btn secondary" href="/posteringer?aar={{ aar + 1 }}&maaned={{ maaned }}" style="padding:7px 12px;">›</a>
+  </div>
+</div>
+
+<div class="tabs">
+  <a href="/posteringer?aar={{ aar }}&maaned=0" class="{{ 'active' if not maaned }}">Alle</a>
+  {% for navn in maaned_navne %}
+  <a href="/posteringer?aar={{ aar }}&maaned={{ loop.index }}" class="{{ 'active' if maaned == loop.index }}">{{ navn }}</a>
+  {% endfor %}
+</div>
+
 <div class="card">
 <table>
   <thead><tr><th>#</th><th>Dato</th><th>Tekst</th><th>Bruger</th><th>Linjer</th></tr></thead>

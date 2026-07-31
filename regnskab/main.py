@@ -2,6 +2,7 @@ import os
 import json
 import base64
 import hashlib
+import logging
 import secrets
 from datetime import date, timedelta
 from contextlib import asynccontextmanager
@@ -16,6 +17,8 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
 import database
 import enable_banking_klient
+
+logger = logging.getLogger("regnskab.bank_sync")
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 
@@ -593,12 +596,22 @@ def _foreslaa_kontonr_ved_behov(felter: dict) -> dict:
     return felter
 
 
+MAANED_NAVNE = ["Jan", "Feb", "Mar", "Apr", "Maj", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dec"]
+
+
 @app.get("/posteringer", response_class=HTMLResponse)
-async def posteringer_side(request: Request):
+async def posteringer_side(request: Request, aar: Optional[int] = None, maaned: Optional[int] = None):
     _kræv_login(request)
+    i_dag = date.today()
+    aar = aar or i_dag.year
+    if maaned is None:
+        maaned = i_dag.month
     return templates.TemplateResponse("posteringer.html", {
         "request": request,
-        "posteringer": database.hent_posteringer(),
+        "posteringer": database.hent_posteringer(limit=1000, aar=aar, maaned=maaned or None),
+        "aar": aar,
+        "maaned": maaned,
+        "maaned_navne": MAANED_NAVNE,
     })
 
 
@@ -836,10 +849,14 @@ async def bank_forbind_callback(request: Request, code: str = "", state: str = "
             if not account_uid:
                 continue
             iban = (konto.get("account_id") or {}).get("iban")
-            database.opret_bank_forbindelse(
+            forbindelse_id = database.opret_bank_forbindelse(
                 institution_navn, institution_navn, account_uid, iban,
                 session.get("session_id"), consent_expires_ts,
             )
+            try:
+                database.opdater_bank_saldo(forbindelse_id, enable_banking_klient.hent_saldo(account_uid))
+            except requests.RequestException:
+                logger.exception("Kunne ikke hente indledende saldo for bankforbindelse %s", forbindelse_id)
     except requests.RequestException as exc:
         return templates.TemplateResponse("bank_forbind.html", {
             "request": request, "institutioner": [], "ikke_konfigureret": False,
@@ -863,8 +880,9 @@ async def bank_forbindelse_luk_post(request: Request, forbindelse_id: int):
 
 
 def _synkroniser_bankforbindelser() -> int:
-    """Henter nye transaktioner for alle aktive bankforbindelser. Fejl på én forbindelse
-    stopper ikke synkronisering af de øvrige. Returnerer samlet antal nye transaktioner."""
+    """Henter nye transaktioner + saldo for alle aktive bankforbindelser. Fejl på én forbindelse
+    stopper ikke synkronisering af de øvrige (men logges, så det ikke fejler i stilhed).
+    Returnerer samlet antal nye transaktioner."""
     if not enable_banking_klient.konfigureret():
         return 0
     antal_nye = 0
@@ -875,5 +893,10 @@ def _synkroniser_bankforbindelser() -> int:
             transaktioner = enable_banking_klient.hent_transaktioner(forbindelse["account_id"])
             antal_nye += database.indlæs_eksterne_banktransaktioner(forbindelse["id"], transaktioner)
         except requests.RequestException:
-            continue
+            logger.exception("Kunne ikke hente transaktioner for bankforbindelse %s", forbindelse["id"])
+        try:
+            saldo = enable_banking_klient.hent_saldo(forbindelse["account_id"])
+            database.opdater_bank_saldo(forbindelse["id"], saldo)
+        except requests.RequestException:
+            logger.exception("Kunne ikke hente saldo for bankforbindelse %s", forbindelse["id"])
     return antal_nye

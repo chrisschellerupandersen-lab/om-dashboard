@@ -420,6 +420,15 @@ def nulstil_testdata():
     almindelig DELETE) — her omgås det bevidst via DROP+CREATE, som ikke udløser
     rækkebaserede triggers. Triggerne genskabes umiddelbart efter."""
     with _conn() as conn:
+        # debitor_poster/kreditor_poster har postering_id-FK'er ind i posteringer — med
+        # PRAGMA foreign_keys=ON udfører SQLite en implicit DELETE FROM posteringer, FØR den
+        # dropper tabellen, for at sikre fremmednøgle-integritet. Den implicitte DELETE
+        # rammer selvfølgelig vores egen forbyd_delete_posteringer-trigger og fejler. Derfor
+        # skal alt der peger på posteringer(id) ryddes FØR posteringer/posteringslinjer droppes.
+        for tabel in ["betalingsbatch_linjer", "debitor_poster", "kreditor_poster"]:
+            conn.execute(f"DELETE FROM {tabel}")
+            conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tabel,))
+
         conn.executescript("""
             DROP TABLE IF EXISTS posteringslinjer;
             DROP TABLE IF EXISTS posteringer;
@@ -463,10 +472,10 @@ def nulstil_testdata():
             BEGIN SELECT RAISE(ABORT, 'Posteringslinjer maa ikke slettes'); END;
         """)
 
-        # Rækkefølge: børn før forældre, så FK-håndhævelsen (PRAGMA foreign_keys=ON) ikke fejler.
+        # Resten: børn før forældre, så FK-håndhævelsen ikke fejler.
         for tabel in [
-            "betalingsbatch_linjer", "debitor_poster", "kreditor_poster", "betalingsbatch",
-            "konteringsregler", "bilag_linjer", "bilag", "debitorer", "kreditorer", "audit_log",
+            "betalingsbatch", "konteringsregler", "bilag_linjer", "bilag",
+            "debitorer", "kreditorer", "audit_log",
         ]:
             conn.execute(f"DELETE FROM {tabel}")
             conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tabel,))

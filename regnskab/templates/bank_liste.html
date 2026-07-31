@@ -72,7 +72,9 @@
       <strong style="font-variant-numeric: tabular-nums;">{{ tx.dato }} — {{ tx.beloeb|dkk }} kr</strong>
       <div class="muted">{{ tx.tekst or "(ingen tekst)" }}</div>
     </div>
-    <span class="badge {{ 'godkendt' if tx.match_status == 'godkendt' else ('ignoreret' if tx.match_status == 'ignoreret' else 'uafklaret') }}">{{ tx.match_status }}</span>
+    <span class="badge {{ 'godkendt' if tx.match_status == 'godkendt' else ('ignoreret' if tx.match_status == 'ignoreret' else 'uafklaret') }}">
+      {{ {"godkendt": "bogført", "ignoreret": "ignoreret", "uafklaret": "uafklaret"}[tx.match_status] }}
+    </span>
   </div>
 
   {% if tx.match_status == 'uafklaret' %}

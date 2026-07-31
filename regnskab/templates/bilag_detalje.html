@@ -72,6 +72,17 @@
       <option value="{{ k.kontonr }}" {% if k.kontonr == bilag.kontonr %}selected{% endif %}>{{ k.kontonr }} — {{ k.navn }}</option>
       {% endfor %}
     </select>
+    <div class="row">
+      <div>
+        <label>IBAN (til betaling)</label>
+        <input name="iban" value="{{ bilag.iban or '' }}" placeholder="Læses fra fakturaen hvis muligt">
+      </div>
+      <div>
+        <label>BIC/SWIFT</label>
+        <input name="bic" value="{{ bilag.bic or '' }}">
+      </div>
+    </div>
+    <p class="muted" style="margin-top:4px;">Gemmes på leverandøren — bruges kun hvis den ikke allerede har bankoplysninger.</p>
     <div style="margin-top:20px; display:flex; gap:10px;">
       <button class="btn" type="submit">Godkend &amp; bogfør</button>
     </div>

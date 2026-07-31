@@ -122,6 +122,8 @@ def init_db():
                 moms_beloeb      REAL DEFAULT 0,
                 beloeb_total     REAL DEFAULT 0,
                 valuta           TEXT DEFAULT 'DKK',
+                iban             TEXT,
+                bic              TEXT,
                 kontonr          TEXT REFERENCES kontoplan(kontonr),
                 status           TEXT NOT NULL DEFAULT 'afventer', -- afventer|godkendt|afvist|bogfoert
                 kreditor_id      INTEGER REFERENCES kreditorer(id),
@@ -302,6 +304,14 @@ def init_db():
         _bt_kolonner = {r["name"] for r in conn.execute("PRAGMA table_info(banktransaktioner)").fetchall()}
         if "postering_id" not in _bt_kolonner:
             conn.execute("ALTER TABLE banktransaktioner ADD COLUMN postering_id INTEGER REFERENCES posteringer(id)")
+
+        # Migration: gem betalings-IBAN/BIC AI'en læser af fakturaen, så de kan gennemgås på
+        # godkendelsessiden og bruges til at oprette/udfylde kreditorens bankoplysninger.
+        _bilag_kolonner = {r["name"] for r in conn.execute("PRAGMA table_info(bilag)").fetchall()}
+        if "iban" not in _bilag_kolonner:
+            conn.execute("ALTER TABLE bilag ADD COLUMN iban TEXT")
+        if "bic" not in _bilag_kolonner:
+            conn.execute("ALTER TABLE bilag ADD COLUMN bic TEXT")
 
         _seed_kontoplan(conn)
 
@@ -578,14 +588,15 @@ def opret_bilag(fil_sti: str, fil_sha256: str, ai_raw_json: Optional[str] = None
             cur = conn.execute(
                 "INSERT INTO bilag (type, fil_sti, fil_sha256, ai_raw_json, ai_model, kilde, "
                 "leverandoer_cvr, leverandoer_navn, fakturanr, fakturadato, forfaldsdato, "
-                "beloeb_ex_moms, moms_beloeb, beloeb_total, kontonr) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "beloeb_ex_moms, moms_beloeb, beloeb_total, kontonr, iban, bic) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     felter.get("type", "leverandoerfaktura"), fil_sti, fil_sha256, ai_raw_json, ai_model, kilde,
                     felter.get("leverandoer_cvr"), felter.get("leverandoer_navn"),
                     felter.get("fakturanr"), felter.get("fakturadato"), felter.get("forfaldsdato"),
                     felter.get("beloeb_ex_moms", 0), felter.get("moms_beloeb", 0),
                     felter.get("beloeb_total", 0), felter.get("kontonr"),
+                    felter.get("iban") or None, felter.get("bic") or None,
                 ),
             )
             _log(conn, felter.get("bruger", "system"), "opret_bilag", "bilag", cur.lastrowid, felter)
@@ -702,17 +713,27 @@ def find_kreditor_by_cvr(cvr: str) -> Optional[Dict[str, Any]]:
         return dict(r) if r else None
 
 
-def find_or_create_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] = None) -> int:
+def find_or_create_kreditor(navn: str, cvr: Optional[str] = None, adresse: Optional[str] = None,
+                             iban: Optional[str] = None, bic: Optional[str] = None) -> int:
+    """iban/bic sættes ved oprettelse af en ny kreditor, og udfylder manglende bankoplysninger
+    på en eksisterende kreditor hvis en senere faktura afslører dem — overskriver aldrig
+    allerede kendte værdier."""
     with _conn() as conn:
+        r = None
         if cvr:
-            r = conn.execute("SELECT id FROM kreditorer WHERE cvr = ?", (cvr,)).fetchone()
-            if r:
-                return r["id"]
-        r = conn.execute("SELECT id FROM kreditorer WHERE navn = ?", (navn,)).fetchone()
+            r = conn.execute("SELECT id, iban, bic FROM kreditorer WHERE cvr = ?", (cvr,)).fetchone()
+        if not r:
+            r = conn.execute("SELECT id, iban, bic FROM kreditorer WHERE navn = ?", (navn,)).fetchone()
         if r:
+            if (iban and not r["iban"]) or (bic and not r["bic"]):
+                conn.execute(
+                    "UPDATE kreditorer SET iban = COALESCE(iban, ?), bic = COALESCE(bic, ?) WHERE id = ?",
+                    (iban, bic, r["id"]),
+                )
             return r["id"]
         cur = conn.execute(
-            "INSERT INTO kreditorer (navn, cvr, adresse) VALUES (?, ?, ?)", (navn, cvr, adresse)
+            "INSERT INTO kreditorer (navn, cvr, adresse, iban, bic) VALUES (?, ?, ?, ?, ?)",
+            (navn, cvr, adresse, iban, bic),
         )
         return cur.lastrowid
 
@@ -830,8 +851,10 @@ def godkend_og_bogfoer_bilag(bilag_id: int, bruger: str, felter: Dict[str, Any])
     navn = felter.get("leverandoer_navn") or "Ukendt leverandør"
     cvr = felter.get("leverandoer_cvr") or None
     adresse = felter.get("leverandoer_adresse") or None
+    iban = felter.get("iban") or None
+    bic = felter.get("bic") or None
 
-    kreditor_id = find_or_create_kreditor(navn, cvr, adresse)
+    kreditor_id = find_or_create_kreditor(navn, cvr, adresse, iban, bic)
 
     linjer = [{"kontonr": kontonr, "debet": beloeb_ex_moms, "kredit": 0}]
     if moms_beloeb:

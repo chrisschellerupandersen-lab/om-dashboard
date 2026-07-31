@@ -291,6 +291,8 @@ def _læs_faktura_med_ai(indhold: bytes, content_type: str, api_key: str):
         '  "beloeb_ex_moms": <beløb ekskl. moms som tal, 0 hvis ikke fundet>,\n'
         '  "moms_beloeb": <momsbeløb som tal, 0 hvis ikke moms er anført>,\n'
         '  "beloeb_total": <totalbeløb inkl. moms som tal>,\n'
+        '  "iban": <leverandørens IBAN til betaling, "" hvis ikke fundet>,\n'
+        '  "bic": <leverandørens BIC/SWIFT-kode, "" hvis ikke fundet>,\n'
         '  "linjer": [{"beskrivelse": <tekst>, "beloeb": <tal>}]\n'
         "}"
     )
@@ -304,7 +306,7 @@ def _læs_faktura_med_ai(indhold: bytes, content_type: str, api_key: str):
     if raw_trimmed.lower().startswith("json"):
         raw_trimmed = raw_trimmed[4:].strip()
     data = json.loads(raw_trimmed)
-    for felt in ("leverandoer_navn", "leverandoer_cvr", "fakturanr", "fakturadato", "forfaldsdato"):
+    for felt in ("leverandoer_navn", "leverandoer_cvr", "fakturanr", "fakturadato", "forfaldsdato", "iban", "bic"):
         data.setdefault(felt, "")
     for felt in ("beloeb_ex_moms", "moms_beloeb", "beloeb_total"):
         data.setdefault(felt, 0)
@@ -342,7 +344,7 @@ async def bilag_godkend(
     leverandoer_navn: str = Form(...), leverandoer_cvr: str = Form(""),
     fakturanr: str = Form(""), fakturadato: str = Form(""), forfaldsdato: str = Form(""),
     beloeb_ex_moms: float = Form(0), moms_beloeb: float = Form(0), beloeb_total: float = Form(0),
-    kontonr: str = Form("4000"),
+    kontonr: str = Form("4000"), iban: str = Form(""), bic: str = Form(""),
 ):
     bruger = _kræv_login(request)
     try:
@@ -351,7 +353,7 @@ async def bilag_godkend(
             "fakturanr": fakturanr, "fakturadato": fakturadato or date.today().isoformat(),
             "forfaldsdato": forfaldsdato or None,
             "beloeb_ex_moms": beloeb_ex_moms, "moms_beloeb": moms_beloeb, "beloeb_total": beloeb_total,
-            "kontonr": kontonr,
+            "kontonr": kontonr, "iban": iban.strip() or None, "bic": bic.strip() or None,
         })
         database.godkend_og_bogfoer_bilag(bilag_id, bruger, felter)
     except ValueError as exc:

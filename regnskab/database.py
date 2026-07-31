@@ -413,8 +413,11 @@ def _log(conn: sqlite3.Connection, bruger: str, handling: str, entitet: str,
 def nulstil_testdata():
     """Rydder alt regnskabsdata (bilag, posteringer, debitor/kreditor, konteringsregler,
     betalingsbatch, audit-log) — til brug mens systemet stadig er under test. Rører IKKE
-    bank_forbindelser eller banktransaktioner (bankhistorikken skal bevares), og heller
-    ikke kontoplan (kontoopsætningen er struktur, ikke testdata).
+    bank_forbindelser eller selve banktransaktionerne (bankhistorikken skal bevares), og
+    heller ikke kontoplan (kontoopsætningen er struktur, ikke testdata). Match-STATUSSEN på
+    banktransaktioner nulstilles derimod til 'uafklaret' — ellers ville en transaktion der
+    var matchet mod fx en kreditorpost stå tilbage som "godkendt" og pege på en post der
+    ikke længere findes, når alt andet er ryddet.
 
     Posteringer/posteringslinjer er ellers append-only (håndhævet af triggers, som blokerer
     almindelig DELETE) — her omgås det bevidst via DROP+CREATE, som ikke udløser
@@ -480,6 +483,10 @@ def nulstil_testdata():
             conn.execute(f"DELETE FROM {tabel}")
             conn.execute("DELETE FROM sqlite_sequence WHERE name = ?", (tabel,))
         conn.execute("DELETE FROM sqlite_sequence WHERE name IN ('posteringer', 'posteringslinjer')")
+
+        conn.execute(
+            "UPDATE banktransaktioner SET match_status = 'uafklaret', matchet_type = NULL, matchet_id = NULL"
+        )
 
 
 def hent_posteringer(limit: int = 200, aar: Optional[int] = None, maaned: Optional[int] = None) -> List[Dict[str, Any]]:

@@ -19,6 +19,7 @@
     <li>Kontoplanen (dine konti)</li>
     <li>Bankforbindelsen og alle indlæste banktransaktioner</li>
   </ul>
+  <p class="muted" style="margin-bottom:16px;">Banktransaktionernes matchstatus nulstilles dog til "uafklaret", så de kan matches igen — ellers ville de stå som "godkendt" mod poster der ikke længere findes.</p>
   <p class="muted" style="margin-bottom:16px;">Kan ikke fortrydes. Skriv <strong>NULSTIL</strong> herunder for at bekræfte.</p>
   <form method="post" action="/admin/nulstil-testdata" onsubmit="return confirm('Er du helt sikker? Alt regnskabsdata (undtagen bank) slettes permanent.');">
     <input name="bekræft" placeholder="Skriv NULSTIL" autocomplete="off" required>

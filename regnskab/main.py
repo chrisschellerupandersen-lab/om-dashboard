@@ -4,7 +4,7 @@ import base64
 import hashlib
 import logging
 import secrets
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from contextlib import asynccontextmanager
 from typing import Optional
 
@@ -719,10 +719,37 @@ async def moms_side(request: Request, aar: Optional[int] = None, kvartal: Option
 
 # ── Bank (simuleret indlæsning + match) ─────────────────────────────────
 
+def _saldo_forældet(forbindelse) -> bool:
+    if not forbindelse["saldo_ts"]:
+        return True
+    try:
+        sidst = datetime.fromisoformat(forbindelse["saldo_ts"])
+    except ValueError:
+        return True
+    return datetime.now() - sidst > timedelta(minutes=5)
+
+
 @app.get("/bank", response_class=HTMLResponse)
-async def bank_side(request: Request):
+async def bank_side(request: Request, aar: Optional[int] = None, maaned: Optional[int] = None):
     _kræv_login(request)
-    transaktioner = database.hent_banktransaktioner()
+    i_dag = date.today()
+    aar = aar or i_dag.year
+    if maaned is None:
+        maaned = i_dag.month
+
+    if enable_banking_klient.konfigureret():
+        for forbindelse in database.hent_bank_forbindelser():
+            if forbindelse["status"] != "aktiv" or not forbindelse["account_id"]:
+                continue
+            if not _saldo_forældet(forbindelse):
+                continue
+            try:
+                saldo = enable_banking_klient.hent_saldo(forbindelse["account_id"])
+                database.opdater_bank_saldo(forbindelse["id"], saldo)
+            except requests.RequestException:
+                logger.exception("Kunne ikke opdatere saldo for bankforbindelse %s", forbindelse["id"])
+
+    transaktioner = database.hent_banktransaktioner(aar=aar, maaned=maaned or None)
     for tx in transaktioner:
         tx["forslag"] = database.foreslaa_matches(tx) if tx["match_status"] == "uafklaret" else []
     return templates.TemplateResponse("bank_liste.html", {
@@ -730,6 +757,7 @@ async def bank_side(request: Request):
         "transaktioner": transaktioner,
         "forbindelser": database.hent_bank_forbindelser(),
         "bank_api_konfigureret": enable_banking_klient.konfigureret(),
+        "aar": aar, "maaned": maaned, "maaned_navne": MAANED_NAVNE,
     })
 
 

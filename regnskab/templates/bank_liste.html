@@ -15,6 +15,18 @@
   </div>
 </div>
 
+<div style="display:flex; gap:6px; align-items:center; margin-bottom:12px;">
+  <a class="btn secondary" href="/bank?aar={{ aar - 1 }}&maaned={{ maaned }}" style="padding:7px 12px;">‹</a>
+  <strong style="min-width:44px; text-align:center;">{{ aar }}</strong>
+  <a class="btn secondary" href="/bank?aar={{ aar + 1 }}&maaned={{ maaned }}" style="padding:7px 12px;">›</a>
+</div>
+<div class="tabs">
+  <a href="/bank?aar={{ aar }}&maaned=0" class="{{ 'active' if not maaned }}">Alle</a>
+  {% for navn in maaned_navne %}
+  <a href="/bank?aar={{ aar }}&maaned={{ loop.index }}" class="{{ 'active' if maaned == loop.index }}">{{ navn }}</a>
+  {% endfor %}
+</div>
+
 {% if forbindelser %}
 <div class="card">
   <h2 style="font-size:14px; margin:0 0 12px;">Bankforbindelser</h2>

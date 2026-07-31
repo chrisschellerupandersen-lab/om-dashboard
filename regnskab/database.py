@@ -912,17 +912,21 @@ def indlæs_banktransaktioner(linjer: List[Dict[str, Any]], kilde: str = "simula
     return antal
 
 
-def hent_banktransaktioner(match_status: Optional[str] = None) -> List[Dict[str, Any]]:
+def hent_banktransaktioner(match_status: Optional[str] = None, aar: Optional[int] = None,
+                            maaned: Optional[int] = None) -> List[Dict[str, Any]]:
     with _conn() as conn:
+        vilkaar = []
+        params: List[Any] = []
         if match_status:
-            rows = conn.execute(
-                "SELECT * FROM banktransaktioner WHERE match_status = ? ORDER BY dato DESC, id DESC",
-                (match_status,),
-            ).fetchall()
-        else:
-            rows = conn.execute(
-                "SELECT * FROM banktransaktioner ORDER BY dato DESC, id DESC"
-            ).fetchall()
+            vilkaar.append("match_status = ?")
+            params.append(match_status)
+        if aar is not None:
+            vilkaar.append("dato LIKE ?")
+            params.append(f"{aar:04d}-{maaned:02d}-%" if maaned else f"{aar:04d}-%")
+        where = f"WHERE {' AND '.join(vilkaar)}" if vilkaar else ""
+        rows = conn.execute(
+            f"SELECT * FROM banktransaktioner {where} ORDER BY dato DESC, id DESC", params
+        ).fetchall()
         return [dict(r) for r in rows]
 
 

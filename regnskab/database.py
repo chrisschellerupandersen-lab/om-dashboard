@@ -1242,6 +1242,9 @@ def ignorer_banktransaktion(transaktion_id: int, bruger: str):
 def bogfoer_bank_direkte(transaktion_id: int, kontonr: str, bruger: str) -> int:
     """Bogfør en banktransaktion direkte mod en valgt konto uden om debitor/kreditor/bilag —
     til poster uden faktura (gebyrer, renter og lignende direkte bankposteringer).
+    Splitter automatisk 25% moms ud, hvis kontoens moms_kode er købs- eller salgsmoms (det
+    beløb der står på bankkontoen er altid inkl. moms). Andre momskoder (momsfri, reduceret,
+    EU-omvendt betalingspligt) bogføres uden split — de kræver særskilt vurdering.
     Returnerer postering_id."""
     with _conn() as conn:
         tx = conn.execute("SELECT * FROM banktransaktioner WHERE id = ?", (transaktion_id,)).fetchone()
@@ -1249,20 +1252,31 @@ def bogfoer_bank_direkte(transaktion_id: int, kontonr: str, bruger: str) -> int:
             raise ValueError("Banktransaktion findes ikke")
         if tx["match_status"] == "godkendt":
             raise ValueError("Banktransaktionen er allerede matchet")
-        if not conn.execute("SELECT 1 FROM kontoplan WHERE kontonr = ?", (kontonr,)).fetchone():
+        konto = conn.execute("SELECT * FROM kontoplan WHERE kontonr = ?", (kontonr,)).fetchone()
+        if not konto:
             raise ValueError("Ukendt kontonummer")
 
-    beloeb = abs(tx["beloeb"])
-    if tx["beloeb"] < 0:
-        linjer = [
-            {"kontonr": kontonr, "debet": beloeb, "kredit": 0},
-            {"kontonr": "6750", "debet": 0, "kredit": beloeb},
-        ]
+    beloeb_total = abs(tx["beloeb"])
+    if konto["moms_kode"] in ("koebsmoms", "salgsmoms"):
+        moms_beloeb = round(beloeb_total * 0.2, 2)
+        beloeb_ex_moms = round(beloeb_total - moms_beloeb, 2)
+        moms_konto = "6960" if konto["moms_kode"] == "koebsmoms" else "6961"
     else:
-        linjer = [
-            {"kontonr": "6750", "debet": beloeb, "kredit": 0},
-            {"kontonr": kontonr, "debet": 0, "kredit": beloeb},
-        ]
+        moms_beloeb = 0
+        beloeb_ex_moms = beloeb_total
+        moms_konto = None
+
+    if tx["beloeb"] < 0:
+        linjer = [{"kontonr": kontonr, "debet": beloeb_ex_moms, "kredit": 0}]
+        if moms_beloeb:
+            linjer.append({"kontonr": moms_konto, "debet": moms_beloeb, "kredit": 0})
+        linjer.append({"kontonr": "6750", "debet": 0, "kredit": beloeb_total})
+    else:
+        linjer = [{"kontonr": "6750", "debet": beloeb_total, "kredit": 0}]
+        if moms_beloeb:
+            linjer.append({"kontonr": moms_konto, "debet": 0, "kredit": moms_beloeb})
+        linjer.append({"kontonr": kontonr, "debet": 0, "kredit": beloeb_ex_moms})
+
     tekst = tx["tekst"] or "Direkte bankpostering"
     postering_id = bogfoer_postering(tx["dato"], tekst, bruger, linjer)
 

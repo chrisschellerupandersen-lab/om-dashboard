@@ -84,7 +84,10 @@ def _dato(val) -> str | None:
 
 def _er_shopbox_pipe_format(headers: List[str]) -> bool:
     joined = "|".join(h.lower() for h in headers)
-    return "item name" in joined and "total amount" in joined and "dato" in joined
+    # Shopbox omdøbte rapporten til engelsk d. 31/7-2026 ("Dato" → "Date");
+    # kolonnepositionerne er uændrede, så vi accepterer begge sprog.
+    har_dato = "dato" in joined or "date" in joined
+    return "item name" in joined and "total amount" in joined and har_dato
 
 
 def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:

@@ -10,7 +10,9 @@
 const RAILWAY_URL    = 'https://bestilling-app-production.up.railway.app/api/opdater-rapport';
 const DASHBOARD_URL  = 'https://om-dashboard-production-0f3a.up.railway.app/api/opdater-rapport';
 const WEBHOOK_SECRET = 'OM-Greve-2026-Hemlig';
-const SØGEORD        = 'Varesalgsrapport';
+// Matcher BÅDE det danske og det engelske rapportnavn (Shopbox omdøbte
+// "Varesalgsrapport" → "Items Sales Report" d. 31/7-2026). {a b} = ELLER i Gmail-søgning.
+const SØGEORD        = '{Varesalgsrapport "Items Sales Report"}';
 const FRA_ADRESSE    = '';
 const LABEL_NAVN     = 'rapport-sendt';
 
@@ -58,6 +60,7 @@ function tjekMail() {
         for (var v = 0; v < vedhæftninger.length; v++) {
           var fil = vedhæftninger[v];
           if (fil.getName().toLowerCase().indexOf('varesalgsrapport') >= 0 ||
+              fil.getName().toLowerCase().indexOf('items sales') >= 0 ||
               fil.getName().toLowerCase().indexOf('.xlsx') >= 0 ||
               fil.getName().toLowerCase().indexOf('.txt') >= 0) {
             Logger.log('Fandt vedhæftning: ' + fil.getName());

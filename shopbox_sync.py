@@ -243,6 +243,8 @@ def inspect_data() -> dict:
         jj = requests.get(f"{BASE}/saved-reports",
                           params={"accessToken": _access_token(), "client": CLIENT},
                           timeout=40).json()
+        out["rapport_navne"] = [f'{it.get("crdate_formatted")} · {it.get("name")}'
+                                for it in (jj.get("data") or [])]
         for it in (jj.get("data") or []):
             if "varesalg" in str(it.get("name", "")).lower():
                 uid = it.get("uid"); out["valgt_rapport"] = it.get("name"); break

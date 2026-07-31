@@ -775,7 +775,19 @@ async def bank_side(request: Request, aar: Optional[int] = None, maaned: Optiona
         "forbindelser": database.hent_bank_forbindelser(),
         "bank_api_konfigureret": enable_banking_klient.konfigureret(),
         "aar": aar, "maaned": maaned, "maaned_navne": MAANED_NAVNE,
+        "kontoplan": database.hent_kontoplan(),
     })
+
+
+@app.post("/bank/{transaktion_id}/bogfoer-direkte")
+async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, kontonr: str = Form(...)):
+    bruger = _kræv_login(request)
+    kontonr = kontonr.split(" ")[0].strip()
+    try:
+        database.bogfoer_bank_direkte(transaktion_id, kontonr, bruger)
+    except ValueError:
+        pass  # ukendt konto eller allerede matchet — siden genindlæses uden ændring
+    return RedirectResponse("/bank", status_code=303)
 
 
 @app.get("/bank/indlaes", response_class=HTMLResponse)

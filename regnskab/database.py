@@ -1109,13 +1109,50 @@ def foreslaa_matches(transaktion: Dict[str, Any], maks: int = 3) -> List[Dict[st
                 "begrundelse": "; ".join(begrundelser) or "beløb matcher",
             })
 
+    # Uploadede, endnu ikke bogførte bilag — så en leverandørfaktura der ligger og venter
+    # automatisk bliver foreslået, i stedet for at brugeren selv skal huske at bogføre den
+    # først og bagefter matche den. Her er selv et rent beløbsmatch et stærkt signal (få
+    # kandidater i puljen), så scoren sættes til mindst 1 i stedet for at kræve et navn/dato-hit.
+    if beloeb < 0:
+        for b in hent_bilag(status="afventer"):
+            if round(abs(beloeb) - (b.get("beloeb_total") or 0), 2) != 0:
+                continue
+            score = 0
+            begrundelser = []
+
+            if b.get("fakturanr") and b["fakturanr"].lower() in tekst_norm:
+                score += 100
+                begrundelser.append(f"fakturanr '{b['fakturanr']}' fundet i posteringsteksten")
+
+            navn_score = fuzz.token_sort_ratio(tekst_norm, (b.get("leverandoer_navn") or "").lower())
+            if navn_score >= 70:
+                score += navn_score
+                begrundelser.append(f"navnematch {navn_score:.0f}%")
+
+            dage = _dage_mellem(dato, b["fakturadato"]) if b.get("fakturadato") else None
+            if dage is not None and dage <= 45:
+                score += max(0, 30 - dage)
+                begrundelser.append(f"{dage} dage fra fakturadato")
+
+            forslag.append({
+                "modpart_type": "bilag",
+                "post_id": b["id"],
+                "navn": b.get("leverandoer_navn") or "Ukendt leverandør",
+                "fakturanr": b.get("fakturanr"),
+                "restbeloeb": b["beloeb_total"],
+                "score": max(score, 1),
+                "begrundelse": "; ".join(begrundelser) or "beløb matcher et uploadet, ikke-bogført bilag",
+            })
+
     forslag.sort(key=lambda f: -f["score"])
     return forslag[:maks]
 
 
 def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bruger: str) -> int:
     """Bruger har bekræftet et matchforslag — bogfør udligningspostering og luk posten.
-    Returnerer postering_id."""
+    Hvis modpart_type er "bilag" bogføres fakturaen først (med bilagets egne, evt. AI-udtrukne
+    felter — ingen manuel indtastning), og selve betalingen udlignes derefter mod den
+    kreditorpost det gav anledning til. Returnerer postering_id for selve udligningen."""
     with _conn() as conn:
         tx = conn.execute("SELECT * FROM banktransaktioner WHERE id = ?", (transaktion_id,)).fetchone()
         if not tx:
@@ -1123,6 +1160,21 @@ def godkend_bank_match(transaktion_id: int, modpart_type: str, post_id: int, bru
         if tx["match_status"] == "godkendt":
             raise ValueError("Banktransaktionen er allerede matchet")
 
+    if modpart_type == "bilag":
+        bilag = hent_et_bilag(post_id)
+        if not bilag:
+            raise ValueError("Bilag findes ikke")
+        if bilag["status"] != "afventer":
+            raise ValueError(f"Bilag har status '{bilag['status']}' — kan ikke matches automatisk")
+        godkend_og_bogfoer_bilag(post_id, bruger, bilag)
+        with _conn() as conn:
+            kp = conn.execute(
+                "SELECT id FROM kreditor_poster WHERE bilag_id = ? ORDER BY id DESC LIMIT 1", (post_id,)
+            ).fetchone()
+        modpart_type = "kreditor"
+        post_id = kp["id"]
+
+    with _conn() as conn:
         if modpart_type == "kreditor":
             post = conn.execute(
                 "SELECT kp.*, k.navn AS navn FROM kreditor_poster kp JOIN kreditorer k ON k.id = kp.kreditor_id "
@@ -1178,6 +1230,44 @@ def ignorer_banktransaktion(transaktion_id: int, bruger: str):
             "UPDATE banktransaktioner SET match_status = 'ignoreret' WHERE id = ?", (transaktion_id,)
         )
         _log(conn, bruger, "ignorer_banktransaktion", "banktransaktion", transaktion_id, {})
+
+
+def bogfoer_bank_direkte(transaktion_id: int, kontonr: str, bruger: str) -> int:
+    """Bogfør en banktransaktion direkte mod en valgt konto uden om debitor/kreditor/bilag —
+    til poster uden faktura (gebyrer, renter og lignende direkte bankposteringer).
+    Returnerer postering_id."""
+    with _conn() as conn:
+        tx = conn.execute("SELECT * FROM banktransaktioner WHERE id = ?", (transaktion_id,)).fetchone()
+        if not tx:
+            raise ValueError("Banktransaktion findes ikke")
+        if tx["match_status"] == "godkendt":
+            raise ValueError("Banktransaktionen er allerede matchet")
+        if not conn.execute("SELECT 1 FROM kontoplan WHERE kontonr = ?", (kontonr,)).fetchone():
+            raise ValueError("Ukendt kontonummer")
+
+    beloeb = abs(tx["beloeb"])
+    if tx["beloeb"] < 0:
+        linjer = [
+            {"kontonr": kontonr, "debet": beloeb, "kredit": 0},
+            {"kontonr": "6750", "debet": 0, "kredit": beloeb},
+        ]
+    else:
+        linjer = [
+            {"kontonr": "6750", "debet": beloeb, "kredit": 0},
+            {"kontonr": kontonr, "debet": 0, "kredit": beloeb},
+        ]
+    tekst = tx["tekst"] or "Direkte bankpostering"
+    postering_id = bogfoer_postering(tx["dato"], tekst, bruger, linjer)
+
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE banktransaktioner SET match_status = 'godkendt', matchet_type = 'direkte', "
+            "matchet_id = ? WHERE id = ?",
+            (postering_id, transaktion_id),
+        )
+        _log(conn, bruger, "bogfoer_bank_direkte", "banktransaktion", transaktion_id,
+             {"kontonr": kontonr, "postering_id": postering_id})
+    return postering_id
 
 
 # ── Rapporter: resultatopgørelse, balance, moms ─────────────────────────

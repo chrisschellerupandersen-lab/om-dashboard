@@ -23,10 +23,10 @@
 // === Konfiguration ===
 var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload';
 
-// Starter kun med Organic Market ApS, og kun mails hvor "Faktura" indgår. Udvid senere
-// med flere afsendere via OR, fx:
-//   '(from:"Organic Market ApS" OR from:"Anden Leverandør") Faktura has:attachment filename:pdf -label:faktura-sendt'
-var GMAIL_SOEGNING = 'from:"Organic Market ApS" Faktura has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
+// Starter kun med Organic Market ApS (greve@organicmarket.dk), og kun mails hvor
+// "Faktura" indgår. Udvid senere med flere afsendere via OR, fx:
+//   '(from:greve@organicmarket.dk OR from:faktura@anden-leverandoer.dk) Faktura has:attachment filename:pdf -label:faktura-sendt'
+var GMAIL_SOEGNING = 'from:greve@organicmarket.dk Faktura has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';

@@ -10,9 +10,9 @@
  * 2. Slet standard-koden og indsæt hele denne fils indhold.
  * 3. Sæt token'et: Project Settings (tandhjulet i venstre menu) → Script Properties
  *    → "Add script property" → Property: INGEST_TOKEN, Value: (se nedenfor, hold hemmeligt).
- * 4. Tilpas GMAIL_SOEGNING nedenfor så den rammer præcis de mails I får fakturaer på
- *    (fx en bestemt afsender eller et Gmail-label) — default fanger alle mails med
- *    PDF-vedhæftning, hvilket kan blive for bredt afhængig af jeres indbakke.
+ * 4. GMAIL_SOEGNING nedenfor er sat til kun at hente fra Organic Market ApS med "Faktura"
+ *    i mailen — udvid til flere afsendere efterhånden som I tilføjer dem (se kommentar
+ *    ved variablen).
  * 5. Kør funktionen "opsaetTrigger" én gang manuelt (Kør-knappen, vælg den funktion)
  *    for at sætte automatisk kørsel hvert 15. minut op. Godkend adgang til Gmail når
  *    Google beder om det.
@@ -23,10 +23,10 @@
 // === Konfiguration ===
 var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload';
 
-// Tilpas denne søgning til jeres behov, fx:
-//   'from:leverandoer.dk has:attachment filename:pdf -label:faktura-sendt'
-//   'label:fakturaer has:attachment filename:pdf -label:faktura-sendt'
-var GMAIL_SOEGNING = 'has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
+// Starter kun med Organic Market ApS, og kun mails hvor "Faktura" indgår. Udvid senere
+// med flere afsendere via OR, fx:
+//   '(from:"Organic Market ApS" OR from:"Anden Leverandør") Faktura has:attachment filename:pdf -label:faktura-sendt'
+var GMAIL_SOEGNING = 'from:"Organic Market ApS" Faktura has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';

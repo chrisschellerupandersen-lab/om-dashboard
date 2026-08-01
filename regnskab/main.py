@@ -89,8 +89,6 @@ def _dage_til(value) -> Optional[int]:
 templates.env.filters["dage_til"] = _dage_til
 
 SECRET_KEY   = os.environ.get("SECRET_KEY", "skift-mig-i-railway-variables")
-REGNSKAB_USER = os.environ.get("REGNSKAB_USERNAME", "admin")
-REGNSKAB_PASS = os.environ.get("REGNSKAB_PASSWORD", "")
 
 signer = URLSafeTimedSerializer(SECRET_KEY)
 SESSION_MAX_AGE = 60 * 60 * 24 * 7  # 7 dage
@@ -124,13 +122,14 @@ async def login_side(request: Request):
 
 @app.post("/login", response_class=HTMLResponse)
 async def login_post(request: Request, brugernavn: str = Form(...), password: str = Form(...)):
-    if brugernavn == REGNSKAB_USER and REGNSKAB_PASS and password == REGNSKAB_PASS:
-        token = signer.dumps({"brugernavn": brugernavn})
+    resultat = database.forsoeg_login(brugernavn, password)
+    if resultat["ok"]:
+        token = signer.dumps({"brugernavn": resultat["brugernavn"]})
         svar = RedirectResponse("/", status_code=303)
         svar.set_cookie("session", token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE)
         return svar
     return templates.TemplateResponse(
-        "login.html", {"request": request, "fejl": "Forkert brugernavn eller adgangskode"}, status_code=401
+        "login.html", {"request": request, "fejl": resultat["fejl"]}, status_code=401
     )
 
 
@@ -180,6 +179,46 @@ async def eksport_zip(request: Request):
         content=buf.getvalue(), media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename=nimbo-regnskab-eksport-{tidsstempel}.zip"},
     )
+
+
+@app.get("/brugere", response_class=HTMLResponse)
+async def brugere_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("brugere.html", {
+        "request": request, "brugere": database.hent_brugere(), "fejl": None,
+    })
+
+
+@app.post("/brugere/ny")
+async def bruger_ny_post(request: Request, brugernavn: str = Form(...), navn: str = Form(""),
+                          password: str = Form(...)):
+    _kræv_login(request)
+    try:
+        database.opret_bruger(brugernavn.strip(), password, navn.strip() or None)
+    except ValueError as exc:
+        return templates.TemplateResponse("brugere.html", {
+            "request": request, "brugere": database.hent_brugere(), "fejl": str(exc),
+        }, status_code=400)
+    return RedirectResponse("/brugere", status_code=303)
+
+
+@app.post("/brugere/{bruger_id}/rediger")
+async def bruger_rediger_post(request: Request, bruger_id: int, navn: str = Form(""), aktiv: str = Form("")):
+    _kræv_login(request)
+    database.opdater_bruger(bruger_id, navn.strip() or None, aktiv == "on")
+    return RedirectResponse("/brugere", status_code=303)
+
+
+@app.post("/brugere/{bruger_id}/nulstil-password")
+async def bruger_nulstil_password_post(request: Request, bruger_id: int, nyt_password: str = Form(...)):
+    _kræv_login(request)
+    try:
+        database.nulstil_bruger_password(bruger_id, nyt_password)
+    except ValueError as exc:
+        return templates.TemplateResponse("brugere.html", {
+            "request": request, "brugere": database.hent_brugere(), "fejl": str(exc),
+        }, status_code=400)
+    return RedirectResponse("/brugere", status_code=303)
 
 
 # ── SIDER ────────────────────────────────────────────────────────────────

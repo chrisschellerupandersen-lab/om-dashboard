@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Brugere — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Brugere</h1><div class="sub">Individuelle login til hver medarbejder</div></div></div>
+
+<div class="card">
+  {% if fejl %}<div class="fejl">{{ fejl }}</div>{% endif %}
+  <table>
+    <thead><tr><th>Brugernavn</th><th>Navn</th><th>Status</th><th>Sidst logget ind</th><th></th></tr></thead>
+    <tbody>
+    {% for b in brugere %}
+      <tr>
+        <td>{{ b.brugernavn }}</td>
+        <td>{{ b.navn or "—" }}</td>
+        <td><span class="badge {{ 'godkendt' if b.aktiv else 'afvist' }}">{{ "aktiv" if b.aktiv else "deaktiveret" }}</span></td>
+        <td>{{ b.sidst_login_ts or "aldrig" }}</td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="/brugere/{{ b.id }}/rediger" style="display:inline;">
+            <input type="hidden" name="navn" value="{{ b.navn or '' }}">
+            <input type="hidden" name="aktiv" value="{{ '' if b.aktiv else 'on' }}">
+            <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">
+              {{ "Deaktivér" if b.aktiv else "Aktivér" }}
+            </button>
+          </form>
+          <button class="btn secondary" type="button" style="padding:4px 10px; font-size:12px;" onclick="document.getElementById('nulstil-{{ b.id }}').style.display='flex';">Nulstil password</button>
+        </td>
+      </tr>
+      <tr id="nulstil-{{ b.id }}" style="display:none;">
+        <td colspan="5">
+          <form method="post" action="/brugere/{{ b.id }}/nulstil-password" style="display:flex; gap:8px; align-items:center;">
+            <input type="password" name="nyt_password" placeholder="Ny adgangskode (mindst 8 tegn)" minlength="8" required style="max-width:260px;">
+            <button class="btn secondary" type="submit" style="padding:6px 12px; font-size:12.5px;">Gem ny adgangskode</button>
+          </form>
+        </td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">Ingen brugere endnu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <form method="post" action="/brugere/ny" style="margin-top:20px;">
+    <div class="row">
+      <div><label>Brugernavn</label><input name="brugernavn" required></div>
+      <div><label>Navn (valgfrit)</label><input name="navn"></div>
+      <div><label>Adgangskode</label><input type="password" name="password" minlength="8" required></div>
+    </div>
+    <button class="btn" type="submit" style="margin-top:14px;">Opret bruger</button>
+  </form>
+</div>
+{% endblock %}

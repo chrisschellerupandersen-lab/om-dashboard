@@ -4,6 +4,7 @@ import json
 import csv
 import io
 import hashlib
+import secrets
 import calendar
 from datetime import datetime, date, timedelta
 from typing import List, Dict, Any, Optional
@@ -341,6 +342,18 @@ def init_db():
                 entitet_id    INTEGER,
                 detaljer_json TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS brugere (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                brugernavn      TEXT NOT NULL UNIQUE,
+                password_hash   TEXT NOT NULL,
+                navn            TEXT,
+                aktiv           INTEGER NOT NULL DEFAULT 1,
+                fejlede_forsoeg INTEGER NOT NULL DEFAULT 0,
+                laast_indtil    TEXT,
+                oprettet_ts     TEXT DEFAULT (datetime('now','localtime')),
+                sidst_login_ts  TEXT
+            );
         """)
 
         # Append-only: posteringer og posteringslinjer må aldrig ændres/slettes
@@ -389,6 +402,19 @@ def init_db():
             conn.execute("ALTER TABLE kreditorer ADD COLUMN konto_nr TEXT")
         if "fi_kode" not in _kred_kolonner:
             conn.execute("ALTER TABLE kreditorer ADD COLUMN fi_kode TEXT")
+
+        # Bootstrap: hvis der endnu ikke findes nogen brugere, opret én fra det gamle
+        # REGNSKAB_USERNAME/REGNSKAB_PASSWORD-miljøvariabel-par, så eksisterende
+        # installationer ikke mister adgang ved overgangen til individuelle brugerkonti.
+        # Herefter er miljøvariablerne uden betydning — login sker udelukkende via brugere.
+        if conn.execute("SELECT COUNT(*) FROM brugere").fetchone()[0] == 0:
+            bootstrap_navn = os.environ.get("REGNSKAB_USERNAME", "admin")
+            bootstrap_kode = os.environ.get("REGNSKAB_PASSWORD")
+            if bootstrap_kode:
+                conn.execute(
+                    "INSERT INTO brugere (brugernavn, password_hash, navn) VALUES (?, ?, ?)",
+                    (bootstrap_navn, _hash_password(bootstrap_kode), bootstrap_navn),
+                )
 
         _seed_kontoplan(conn)
 
@@ -463,6 +489,129 @@ def _seed_kontoplan(conn: sqlite3.Connection):
             "UPDATE kontoplan SET navn = ? WHERE kontonr = ? AND navn = ?",
             (ny, kontonr, gammel),
         )
+
+
+# ── Brugere / login ──────────────────────────────────────────────────────
+
+PBKDF2_ITERATIONER = 260_000
+MAKS_LOGIN_FORSOEG = 5
+LOCKOUT_MINUTTER = 15
+
+
+def _hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    hash_hex = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), PBKDF2_ITERATIONER).hex()
+    return f"pbkdf2_sha256${PBKDF2_ITERATIONER}${salt}${hash_hex}"
+
+
+def _verificer_password(password: str, gemt_hash: str) -> bool:
+    try:
+        algoritme, iter_str, salt, hash_hex = gemt_hash.split("$")
+        if algoritme != "pbkdf2_sha256":
+            return False
+        iterationer = int(iter_str)
+    except (ValueError, AttributeError):
+        return False
+    beregnet = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt), iterationer).hex()
+    return secrets.compare_digest(beregnet, hash_hex)
+
+
+def opret_bruger(brugernavn: str, password: str, navn: Optional[str] = None) -> int:
+    if not brugernavn:
+        raise ValueError("Brugernavn er påkrævet")
+    if len(password) < 8:
+        raise ValueError("Adgangskoden skal være mindst 8 tegn")
+    with _conn() as conn:
+        try:
+            cur = conn.execute(
+                "INSERT INTO brugere (brugernavn, password_hash, navn) VALUES (?, ?, ?)",
+                (brugernavn, _hash_password(password), navn or brugernavn),
+            )
+        except sqlite3.IntegrityError:
+            raise ValueError(f"Brugernavnet '{brugernavn}' er allerede i brug")
+        return cur.lastrowid
+
+
+def hent_brugere() -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT id, brugernavn, navn, aktiv, oprettet_ts, sidst_login_ts FROM brugere ORDER BY brugernavn"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_en_bruger(bruger_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT id, brugernavn, navn, aktiv, oprettet_ts, sidst_login_ts FROM brugere WHERE id = ?",
+            (bruger_id,),
+        ).fetchone()
+        return dict(r) if r else None
+
+
+def opdater_bruger(bruger_id: int, navn: Optional[str] = None, aktiv: Optional[bool] = None):
+    felter, vaerdier = [], []
+    if navn is not None:
+        felter.append("navn = ?")
+        vaerdier.append(navn)
+    if aktiv is not None:
+        felter.append("aktiv = ?")
+        vaerdier.append(1 if aktiv else 0)
+    if not felter:
+        return
+    vaerdier.append(bruger_id)
+    with _conn() as conn:
+        conn.execute(f"UPDATE brugere SET {', '.join(felter)} WHERE id = ?", vaerdier)
+
+
+def nulstil_bruger_password(bruger_id: int, nyt_password: str):
+    if len(nyt_password) < 8:
+        raise ValueError("Adgangskoden skal være mindst 8 tegn")
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE brugere SET password_hash = ?, fejlede_forsoeg = 0, laast_indtil = NULL WHERE id = ?",
+            (_hash_password(nyt_password), bruger_id),
+        )
+
+
+def forsoeg_login(brugernavn: str, password: str) -> Dict[str, Any]:
+    """Slår brugeren op, håndhæver lockout efter gentagne fejlslagne forsøg, og verificerer
+    password tidssikkert. Returnerer altid {"ok": bool, "fejl": str|None, "brugernavn": str|None}
+    — kalder skal ikke selv kende til brugerens interne tilstand."""
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT * FROM brugere WHERE brugernavn = ?", (brugernavn,)
+        ).fetchone()
+
+        if not r or not r["aktiv"]:
+            return {"ok": False, "fejl": "Forkert brugernavn eller adgangskode", "brugernavn": None}
+
+        if r["laast_indtil"]:
+            try:
+                laast_indtil = datetime.fromisoformat(r["laast_indtil"])
+            except ValueError:
+                laast_indtil = None
+            if laast_indtil and datetime.now() < laast_indtil:
+                minutter = max(1, int((laast_indtil - datetime.now()).total_seconds() // 60) + 1)
+                return {"ok": False, "fejl": f"For mange forkerte forsøg — prøv igen om {minutter} min.", "brugernavn": None}
+
+        if not _verificer_password(password, r["password_hash"]):
+            nye_forsoeg = r["fejlede_forsoeg"] + 1
+            laast_indtil = None
+            if nye_forsoeg >= MAKS_LOGIN_FORSOEG:
+                laast_indtil = (datetime.now() + timedelta(minutes=LOCKOUT_MINUTTER)).isoformat()
+            conn.execute(
+                "UPDATE brugere SET fejlede_forsoeg = ?, laast_indtil = ? WHERE id = ?",
+                (nye_forsoeg, laast_indtil, r["id"]),
+            )
+            return {"ok": False, "fejl": "Forkert brugernavn eller adgangskode", "brugernavn": None}
+
+        conn.execute(
+            "UPDATE brugere SET fejlede_forsoeg = 0, laast_indtil = NULL, "
+            "sidst_login_ts = datetime('now','localtime') WHERE id = ?",
+            (r["id"],),
+        )
+        return {"ok": True, "fejl": None, "brugernavn": r["brugernavn"]}
 
 
 # ── Posteringer (dobbelt bogholderi) ────────────────────────────────────────

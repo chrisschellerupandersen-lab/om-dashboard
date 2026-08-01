@@ -28,12 +28,14 @@ var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload
 // Genbruger samme afsender som det velfungerende gmail-til-economic-script. INGEN
 // in:inbox-begrænsning her (til forskel fra forward_faktura.gs) — mails der allerede er
 // behandlet af e-conomic-scriptet og arkiveret ud af indbakken skal stadig kunne findes.
-// "filename:pdf" er bevidst UDELADT her — GmailApp.search kan opføre sig anderledes end
-// Gmails egen søgelinje på det operator, og selve PDF-tjekket sker alligevel i koden
-// nedenfor (fil.getContentType()). Flere afsendere tilføjes med (from:a OR from:b) —
-// IKKE from:(a OR b), som Apps Scripts GmailApp.search fejlfortolker:
-//   '(from:rmk@organicmarket.dk OR from:anden@leverandoer.dk) has:attachment -label:faktura-sendt'
-var GMAIL_SOEGNING = 'from:rmk@organicmarket.dk has:attachment -label:faktura-sendt -label:faktura-fejl';
+// "filename:pdf" er bevidst UDELADT — PDF-tjekket sker i koden (fil.getContentType()).
+// -label:-udelukkelsen er OGSÅ bevidst UDELADT fra selve søgningen: GmailApp.search gav 0
+// resultater med -label:faktura-sendt/-fejl (bindestreg i labelnavnet lige efter negations-
+// tegnet blev tilsyneladende fejlfortolket), selvom præcis samme søgestreng virkede fint i
+// Gmails egen søgelinje. Alle matchende tråde hentes derfor nu, og dubletter frasorteres i
+// koden nedenfor via traad.getLabels() i stedet. Flere afsendere: (from:a OR from:b) —
+// IKKE from:(a OR b), som GmailApp.search også fejlfortolker.
+var GMAIL_SOEGNING = 'from:rmk@organicmarket.dk has:attachment';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';
@@ -52,10 +54,17 @@ function hentOgSendFakturaer() {
   Logger.log('Søgning: ' + GMAIL_SOEGNING);
 
   var traade = GmailApp.search(GMAIL_SOEGNING, 0, MAKS_TRAADE_PR_KOERSEL);
-  Logger.log('Fandt ' + traade.length + ' tråd(e) at behandle.');
+  Logger.log('Fandt ' + traade.length + ' tråd(e) i alt.');
 
   for (var i = 0; i < traade.length; i++) {
     var traad = traade[i];
+
+    // Dublet-tjek i kode i stedet for -label: i søgestrengen (se kommentar ved GMAIL_SOEGNING).
+    var alleredeBehandlet = traad.getLabels().some(function (l) {
+      return l.getName() === LABEL_SENDT || l.getName() === LABEL_FEJL;
+    });
+    if (alleredeBehandlet) continue;
+
     var beskeder = traad.getMessages();
     var traadOk = true;
     var antalSendt = 0;

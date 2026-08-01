@@ -74,15 +74,19 @@
     </select>
     <div class="row">
       <div>
-        <label>IBAN (til betaling)</label>
-        <input name="iban" value="{{ bilag.iban or '' }}" placeholder="Læses fra fakturaen hvis muligt">
+        <label>Reg.nr.</label>
+        <input name="reg_nr" value="{{ bilag.reg_nr or '' }}" placeholder="Læses fra fakturaen hvis muligt">
       </div>
       <div>
-        <label>BIC/SWIFT</label>
-        <input name="bic" value="{{ bilag.bic or '' }}">
+        <label>Kontonr.</label>
+        <input name="konto_nr" value="{{ bilag.konto_nr or '' }}">
+      </div>
+      <div>
+        <label>FI-kode</label>
+        <input name="fi_kode" value="{{ bilag.fi_kode or '' }}" placeholder="FI-indbetalingskort">
       </div>
     </div>
-    <p class="muted" style="margin-top:4px;">Gemmes på leverandøren — bruges kun hvis den ikke allerede har bankoplysninger.</p>
+    <p class="muted" style="margin-top:4px;">Gemmes på leverandøren — bruges kun hvis den ikke allerede har betalingsoplysninger.</p>
     <div style="margin-top:20px; display:flex; gap:10px;">
       <button class="btn" type="submit">Godkend &amp; bogfør</button>
     </div>

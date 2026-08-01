@@ -21,8 +21,9 @@
     <label>Email</label>
     <input name="email" type="email" value="{{ kreditor.email or '' if kreditor else '' }}">
     <div class="row">
-      <div><label>IBAN</label><input name="iban" value="{{ kreditor.iban or '' if kreditor else '' }}" placeholder="Til betalingsfil, valgfrit"></div>
-      <div><label>BIC/SWIFT</label><input name="bic" value="{{ kreditor.bic or '' if kreditor else '' }}" placeholder="Valgfrit"></div>
+      <div><label>Reg.nr.</label><input name="reg_nr" value="{{ kreditor.reg_nr or '' if kreditor else '' }}" placeholder="Til betaling via netbank"></div>
+      <div><label>Kontonr.</label><input name="konto_nr" value="{{ kreditor.konto_nr or '' if kreditor else '' }}"></div>
+      <div><label>FI-kode</label><input name="fi_kode" value="{{ kreditor.fi_kode or '' if kreditor else '' }}" placeholder="FI-indbetalingskort, valgfrit"></div>
     </div>
     <label>Standardkonto</label>
     <select name="standard_kontonr">

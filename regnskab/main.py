@@ -291,8 +291,9 @@ def _læs_faktura_med_ai(indhold: bytes, content_type: str, api_key: str):
         '  "beloeb_ex_moms": <beløb ekskl. moms som tal, 0 hvis ikke fundet>,\n'
         '  "moms_beloeb": <momsbeløb som tal, 0 hvis ikke moms er anført>,\n'
         '  "beloeb_total": <totalbeløb inkl. moms som tal>,\n'
-        '  "iban": <leverandørens IBAN til betaling, "" hvis ikke fundet>,\n'
-        '  "bic": <leverandørens BIC/SWIFT-kode, "" hvis ikke fundet>,\n'
+        '  "reg_nr": <registreringsnummer (4 cifre) for leverandørens bankkonto til betaling via netbank, "" hvis ikke fundet>,\n'
+        '  "konto_nr": <kontonummer for leverandørens bankkonto, "" hvis ikke fundet>,\n'
+        '  "fi_kode": <FI-indbetalingskortkode/-linje til betaling via netbank, fx en +71-, +73- eller +04-kode, "" hvis ikke fundet>,\n'
         '  "linjer": [{"beskrivelse": <tekst>, "beloeb": <tal>}]\n'
         "}"
     )
@@ -306,7 +307,8 @@ def _læs_faktura_med_ai(indhold: bytes, content_type: str, api_key: str):
     if raw_trimmed.lower().startswith("json"):
         raw_trimmed = raw_trimmed[4:].strip()
     data = json.loads(raw_trimmed)
-    for felt in ("leverandoer_navn", "leverandoer_cvr", "fakturanr", "fakturadato", "forfaldsdato", "iban", "bic"):
+    for felt in ("leverandoer_navn", "leverandoer_cvr", "fakturanr", "fakturadato", "forfaldsdato",
+                 "reg_nr", "konto_nr", "fi_kode"):
         data.setdefault(felt, "")
     for felt in ("beloeb_ex_moms", "moms_beloeb", "beloeb_total"):
         data.setdefault(felt, 0)
@@ -344,7 +346,7 @@ async def bilag_godkend(
     leverandoer_navn: str = Form(...), leverandoer_cvr: str = Form(""),
     fakturanr: str = Form(""), fakturadato: str = Form(""), forfaldsdato: str = Form(""),
     beloeb_ex_moms: float = Form(0), moms_beloeb: float = Form(0), beloeb_total: float = Form(0),
-    kontonr: str = Form("4000"), iban: str = Form(""), bic: str = Form(""),
+    kontonr: str = Form("4000"), reg_nr: str = Form(""), konto_nr: str = Form(""), fi_kode: str = Form(""),
 ):
     bruger = _kræv_login(request)
     try:
@@ -353,7 +355,8 @@ async def bilag_godkend(
             "fakturanr": fakturanr, "fakturadato": fakturadato or date.today().isoformat(),
             "forfaldsdato": forfaldsdato or None,
             "beloeb_ex_moms": beloeb_ex_moms, "moms_beloeb": moms_beloeb, "beloeb_total": beloeb_total,
-            "kontonr": kontonr, "iban": iban.strip() or None, "bic": bic.strip() or None,
+            "kontonr": kontonr, "reg_nr": reg_nr.strip() or None, "konto_nr": konto_nr.strip() or None,
+            "fi_kode": fi_kode.strip() or None,
         })
         database.godkend_og_bogfoer_bilag(bilag_id, bruger, felter)
     except ValueError as exc:
@@ -469,11 +472,11 @@ async def kreditor_ny_side(request: Request):
 async def kreditor_ny_post(
     request: Request,
     navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
-    iban: str = Form(""), bic: str = Form(""), standard_kontonr: str = Form(""),
+    reg_nr: str = Form(""), konto_nr: str = Form(""), fi_kode: str = Form(""), standard_kontonr: str = Form(""),
 ):
     _kræv_login(request)
-    database.opret_kreditor(navn, cvr or None, adresse or None, email or None, iban or None, bic or None,
-                             standard_kontonr or None)
+    database.opret_kreditor(navn, cvr or None, adresse or None, email or None, reg_nr or None, konto_nr or None,
+                             fi_kode or None, standard_kontonr or None)
     return RedirectResponse("/kreditorer", status_code=303)
 
 
@@ -494,11 +497,11 @@ async def kreditor_rediger_side(request: Request, kreditor_id: int):
 async def kreditor_rediger_post(
     request: Request, kreditor_id: int,
     navn: str = Form(...), cvr: str = Form(""), adresse: str = Form(""), email: str = Form(""),
-    iban: str = Form(""), bic: str = Form(""), standard_kontonr: str = Form(""),
+    reg_nr: str = Form(""), konto_nr: str = Form(""), fi_kode: str = Form(""), standard_kontonr: str = Form(""),
 ):
     bruger = _kræv_login(request)
     database.opdater_kreditor(kreditor_id, bruger, navn, cvr or None, adresse or None, email or None,
-                               iban or None, bic or None, standard_kontonr or None)
+                               reg_nr or None, konto_nr or None, fi_kode or None, standard_kontonr or None)
     return RedirectResponse(f"/kreditorer/{kreditor_id}/rediger", status_code=303)
 
 

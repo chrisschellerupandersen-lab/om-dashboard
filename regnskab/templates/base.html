@@ -166,6 +166,10 @@
         <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><rect x="2" y="2" width="13" height="13" rx="1.6" stroke="currentColor" stroke-width="1.5"/><path d="M2 6.5h13M6.5 6.5V15" stroke="currentColor" stroke-width="1.5"/></svg>
         Kontoplan
       </a>
+      <a href="/eksport" class="{{ 'active' if request.url.path.startswith('/eksport') else '' }}">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 2v8.5M5 7l3.5 3.5L12 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12v1.5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Eksport
+      </a>
       <div class="grp-label">Rapporter</div>
       <a href="/rapporter/resultatopgoerelse" class="{{ 'active' if request.url.path.startswith('/rapporter/resultatopgoerelse') else '' }}">
         <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3 13.5V3.5M3 13.5h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 11V8.5M8.5 11V6M11.5 11V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>

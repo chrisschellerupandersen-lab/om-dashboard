@@ -2,6 +2,7 @@ import os
 import json
 import csv
 import io
+import zipfile
 import base64
 import hashlib
 import logging
@@ -155,6 +156,30 @@ async def nulstil_testdata_post(request: Request, bekræft: str = Form(...)):
         }, status_code=400)
     database.nulstil_testdata()
     return RedirectResponse("/dashboard", status_code=303)
+
+
+@app.get("/eksport", response_class=HTMLResponse)
+async def eksport_side(request: Request):
+    _kræv_login(request)
+    return templates.TemplateResponse("eksport.html", {
+        "request": request, "tabeller": database.EKSPORT_TABELLER,
+    })
+
+
+@app.get("/eksport/zip")
+async def eksport_zip(request: Request):
+    _kræv_login(request)
+    tabeller = database.eksporter_alle_tabeller_csv()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for navn, csv_tekst in tabeller.items():
+            zf.writestr(f"{navn}.csv", "﻿" + csv_tekst)
+    buf.seek(0)
+    tidsstempel = date.today().isoformat()
+    return Response(
+        content=buf.getvalue(), media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename=nimbo-regnskab-eksport-{tidsstempel}.zip"},
+    )
 
 
 # ── SIDER ────────────────────────────────────────────────────────────────

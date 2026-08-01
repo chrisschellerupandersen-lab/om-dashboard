@@ -1,6 +1,8 @@
 import sqlite3
 import os
 import json
+import csv
+import io
 import hashlib
 import calendar
 from datetime import datetime, date, timedelta
@@ -53,6 +55,35 @@ def sikkerhedskopier_database(behold_dage: int = 7) -> str:
             os.remove(sti)
 
     return maal_sti
+
+
+EKSPORT_TABELLER = [
+    "kontoplan", "bilag", "bilag_linjer", "posteringer", "posteringslinjer",
+    "debitorer", "debitor_poster", "kreditorer", "kreditor_poster",
+    "konteringsregler", "bank_konteringsregler", "bank_forbindelser",
+    "banktransaktioner", "betalingsbatch", "betalingsbatch_linjer", "audit_log",
+]
+
+
+def eksporter_alle_tabeller_csv() -> Dict[str, str]:
+    """Returnerer {tabelnavn: csv-tekst} for alle tabeller i bogføringen — til fuld eksport
+    i maskinlæsbart format, jf. bogføringslovens krav om at data skal kunne gendannes."""
+    resultat = {}
+    with _conn() as conn:
+        for tabel in EKSPORT_TABELLER:
+            rows = conn.execute(f"SELECT * FROM {tabel}").fetchall()
+            buf = io.StringIO()
+            writer = csv.writer(buf, delimiter=";")
+            if rows:
+                kolonner = list(rows[0].keys())
+                writer.writerow(kolonner)
+                for r in rows:
+                    writer.writerow([r[k] for k in kolonner])
+            else:
+                kol_info = conn.execute(f"PRAGMA table_info({tabel})").fetchall()
+                writer.writerow([c["name"] for c in kol_info])
+            resultat[tabel] = buf.getvalue()
+    return resultat
 
 
 def init_db():

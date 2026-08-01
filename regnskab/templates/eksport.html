@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Eksport — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Eksport</h1><div class="sub">Fuld eksport af bogføringsdata i maskinlæsbart format</div></div></div>
+
+<div class="card" style="max-width:560px;">
+  <p class="muted" style="margin:0 0 14px;">
+    Downloader en ZIP-fil med én CSV-fil pr. tabel — hele bogføringen (posteringer, bilag,
+    debitorer, kreditorer, kontoplan, banktransaktioner, betalingskørsler og aktivitetslog)
+    som den ser ud lige nu. Til opbevaring uden for systemet, til jeres revisor, eller hvis
+    Skattestyrelsen beder om et udtræk.
+  </p>
+  <a class="btn" href="/eksport/zip">Download komplet eksport (ZIP)</a>
+  <p class="muted" style="margin-top:18px; margin-bottom:6px;">Indeholder følgende tabeller:</p>
+  <ul style="margin:0; padding-left:20px; font-size:12.5px; color:var(--muted); columns:2;">
+    {% for t in tabeller %}
+    <li>{{ t }}</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -24,6 +24,7 @@
         <td><input name="beskrivelse" value="{{ r.beskrivelse or '' }}" form="regelform-{{ r.id }}" style="min-width:140px;"></td>
         <td style="white-space:nowrap;">
           <button class="btn secondary" type="submit" form="regelform-{{ r.id }}" style="padding:4px 10px; font-size:12px;">Gem</button>
+          <a class="btn secondary" href="/bank-konteringsregler/{{ r.id }}/kontrol" style="padding:4px 10px; font-size:12px;">Kør kontrol</a>
           <form method="post" action="/bank-konteringsregler/{{ r.id }}/slet" style="display:inline;" onsubmit="return confirm('Slet denne regel?');">
             <button class="btn secondary" type="submit" style="padding:4px 10px; font-size:12px;">Slet</button>
           </form>

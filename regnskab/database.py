@@ -1393,6 +1393,22 @@ def anvend_bank_konteringsregel_paa_ventende(match_tekst: str, kontonr: str, bru
     return bogfoerte
 
 
+def find_ventende_for_bank_regel(regel_id: int) -> List[Dict[str, Any]]:
+    """Kontrol-visning: finder alle uafklarede banktransaktioner der matcher en given
+    bank-konteringsregel, UDEN at bogføre noget — bruges til at vise en liste brugeren selv
+    vælger hvad der skal bogføres fra, i stedet for at det sker automatisk i det skjulte."""
+    with _conn() as conn:
+        regel = conn.execute("SELECT * FROM bank_konteringsregler WHERE id = ?", (regel_id,)).fetchone()
+        if not regel:
+            return []
+        rows = conn.execute(
+            "SELECT * FROM banktransaktioner WHERE match_status = 'uafklaret' AND lower(tekst) LIKE ? "
+            "ORDER BY dato DESC",
+            (f"%{regel['match_tekst'].lower()}%",),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def hent_bank_konteringsregler() -> List[Dict[str, Any]]:
     with _conn() as conn:
         rows = conn.execute("""

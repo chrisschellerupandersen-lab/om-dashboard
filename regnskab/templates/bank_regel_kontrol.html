@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Kontrol af regel — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Kontrol: "{{ regel.match_tekst }}"</h1>
+    <div class="sub">Bogfører på {{ regel.kontonr }} — {{ regel.konto_navn }}</div>
+  </div>
+  <a class="btn secondary" href="/bank/regler">&larr; Tilbage til regler</a>
+</div>
+
+<div class="card">
+  {% if matches %}
+  <p class="muted" style="margin:0 0 14px;">{{ matches|length }} {{ "uafklaret transaktion" if matches|length == 1 else "uafklarede transaktioner" }} matcher nøgleordet "{{ regel.match_tekst }}".</p>
+  <table>
+    <thead><tr><th>Dato</th><th class="num">Beløb</th><th>Tekst</th><th></th></tr></thead>
+    <tbody>
+    {% for tx in matches %}
+      <tr>
+        <td>{{ tx.dato }}</td>
+        <td class="num">{{ tx.beloeb|dkk }} kr</td>
+        <td>{{ tx.tekst or "(ingen tekst)" }}</td>
+        <td>
+          <form method="post" action="/bank/{{ tx.id }}/bogfoer-direkte" style="display:inline;">
+            <input type="hidden" name="kontonr" value="{{ regel.kontonr }}">
+            <button class="btn secondary" type="submit" style="padding:5px 12px; font-size:12.5px;">Bogfør</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <form method="post" action="/bank-konteringsregler/{{ regel.id }}/bogfoer-alle" style="margin-top:16px;">
+    <button class="btn" type="submit">Bogfør alle {{ matches|length }} match</button>
+  </form>
+  {% else %}
+  <p class="muted">Ingen uafklarede transaktioner matcher lige nu.</p>
+  {% endif %}
+</div>
+{% endblock %}

@@ -791,6 +791,29 @@ async def bank_regler_side(request: Request):
     })
 
 
+@app.get("/bank-konteringsregler/{regel_id}/kontrol", response_class=HTMLResponse)
+async def bank_konteringsregel_kontrol_side(request: Request, regel_id: int):
+    _kræv_login(request)
+    regler = {r["id"]: r for r in database.hent_bank_konteringsregler()}
+    regel = regler.get(regel_id)
+    if not regel:
+        raise HTTPException(404, "Regel findes ikke")
+    return templates.TemplateResponse("bank_regel_kontrol.html", {
+        "request": request, "regel": regel,
+        "matches": database.find_ventende_for_bank_regel(regel_id),
+    })
+
+
+@app.post("/bank-konteringsregler/{regel_id}/bogfoer-alle")
+async def bank_konteringsregel_bogfoer_alle_post(request: Request, regel_id: int):
+    bruger = _kræv_login(request)
+    regler = {r["id"]: r for r in database.hent_bank_konteringsregler()}
+    regel = regler.get(regel_id)
+    if regel:
+        database.anvend_bank_konteringsregel_paa_ventende(regel["match_tekst"], regel["kontonr"], bruger)
+    return RedirectResponse(f"/bank-konteringsregler/{regel_id}/kontrol", status_code=303)
+
+
 @app.post("/bank/{transaktion_id}/bogfoer-direkte")
 async def bank_bogfoer_direkte_post(request: Request, transaktion_id: int, kontonr: str = Form(...),
                                      opret_regel_noegleord: str = Form("")):

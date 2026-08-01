@@ -27,11 +27,20 @@ UPLOAD_DIR = os.environ.get("UPLOAD_DIR", "uploads")
 _scheduler = BackgroundScheduler(timezone="Europe/Copenhagen")
 
 
+def _daglig_backup():
+    try:
+        sti = database.sikkerhedskopier_database()
+        logger.info("Databasesikkerhedskopi oprettet: %s", sti)
+    except Exception:
+        logger.exception("Databasesikkerhedskopiering fejlede")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     database.init_db()
     _scheduler.add_job(_synkroniser_bankforbindelser, "cron", hour=6, minute=0, id="bank_sync", replace_existing=True)
+    _scheduler.add_job(_daglig_backup, "cron", hour=3, minute=0, id="db_backup", replace_existing=True)
     _scheduler.start()
     yield
     _scheduler.shutdown()

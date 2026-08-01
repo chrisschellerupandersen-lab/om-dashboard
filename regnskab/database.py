@@ -21,6 +21,40 @@ def _conn() -> sqlite3.Connection:
     return conn
 
 
+def sikkerhedskopier_database(behold_dage: int = 7) -> str:
+    """Tager en konsistent kopi af databasen via SQLites indbyggede backup-API (sikkert at
+    køre mens andre forbindelser læser/skriver samtidig, i modsætning til en rå filkopi) og
+    gemmer den i en backups-undermappe på samme volume som selve databasen. Rydder samtidig
+    kopier ældre end behold_dage.
+
+    Første skridt mod betryggende opbevaring — beskytter mod applikationsfejl (fx en
+    fejlagtig sletning) og giver et gendannelsespunkt, men IKKE mod at hele volumen/serveren
+    går tabt. Ekstern opbevaring (cloud storage, mail) er en naturlig udvidelse senere."""
+    mappe = os.path.join(os.path.dirname(DB_PATH) or ".", "backups")
+    os.makedirs(mappe, exist_ok=True)
+
+    tidsstempel = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    maal_sti = os.path.join(mappe, f"regnskab-{tidsstempel}.db")
+
+    kilde = sqlite3.connect(DB_PATH)
+    maal = sqlite3.connect(maal_sti)
+    try:
+        kilde.backup(maal)
+    finally:
+        maal.close()
+        kilde.close()
+
+    graense = datetime.now() - timedelta(days=behold_dage)
+    for navn in os.listdir(mappe):
+        if not (navn.startswith("regnskab-") and navn.endswith(".db")):
+            continue
+        sti = os.path.join(mappe, navn)
+        if datetime.fromtimestamp(os.path.getmtime(sti)) < graense:
+            os.remove(sti)
+
+    return maal_sti
+
+
 def init_db():
     with _conn() as conn:
         # GoCardless Bank Account Data lukkede for nye tilmeldinger i juli 2025 — erstattet

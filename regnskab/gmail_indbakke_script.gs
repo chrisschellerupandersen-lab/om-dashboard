@@ -28,10 +28,12 @@ var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload
 // Genbruger samme afsender som det velfungerende gmail-til-economic-script. INGEN
 // in:inbox-begrænsning her (til forskel fra forward_faktura.gs) — mails der allerede er
 // behandlet af e-conomic-scriptet og arkiveret ud af indbakken skal stadig kunne findes.
-// Flere afsendere tilføjes med (from:a OR from:b) — IKKE from:(a OR b), som Apps Scripts
-// GmailApp.search fejlfortolker:
-//   '(from:rmk@organicmarket.dk OR from:anden@leverandoer.dk) has:attachment filename:pdf -label:faktura-sendt'
-var GMAIL_SOEGNING = 'from:rmk@organicmarket.dk has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
+// "filename:pdf" er bevidst UDELADT her — GmailApp.search kan opføre sig anderledes end
+// Gmails egen søgelinje på det operator, og selve PDF-tjekket sker alligevel i koden
+// nedenfor (fil.getContentType()). Flere afsendere tilføjes med (from:a OR from:b) —
+// IKKE from:(a OR b), som Apps Scripts GmailApp.search fejlfortolker:
+//   '(from:rmk@organicmarket.dk OR from:anden@leverandoer.dk) has:attachment -label:faktura-sendt'
+var GMAIL_SOEGNING = 'from:rmk@organicmarket.dk has:attachment -label:faktura-sendt -label:faktura-fejl';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';
@@ -46,6 +48,8 @@ function hentOgSendFakturaer() {
 
   var sendtLabel = hentEllerOpretLabel_(LABEL_SENDT);
   var fejlLabel = hentEllerOpretLabel_(LABEL_FEJL);
+
+  Logger.log('Søgning: ' + GMAIL_SOEGNING);
 
   var traade = GmailApp.search(GMAIL_SOEGNING, 0, MAKS_TRAADE_PR_KOERSEL);
   Logger.log('Fandt ' + traade.length + ' tråd(e) at behandle.');

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Betalingskørsel #{{ batch.id }} — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Betalingskørsel #{{ batch.id }}</h1><div class="sub">Oprettet {{ batch.oprettet_ts }} af {{ batch.oprettet_af }}</div></div>
+  <div style="display:flex; gap:10px;">
+    <a class="btn secondary" href="/betaling">&larr; Tilbage</a>
+    <a class="btn secondary" href="/betaling/{{ batch.id }}/csv">Download CSV</a>
+  </div>
+</div>
+
+<div class="card">
+  {% if batch.status == 'sendt' %}
+  <div style="margin-bottom:18px; padding:12px 14px; background:var(--good-soft); border-radius:var(--radius-chip); color:var(--good); font-weight:600; font-size:13px;">
+    Markeret som sendt — posterne afventer nu match mod den rigtige banktransaktion.
+  </div>
+  {% else %}
+  <p class="muted" style="margin:0 0 14px;">Download CSV'en og gennemfør betalingen i jeres netbank. Marker derefter kørslen som sendt, så posterne kan matches automatisk når betalingen rammer bankkontoen. Systemet sender aldrig penge selv.</p>
+  <form method="post" action="/betaling/{{ batch.id }}/sendt" onsubmit="return confirm('Har du gennemført betalingen i netbank? Dette markerer kørslen som sendt.');" style="margin-bottom:18px;">
+    <button class="btn" type="submit">Marker som sendt</button>
+  </form>
+  {% endif %}
+
+  <table>
+    <thead><tr><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Beløb</th><th>Reg.nr</th><th>Kontonr</th><th>FI-kode</th></tr></thead>
+    <tbody>
+    {% for l in linjer %}
+      <tr>
+        <td>{{ l.kreditor_navn }}</td>
+        <td>{{ l.fakturanr or "—" }}</td>
+        <td>{{ l.forfaldsdato|dato }}</td>
+        <td class="num">{{ l.beloeb|dkk }} kr</td>
+        <td>{{ l.reg_nr or "—" }}</td>
+        <td>{{ l.konto_nr or "—" }}</td>
+        <td>{{ l.fi_kode or "—" }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

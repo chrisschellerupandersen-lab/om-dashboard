@@ -1,17 +1,19 @@
 import os
 import json
+import csv
+import io
 import base64
 import hashlib
 import logging
 import secrets
 from datetime import date, datetime, timedelta
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, List
 
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI, Request, HTTPException, UploadFile, File, Form
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, FileResponse, Response
 from fastapi.templating import Jinja2Templates
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 
@@ -520,6 +522,66 @@ async def konteringsregel_slet_post(request: Request, regel_id: int, kreditor_id
     bruger = _kræv_login(request)
     database.slet_konteringsregel(regel_id, bruger)
     return RedirectResponse(f"/kreditorer/{kreditor_id}/rediger", status_code=303)
+
+
+# ── Betaling (kørsler til gennemsyn/eksport — flytter aldrig penge selv) ────
+
+@app.get("/betaling", response_class=HTMLResponse)
+async def betaling_side(request: Request):
+    _kræv_login(request)
+    poster = [p for p in database.hent_aabne_kreditor_poster() if p["status"] == "aaben"]
+    return templates.TemplateResponse("betaling.html", {
+        "request": request, "poster": poster,
+        "batches": database.hent_betalingsbatches(),
+    })
+
+
+@app.post("/betaling/ny")
+async def betaling_ny_post(request: Request, post_id: List[int] = Form(default=[])):
+    bruger = _kræv_login(request)
+    if post_id:
+        batch_id = database.opret_betalingsbatch(post_id, bruger)
+        return RedirectResponse(f"/betaling/{batch_id}", status_code=303)
+    return RedirectResponse("/betaling", status_code=303)
+
+
+@app.get("/betaling/{batch_id}", response_class=HTMLResponse)
+async def betaling_batch_side(request: Request, batch_id: int):
+    _kræv_login(request)
+    batch = database.hent_en_betalingsbatch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Betalingskørsel findes ikke")
+    return templates.TemplateResponse("betaling_batch.html", {
+        "request": request, "batch": batch,
+        "linjer": database.hent_betalingsbatch_linjer(batch_id),
+    })
+
+
+@app.get("/betaling/{batch_id}/csv")
+async def betaling_batch_csv(request: Request, batch_id: int):
+    _kræv_login(request)
+    batch = database.hent_en_betalingsbatch(batch_id)
+    if not batch:
+        raise HTTPException(404, "Betalingskørsel findes ikke")
+    buf = io.StringIO()
+    writer = csv.writer(buf, delimiter=";")
+    writer.writerow(["Navn", "Reg.nr", "Kontonr", "FI-kode", "Beløb", "Reference"])
+    for l in database.hent_betalingsbatch_linjer(batch_id):
+        writer.writerow([
+            l["kreditor_navn"], l["reg_nr"] or "", l["konto_nr"] or "", l["fi_kode"] or "",
+            f"{l['beloeb']:.2f}".replace(".", ","), l["fakturanr"] or "",
+        ])
+    return Response(
+        content="﻿" + buf.getvalue(), media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=betaling-{batch_id}.csv"},
+    )
+
+
+@app.post("/betaling/{batch_id}/sendt")
+async def betaling_batch_sendt_post(request: Request, batch_id: int):
+    bruger = _kræv_login(request)
+    database.marker_betalingsbatch_sendt(batch_id, bruger)
+    return RedirectResponse(f"/betaling/{batch_id}", status_code=303)
 
 
 CVR_API_USER_AGENT = "Nimbo Regnskab (regnskab-app; kontakt via Railway-projektejer)"

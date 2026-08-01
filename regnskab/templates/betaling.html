@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Betaling — Nimbo Regnskab{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Betaling</h1><div class="sub">Udvælg forfaldne fakturaer til en betalingskørsel</div></div></div>
+
+<div class="card">
+  {% if poster %}
+  <form method="post" action="/betaling/ny">
+    <table>
+      <thead><tr><th></th><th>Leverandør</th><th>Fakturanr</th><th>Forfald</th><th class="num">Beløb</th><th>Betalingsoplysninger</th></tr></thead>
+      <tbody>
+      {% for p in poster %}
+        <tr>
+          <td><input type="checkbox" name="post_id" value="{{ p.id }}"></td>
+          <td>{{ p.kreditor_navn }}</td>
+          <td>{{ p.fakturanr or "—" }}</td>
+          <td>
+            <span {% if p.aldersgruppe != 'ikke forfalden' %}style="color:var(--bad); font-weight:600;"{% endif %}>
+              {{ p.forfaldsdato|dato }}
+            </span>
+          </td>
+          <td class="num">{{ p.restbeloeb|dkk }} kr</td>
+          <td class="muted">
+            {% if p.fi_kode %}FI-kode
+            {% elif p.reg_nr and p.konto_nr %}{{ p.reg_nr }} {{ p.konto_nr }}
+            {% else %}mangler{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <button class="btn" type="submit" style="margin-top:16px;">Opret betalingskørsel af valgte</button>
+  </form>
+  {% else %}
+  <p class="muted">Ingen åbne, ikke-udvalgte kreditorposter.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="font-size:14px; margin:0 0 12px;">Betalingskørsler</h2>
+  <table>
+    <thead><tr><th>#</th><th>Oprettet</th><th>Status</th><th class="num">Linjer</th><th class="num">Sum</th></tr></thead>
+    <tbody>
+    {% for b in batches %}
+      <tr>
+        <td><a href="/betaling/{{ b.id }}">#{{ b.id }}</a></td>
+        <td>{{ b.oprettet_ts }}</td>
+        <td><span class="badge {{ 'godkendt' if b.status in ('sendt', 'afstemt') else 'uafklaret' }}">{{ b.status }}</span></td>
+        <td class="num">{{ b.antal_linjer }}</td>
+        <td class="num">{{ b.sum_beloeb|dkk }} kr</td>
+      </tr>
+    {% else %}
+      <tr><td colspan="5" class="muted">Ingen betalingskørsler endnu.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

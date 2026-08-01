@@ -999,7 +999,7 @@ def hent_aabne_debitor_poster() -> List[Dict[str, Any]]:
 def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
     with _conn() as conn:
         rows = conn.execute("""
-            SELECT kp.*, k.navn AS kreditor_navn
+            SELECT kp.*, k.navn AS kreditor_navn, k.reg_nr, k.konto_nr, k.fi_kode
             FROM kreditor_poster kp JOIN kreditorer k ON k.id = kp.kreditor_id
             WHERE kp.status NOT IN ('udlignet', 'annulleret')
             ORDER BY kp.forfaldsdato
@@ -1008,6 +1008,77 @@ def hent_aabne_kreditor_poster() -> List[Dict[str, Any]]:
         for r in out:
             r["aldersgruppe"] = _aldersgruppe(r["forfaldsdato"])
         return out
+
+
+# ── Betalingskørsler ─────────────────────────────────────────────────────
+
+def opret_betalingsbatch(kreditor_post_ids: List[int], bruger: str) -> int:
+    """Samler udvalgte åbne kreditorposter i en betalingskørsel — kun til eksport/gennemsyn,
+    flytter aldrig penge. Posterne markeres 'udvalgt', så de ikke kan vælges i en ny kørsel
+    samtidig med at de stadig indgår normalt i bank-matchforslag."""
+    with _conn() as conn:
+        cur = conn.execute(
+            "INSERT INTO betalingsbatch (oprettet_af, status) VALUES (?, 'kladde')", (bruger,)
+        )
+        batch_id = cur.lastrowid
+        for post_id in kreditor_post_ids:
+            post = conn.execute(
+                "SELECT restbeloeb, status FROM kreditor_poster WHERE id = ?", (post_id,)
+            ).fetchone()
+            if not post or post["status"] not in ("aaben",):
+                continue
+            end_to_end_id = f"NIMBO-{batch_id}-{post_id}"
+            conn.execute(
+                "INSERT INTO betalingsbatch_linjer (batch_id, kreditor_post_id, beloeb, end_to_end_id) "
+                "VALUES (?, ?, ?, ?)",
+                (batch_id, post_id, post["restbeloeb"], end_to_end_id),
+            )
+            conn.execute("UPDATE kreditor_poster SET status = 'udvalgt' WHERE id = ?", (post_id,))
+        _log(conn, bruger, "opret_betalingsbatch", "betalingsbatch", batch_id,
+             {"antal_poster": len(kreditor_post_ids)})
+        return batch_id
+
+
+def hent_betalingsbatches() -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT b.*, COUNT(l.id) AS antal_linjer, COALESCE(SUM(l.beloeb), 0) AS sum_beloeb
+            FROM betalingsbatch b LEFT JOIN betalingsbatch_linjer l ON l.batch_id = b.id
+            GROUP BY b.id ORDER BY b.id DESC
+        """).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_en_betalingsbatch(batch_id: int) -> Optional[Dict[str, Any]]:
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM betalingsbatch WHERE id = ?", (batch_id,)).fetchone()
+        return dict(r) if r else None
+
+
+def hent_betalingsbatch_linjer(batch_id: int) -> List[Dict[str, Any]]:
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT l.*, kp.fakturanr, kp.forfaldsdato, k.navn AS kreditor_navn,
+                   k.reg_nr, k.konto_nr, k.fi_kode
+            FROM betalingsbatch_linjer l
+            JOIN kreditor_poster kp ON kp.id = l.kreditor_post_id
+            JOIN kreditorer k ON k.id = kp.kreditor_id
+            WHERE l.batch_id = ? ORDER BY l.id
+        """, (batch_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+
+def marker_betalingsbatch_sendt(batch_id: int, bruger: str):
+    """Brugeren har selv gennemført betalingen i netbank — markerer kørslen som sendt, og
+    flytter dens kreditorposter til 'betalt-afventer-match' så de automatisk kan udlignes
+    når den rigtige banktransaktion senere synkroniseres eller indlæses."""
+    with _conn() as conn:
+        conn.execute("UPDATE betalingsbatch SET status = 'sendt' WHERE id = ?", (batch_id,))
+        conn.execute("""
+            UPDATE kreditor_poster SET status = 'betalt-afventer-match'
+            WHERE id IN (SELECT kreditor_post_id FROM betalingsbatch_linjer WHERE batch_id = ?)
+        """, (batch_id,))
+        _log(conn, bruger, "marker_betalingsbatch_sendt", "betalingsbatch", batch_id, {})
 
 
 def hent_dashboard_kpi() -> Dict[str, Any]:

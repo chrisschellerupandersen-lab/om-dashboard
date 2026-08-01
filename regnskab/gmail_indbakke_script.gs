@@ -25,11 +25,13 @@
 // === Konfiguration ===
 var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload';
 
-// Genbruger samme afsender som det velfungerende gmail-til-economic-script. Flere afsendere
-// tilføjes med (from:a OR from:b) — IKKE from:(a OR b), som Apps Scripts GmailApp.search
-// fejlfortolker (samme faldgrube som i forward_faktura.gs):
-//   'in:inbox (from:rmk@organicmarket.dk OR from:anden@leverandoer.dk) has:attachment filename:pdf -label:faktura-sendt'
-var GMAIL_SOEGNING = 'in:inbox from:rmk@organicmarket.dk has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
+// Genbruger samme afsender som det velfungerende gmail-til-economic-script. INGEN
+// in:inbox-begrænsning her (til forskel fra forward_faktura.gs) — mails der allerede er
+// behandlet af e-conomic-scriptet og arkiveret ud af indbakken skal stadig kunne findes.
+// Flere afsendere tilføjes med (from:a OR from:b) — IKKE from:(a OR b), som Apps Scripts
+// GmailApp.search fejlfortolker:
+//   '(from:rmk@organicmarket.dk OR from:anden@leverandoer.dk) has:attachment filename:pdf -label:faktura-sendt'
+var GMAIL_SOEGNING = 'from:rmk@organicmarket.dk has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';

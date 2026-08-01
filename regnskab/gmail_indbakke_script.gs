@@ -6,13 +6,15 @@
  * med status "afventer" klar til gennemsyn.
  *
  * OPSÆTNING:
- * 1. Gå til https://script.google.com, opret et nyt projekt.
+ * 1. VIGTIGT: Gå til https://script.google.com MENS DU ER LOGGET IND SOM
+ *    greve@organicmarket.dk (tjek kontoikonet øverst til højre i browseren) — det er den
+ *    postkasse scriptet læser fra, ikke en filtreret afsender. Opret et nyt projekt.
  * 2. Slet standard-koden og indsæt hele denne fils indhold.
  * 3. Sæt token'et: Project Settings (tandhjulet i venstre menu) → Script Properties
  *    → "Add script property" → Property: INGEST_TOKEN, Value: (se nedenfor, hold hemmeligt).
- * 4. GMAIL_SOEGNING nedenfor er sat til kun at hente fra Organic Market ApS med "Faktura"
- *    i mailen — udvid til flere afsendere efterhånden som I tilføjer dem (se kommentar
- *    ved variablen).
+ * 4. GMAIL_SOEGNING nedenfor kræver kun "Faktura" + PDF-vedhæftning — ingen afsenderfilter,
+ *    da alle leverandørers fakturaer skal fanges, ikke kun én. Stram til efter behov, se
+ *    kommentar ved variablen.
  * 5. Kør funktionen "opsaetTrigger" én gang manuelt (Kør-knappen, vælg den funktion)
  *    for at sætte automatisk kørsel hvert 15. minut op. Godkend adgang til Gmail når
  *    Google beder om det.
@@ -23,10 +25,10 @@
 // === Konfiguration ===
 var INGEST_URL = 'https://regnskab-production.up.railway.app/api/indbakke/upload';
 
-// Starter kun med Organic Market ApS (greve@organicmarket.dk), og kun mails hvor
-// "Faktura" indgår. Udvid senere med flere afsendere via OR, fx:
-//   '(from:greve@organicmarket.dk OR from:faktura@anden-leverandoer.dk) Faktura has:attachment filename:pdf -label:faktura-sendt'
-var GMAIL_SOEGNING = 'from:greve@organicmarket.dk Faktura has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
+// Ingen afsenderfilter — fanger "Faktura" fra alle leverandører. Stram til med from: hvis
+// indbakken får for meget andet med "Faktura" i sig, fx:
+//   'from:leverandoer1.dk OR from:leverandoer2.dk Faktura has:attachment filename:pdf -label:faktura-sendt'
+var GMAIL_SOEGNING = 'Faktura has:attachment filename:pdf -label:faktura-sendt -label:faktura-fejl';
 
 var LABEL_SENDT = 'faktura-sendt';
 var LABEL_FEJL = 'faktura-fejl';

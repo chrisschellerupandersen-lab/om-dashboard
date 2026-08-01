@@ -1304,7 +1304,7 @@ def hent_dashboard_kpi() -> Dict[str, Any]:
             "SELECT COUNT(*) c, COALESCE(SUM(restbeloeb),0) s FROM debitor_poster WHERE status != 'udlignet'"
         ).fetchone()
         afventer = conn.execute("SELECT COUNT(*) c FROM bilag WHERE status = 'afventer'").fetchone()
-        bank = conn.execute("SELECT COALESCE(SUM(beloeb),0) s FROM banktransaktioner").fetchone()
+        bank = conn.execute("SELECT COALESCE(SUM(saldo),0) s FROM bank_forbindelser WHERE status = 'aktiv'").fetchone()
         maaned = conn.execute("""
             SELECT COALESCE(SUM(beloeb_total),0) s, COUNT(*) c FROM bilag
             WHERE status = 'bogfoert' AND strftime('%Y-%m', godkendt_ts) = strftime('%Y-%m','now','localtime')
@@ -1316,6 +1316,71 @@ def hent_dashboard_kpi() -> Dict[str, Any]:
             "banksaldo": bank["s"],
             "maaned_sum": maaned["s"], "maaned_antal": maaned["c"],
         }
+
+
+def hent_dashboard_udvikling(antal_maaneder: int = 6) -> Dict[str, Any]:
+    """Månedlig omsætning/omkostninger/resultat for de seneste antal_maaneder måneder (til
+    udviklingsgraf), samt nøgletal: bruttoavance % for indeværende måned (omsætning minus
+    vareforbrug på konto 2000/2100) og likviditetsgrad (banksaldo ift. åbne kreditorer)."""
+    i_dag = date.today()
+    fra_maaned = i_dag.replace(day=1)
+    for _ in range(antal_maaneder - 1):
+        fra_maaned = (fra_maaned - timedelta(days=1)).replace(day=1)
+
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT strftime('%Y-%m', p.dato) AS maaned,
+                   SUM(CASE WHEN k.kontotype = 'omsaetning' THEN pl.kredit - pl.debet ELSE 0 END) AS omsaetning,
+                   SUM(CASE WHEN k.kontotype = 'omkostning' THEN pl.debet - pl.kredit ELSE 0 END) AS omkostninger
+            FROM posteringslinjer pl
+            JOIN posteringer p ON p.id = pl.postering_id
+            JOIN kontoplan k ON k.kontonr = pl.kontonr
+            WHERE k.kontotype IN ('omsaetning', 'omkostning') AND p.dato >= ?
+            GROUP BY maaned
+        """, (fra_maaned.isoformat(),)).fetchall()
+        raa = {r["maaned"]: r for r in rows}
+
+        bruttoavance_row = conn.execute("""
+            SELECT
+                COALESCE(SUM(CASE WHEN k.kontotype = 'omsaetning' THEN pl.kredit - pl.debet ELSE 0 END), 0) AS omsaetning,
+                COALESCE(SUM(CASE WHEN pl.kontonr IN ('2000','2100') THEN pl.debet - pl.kredit ELSE 0 END), 0) AS vareforbrug
+            FROM posteringslinjer pl
+            JOIN posteringer p ON p.id = pl.postering_id
+            JOIN kontoplan k ON k.kontonr = pl.kontonr
+            WHERE strftime('%Y-%m', p.dato) = ?
+        """, (i_dag.strftime("%Y-%m"),)).fetchone()
+
+        banksaldo = conn.execute(
+            "SELECT COALESCE(SUM(saldo), 0) s FROM bank_forbindelser WHERE status = 'aktiv'"
+        ).fetchone()["s"]
+        aaben_kreditor = conn.execute(
+            "SELECT COALESCE(SUM(restbeloeb), 0) s FROM kreditor_poster WHERE status NOT IN ('udlignet','annulleret')"
+        ).fetchone()["s"]
+
+    # Sammenhængende månedsserie uden huller, selv for måneder uden bogføring.
+    udvikling = []
+    m = fra_maaned
+    for _ in range(antal_maaneder):
+        noegle = m.strftime("%Y-%m")
+        r = raa.get(noegle)
+        omsaetning = round(r["omsaetning"], 2) if r else 0.0
+        omkostninger = round(r["omkostninger"], 2) if r else 0.0
+        udvikling.append({
+            "maaned": noegle, "omsaetning": omsaetning, "omkostninger": omkostninger,
+            "resultat": round(omsaetning - omkostninger, 2),
+        })
+        m = date(m.year + 1, 1, 1) if m.month == 12 else date(m.year, m.month + 1, 1)
+
+    omsaetning_denne = bruttoavance_row["omsaetning"]
+    vareforbrug_denne = bruttoavance_row["vareforbrug"]
+    bruttoavance_pct = round((omsaetning_denne - vareforbrug_denne) / omsaetning_denne * 100, 1) if omsaetning_denne else None
+    likviditetsgrad_pct = round(banksaldo / aaben_kreditor * 100) if aaben_kreditor else None
+
+    return {
+        "udvikling": udvikling,
+        "bruttoavance_pct": bruttoavance_pct,
+        "likviditetsgrad_pct": likviditetsgrad_pct,
+    }
 
 
 # ── Banktransaktioner (simuleret indlæsning) + match ────────────────────

@@ -242,11 +242,16 @@ def _dansk_dato(d: date) -> str:
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard_side(request: Request):
     bruger = _kræv_login(request)
+    udvikling = database.hent_dashboard_udvikling()
+    for m in udvikling["udvikling"]:
+        aar, maaned_nr = m["maaned"].split("-")
+        m["label"] = f"{MAANED_NAVNE[int(maaned_nr) - 1]} {aar[2:]}"
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "bruger": bruger,
         "idag": _dansk_dato(date.today()),
         "kpi": database.hent_dashboard_kpi(),
+        "udvikling": udvikling,
         "posteringer": database.hent_posteringer(limit=6),
     })
 

@@ -2289,6 +2289,29 @@ async def api_db_shopbox_maaned(request: Request, aar: Optional[int] = None,
     return database.hent_db_shopbox_maaned(aar=aar, maaned=maaned, loen_tir_ons=loen, omk_pr_dag=omk)
 
 
+@app.get("/api/bemanding/uger")
+async def api_bemanding_uger(request: Request):
+    """Uger markeret som fuld bemanding (løn alle dage)."""
+    _kræv_login(request)
+    return {"uger": database.hent_fuld_bemanding_uger()}
+
+
+@app.post("/api/bemanding/uger")
+async def api_bemanding_saet(request: Request):
+    """Marker/fjern en uge som fuld bemanding. Body: {aar, uge, aktiv}.
+    Accepterer login ELLER webhook-secret (til automatisk opsætning)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    if body.get("aar") is None or body.get("uge") is None:
+        raise HTTPException(status_code=400, detail="Mangler aar/uge")
+    return database.saet_fuld_bemanding(body["aar"], body["uge"], body.get("aktiv", True))
+
+
 @app.get("/api/db-shopbox/poster")
 async def api_db_shopbox_poster(request: Request, slags: str, periode: str):
     """Drill-down: varer/poster bag DB for én periode."""

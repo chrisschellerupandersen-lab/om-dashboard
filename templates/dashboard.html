@@ -2915,6 +2915,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
           </div>
+          <div id="dbs-bemanding" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);"></div>
         </div>
 
         <!-- KPI-fliser: seneste dag / uge / måned -->
@@ -3983,9 +3984,12 @@ async function loadDbsMaaned(val){
   (d.dage||[]).slice().reverse().forEach(x=>{
     const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
     const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
+    const fuldBadge = x.fuld_bemanding
+      ? ' <span title="Fuld bemanding — løn alle dage" style="font-family:\'DM Mono\',monospace;font-size:8px;letter-spacing:.05em;text-transform:uppercase;background:#8a3a3a;color:#fff;border-radius:4px;padding:1px 4px;">fuld</span>'
+      : '';
     html += `<tr${weekend?' style="background:rgba(0,0,0,.02);"':''}>
       <td style="text-align:left;">${fmtDato(x.dato)}</td>
-      <td style="text-align:left;color:var(--ash);">${x.ugedag}</td>
+      <td style="text-align:left;color:var(--ash);">${x.ugedag}${fuldBadge}</td>
       <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
       <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
       <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
@@ -4003,6 +4007,46 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${_dbsKr(t.omk)}</td>
       <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td></tr></tfoot>`;
   tbl.innerHTML = html;
+  dbsRenderBemanding(d);
+}
+
+// Uge-toggles: marker uger som FULD bemanding (løn alle dage, ikke kun tir/ons)
+function dbsRenderBemanding(d){
+  const box = document.getElementById('dbs-bemanding');
+  if (!box) return;
+  // Find de ISO-uger måneden rører, + om de er fuldt bemandede (fra dagenes flag)
+  const uger = new Map();  // "aar-uge" -> {aar, uge, fuld}
+  (d.dage||[]).forEach(x=>{
+    const w = _tgIsoUge(x.dato);
+    const k = w.aar + '-' + w.uge;
+    const cur = uger.get(k) || {aar:w.aar, uge:w.uge, fuld:false};
+    if (x.fuld_bemanding) cur.fuld = true;
+    uger.set(k, cur);
+  });
+  const liste = [...uger.values()].sort((a,b)=>a.uge-b.uge);
+  const chips = liste.map(w=>{
+    const on = w.fuld;
+    return `<button onclick="dbsToggleBemanding(${w.aar},${w.uge},${on?0:1})"
+      title="${on?'Fjern':'Marker'} fuld bemanding for uge ${w.uge}"
+      style="font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;border-radius:8px;
+             padding:5px 10px;border:1px solid ${on?'#8a3a3a':'var(--border)'};
+             background:${on?'#8a3a3a':'transparent'};color:${on?'#fff':'var(--ash)'};">
+      ${on?'✓ ':''}Uge ${w.uge}</button>`;
+  }).join(' ');
+  box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+      <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Fuld bemanding (løn alle dage)</span>
+      ${chips}</div>`;
+}
+
+async function dbsToggleBemanding(aar, uge, aktiv){
+  try {
+    await fetch('/api/bemanding/uger', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({aar, uge, aktiv: !!aktiv})
+    });
+  } catch(e){ return; }
+  const sel = document.getElementById('dbs-maaned-vaelg');
+  loadDbsMaaned(sel ? sel.value : '');
 }
 
 function dbsRenderKpi(){

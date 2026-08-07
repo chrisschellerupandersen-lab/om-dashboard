@@ -99,6 +99,13 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_trans_dato ON transaktioner(dato);
             CREATE INDEX IF NOT EXISTS idx_trans_vare ON transaktioner(varenavn);
 
+            -- Uger med FULD bemanding: løn regnes alle dage (ikke kun tir/ons).
+            CREATE TABLE IF NOT EXISTS fuld_bemanding_uger (
+                aar  INTEGER NOT NULL,
+                uge  INTEGER NOT NULL,
+                PRIMARY KEY (aar, uge)
+            );
+
             CREATE TABLE IF NOT EXISTS ugebestillinger (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 uge           INTEGER NOT NULL,
@@ -7993,6 +8000,29 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
 _LOEN_START = (2026, 6)
 
 
+def hent_fuld_bemanding_uger() -> List[Dict]:
+    """Alle uger markeret som 'fuld bemanding' (løn alle dage)."""
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT aar, uge FROM fuld_bemanding_uger ORDER BY aar, uge"
+        ).fetchall()
+    return [{"aar": r["aar"], "uge": r["uge"]} for r in rows]
+
+
+def saet_fuld_bemanding(aar: int, uge: int, aktiv: bool = True) -> dict:
+    """Marker (aktiv=True) eller fjern (aktiv=False) en uge som fuld bemanding.
+    Uge = ISO-ugenummer, så det matcher resten af dashboardet."""
+    aar, uge = int(aar), int(uge)
+    with _conn() as conn:
+        if aktiv:
+            conn.execute("INSERT OR IGNORE INTO fuld_bemanding_uger (aar, uge) VALUES (?, ?)",
+                         (aar, uge))
+        else:
+            conn.execute("DELETE FROM fuld_bemanding_uger WHERE aar = ? AND uge = ?",
+                         (aar, uge))
+    return {"aar": aar, "uge": uge, "aktiv": bool(aktiv)}
+
+
 def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
                            loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
     """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
@@ -8010,6 +8040,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         """).fetchall()
         maaneder = [{"aar": r["y"], "maaned": r["m"],
                      "label": f"{_DK_MDR[r['m']].capitalize()} {r['y']}"} for r in mrows]
+        # Uger med fuld bemanding (løn alle dage) — ISO (år, uge)
+        fuld_bemanding = {(r["aar"], r["uge"]) for r in
+                          conn.execute("SELECT aar, uge FROM fuld_bemanding_uger").fetchall()}
         if not maaneder:
             return {"aar": None, "maaned": None, "maaned_navn": "", "dage": [],
                     "total": {}, "maaneder": [], "loen_aktiv": False}
@@ -8048,7 +8081,10 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         x = per.get(iso)
         oms = float(x["oms_ex"]) if x else 0.0
         db = float(x["db_kr"]) if x else 0.0
-        loen = loen_tir_ons if (loen_aktiv and d.weekday() in (1, 2)) else 0.0  # 1=tir, 2=ons
+        iso_y, iso_w, _ = d.isocalendar()
+        fuld = (iso_y, iso_w) in fuld_bemanding
+        # Fuld bemanding: løn ALLE dage. Ellers kun tir(1)+ons(2). 300 kr/dag begge steder.
+        loen = loen_tir_ons if (loen_aktiv and (fuld or d.weekday() in (1, 2))) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
         dage.append({
@@ -8060,6 +8096,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "loen":     round(loen),
             "omk":      round(omk),
             "resultat": round(res),
+            "fuld_bemanding": fuld,
         })
         tot["oms_ex"] += oms; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res

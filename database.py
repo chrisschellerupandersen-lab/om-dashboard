@@ -25,6 +25,7 @@ _KAFFE_WHERE = """(
     AND LOWER(varenavn) NOT LIKE '%flødeis%'
     AND LOWER(varenavn) NOT LIKE '%flodeis%'
     AND LOWER(varenavn) NOT LIKE '%chai%'
+    AND LOWER(varenavn) NOT LIKE '%kaps%'
 )"""
 
 # Kager — identificeres på varenavn, da kassesystemet IKKE har en Kager-kategori
@@ -3180,7 +3181,8 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         "AND LOWER(varenavn) NOT LIKE '%protein%' "
         "AND LOWER(varenavn) NOT LIKE '%flødeis%' "
         "AND LOWER(varenavn) NOT LIKE '%flodeis%' "
-        "AND LOWER(varenavn) NOT LIKE '%chai%'"
+        "AND LOWER(varenavn) NOT LIKE '%chai%' "
+        "AND LOWER(varenavn) NOT LIKE '%kaps%'"
     )
     _WIENER_LIKE = (
         "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "

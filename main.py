@@ -2652,6 +2652,37 @@ async def api_gmail_status(request: Request):
     return {"ok": True, "status": status, "har_token": har_token}
 
 
+@app.post("/api/bager/gmail-diagnose")
+async def api_gmail_diagnose(request: Request):
+    """Midlertidig diagnose (webhook-sikret): vis Gmail-sync-opsætning + seneste
+    log, og kør evt. en sync for at se den præcise fejl. Ingen login nødvendig."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    diag = {
+        "har_GMAIL_TOKEN_JSON":  bool(os.environ.get("GMAIL_TOKEN_JSON")),
+        "har_ANTHROPIC_API_KEY": bool(os.environ.get("ANTHROPIC_API_KEY")),
+        "gmail_sender": GMAIL_SENDER,
+    }
+    # Test om token overhovedet kan bygges/refreshes (uden at hente mails)
+    try:
+        _gmail_creds()
+        diag["creds_ok"] = True
+    except Exception as e:
+        diag["creds_ok"] = False
+        diag["creds_fejl"] = f"{type(e).__name__}: {str(e)[:200]}"
+    try:
+        diag["seneste_log"] = database.hent_gmail_sync_status()
+    except Exception as e:
+        diag["log_fejl"] = str(e)[:200]
+    if body.get("run"):
+        diag["sync_resultat"] = gmail_sync_run()
+    return {"ok": True, **diag}
+
+
 
 # ── MORGENBRIEFING ────────────────────────────────────────────────────────────
 

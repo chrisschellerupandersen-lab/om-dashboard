@@ -2678,6 +2678,18 @@ async def api_gmail_diagnose(request: Request):
         diag["seneste_log"] = database.hent_gmail_sync_status()
     except Exception as e:
         diag["log_fejl"] = str(e)[:200]
+    # Hvad ligger faktisk gemt i bager_regnskab? (så vi kan se om data når UI'et)
+    try:
+        with database._conn() as conn:
+            rows = conn.execute("""
+                SELECT aar, uge, faktura, retur_ialt, retur_wiener, retur_boller, tgtg, indlæst
+                FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 12
+            """).fetchall()
+        diag["bager_regnskab"] = [dict(r) for r in rows]
+        diag["antal_rækker_ialt"] = database._conn().execute(
+            "SELECT COUNT(*) FROM bager_regnskab").fetchone()[0]
+    except Exception as e:
+        diag["bager_regnskab_fejl"] = str(e)[:200]
     if body.get("run"):
         diag["sync_resultat"] = gmail_sync_run()
     return {"ok": True, **diag}

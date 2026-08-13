@@ -6,17 +6,25 @@ from typing import List, Dict, Any, Optional
 DB_PATH = os.environ.get("DB_PATH", "dashboard.db")
 
 # Alle kaffedrikke — fanger kaffe, flat white, cappuccino, americano osv.
+# Undtaget bevidst (ikke kaffe-opgørelsen): proteinkaffe, flødeis med kaffe,
+# chai latte — bekræftet med butikken.
 _KAFFE_WHERE = """(
-    LOWER(varenavn) LIKE '%kaffe%'
-    OR LOWER(varenavn) LIKE '%flat white%'
-    OR LOWER(varenavn) LIKE '%cappuccino%'
-    OR LOWER(varenavn) LIKE '%americano%'
-    OR LOWER(varenavn) LIKE '%latte%'
-    OR LOWER(varenavn) LIKE '%espresso%'
-    OR LOWER(varenavn) LIKE '%macchiato%'
-    OR LOWER(varenavn) LIKE '%cortado%'
-    OR LOWER(varenavn) LIKE '%lungo%'
-    OR LOWER(varenavn) LIKE '%mocha%'
+    (
+        LOWER(varenavn) LIKE '%kaffe%'
+        OR LOWER(varenavn) LIKE '%flat white%'
+        OR LOWER(varenavn) LIKE '%cappuccino%'
+        OR LOWER(varenavn) LIKE '%americano%'
+        OR LOWER(varenavn) LIKE '%latte%'
+        OR LOWER(varenavn) LIKE '%espresso%'
+        OR LOWER(varenavn) LIKE '%macchiato%'
+        OR LOWER(varenavn) LIKE '%cortado%'
+        OR LOWER(varenavn) LIKE '%lungo%'
+        OR LOWER(varenavn) LIKE '%mocha%'
+    )
+    AND LOWER(varenavn) NOT LIKE '%protein%'
+    AND LOWER(varenavn) NOT LIKE '%flødeis%'
+    AND LOWER(varenavn) NOT LIKE '%flodeis%'
+    AND LOWER(varenavn) NOT LIKE '%chai%'
 )"""
 
 # Kager — identificeres på varenavn, da kassesystemet IKKE har en Kager-kategori
@@ -3161,12 +3169,18 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         next_uge = 1
         next_aar = aar + 1
 
+    # Samme kaffe-definition som _KAFFE_WHERE: proteinkaffe, flødeis m. kaffe
+    # og chai latte tæller IKKE som kaffe.
     _KAFFE_LIKE = (
-        "LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+        "( LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
         "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
         "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%' "
         "OR LOWER(varenavn) LIKE '%macchiato%' OR LOWER(varenavn) LIKE '%cortado%' "
-        "OR LOWER(varenavn) LIKE '%lungo%' OR LOWER(varenavn) LIKE '%mocha%'"
+        "OR LOWER(varenavn) LIKE '%lungo%' OR LOWER(varenavn) LIKE '%mocha%' ) "
+        "AND LOWER(varenavn) NOT LIKE '%protein%' "
+        "AND LOWER(varenavn) NOT LIKE '%flødeis%' "
+        "AND LOWER(varenavn) NOT LIKE '%flodeis%' "
+        "AND LOWER(varenavn) NOT LIKE '%chai%'"
     )
     _WIENER_LIKE = (
         "LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "

@@ -2684,7 +2684,21 @@ async def api_bagvaerk_oekonomi(request: Request):
             out[navn] = {"fra": fra, "til": idag.isoformat(),
                          "oms_ex_moms": oms, "db_kr": db,
                          "db_pct": round(db / oms * 100, 1) if oms > 0 else 0.0}
-    return {"ok": True, "perioder": out}
+        # Måned-for-måned historik
+        mrows = conn.execute("""
+            SELECT strftime('%Y-%m', dato) AS maaned,
+                   COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
+                   COALESCE(SUM(db_korrekt),0)         AS db
+            FROM v_transaktioner
+            WHERE TRIM(kategori) = 'Bagværk'
+            GROUP BY maaned ORDER BY maaned
+        """).fetchall()
+    maaneder = []
+    for r in mrows:
+        oms = round(float(r["oms"]), 2); db = round(float(r["db"]), 2)
+        maaneder.append({"maaned": r["maaned"], "oms_ex_moms": oms, "db_kr": db,
+                         "db_pct": round(db / oms * 100, 1) if oms > 0 else 0.0})
+    return {"ok": True, "perioder": out, "maaneder": maaneder}
 
 
 @app.post("/api/bager/gmail-diagnose")

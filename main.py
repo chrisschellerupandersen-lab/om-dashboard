@@ -2652,6 +2652,41 @@ async def api_gmail_status(request: Request):
     return {"ok": True, "status": status, "har_token": har_token}
 
 
+@app.post("/api/bagvaerk-oekonomi")
+async def api_bagvaerk_oekonomi(request: Request):
+    """Webhook-sikret udtræk: bagværks-omsætning (ex moms) + DB pr. periode,
+    så vi kan regne på et 'hvis DB var X%'-scenarie."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    from datetime import date as _date, timedelta as _td
+    idag = _date.today()
+    perioder = {
+        "seneste_30_dage":  (idag - _td(days=30)).isoformat(),
+        "seneste_90_dage":  (idag - _td(days=90)).isoformat(),
+        "seneste_365_dage": (idag - _td(days=365)).isoformat(),
+        "år_til_dato":      _date(idag.year, 1, 1).isoformat(),
+    }
+    out = {}
+    with database._conn() as conn:
+        for navn, fra in perioder.items():
+            r = conn.execute("""
+                SELECT COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
+                       COALESCE(SUM(db_korrekt),0)         AS db
+                FROM v_transaktioner
+                WHERE TRIM(kategori) = 'Bagværk' AND dato >= ? AND dato <= ?
+            """, (fra, idag.isoformat())).fetchone()
+            oms = round(float(r["oms"]), 2)
+            db  = round(float(r["db"]), 2)
+            out[navn] = {"fra": fra, "til": idag.isoformat(),
+                         "oms_ex_moms": oms, "db_kr": db,
+                         "db_pct": round(db / oms * 100, 1) if oms > 0 else 0.0}
+    return {"ok": True, "perioder": out}
+
+
 @app.post("/api/bager/gmail-diagnose")
 async def api_gmail_diagnose(request: Request):
     """Midlertidig diagnose (webhook-sikret): vis Gmail-sync-opsætning + seneste

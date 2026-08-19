@@ -54,6 +54,10 @@ _KAGE_WHERE = """(
 # Justér datoen her hvis skiftet flytter sig.
 _RETUR_SLUT = "2026-08-31"
 
+# Organic Bakery leverer først fra denne DATO (1/9 = tirsdag). Mandag 31/8 i uge 36
+# tilhører stadig den gamle bager → dage før denne dato bestilles ikke hos Organic.
+_ORGANIC_START = "2026-09-01"
+
 # Sell-through-ankret bestilling (newsvendor-lite). Mål: minimalt spild, da der
 # ingen retur er. Service-faktor pr. risikogruppe ganges på den daglige
 # sell-through-median:
@@ -5270,6 +5274,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 med = _median(pr_wd[i][-8:])
                 basis_dag[dn] = med
                 anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf))
+        # Dage før Organic Bakery-start (fx mandag 31/8 i uge 36 = gammel bager) → 0
+        for i, dn in enumerate(DAGE):
+            if (mon_dato + timedelta(days=i)).isoformat() < _ORGANIC_START:
+                basis_dag[dn] = 0.0
+                anb_dag[dn] = 0
         total_anb = sum(anb_dag.values())
         produkter.append({
             "varenavn":        p["navn"],

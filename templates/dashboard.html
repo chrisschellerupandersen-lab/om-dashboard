@@ -10181,7 +10181,15 @@ async function loadBernUge(uge, aar) {
 
   const eksportUrl = `/api/bestilling/eksport?uge=${d.maal_uge}&aar=${d.maal_aar}`;
 
-  // Retur-beregning: baseret på produkter i denne uge (skifter når du skifter uge)
+  // Retur-beregning: baseret på produkter i denne uge (skifter når du skifter uge).
+  // Organic Bakery (fra 1/9) har INGEN retur → vis '—' i stedet for en prognose.
+  if (d.metode === 'organic-bakery') {
+    ['bern-retur-boller','bern-retur-wiener'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.textContent = '—';
+    });
+    const bs = document.getElementById('bern-retur-boller-sub'); if (bs) bs.textContent = 'ingen retur (Organic Bakery)';
+    const ws = document.getElementById('bern-retur-wiener-sub'); if (ws) ws.textContent = 'ingen retur (Organic Bakery)';
+  } else
   try {
     let bollerTotal = 0, wienerTotal = 0;
 

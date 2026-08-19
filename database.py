@@ -43,7 +43,10 @@ _KAGE_WHERE = """(
     OR LOWER(varenavn) LIKE '%muffin%'
     OR LOWER(varenavn) LIKE '%tiramisu%'
     OR LOWER(varenavn) LIKE '%brunkager%'
+    OR LOWER(varenavn) LIKE '%gulerodskage%'
 )"""
+# NB: nye kager tilføjes her som én linje pr. stk. (Organic Bakery-sortimentet
+# vokser over tid — start: gulerodskage).
 
 
 def _conn() -> sqlite3.Connection:

@@ -9870,8 +9870,9 @@ async function loadBernUge(uge, aar) {
     return;
   }
 
-  // Kun anvend basis-justering for fremtidige/aktuelle uger — faktiske bestillinger holdes urørte
-  if (basisData.length > 0 && !d.faktisk) {
+  // Kun anvend basis-justering for fremtidige/aktuelle uger — faktiske bestillinger holdes urørte.
+  // Organic Bakery-anbefalingen (fra 1/9) er allerede sell-through-ankret på serveren → brug den direkte.
+  if (basisData.length > 0 && !d.faktisk && d.metode !== 'organic-bakery') {
     const basisMap = {};
     basisData.forEach(row => {
       if (!basisMap[row.varenavn]) basisMap[row.varenavn] = {};

@@ -92,6 +92,20 @@ _ORGANIC_BAKERY = [
 ]
 
 
+def _organic_kat(navn: str) -> str:
+    """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
+    n = (navn or "").lower()
+    if any(k in n for k in ("gulerodskage", "cookie")):
+        return "Kage"
+    if "bolle" in n:                                   # tebolle + surdejsbolle
+        return "Boller"
+    if any(k in n for k in ("brød", "focaccia", "rugbrød")):
+        return "Brød"
+    if any(k in n for k in ("tebirkes", "croissant", "snurre", "pain")):
+        return "Wiener"
+    return ""
+
+
 def _bestil_risikogruppe(varenavn: str, kat: str) -> str:
     """Klassificér en vare til spild-risikogruppe (styrer bestillings-bufferen)."""
     n = (varenavn or "").lower()
@@ -5259,7 +5273,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         total_anb = sum(anb_dag.values())
         produkter.append({
             "varenavn":        p["navn"],
-            "kategori":        ("Kage" if p["gruppe"] == "kage" else ""),
+            "kategori":        _organic_kat(p["navn"]),
             "risikogruppe":    p["gruppe"],
             "service_faktor":  sf,
             "indkoeb_ex_moms": p["indkoeb"],

@@ -1137,9 +1137,11 @@ async def api_bestillings_anbefaling(
     # sell-through for at minimere spild (ingen retur). Før: klassisk metode.
     # ?metode=sellthrough / klassisk kan overstyre til test.
     maal_mon = date.fromisocalendar(int(aar), int(uge), 1).isoformat()
-    brug_st = (metode == "sellthrough") or (metode != "klassisk" and maal_mon >= database._RETUR_SLUT)
+    auto_organic = maal_mon >= database._RETUR_SLUT   # fra 1/9 = Organic Bakery
     try:
-        if brug_st:
+        if metode == "organic" or (metode is None and auto_organic):
+            return database.hent_bestillings_uge_organic(int(uge), int(aar))
+        if metode == "sellthrough":
             return database.hent_bestillings_uge_sellthrough(int(uge), int(aar))
         return database.hent_bestillings_uge(int(uge), int(aar))
     except Exception as e:
@@ -2718,17 +2720,16 @@ async def api_test_sellthrough(request: Request):
     if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
         raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
     uge = int(body.get("uge")); aar = int(body.get("aar"))
-    st = database.hent_bestillings_uge_sellthrough(uge, aar, body.get("service"))
-    kl = database.hent_bestillings_uge(uge, aar)  # klassisk til sammenligning
-    kl_tot = {p["varenavn"]: p["total_anbefalet"] for p in kl.get("produkter", [])}
+    org = database.hent_bestillings_uge_organic(uge, aar, body.get("service"))
     prod = [{
         "navn": p["varenavn"], "gruppe": p["risikogruppe"], "sf": p["service_faktor"],
-        "basis": p["basis"], "anb": p["anbefalet"],
-        "st_total": p["total_anbefalet"], "klassisk_total": kl_tot.get(p["varenavn"]),
-    } for p in st.get("produkter", [])]
-    return {"ok": True, "uge": uge, "aar": aar,
-            "st_total_stk": st.get("total_stk"), "klassisk_total_stk": kl.get("total_stk"),
-            "service_faktorer": st.get("service_faktorer"), "produkter": prod}
+        "kilde": p["kilde_varenumre"], "historik": p["har_historik"],
+        "anb": p["anbefalet"], "tot": p["total_anbefalet"],
+        "db": p["db_ved_salg"],
+    } for p in org.get("produkter", [])]
+    return {"ok": True, "uge": uge, "aar": aar, "metode": org.get("metode"),
+            "total_stk": org.get("total_stk"), "total_indkoeb": org.get("total_indkoeb"),
+            "service_faktorer": org.get("service_faktorer"), "produkter": prod}
 
 
 @app.post("/api/bager/gmail-diagnose")

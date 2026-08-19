@@ -65,6 +65,30 @@ _RETUR_SLUT = "2026-08-31"
 _SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
 
 
+# Organic Bakery-sortiment fra 1/9-2026 (16 varer). Pr. vare:
+#   navn, indkøbspris ex moms, udsalgspris ex moms, risikogruppe,
+#   kilde = gamle varenumre hvis sell-through mappes fra (bro til historik).
+# Snegle + konfekt udgår (ingen kilde-mapping). Grovbirkes foldes ind i Tebirkes.
+_ORGANIC_BAKERY = [
+    {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051]},
+    {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},
+    {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158]},
+    {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045]},
+    {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043]},
+    {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044]},
+    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061]},
+    {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062]},
+    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067]},
+    {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066]},
+    {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063]},
+    {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": []},
+    {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055]},
+    {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [13657]},
+    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": []},
+    {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075]},
+]
+
+
 def _bestil_risikogruppe(varenavn: str, kat: str) -> str:
     """Klassificér en vare til spild-risikogruppe (styrer bestillings-bufferen)."""
     n = (varenavn or "").lower()
@@ -5162,6 +5186,103 @@ def hent_bestillings_uge_sellthrough(maal_uge: int, maal_aar: int,
         "produkter":    produkter,
         "total_stk":    total_stk,
         "total_kr":     round(total_kr, 2),
+        "faktisk":      False,
+    }
+
+
+def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
+                                 service: dict = None) -> Dict:
+    """Organic Bakery-anbefaling (fra 1/9): fuld liste over de 16 nye varer.
+    Hver vares sell-through mappes fra de GAMLE varers faktiske salg (bro til
+    historik), så anbefalingen rammer fra dag ét. Samme newsvendor-logik +
+    service-faktor pr. risikogruppe. Snegle/konfekt indgår ikke; grovbirkes
+    er foldet ind i Tebirkes via kilde-mappingen."""
+    from datetime import date, timedelta
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    svc = dict(_SERVICE_FAKTOR)
+    if service:
+        svc.update({k: float(v) for k, v in service.items() if k in svc})
+
+    mon_dato     = date.fromisocalendar(maal_aar, maal_uge, 1)
+    vindue_start = (mon_dato - timedelta(weeks=13)).isoformat()
+    maal_mon     = mon_dato.isoformat()
+    alle_kilde   = sorted({vn for p in _ORGANIC_BAKERY for vn in p["kilde"]})
+
+    with _conn() as conn:
+        aabne = [r[0] for r in conn.execute("""
+            SELECT DISTINCT dato FROM transaktioner
+            WHERE dato >= ? AND dato < ? ORDER BY dato
+        """, (vindue_start, maal_mon)).fetchall()]
+        salg: Dict = {}
+        if alle_kilde:
+            ph = ",".join("?" * len(alle_kilde))
+            for r in conn.execute(f"""
+                SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
+                       ROUND(SUM(antal),0) AS stk
+                FROM transaktioner
+                WHERE dato >= ? AND dato < ?
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                GROUP BY vn, dato
+            """, (vindue_start, maal_mon, *alle_kilde)).fetchall():
+                if r["vn"] is not None:
+                    salg[(int(r["vn"]), r["dato"])] = float(r["stk"] or 0)
+        tg = conn.execute("SELECT tgtg FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()
+        tgtg_kr = float(tg[0]) if (tg and tg[0]) else 0.0
+    tgtg_korr = 0.95 if tgtg_kr > 1000 else 1.0
+
+    wd_af_dato = {d: date.fromisoformat(d).weekday() for d in aabne}
+    si  = _SI_MAANED.get(mon_dato.month, 1.0)
+    evt = _get_event(maal_uge, maal_aar)
+    dag_fak = evt["dag_fak"] if evt else {d: 1.0 for d in DAGE}
+
+    produkter = []
+    for p in _ORGANIC_BAKERY:
+        sf = svc.get(p["gruppe"], 1.0)
+        pr_wd: Dict[int, list] = {i: [] for i in range(7)}
+        for d in aabne:
+            s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
+            pr_wd[wd_af_dato[d]].append(s)
+        basis_dag, anb_dag = {}, {}
+        for i, dn in enumerate(DAGE):
+            med = _median(pr_wd[i][-8:])
+            basis_dag[dn] = med
+            anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf))
+        total_anb = sum(anb_dag.values())
+        produkter.append({
+            "varenavn":        p["navn"],
+            "kategori":        ("Kage" if p["gruppe"] == "kage" else ""),
+            "risikogruppe":    p["gruppe"],
+            "service_faktor":  sf,
+            "indkoeb_ex_moms": p["indkoeb"],
+            "udsalg_ex_moms":  p["udsalg"],
+            "pris_ex_moms":    p["indkoeb"],
+            "kilde_varenumre": p["kilde"],
+            "har_historik":    bool(p["kilde"]),
+            "basis":           {d: round(basis_dag[d], 1) for d in DAGE},
+            "anbefalet":       anb_dag,
+            "total_basis":     round(sum(basis_dag.values())),
+            "total_anbefalet": total_anb,
+            "total_pris":      round(total_anb * p["indkoeb"], 2),
+            "db_ved_salg":     round(total_anb * (p["udsalg"] - p["indkoeb"]), 2),
+        })
+
+    total_stk     = sum(x["total_anbefalet"] for x in produkter)
+    total_indkoeb = sum(x["total_pris"] for x in produkter)
+    return {
+        "maal_uge":     maal_uge,
+        "maal_aar":     maal_aar,
+        "dato_range":   _dato_range(maal_uge, maal_aar),
+        "metode":       "organic-bakery",
+        "maaned":       mon_dato.month,
+        "si":           round(si, 2),
+        "event":        evt,
+        "tgtg_kr":      round(tgtg_kr),
+        "tgtg_korrektion": round(tgtg_korr, 2),
+        "service_faktorer": svc,
+        "produkter":    produkter,
+        "total_stk":    total_stk,
+        "total_indkoeb": round(total_indkoeb, 2),
+        "total_kr":     round(total_indkoeb, 2),
         "faktisk":      False,
     }
 

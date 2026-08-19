@@ -2865,6 +2865,37 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <style>
+        .bageri-prof-btn{padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ash);}
+        .bageri-prof-btn.active{background:var(--forest);color:#fff;border-color:var(--forest);}
+        #bageri-tabel td, #bageri-tabel th{padding:5px 7px;}
+        .bageri-badge{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.03em;text-transform:uppercase;border-radius:4px;padding:1px 4px;margin-left:5px;}
+      </style>
+      <div class="panel" id="p-bageri">
+        <div class="page-hdr">
+          <h2>Bageri — Organic Bakery</h2>
+          <p>Sell-through-bestilling fra 1/9 · ingen retur · bestil så tæt på salget som muligt (minimalt spild)</p>
+        </div>
+        <div class="card" id="bageri-kort">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <button onclick="bageriUge(-1)" style="padding:5px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:14px;">‹</button>
+              <span id="bageri-uge-lbl" style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--forest);min-width:170px;text-align:center;">Uge —</span>
+              <button onclick="bageriUge(1)" style="padding:5px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:14px;">›</button>
+            </div>
+            <div style="display:flex;gap:4px;" id="bageri-profil">
+              <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
+              <button class="bageri-prof-btn" data-p="balanceret" onclick="bageriProfil('balanceret')">Balanceret</button>
+            </div>
+          </div>
+          <div id="bageri-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:720px;" id="bageri-tabel"></table>
+          </div>
+          <p id="bageri-note" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;"></p>
+        </div>
+      </div>
+
       <div class="panel" id="p-solgtpivot">
         <div class="page-hdr">
           <h2>Solgte enheder — kategori &amp; produkt</h2>
@@ -3716,6 +3747,7 @@ function showPanel(id, el) {
     _buildNav();
   }
   // Load specific page data
+  if (id === 'bageri') loadBageri();
   if (id === 'basis') loadBasis();
   if (id === 'social') loadSocial();
   if (id === 'dbshopbox') loadDbShopbox();
@@ -3879,6 +3911,102 @@ function _spFmt(v){
   return _spData && _spData.er_kr ? Math.round(v).toLocaleString('da-DK')+' kr'
                                   : Number(v).toLocaleString('da-DK');
 }
+// ── BAGERI (Organic Bakery) — sell-through-bestilling, ingen retur ───────────
+let _bageriUge = null, _bageriAar = null, _bageriProfil = 'minimal';
+
+function _bageriMandag(aar, uge){
+  const s = new Date(aar, 0, 4);
+  const m = new Date(s);
+  m.setDate(s.getDate() - ((s.getDay() + 6) % 7) + (uge - 1) * 7);
+  return m;
+}
+
+async function loadBageri(){
+  if (_bageriUge === null){
+    const iso = _isoUgeIdag();
+    let u = iso.uge + 1, a = iso.aar;
+    if (u > 52){ u = 1; a++; }
+    // Før 1/9-2026: vis uge 36 (første Organic Bakery-uge) som udgangspunkt
+    if (_datoStr(_bageriMandag(a, u)) < '2026-08-31'){ u = 36; a = 2026; }
+    _bageriUge = u; _bageriAar = a;
+  }
+  _bageriRender();
+}
+function bageriUge(delta){
+  _bageriUge += delta;
+  if (_bageriUge < 1){ _bageriUge = 52; _bageriAar--; }
+  if (_bageriUge > 52){ _bageriUge = 1; _bageriAar++; }
+  _bageriRender();
+}
+function bageriProfil(p){ _bageriProfil = p; _bageriRender(); }
+
+async function _bageriRender(){
+  document.querySelectorAll('#bageri-profil .bageri-prof-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.p === _bageriProfil));
+  const tbl = document.getElementById('bageri-tabel');
+  tbl.innerHTML = '<tr><td style="padding:16px;color:var(--ash);">Henter…</td></tr>';
+  const d = await api(`/api/bestilling/anbefaling?uge=${_bageriUge}&aar=${_bageriAar}&metode=organic&profil=${_bageriProfil}`);
+  if (!d || d.error){
+    tbl.innerHTML = `<tr><td style="padding:16px;color:var(--danger);">${(d&&d.error)||'Kunne ikke hente'}</td></tr>`;
+    return;
+  }
+  document.getElementById('bageri-uge-lbl').textContent = `Uge ${d.maal_uge} · ${d.dato_range} ${d.maal_aar}`;
+
+  const DAGE = ['man','tir','ons','tor','fre','loe','son'];
+  const LBL  = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+  const KATO = ['Brød','Boller','Wiener','Kage'];
+  const WKND = new Set(['fre','loe','son']);
+  const kr = v => Math.round(v||0).toLocaleString('da-DK');
+
+  // Totaler
+  const dbPot = (d.produkter||[]).reduce((s,p)=>s+(p.db_ved_salg||0),0);
+  const tile = (lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${lbl}</div>
+      <div style="font-size:19px;font-weight:700;line-height:1;color:${clr||'var(--forest)'};">${val}</div></div>`;
+  document.getElementById('bageri-tot').innerHTML =
+      tile('Antal i alt', d.total_stk + ' stk')
+    + tile('Indkøb (ex moms)', kr(d.total_indkoeb)+' kr', '#8a3a3a')
+    + tile('DB hvis alt sælges', kr(dbPot)+' kr', 'var(--moss)')
+    + tile('Profil', _bageriProfil==='minimal'?'Minimal spild':'Balanceret', 'var(--ash)');
+
+  // Gruppér efter kategori
+  const groups = {};
+  (d.produkter||[]).forEach(p => { const k=p.kategori||'Andet'; (groups[k]=groups[k]||[]).push(p); });
+  const order = [...KATO, ...Object.keys(groups).filter(k=>!KATO.includes(k))];
+
+  let head = `<thead><tr><th style="text-align:left;min-width:170px;">Vare</th>`
+    + DAGE.map(dg=>`<th class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${LBL[dg]}</th>`).join('')
+    + `<th class="num">Uge</th><th class="num">Kr</th></tr></thead>`;
+  let body = '';
+  order.forEach(kat=>{
+    const prods = groups[kat]; if(!prods||!prods.length) return;
+    body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="10" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
+    prods.forEach(p=>{
+      const risk = p.risikogruppe==='risiko';
+      const badge = risk
+        ? `<span class="bageri-badge" style="background:#8a3a3a;color:#fff;" title="Ikke-fryse-egnet — bestilt stramt">stram</span>` : '';
+      const seed = !p.har_historik
+        ? `<span class="bageri-badge" style="background:var(--amber);color:#4a3800;" title="Ny vare — startbud uden historik">nyt</span>` : '';
+      body += `<tr>
+        <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
+        + DAGE.map(dg=>{
+            const v = p.anbefalet[dg]||0;
+            return `<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${v||'–'}</td>`;
+          }).join('')
+        + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
+           <td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
+    });
+  });
+  let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+      <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
+      <td class="num">${d.total_stk}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
+  tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
+
+  document.getElementById('bageri-note').textContent =
+    `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
+    + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`;
+}
+
 async function loadSolgtPivot(){
   _spGranStyle();
   const antal = _spGran==='dag'?14 : _spGran==='aar'?6 : 12;
@@ -4376,6 +4504,7 @@ const NAV_DEFAULT = [
   {id:'aar',         label:'Årsplan',               group:'Salg & økonomi',      hidden:false},
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},
+  {id:'bageri',      label:'Bageri (Organic)',      group:'Bageri & indkøb',     hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'prisaendring',label:'Prisændringer',         group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},

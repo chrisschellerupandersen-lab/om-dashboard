@@ -1115,12 +1115,19 @@ async def api_beregner_kontekst(request: Request):
         return {"ok": False, "fejl": str(e)}
 
 
+_BAGERI_PROFILER = {
+    "minimal":    {"risiko": 0.95, "standard": 1.05, "kage": 0.90},
+    "balanceret": {"risiko": 1.00, "standard": 1.15, "kage": 1.00},
+}
+
+
 @app.get("/api/bestilling/anbefaling")
 async def api_bestillings_anbefaling(
     request: Request,
     uge: Optional[int] = None,
     aar: Optional[int] = None,
     metode: Optional[str] = None,
+    profil: Optional[str] = None,
 ):
     _kræv_login(request)
     from datetime import date
@@ -1138,11 +1145,12 @@ async def api_bestillings_anbefaling(
     # ?metode=sellthrough / klassisk kan overstyre til test.
     maal_mon = date.fromisocalendar(int(aar), int(uge), 1).isoformat()
     auto_organic = maal_mon >= database._RETUR_SLUT   # fra 1/9 = Organic Bakery
+    service = _BAGERI_PROFILER.get(profil) if profil else None
     try:
         if metode == "organic" or (metode is None and auto_organic):
-            return database.hent_bestillings_uge_organic(int(uge), int(aar))
+            return database.hent_bestillings_uge_organic(int(uge), int(aar), service)
         if metode == "sellthrough":
-            return database.hent_bestillings_uge_sellthrough(int(uge), int(aar))
+            return database.hent_bestillings_uge_sellthrough(int(uge), int(aar), service)
         return database.hent_bestillings_uge(int(uge), int(aar))
     except Exception as e:
         import traceback

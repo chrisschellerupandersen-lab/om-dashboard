@@ -48,6 +48,12 @@ _KAGE_WHERE = """(
 # NB: nye kager tilføjes her som én linje pr. stk. (Organic Bakery-sortimentet
 # vokser over tid — start: gulerodskage).
 
+# Bagværks-leverandørskift til Organic Bakery = INGEN retur. Retur-prognosen
+# (10% boller / 13,5% wiener) slås fra for uger fra og med denne mandag.
+# 2026-08-31 = mandag i uge 36, den første Organic Bakery-uge (go-live 1/9).
+# Justér datoen her hvis skiftet flytter sig.
+_RETUR_SLUT = "2026-08-31"
+
 
 def _conn() -> sqlite3.Connection:
     db_dir = os.path.dirname(DB_PATH)
@@ -925,12 +931,14 @@ def hent_kpi(aar: int = None) -> Dict:
         b_stk = int(bestil_boller["stk"]) if (bestil_boller and bestil_boller["stk"]) else None
         b_kr  = bestil_boller["kr"]       if (bestil_boller and bestil_boller["kr"])  else None
 
-        # Altid vis retur-prognose baseret på bestilling (10% boller, 13,5% wiener)
-        # Hvis faktura for ugen findes, brug faktiske retur-kr til at beregne stk
+        # Retur-prognose baseret på bestilling (10% boller, 13,5% wiener).
+        # Fra Organic Bakery (uge fra og med _RETUR_SLUT) er der INGEN retur →
+        # prognosen slås fra. Hvis faktura for ugen findes, brug faktiske retur-kr.
         RETUR_BOLLER = 0.10
         RETUR_WIENER = 0.135
+        retur_aktiv = uge_mandag < _RETUR_SLUT
         bager_retur_info = None
-        if w_stk or b_stk:
+        if retur_aktiv and (w_stk or b_stk):
             if bager_uge_row and (bager_uge_row["retur_wiener"] or bager_uge_row["retur_boller"]):
                 # Faktiske retur fra faktura
                 wien_stk   = _retur_stk(bager_uge_row["retur_wiener"], w_stk, w_kr)
@@ -1000,6 +1008,7 @@ def hent_kpi(aar: int = None) -> Dict:
         "snit_12uger_dag":  dict(snit_4u_row)        if snit_4u_row       else None,
         "bager_uge":        dict(bager_uge_row)     if bager_uge_row     else None,
         "bager_retur":      bager_retur_info,
+        "retur_aktiv":      retur_aktiv,   # False fra 1/9 (Organic Bakery, ingen retur)
         "bager_iso_uge":    iso[1],
     }
 

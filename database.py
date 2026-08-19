@@ -54,6 +54,36 @@ _KAGE_WHERE = """(
 # Justér datoen her hvis skiftet flytter sig.
 _RETUR_SLUT = "2026-08-31"
 
+# Sell-through-ankret bestilling (newsvendor-lite). Mål: minimalt spild, da der
+# ingen retur er. Service-faktor pr. risikogruppe ganges på den daglige
+# sell-through-median:
+#  - risiko  = ikke-fryse-egnet (tebirkes, croissant, pain au chocolate): spild
+#    er rent tab → bestil STRAMT (under median → hellere udsolgt end spild)
+#  - kage    = letfordærveligt/dyrt → også stramt
+#  - standard= fryse-egnet (brød, boller, focaccia, rugbrød, teboller, snurrer):
+#    rest kan fryses/B2B'es → lille buffer over median
+_SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
+
+
+def _bestil_risikogruppe(varenavn: str, kat: str) -> str:
+    """Klassificér en vare til spild-risikogruppe (styrer bestillings-bufferen)."""
+    n = (varenavn or "").lower()
+    if kat == "Kage":
+        return "kage"
+    if any(k in n for k in ("tebirkes", "birkes", "croissant", "crossaint",
+                            "pain au", "marcipan")):
+        return "risiko"
+    return "standard"
+
+
+def _median(vals: list) -> float:
+    xs = sorted(v for v in vals if v is not None)
+    n = len(xs)
+    if n == 0:
+        return 0.0
+    m = n // 2
+    return float(xs[m]) if n % 2 else (xs[m - 1] + xs[m]) / 2.0
+
 
 def _conn() -> sqlite3.Connection:
     db_dir = os.path.dirname(DB_PATH)
@@ -5001,6 +5031,138 @@ def hent_bestillings_uge(maal_uge: int, maal_aar: int) -> Dict:
         "total_stk":       total_stk,
         "total_kr":        round(total_kr, 2),
         "faktisk":         False,
+    }
+
+
+def hent_bestillings_uge_sellthrough(maal_uge: int, maal_aar: int,
+                                     service: dict = None) -> Dict:
+    """Sell-through-ankret bestillingsanbefaling (newsvendor-lite).
+
+    Basis pr. dag = median af FAKTISK solgte stk på samme ugedag de seneste ~8
+    uger (ikke tidligere bestillinger). Justeres med sæson (SI), event/helligdag
+    og en service-faktor pr. risikogruppe, så spild minimeres — vigtigt fordi
+    Organic Bakery ikke tager retur. Returnerer samme form som
+    hent_bestillings_uge, så frontenden kan vise den direkte.
+    """
+    from datetime import date, timedelta
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    svc = dict(_SERVICE_FAKTOR)
+    if service:
+        svc.update({k: float(v) for k, v in service.items() if k in svc})
+
+    mon_dato    = date.fromisocalendar(maal_aar, maal_uge, 1)
+    vindue_start = (mon_dato - timedelta(weeks=13)).isoformat()   # ~12 ugers historik
+    maal_mon    = mon_dato.isoformat()
+
+    with _conn() as conn:
+        _pp_priser = _aktive_priser(conn, maal_mon)
+        sd_map     = _stamdata_type_map()
+
+        # Produktliste + priser fra seneste indlæste ugebestilling før mål-ugen
+        basis = conn.execute("""
+            SELECT uge, aar FROM ugebestillinger
+            WHERE (aar < ?) OR (aar = ? AND uge < ?)
+            ORDER BY aar DESC, uge DESC LIMIT 1
+        """, (maal_aar, maal_aar, maal_uge)).fetchone()
+        if not basis:
+            return {"error": "Ingen ugebestillinger indlæst endnu"}
+        prod_rows = conn.execute("""
+            SELECT varenummer, varenavn, pris_ex_moms
+            FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY id
+        """, (basis["uge"], basis["aar"])).fetchall()
+
+        # Åbne dage i vinduet (manglende produktsalg på en åben dag = 0 solgt)
+        aabne = [r[0] for r in conn.execute("""
+            SELECT DISTINCT dato FROM transaktioner
+            WHERE dato >= ? AND dato < ? ORDER BY dato
+        """, (vindue_start, maal_mon)).fetchall()]
+
+        # Faktisk solgt pr. (varenummer, dato)
+        salg: Dict = {}
+        for r in conn.execute("""
+            SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
+                   ROUND(SUM(antal),0) AS stk
+            FROM transaktioner
+            WHERE dato >= ? AND dato < ? AND varenummer!='' AND varenummer!='0'
+            GROUP BY vn, dato
+        """, (vindue_start, maal_mon)).fetchall():
+            if r["vn"] is not None:
+                salg[(int(r["vn"]), r["dato"])] = float(r["stk"] or 0)
+
+        # Seneste uges TGTG → let nedjustering (kannibaliserer salget)
+        tgtg_kr = conn.execute("""
+            SELECT tgtg FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 1
+        """).fetchone()
+        tgtg_kr = float(tgtg_kr[0]) if (tgtg_kr and tgtg_kr[0]) else 0.0
+    tgtg_korr = 0.95 if tgtg_kr > 1000 else 1.0
+
+    # Ugedag-index pr. åben dato (man=0 .. søn=6)
+    wd_af_dato = {d: date.fromisoformat(d).weekday() for d in aabne}
+
+    si  = _SI_MAANED.get(mon_dato.month, 1.0)
+    evt = _get_event(maal_uge, maal_aar)
+    dag_fak = evt["dag_fak"] if evt else {d: 1.0 for d in DAGE}
+
+    produkter = []
+    for r in prod_rows:
+        vn_str  = r["varenummer"] or ""
+        try:
+            vn = int(float(vn_str)) if vn_str not in ("", "0") else None
+        except (ValueError, TypeError):
+            vn = None
+        kat   = _kat(r["varenavn"], sd_map)
+        gruppe = _bestil_risikogruppe(r["varenavn"], kat)
+        sf     = svc.get(gruppe, 1.0)
+
+        # Median af de seneste ~8 samme-ugedage
+        pr_wd: Dict[int, list] = {i: [] for i in range(7)}
+        if vn is not None:
+            for d in aabne:
+                pr_wd[wd_af_dato[d]].append(salg.get((vn, d), 0.0))
+        basis_dag, anb_dag = {}, {}
+        for i, dn in enumerate(DAGE):
+            seneste = pr_wd[i][-8:]                    # nyeste 8 forekomster
+            med = _median(seneste)
+            basis_dag[dn] = med
+            raw = med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf
+            anb_dag[dn] = int(round(raw))
+
+        pris = _pp_priser.get(str(r["varenavn"]).strip().lower(),
+                              float(r["pris_ex_moms"] or 0))
+        total_anb = sum(anb_dag.values())
+        produkter.append({
+            "varenummer":      vn_str,
+            "varenavn":        r["varenavn"],
+            "kategori":        kat,
+            "risikogruppe":    gruppe,
+            "service_faktor":  sf,
+            "pris_ex_moms":    round(pris, 2),
+            "basis":           {d: round(basis_dag[d], 1) for d in DAGE},
+            "anbefalet":       anb_dag,
+            "manuel":          {},
+            "min_anb_dage":    [],
+            "total_basis":     round(sum(basis_dag.values())),
+            "total_anbefalet": total_anb,
+            "total_pris":      round(total_anb * pris, 2),
+        })
+
+    total_stk = sum(p["total_anbefalet"] for p in produkter)
+    total_kr  = sum(p["total_pris"]      for p in produkter)
+    return {
+        "maal_uge":     maal_uge,
+        "maal_aar":     maal_aar,
+        "dato_range":   _dato_range(maal_uge, maal_aar),
+        "metode":       "sell-through",
+        "maaned":       mon_dato.month,
+        "si":           round(si, 2),
+        "event":        evt,
+        "tgtg_kr":      round(tgtg_kr),
+        "tgtg_korrektion": round(tgtg_korr, 2),
+        "service_faktorer": svc,
+        "produkter":    produkter,
+        "total_stk":    total_stk,
+        "total_kr":     round(total_kr, 2),
+        "faktisk":      False,
     }
 
 

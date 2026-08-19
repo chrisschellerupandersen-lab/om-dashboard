@@ -1120,10 +1120,11 @@ async def api_bestillings_anbefaling(
     request: Request,
     uge: Optional[int] = None,
     aar: Optional[int] = None,
+    metode: Optional[str] = None,
 ):
     _kræv_login(request)
+    from datetime import date
     if uge is None:
-        from datetime import date
         iso = date.today().isocalendar()
         uge = iso[1] + 1
         aar = iso[0]
@@ -1131,9 +1132,15 @@ async def api_bestillings_anbefaling(
             uge = 1
             aar += 1
     if aar is None:
-        from datetime import date
         aar = date.today().year
+    # Fra Organic Bakery (mål-uge fra og med 1/9) ankres anbefalingen på faktisk
+    # sell-through for at minimere spild (ingen retur). Før: klassisk metode.
+    # ?metode=sellthrough / klassisk kan overstyre til test.
+    maal_mon = date.fromisocalendar(int(aar), int(uge), 1).isoformat()
+    brug_st = (metode == "sellthrough") or (metode != "klassisk" and maal_mon >= database._RETUR_SLUT)
     try:
+        if brug_st:
+            return database.hent_bestillings_uge_sellthrough(int(uge), int(aar))
         return database.hent_bestillings_uge(int(uge), int(aar))
     except Exception as e:
         import traceback
@@ -2699,6 +2706,29 @@ async def api_bagvaerk_oekonomi(request: Request):
         maaneder.append({"maaned": r["maaned"], "oms_ex_moms": oms, "db_kr": db,
                          "db_pct": round(db / oms * 100, 1) if oms > 0 else 0.0})
     return {"ok": True, "perioder": out, "maaneder": maaneder}
+
+
+@app.post("/api/bestilling/test-sellthrough")
+async def api_test_sellthrough(request: Request):
+    """Midlertidig (webhook-sikret) validering af sell-through-anbefalingen."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    uge = int(body.get("uge")); aar = int(body.get("aar"))
+    st = database.hent_bestillings_uge_sellthrough(uge, aar, body.get("service"))
+    kl = database.hent_bestillings_uge(uge, aar)  # klassisk til sammenligning
+    kl_tot = {p["varenavn"]: p["total_anbefalet"] for p in kl.get("produkter", [])}
+    prod = [{
+        "navn": p["varenavn"], "gruppe": p["risikogruppe"], "sf": p["service_faktor"],
+        "basis": p["basis"], "anb": p["anbefalet"],
+        "st_total": p["total_anbefalet"], "klassisk_total": kl_tot.get(p["varenavn"]),
+    } for p in st.get("produkter", [])]
+    return {"ok": True, "uge": uge, "aar": aar,
+            "st_total_stk": st.get("total_stk"), "klassisk_total_stk": kl.get("total_stk"),
+            "service_faktorer": st.get("service_faktorer"), "produkter": prod}
 
 
 @app.post("/api/bager/gmail-diagnose")

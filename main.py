@@ -2740,6 +2740,33 @@ async def api_test_sellthrough(request: Request):
             "service_faktorer": org.get("service_faktorer"), "produkter": prod}
 
 
+@app.post("/api/bageri/recovery-varer")
+async def api_bageri_recovery(request: Request):
+    """Diagnose (webhook): list frost/'fra i går'-varer så vi kan bygge
+    spild/redning-detektionen på de faktiske varenavne."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT varenavn,
+                   COUNT(DISTINCT dato) AS dage,
+                   ROUND(SUM(antal)) AS antal,
+                   ROUND(SUM(omsætning)) AS oms,
+                   ROUND(AVG(CASE WHEN antal>0 THEN omsætning/antal END),1) AS snitpris_incl
+            FROM transaktioner
+            WHERE LOWER(varenavn) LIKE '%frost%'
+               OR LOWER(varenavn) LIKE '%i går%'
+               OR LOWER(varenavn) LIKE '%igår%'
+               OR LOWER(varenavn) LIKE '%dagen%'
+            GROUP BY varenavn ORDER BY antal DESC
+        """).fetchall()
+    return {"ok": True, "varer": [dict(r) for r in rows]}
+
+
 @app.post("/api/bager/gmail-diagnose")
 async def api_gmail_diagnose(request: Request):
     """Midlertidig diagnose (webhook-sikret): vis Gmail-sync-opsætning + seneste

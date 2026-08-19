@@ -81,10 +81,12 @@ _ORGANIC_BAKERY = [
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065]},        # + Høj Romsnegle
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063]},
-    {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": []},
+    {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [],
+     "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055]},
     {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [13657]},
-    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": []},
+    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [],
+     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075]},
 ]
 
@@ -5238,15 +5240,21 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
-        pr_wd: Dict[int, list] = {i: [] for i in range(7)}
-        for d in aabne:
-            s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
-            pr_wd[wd_af_dato[d]].append(s)
-        basis_dag, anb_dag = {}, {}
-        for i, dn in enumerate(DAGE):
-            med = _median(pr_wd[i][-8:])
-            basis_dag[dn] = med
-            anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf))
+        seed = p.get("seed")
+        if not p["kilde"] and seed:
+            # Ny vare uden historik → brug startbud direkte (ikke skaleret om)
+            basis_dag = {d: float(seed.get(d, 0)) for d in DAGE}
+            anb_dag   = {d: int(seed.get(d, 0))   for d in DAGE}
+        else:
+            pr_wd: Dict[int, list] = {i: [] for i in range(7)}
+            for d in aabne:
+                s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
+                pr_wd[wd_af_dato[d]].append(s)
+            basis_dag, anb_dag = {}, {}
+            for i, dn in enumerate(DAGE):
+                med = _median(pr_wd[i][-8:])
+                basis_dag[dn] = med
+                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf))
         total_anb = sum(anb_dag.values())
         produkter.append({
             "varenavn":        p["navn"],

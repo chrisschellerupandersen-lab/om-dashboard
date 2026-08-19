@@ -78,8 +78,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044]},
     {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061]},
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062]},
-    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067]},
-    {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066]},
+    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065]},        # + Høj Romsnegle
+    {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": []},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055]},

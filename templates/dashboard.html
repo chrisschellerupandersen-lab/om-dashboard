@@ -4071,12 +4071,14 @@ async function _bageriSpildRender(){
       <td class="num" style="color:${sc};">${k.spild_pct==null?'–':k.spild_pct+'%'}</td>
       <td class="num">${k.reel_dg_pct==null?'–':k.reel_dg_pct+'%'}</td></tr>`;
     (k.varer||[]).forEach(v=>{
+      const erRed = v.type === 'reddet';
+      const navn = erRed ? ('↻ ' + v.navn) : v.navn;
       body += `<tr class="bspild-det-${idx}" style="display:none;background:rgba(0,0,0,.025);">
-        <td style="text-align:left;padding-left:24px;color:var(--ash);">${v.navn}</td>
-        <td class="num" style="color:var(--ash);">${v.bestilt}</td>
-        <td class="num" style="color:var(--ash);">${v.frisk_solgt}</td>
-        <td class="num" style="color:var(--ash);">–</td>
-        <td class="num" style="color:var(--ash);">${v.rest}</td>
+        <td style="text-align:left;padding-left:24px;color:${erRed?'var(--moss)':'var(--ash)'};">${navn}</td>
+        <td class="num" style="color:var(--ash);">${erRed?'–':v.bestilt}</td>
+        <td class="num" style="color:var(--ash);">${erRed?'–':v.frisk_solgt}</td>
+        <td class="num" style="color:var(--moss);">${v.reddet||'–'}</td>
+        <td class="num" style="color:var(--ash);">${erRed?'–':v.rest}</td>
         <td class="num" style="color:var(--ash);">–</td>
         <td class="num" style="color:var(--ash);">–</td></tr>`;
     });

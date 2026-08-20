@@ -5418,12 +5418,17 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                 agg[kat]["reddet_stk"] += float(r["antal"]) * faktor
                 agg[kat]["reddet_oms"] += float(r["oms"])
                 agg[kat]["reddet_db"]  += float(r["db"])
+                key = "reddet:" + _norm(r["varenavn"]).lower()
+                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]),
+                                               "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "reddet"})
+                p["reddet"] += float(r["antal"]) * faktor
             else:
                 agg[kat]["frisk_stk"] += float(r["antal"])
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
                 key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
-                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]), "bestilt": 0.0, "frisk": 0.0})
+                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]),
+                                               "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
                 p["frisk"] += float(r["antal"])
 
         # Bestilt denne uge fra ugebestilling
@@ -5435,7 +5440,8 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             if kat in agg:
                 agg[kat]["bestilt_stk"] += float(r["stk"])
                 key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
-                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]), "bestilt": 0.0, "frisk": 0.0})
+                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]),
+                                               "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
                 p["bestilt"] += float(r["stk"])
                 p["navn"] = _norm(r["varenavn"])   # foretræk ordre-arkets navn
 
@@ -5450,14 +5456,19 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
         db_sales   = a["frisk_db"] + a["reddet_db"]
         reel_db    = db_sales - spild_kost
         oms        = a["frisk_oms"] + a["reddet_oms"]
-        varer = sorted(prod[k].values(),
-                       key=lambda p: max(0.0, p["bestilt"] - p["frisk"]), reverse=True)
+        _pl = list(prod[k].values())
+        # Friske varer først (efter rest), derefter rednings-varer (frost / fra i går)
+        _pl.sort(key=lambda p: (p.get("type") == "reddet",
+                                -max(0.0, p["bestilt"] - p["frisk"]),
+                                -p.get("reddet", 0)))
         varer = [{
             "navn":        p["navn"],
+            "type":        p.get("type", "frisk"),
             "bestilt":     round(p["bestilt"]),
             "frisk_solgt": round(p["frisk"]),
+            "reddet":      round(p.get("reddet", 0)),
             "rest":        round(max(0.0, p["bestilt"] - p["frisk"])),
-        } for p in varer if (p["bestilt"] or p["frisk"])]
+        } for p in _pl if (p["bestilt"] or p["frisk"] or p.get("reddet", 0))]
         rows.append({
             "kategori":     k,
             "bestilt":      round(bestilt),

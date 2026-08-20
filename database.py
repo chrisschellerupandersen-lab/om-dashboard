@@ -5513,6 +5513,39 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             "kategorier": rows, "total": total}
 
 
+def _trend_uge_fra_anbefaling(w: int, y: int) -> Dict:
+    """Byg en 'kommende uge'-post ud fra Organic Bakery-anbefalingen (beregneren),
+    så planlagte bestillinger vises som kommende uger i trenden."""
+    from datetime import date, timedelta
+    rec = hent_bestillings_uge_organic(w, y)
+    KATS = ["Brød", "Boller", "Wiener", "Kage"]
+    kat_best = {k: 0.0 for k in KATS}
+    kat_varer = {k: [] for k in KATS}
+    for p in rec.get("produkter", []):
+        kat = p.get("kategori") or ""
+        if kat not in kat_best:
+            continue
+        n = p.get("total_anbefalet", 0)
+        kat_best[kat] += n
+        if n:
+            kat_varer[kat].append({"navn": p["varenavn"], "type": "frisk",
+                                    "bestilt": n, "frisk_solgt": 0, "reddet": 0, "rest": n})
+    kategorier = [{
+        "kategori": k, "bestilt": round(kat_best[k]), "frisk_solgt": 0, "reddet": 0,
+        "spild": None, "spild_pct": None, "reel_dg_pct": None, "spild_kost": None,
+        "redningsandel_pct": 0, "oms_ex": 0, "varer": kat_varer[k],
+    } for k in KATS]
+    mon = date.fromisocalendar(y, w, 1); sun = mon + timedelta(days=6)
+    total_best = round(sum(kat_best.values()))
+    return {
+        "uge": w, "aar": y, "dato_range": f"{mon.strftime('%d/%m')}–{sun.strftime('%d/%m')}",
+        "har_bestilt": total_best > 0,
+        "total": {"bestilt": total_best, "frisk_solgt": 0, "reddet": 0,
+                  "spild": None, "spild_pct": None, "spild_kost": None, "reel_dg_pct": None},
+        "kategorier": kategorier,
+    }
+
+
 def hent_bageri_spild_trend(antal: int = 8) -> Dict:
     """Spild-trend over de seneste N uger (følg om spildet falder).
     Genbruger hent_bageri_spild pr. uge. Ældste uge først."""
@@ -5537,20 +5570,37 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
             completed.append(key)
         d = d - timedelta(days=7)
     completed.reverse()   # ældste først
-    alle = completed + [k for k in kommende if k not in seen]
+    valgt = list(completed)
+    for k in kommende:
+        if k not in seen:
+            seen.add(k); valgt.append(k)
+    poster = [(yy, ww, "salg") for (yy, ww) in valgt]
+
+    # Tilføj kommende Organic Bakery-anbefalinger (fra beregneren) som kommende uger
+    latest_mon = max([date.fromisocalendar(yy, ww, 1) for (yy, ww) in valgt], default=maxdato_d)
+    tilf, i = 0, 1
+    while tilf < 4 and i <= 8:
+        m = latest_mon + timedelta(weeks=i); i += 1
+        iso2 = m.isocalendar(); key2 = (iso2[0], iso2[1])
+        if key2 in seen:
+            continue
+        if m.isoformat() < _RETUR_SLUT:   # kun Organic Bakery-æra (fra 1/9)
+            continue
+        seen.add(key2); poster.append((iso2[0], iso2[1], "anbefaling")); tilf += 1
+
+    poster.sort(key=lambda x: (x[0], x[1]))
 
     # Reference = ugen for seneste salg = indeværende uge (data-drevet, ikke serverur)
     mkey = (maxdato_d.isocalendar()[0], maxdato_d.isocalendar()[1])
     uger = []
-    for (y, w) in alle:
-        r = hent_bageri_spild(w, y)
-        t = r["total"]
-        if (y, w) < mkey:
-            status = "afsluttet"
-        elif (y, w) == mkey:
-            status = "indeværende"
-        else:
+    for (y, w, kilde) in poster:
+        if kilde == "anbefaling":
+            r = _trend_uge_fra_anbefaling(w, y)
             status = "kommende"
+        else:
+            r = hent_bageri_spild(w, y)
+            status = "afsluttet" if (y, w) < mkey else ("indeværende" if (y, w) == mkey else "kommende")
+        t = r["total"]
         ufuld = status != "afsluttet"     # ikke færdig-solgt → spild ikke endeligt
         uger.append({
             "uge": w, "aar": y, "dato_range": r["dato_range"],
@@ -5563,6 +5613,7 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
             "har_bestilt": r["har_bestilt"],
             "status": status, "ufuldstaendig": ufuld,
             "kommende": ufuld,   # bagudkompatibelt flag
+            "kilde": kilde,      # 'salg' | 'anbefaling'
             "kategorier": r["kategorier"],   # per-gruppe (+ varer) til drill-down/pivot
         })
     # Snit kun over AFSLUTTEDE uger med bestilling

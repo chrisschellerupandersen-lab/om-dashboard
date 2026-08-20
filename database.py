@@ -5388,16 +5388,25 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             n = n[6:].strip()
         return n
 
+    def _vnr(x):
+        s = str(x or "").strip()
+        if s in ("", "0"):
+            return ""
+        try:
+            return str(int(float(s)))
+        except (ValueError, TypeError):
+            return s
+
     with _conn() as conn:
         # Salg denne uge pr. varenavn (ex moms + korrekt DB, inkl. frost VF=0-regel)
         for r in conn.execute("""
-            SELECT varenavn,
+            SELECT varenummer, varenavn,
                    COALESCE(SUM(antal),0)              AS antal,
                    COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
                    COALESCE(SUM(db_korrekt),0)         AS db
             FROM v_transaktioner
             WHERE dato >= ? AND dato <= ?
-            GROUP BY varenavn
+            GROUP BY varenummer, varenavn
         """, (mon.isoformat(), sun.isoformat())).fetchall():
             rolle = _bageri_rolle(r["varenavn"])
             if not rolle:
@@ -5413,21 +5422,22 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                 agg[kat]["frisk_stk"] += float(r["antal"])
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
-                nn = _norm(r["varenavn"]); key = nn.lower()
-                p = prod[kat].setdefault(key, {"navn": nn, "bestilt": 0.0, "frisk": 0.0})
+                key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
+                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]), "bestilt": 0.0, "frisk": 0.0})
                 p["frisk"] += float(r["antal"])
 
         # Bestilt denne uge fra ugebestilling
         for r in conn.execute("""
-            SELECT varenavn, COALESCE(SUM(man+tir+ons+tor+fre+loe+son),0) AS stk
-            FROM ugebestillinger WHERE uge=? AND aar=? GROUP BY varenavn
+            SELECT varenummer, varenavn, COALESCE(SUM(man+tir+ons+tor+fre+loe+son),0) AS stk
+            FROM ugebestillinger WHERE uge=? AND aar=? GROUP BY varenummer, varenavn
         """, (uge, aar)).fetchall():
             kat = _bakery_kat(r["varenavn"])
             if kat in agg:
                 agg[kat]["bestilt_stk"] += float(r["stk"])
-                nn = _norm(r["varenavn"]); key = nn.lower()
-                p = prod[kat].setdefault(key, {"navn": nn, "bestilt": 0.0, "frisk": 0.0})
+                key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
+                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]), "bestilt": 0.0, "frisk": 0.0})
                 p["bestilt"] += float(r["stk"])
+                p["navn"] = _norm(r["varenavn"])   # foretræk ordre-arkets navn
 
     rows, tot = [], {"bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "spild": 0.0,
                      "db": 0.0, "spild_kost": 0.0, "oms": 0.0}

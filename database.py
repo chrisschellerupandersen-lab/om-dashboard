@@ -5502,14 +5502,17 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
         maxdato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
     if not maxdato:
         return {"uger": []}
-    d = date.fromisoformat(str(maxdato)[:10])
+    maxdato_d = date.fromisoformat(str(maxdato)[:10])
+    d = maxdato_d
     uger, seen = [], set()
     guard = 0
-    while len(uger) < antal and guard < antal * 3:
+    while len(uger) < antal and guard < antal * 4:
         guard += 1
         iso = d.isocalendar()
         key = (iso[0], iso[1])
-        if key not in seen:
+        # Spring ufuldstændige uger over (ugens søndag efter seneste salgsdato)
+        uge_sun = date.fromisocalendar(iso[0], iso[1], 7)
+        if key not in seen and uge_sun <= maxdato_d:
             seen.add(key)
             r = hent_bageri_spild(iso[1], iso[0])
             t = r["total"]

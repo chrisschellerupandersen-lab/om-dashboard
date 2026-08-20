@@ -5539,24 +5539,34 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
     completed.reverse()   # ældste først
     alle = completed + [k for k in kommende if k not in seen]
 
+    # Reference = ugen for seneste salg = indeværende uge (data-drevet, ikke serverur)
+    mkey = (maxdato_d.isocalendar()[0], maxdato_d.isocalendar()[1])
     uger = []
     for (y, w) in alle:
         r = hent_bageri_spild(w, y)
         t = r["total"]
-        komm = date.fromisocalendar(y, w, 7) > maxdato_d
+        if (y, w) < mkey:
+            status = "afsluttet"
+        elif (y, w) == mkey:
+            status = "indeværende"
+        else:
+            status = "kommende"
+        ufuld = status != "afsluttet"     # ikke færdig-solgt → spild ikke endeligt
         uger.append({
             "uge": w, "aar": y, "dato_range": r["dato_range"],
             "bestilt": t["bestilt"], "solgt": t["frisk_solgt"] + t["reddet"],
             "frisk_solgt": t["frisk_solgt"], "reddet": t["reddet"],
-            "spild":      None if komm else t["spild"],
-            "spild_pct":  None if komm else t["spild_pct"],
-            "spild_kost": None if komm else t["spild_kost"],
-            "reel_dg_pct": None if komm else t["reel_dg_pct"],
-            "har_bestilt": r["har_bestilt"], "kommende": komm,
+            "spild":      None if ufuld else t["spild"],
+            "spild_pct":  None if ufuld else t["spild_pct"],
+            "spild_kost": None if ufuld else t["spild_kost"],
+            "reel_dg_pct": None if ufuld else t["reel_dg_pct"],
+            "har_bestilt": r["har_bestilt"],
+            "status": status, "ufuldstaendig": ufuld,
+            "kommende": ufuld,   # bagudkompatibelt flag
             "kategorier": r["kategorier"],   # per-gruppe (+ varer) til drill-down/pivot
         })
     # Snit kun over AFSLUTTEDE uger med bestilling
-    m = [u for u in uger if not u["kommende"] and u["har_bestilt"] and u["spild_pct"] is not None]
+    m = [u for u in uger if u["status"] == "afsluttet" and u["har_bestilt"] and u["spild_pct"] is not None]
     snit = {
         "spild_pct": round(sum(u["spild_pct"] for u in m) / len(m), 1) if m else None,
         "spild_kost": round(sum(u["spild_kost"] for u in m) / len(m)) if m else None,

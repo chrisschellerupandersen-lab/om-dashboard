@@ -4151,8 +4151,8 @@ function _trendUger(d){
   let body = '';
   d.uger.slice().reverse().forEach((u,wi)=>{   // nyeste uger først
     const c = _trendCol(u.spild_pct);
-    const komm = u.kommende;
-    const kb = komm ? ' <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">kommende</span>' : '';
+    const komm = u.ufuldstaendig;
+    const kb = komm ? ` <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">${u.status||'kommende'}</span>` : '';
     body += `<tr style="cursor:pointer;${komm?'opacity:.85;':''}" onclick="_trendFoldU(${wi})">
       <td style="text-align:left;font-weight:600;"><span id="btr-arU-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span>${kb}</td>
       <td class="num">${u.bestilt}</td><td class="num">${u.solgt}</td>
@@ -4216,8 +4216,8 @@ function _trendGruppe(d){
   let body = '';
   d.uger.slice().reverse().forEach((u,wi)=>{   // nyeste uger først
     const byk = {}; (u.kategorier||[]).forEach(k=>byk[k.kategori]=k);
-    const komm = u.kommende;
-    const kb = komm ? ' <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">kommende</span>' : '';
+    const komm = u.ufuldstaendig;
+    const kb = komm ? ` <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">${u.status||'kommende'}</span>` : '';
     body += `<tr style="cursor:pointer;font-weight:600;${komm?'opacity:.85;':''}" onclick="_trendFoldG(${wi})">
       <td style="text-align:left;"><span id="btg-ar-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge}${kb}</td>`
       + KATS.map(kt=>{

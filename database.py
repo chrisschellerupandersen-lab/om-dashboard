@@ -5494,6 +5494,45 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             "kategorier": rows, "total": total}
 
 
+def hent_bageri_spild_trend(antal: int = 8) -> Dict:
+    """Spild-trend over de seneste N uger (følg om spildet falder).
+    Genbruger hent_bageri_spild pr. uge. Ældste uge først."""
+    from datetime import date, timedelta
+    with _conn() as conn:
+        maxdato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+    if not maxdato:
+        return {"uger": []}
+    d = date.fromisoformat(str(maxdato)[:10])
+    uger, seen = [], set()
+    guard = 0
+    while len(uger) < antal and guard < antal * 3:
+        guard += 1
+        iso = d.isocalendar()
+        key = (iso[0], iso[1])
+        if key not in seen:
+            seen.add(key)
+            r = hent_bageri_spild(iso[1], iso[0])
+            t = r["total"]
+            uger.append({
+                "uge": iso[1], "aar": iso[0], "dato_range": r["dato_range"],
+                "bestilt": t["bestilt"], "solgt": t["frisk_solgt"] + t["reddet"],
+                "frisk_solgt": t["frisk_solgt"], "reddet": t["reddet"],
+                "spild": t["spild"], "spild_pct": t["spild_pct"],
+                "spild_kost": t["spild_kost"], "reel_dg_pct": t["reel_dg_pct"],
+                "har_bestilt": r["har_bestilt"],
+            })
+        d = d - timedelta(days=7)
+    uger.reverse()
+    # Snit over uger med bestilling
+    m = [u for u in uger if u["har_bestilt"] and u["spild_pct"] is not None]
+    snit = {
+        "spild_pct": round(sum(u["spild_pct"] for u in m) / len(m), 1) if m else None,
+        "spild_kost": round(sum(u["spild_kost"] for u in m) / len(m)) if m else None,
+        "reel_dg_pct": round(sum(u["reel_dg_pct"] for u in m if u["reel_dg_pct"] is not None) / len(m), 1) if m else None,
+    }
+    return {"uger": uger, "snit": snit}
+
+
 # ── BASIS BESTILLING (DAGLIG SKABELON) ────────────────────────────────────────
 
 def hent_basis_bestilling() -> List[Dict]:

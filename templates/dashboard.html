@@ -2905,6 +2905,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl" style="width:100%;min-width:640px;" id="bageri-spild-tabel"></table>
           </div>
         </div>
+
+        <div class="card" id="bageri-trend-kort" style="margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild-trend — seneste uger</span>
+            <span id="bageri-trend-snit" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+          </div>
+          <div id="bageri-trend-bars" style="display:flex;align-items:flex-end;gap:8px;height:120px;margin-bottom:14px;padding:0 2px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:620px;" id="bageri-trend-tabel"></table>
+          </div>
+        </div>
       </div>
 
       <div class="panel" id="p-solgtpivot">
@@ -3942,6 +3953,7 @@ async function loadBageri(){
     _bageriUge = u; _bageriAar = a;
   }
   _bageriRender();
+  _bageriTrendRender();
 }
 function bageriUge(delta){
   _bageriUge += delta;
@@ -4084,6 +4096,46 @@ function _bageriSpildFold(idx){
   rows.forEach(r => r.style.display = show ? '' : 'none');
   const ar = document.getElementById('bspild-ar-'+idx);
   if (ar) ar.textContent = show ? '▾' : '▸';
+}
+
+async function _bageriTrendRender(){
+  const bars = document.getElementById('bageri-trend-bars');
+  const tbl  = document.getElementById('bageri-trend-tabel');
+  const snitEl = document.getElementById('bageri-trend-snit');
+  if (!bars) return;
+  bars.innerHTML = '<span style="color:var(--ash);font-size:11px;">Henter…</span>';
+  const d = await api('/api/bageri/spild-trend?uger=8');
+  if (!d || !d.uger || !d.uger.length){ bars.innerHTML=''; if(tbl) tbl.innerHTML=''; return; }
+  const kr = v => Math.round(v||0).toLocaleString('da-DK');
+  const col = p => p>=15 ? 'var(--danger)' : p>=8 ? '#e67e22' : 'var(--moss)';
+  const uger = d.uger;
+  const maxPct = Math.max(10, ...uger.map(u => u.spild_pct||0));
+  bars.innerHTML = uger.map(u => {
+    const p = u.spild_pct;
+    const h = (p==null) ? 0 : Math.round(p / maxPct * 100);
+    const c = (p==null) ? 'var(--border)' : col(p);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:26px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:${c};font-weight:600;">${p==null?'–':p+'%'}</div>
+      <div style="width:100%;height:80px;display:flex;align-items:flex-end;">
+        <div style="width:100%;height:${h}%;background:${c};border-radius:3px 3px 0 0;min-height:${p==null?0:2}px;"></div>
+      </div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">u${u.uge}</div>
+    </div>`;
+  }).join('');
+  if (snitEl) snitEl.textContent = (d.snit && d.snit.spild_pct!=null)
+    ? `Snit: ${d.snit.spild_pct}% spild · ${kr(d.snit.spild_kost)} kr/uge · reel DG ${d.snit.reel_dg_pct}%` : '';
+  const head = `<thead><tr><th style="text-align:left;">Uge</th><th class="num">Bestilt</th><th class="num">Solgt</th><th class="num">Spild</th><th class="num">Spild %</th><th class="num">Spild-kost</th><th class="num">Reel DG %</th></tr></thead>`;
+  const body = uger.map(u => {
+    const c = (u.spild_pct==null) ? 'var(--ash)' : col(u.spild_pct);
+    return `<tr>
+      <td style="text-align:left;">u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span></td>
+      <td class="num">${u.bestilt}</td><td class="num">${u.solgt}</td>
+      <td class="num" style="color:${c};font-weight:600;">${u.spild}</td>
+      <td class="num" style="color:${c};">${u.spild_pct==null?'–':u.spild_pct+'%'}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(u.spild_kost)}</td>
+      <td class="num">${u.reel_dg_pct==null?'–':u.reel_dg_pct+'%'}</td></tr>`;
+  }).join('');
+  if (tbl) tbl.innerHTML = head + '<tbody>'+body+'</tbody>';
 }
 
 async function loadSolgtPivot(){

@@ -5519,35 +5519,44 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
     from datetime import date, timedelta
     with _conn() as conn:
         maxdato = conn.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+        best_rows = conn.execute("SELECT DISTINCT aar, uge FROM ugebestillinger").fetchall()
     if not maxdato:
         return {"uger": []}
     maxdato_d = date.fromisoformat(str(maxdato)[:10])
-    d = maxdato_d
-    uger, seen = [], set()
-    guard = 0
-    while len(uger) < antal and guard < antal * 4:
+    # Kommende bestillingsuger (søndag efter seneste salgsdato) — med selvom ikke solgt endnu
+    kommende = sorted({(b["aar"], b["uge"]) for b in best_rows
+                       if date.fromisocalendar(b["aar"], b["uge"], 7) > maxdato_d})
+    # Afsluttede uger: sidste N med søndag <= seneste salgsdato
+    completed, seen, d, guard = [], set(), maxdato_d, 0
+    while len(completed) < antal and guard < antal * 4:
         guard += 1
         iso = d.isocalendar()
         key = (iso[0], iso[1])
-        # Spring ufuldstændige uger over (ugens søndag efter seneste salgsdato)
-        uge_sun = date.fromisocalendar(iso[0], iso[1], 7)
-        if key not in seen and uge_sun <= maxdato_d:
+        if key not in seen and date.fromisocalendar(iso[0], iso[1], 7) <= maxdato_d:
             seen.add(key)
-            r = hent_bageri_spild(iso[1], iso[0])
-            t = r["total"]
-            uger.append({
-                "uge": iso[1], "aar": iso[0], "dato_range": r["dato_range"],
-                "bestilt": t["bestilt"], "solgt": t["frisk_solgt"] + t["reddet"],
-                "frisk_solgt": t["frisk_solgt"], "reddet": t["reddet"],
-                "spild": t["spild"], "spild_pct": t["spild_pct"],
-                "spild_kost": t["spild_kost"], "reel_dg_pct": t["reel_dg_pct"],
-                "har_bestilt": r["har_bestilt"],
-                "kategorier": r["kategorier"],   # per-gruppe (+ varer) til drill-down/pivot
-            })
+            completed.append(key)
         d = d - timedelta(days=7)
-    uger.reverse()
-    # Snit over uger med bestilling
-    m = [u for u in uger if u["har_bestilt"] and u["spild_pct"] is not None]
+    completed.reverse()   # ældste først
+    alle = completed + [k for k in kommende if k not in seen]
+
+    uger = []
+    for (y, w) in alle:
+        r = hent_bageri_spild(w, y)
+        t = r["total"]
+        komm = date.fromisocalendar(y, w, 7) > maxdato_d
+        uger.append({
+            "uge": w, "aar": y, "dato_range": r["dato_range"],
+            "bestilt": t["bestilt"], "solgt": t["frisk_solgt"] + t["reddet"],
+            "frisk_solgt": t["frisk_solgt"], "reddet": t["reddet"],
+            "spild":      None if komm else t["spild"],
+            "spild_pct":  None if komm else t["spild_pct"],
+            "spild_kost": None if komm else t["spild_kost"],
+            "reel_dg_pct": None if komm else t["reel_dg_pct"],
+            "har_bestilt": r["har_bestilt"], "kommende": komm,
+            "kategorier": r["kategorier"],   # per-gruppe (+ varer) til drill-down/pivot
+        })
+    # Snit kun over AFSLUTTEDE uger med bestilling
+    m = [u for u in uger if not u["kommende"] and u["har_bestilt"] and u["spild_pct"] is not None]
     snit = {
         "spild_pct": round(sum(u["spild_pct"] for u in m) / len(m), 1) if m else None,
         "spild_kost": round(sum(u["spild_kost"] for u in m) / len(m)) if m else None,

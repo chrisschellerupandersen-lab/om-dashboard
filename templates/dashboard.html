@@ -4149,14 +4149,16 @@ function _bageriTrendTabel(){
 function _trendUger(d){
   const head = `<thead><tr><th style="text-align:left;">Uge</th><th class="num">Bestilt</th><th class="num">Solgt</th><th class="num">Spild</th><th class="num">Spild %</th><th class="num">Spild-kost</th><th class="num">Reel DG %</th></tr></thead>`;
   let body = '';
-  d.uger.forEach((u,wi)=>{
+  d.uger.slice().reverse().forEach((u,wi)=>{   // nyeste uger først
     const c = _trendCol(u.spild_pct);
-    body += `<tr style="cursor:pointer;" onclick="_trendFoldU(${wi})">
-      <td style="text-align:left;font-weight:600;"><span id="btr-arU-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span></td>
+    const komm = u.kommende;
+    const kb = komm ? ' <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">kommende</span>' : '';
+    body += `<tr style="cursor:pointer;${komm?'opacity:.85;':''}" onclick="_trendFoldU(${wi})">
+      <td style="text-align:left;font-weight:600;"><span id="btr-arU-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span>${kb}</td>
       <td class="num">${u.bestilt}</td><td class="num">${u.solgt}</td>
-      <td class="num" style="font-weight:700;color:${c};">${u.spild}</td>
+      <td class="num" style="font-weight:700;color:${c};">${komm?'–':u.spild}</td>
       <td class="num" style="color:${c};">${u.spild_pct==null?'–':u.spild_pct+'%'}</td>
-      <td class="num" style="color:#8a3a3a;">${_trendKr(u.spild_kost)}</td>
+      <td class="num" style="color:#8a3a3a;">${komm?'–':_trendKr(u.spild_kost)}</td>
       <td class="num">${u.reel_dg_pct==null?'–':u.reel_dg_pct+'%'}</td></tr>`;
     (u.kategorier||[]).forEach((k,ci)=>{
       const cc = _trendCol(k.spild_pct);
@@ -4164,10 +4166,10 @@ function _trendUger(d){
       body += `<tr class="btr-cat-${wi}" style="display:none;background:rgba(45,74,45,.05);cursor:pointer;" onclick="_trendFoldC(${wi},${ci})">
         <td style="text-align:left;padding-left:20px;"><span id="btr-arC-${wi}-${ci}" style="display:inline-block;width:12px;color:var(--ash);">${nV?'▸':''}</span>${k.kategori}</td>
         <td class="num">${k.bestilt}</td><td class="num">${k.frisk_solgt + k.reddet}</td>
-        <td class="num" style="color:${cc};">${k.spild}</td>
-        <td class="num" style="color:${cc};">${k.spild_pct==null?'–':k.spild_pct+'%'}</td>
-        <td class="num" style="color:#8a3a3a;">${_trendKr(k.spild_kost)}</td>
-        <td class="num">${k.reel_dg_pct==null?'–':k.reel_dg_pct+'%'}</td></tr>`;
+        <td class="num" style="color:${cc};">${komm?'–':k.spild}</td>
+        <td class="num" style="color:${cc};">${komm?'–':(k.spild_pct==null?'–':k.spild_pct+'%')}</td>
+        <td class="num" style="color:#8a3a3a;">${komm?'–':_trendKr(k.spild_kost)}</td>
+        <td class="num">${komm?'–':(k.reel_dg_pct==null?'–':k.reel_dg_pct+'%')}</td></tr>`;
       (k.varer||[]).forEach(v=>{
         const erRed = v.type==='reddet';
         body += `<tr class="btr-prod-${wi}-${ci} btr-pw-${wi}" style="display:none;background:rgba(0,0,0,.025);">
@@ -4206,23 +4208,58 @@ function _trendFoldC(wi, ci){
 
 function _trendGruppe(d){
   const KATS = ['Brød','Boller','Wiener','Kage'];
+  const bl = 'border-left:2px solid var(--border);';
   const h1 = '<tr><th rowspan="2" style="text-align:left;">Uge</th>'
-    + KATS.map(k=>`<th colspan="3" style="text-align:center;border-left:1px solid var(--border);">${k}</th>`).join('') + '</tr>';
+    + KATS.map(k=>`<th colspan="4" style="text-align:center;${bl}">${k}</th>`).join('') + '</tr>';
   const h2 = '<tr>'
-    + KATS.map(()=>`<th class="num" style="border-left:1px solid var(--border);">Købt</th><th class="num">Solgt</th><th class="num">Diff</th>`).join('') + '</tr>';
+    + KATS.map(()=>`<th class="num" style="${bl}">Købt</th><th class="num">Solgt</th><th class="num">Diff</th><th class="num">Kost</th>`).join('') + '</tr>';
   let body = '';
-  d.uger.forEach(u=>{
+  d.uger.slice().reverse().forEach((u,wi)=>{   // nyeste uger først
     const byk = {}; (u.kategorier||[]).forEach(k=>byk[k.kategori]=k);
-    body += `<tr><td style="text-align:left;">u${u.uge}</td>`
+    const komm = u.kommende;
+    const kb = komm ? ' <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">kommende</span>' : '';
+    body += `<tr style="cursor:pointer;font-weight:600;${komm?'opacity:.85;':''}" onclick="_trendFoldG(${wi})">
+      <td style="text-align:left;"><span id="btg-ar-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge}${kb}</td>`
       + KATS.map(kt=>{
-          const k = byk[kt] || {bestilt:0,frisk_solgt:0,reddet:0};
+          const k = byk[kt] || {bestilt:0,frisk_solgt:0,reddet:0,spild_pct:null,spild_kost:0};
           const solgt = (k.frisk_solgt||0)+(k.reddet||0);
           const diff  = (k.bestilt||0)-solgt;
+          if (komm)
+            return `<td class="num" style="${bl}">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:var(--ash);">–</td><td class="num" style="color:var(--ash);">–</td>`;
           const dc = diff>0 ? 'var(--danger)' : diff<0 ? 'var(--moss)' : 'var(--ash)';
-          return `<td class="num" style="border-left:1px solid var(--border);">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:${dc};font-weight:600;">${diff>0?'+':''}${diff}</td>`;
+          const pct = (k.spild_pct==null) ? '' : ` <span style="font-size:9px;opacity:.8;">(${k.spild_pct}%)</span>`;
+          return `<td class="num" style="${bl}">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:${dc};font-weight:600;">${diff>0?'+':''}${diff}${pct}</td><td class="num" style="color:#8a3a3a;">${_trendKr(k.spild_kost)}</td>`;
         }).join('') + '</tr>';
+    // Drill-down: produkter placeret under deres egen gruppes kolonner
+    (u.kategorier||[]).forEach(k=>{
+      const ci = KATS.indexOf(k.kategori); if (ci<0) return;
+      (k.varer||[]).forEach(v=>{
+        const erRed = v.type==='reddet';
+        let cells = '';
+        for (let g=0; g<KATS.length; g++){
+          if (g===ci){
+            cells += `<td class="num" style="${bl}color:var(--ash);">${erRed?'–':v.bestilt}</td>`
+                   + `<td class="num" style="color:var(--ash);">${erRed?(v.reddet||'–'):v.frisk_solgt}</td>`
+                   + `<td class="num" style="color:${erRed?'var(--moss)':'var(--ash)'};">${erRed?'reddet':(v.bestilt-v.frisk_solgt)}</td>`
+                   + `<td class="num"></td>`;
+          } else {
+            cells += `<td class="num" style="${bl}"></td><td class="num"></td><td class="num"></td><td class="num"></td>`;
+          }
+        }
+        body += `<tr class="btg-p-${wi}" style="display:none;background:rgba(0,0,0,.025);">
+          <td style="text-align:left;padding-left:22px;color:${erRed?'var(--moss)':'var(--ash)'};">${erRed?'↻ ':''}${v.navn}</td>${cells}</tr>`;
+      });
+    });
   });
   return `<thead>${h1}${h2}</thead><tbody>${body}</tbody>`;
+}
+
+function _trendFoldG(wi){
+  const rows = document.querySelectorAll('.btg-p-'+wi);
+  if (!rows.length) return;
+  const show = rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = show ? '' : 'none');
+  const ar = document.getElementById('btg-ar-'+wi); if (ar) ar.textContent = show ? '▾' : '▸';
 }
 
 async function loadSolgtPivot(){

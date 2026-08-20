@@ -4112,7 +4112,7 @@ async function _bageriTrendRender(){
   const bars = document.getElementById('bageri-trend-bars');
   if (!bars) return;
   bars.innerHTML = '<span style="color:var(--ash);font-size:11px;">Henter…</span>';
-  const d = await api('/api/bageri/spild-trend?uger=8');
+  const d = await api('/api/bageri/spild-trend?uger=20');
   _bageriTrendData = d;
   const tbl = document.getElementById('bageri-trend-tabel');
   if (!d || !d.uger || !d.uger.length){ bars.innerHTML=''; if(tbl) tbl.innerHTML=''; return; }

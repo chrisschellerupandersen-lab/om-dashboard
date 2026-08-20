@@ -5292,7 +5292,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                     salg[(int(r["vn"]), r["dato"])] = float(r["stk"] or 0)
         tg = conn.execute("SELECT tgtg FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()
         tgtg_kr = float(tg[0]) if (tg and tg[0]) else 0.0
-    tgtg_korr = 0.95 if tgtg_kr > 1000 else 1.0
+    tgtg_korr = 1.0   # TGTG udgår 1/9 → ingen TGTG-korrektion i Organic-anbefalingen
 
     wd_af_dato = {d: date.fromisoformat(d).weekday() for d in aabne}
     si  = _SI_MAANED.get(mon_dato.month, 1.0)

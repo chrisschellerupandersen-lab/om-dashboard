@@ -2907,10 +2907,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
 
         <div class="card" id="bageri-trend-kort" style="margin-top:16px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
             <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild-trend — seneste uger</span>
-            <span id="bageri-trend-snit" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
+            <div style="display:flex;gap:4px;" id="bageri-trend-toggle">
+              <button class="bageri-prof-btn" data-tv="uger"   onclick="_bageriTrendView('uger')">Uger (drill-down)</button>
+              <button class="bageri-prof-btn" data-tv="gruppe" onclick="_bageriTrendView('gruppe')">Pr. gruppe</button>
+            </div>
           </div>
+          <div id="bageri-trend-snit" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:10px;"></div>
           <div id="bageri-trend-bars" style="display:flex;align-items:flex-end;gap:8px;height:120px;margin-bottom:14px;padding:0 2px;"></div>
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:620px;" id="bageri-trend-tabel"></table>
@@ -4100,22 +4104,24 @@ function _bageriSpildFold(idx){
   if (ar) ar.textContent = show ? '▾' : '▸';
 }
 
+let _bageriTrendData = null, _bageriTrendViewMode = 'uger';
+const _trendCol = p => (p==null) ? 'var(--ash)' : p>=15 ? 'var(--danger)' : p>=8 ? '#e67e22' : 'var(--moss)';
+const _trendKr  = v => Math.round(v||0).toLocaleString('da-DK');
+
 async function _bageriTrendRender(){
   const bars = document.getElementById('bageri-trend-bars');
-  const tbl  = document.getElementById('bageri-trend-tabel');
-  const snitEl = document.getElementById('bageri-trend-snit');
   if (!bars) return;
   bars.innerHTML = '<span style="color:var(--ash);font-size:11px;">Henter…</span>';
   const d = await api('/api/bageri/spild-trend?uger=8');
+  _bageriTrendData = d;
+  const tbl = document.getElementById('bageri-trend-tabel');
   if (!d || !d.uger || !d.uger.length){ bars.innerHTML=''; if(tbl) tbl.innerHTML=''; return; }
-  const kr = v => Math.round(v||0).toLocaleString('da-DK');
-  const col = p => p>=15 ? 'var(--danger)' : p>=8 ? '#e67e22' : 'var(--moss)';
   const uger = d.uger;
   const maxPct = Math.max(10, ...uger.map(u => u.spild_pct||0));
   bars.innerHTML = uger.map(u => {
     const p = u.spild_pct;
     const h = (p==null) ? 0 : Math.round(p / maxPct * 100);
-    const c = (p==null) ? 'var(--border)' : col(p);
+    const c = (p==null) ? 'var(--border)' : _trendCol(p);
     return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:26px;">
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:${c};font-weight:600;">${p==null?'–':p+'%'}</div>
       <div style="width:100%;height:80px;display:flex;align-items:flex-end;">
@@ -4124,20 +4130,99 @@ async function _bageriTrendRender(){
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">u${u.uge}</div>
     </div>`;
   }).join('');
+  const snitEl = document.getElementById('bageri-trend-snit');
   if (snitEl) snitEl.textContent = (d.snit && d.snit.spild_pct!=null)
-    ? `Snit: ${d.snit.spild_pct}% spild · ${kr(d.snit.spild_kost)} kr/uge · reel DG ${d.snit.reel_dg_pct}%` : '';
+    ? `Snit: ${d.snit.spild_pct}% spild · ${_trendKr(d.snit.spild_kost)} kr/uge · reel DG ${d.snit.reel_dg_pct}%` : '';
+  _bageriTrendTabel();
+}
+
+function _bageriTrendView(v){ _bageriTrendViewMode = v; _bageriTrendTabel(); }
+
+function _bageriTrendTabel(){
+  document.querySelectorAll('#bageri-trend-toggle .bageri-prof-btn')
+    .forEach(b => b.classList.toggle('active', b.dataset.tv === _bageriTrendViewMode));
+  const d = _bageriTrendData, tbl = document.getElementById('bageri-trend-tabel');
+  if (!d || !tbl) return;
+  tbl.innerHTML = (_bageriTrendViewMode === 'gruppe') ? _trendGruppe(d) : _trendUger(d);
+}
+
+function _trendUger(d){
   const head = `<thead><tr><th style="text-align:left;">Uge</th><th class="num">Bestilt</th><th class="num">Solgt</th><th class="num">Spild</th><th class="num">Spild %</th><th class="num">Spild-kost</th><th class="num">Reel DG %</th></tr></thead>`;
-  const body = uger.map(u => {
-    const c = (u.spild_pct==null) ? 'var(--ash)' : col(u.spild_pct);
-    return `<tr>
-      <td style="text-align:left;">u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span></td>
+  let body = '';
+  d.uger.forEach((u,wi)=>{
+    const c = _trendCol(u.spild_pct);
+    body += `<tr style="cursor:pointer;" onclick="_trendFoldU(${wi})">
+      <td style="text-align:left;font-weight:600;"><span id="btr-arU-${wi}" style="display:inline-block;width:12px;color:var(--ash);">▸</span>u${u.uge} <span style="color:var(--ash);font-size:10px;">${u.dato_range}</span></td>
       <td class="num">${u.bestilt}</td><td class="num">${u.solgt}</td>
-      <td class="num" style="color:${c};font-weight:600;">${u.spild}</td>
+      <td class="num" style="font-weight:700;color:${c};">${u.spild}</td>
       <td class="num" style="color:${c};">${u.spild_pct==null?'–':u.spild_pct+'%'}</td>
-      <td class="num" style="color:#8a3a3a;">${kr(u.spild_kost)}</td>
+      <td class="num" style="color:#8a3a3a;">${_trendKr(u.spild_kost)}</td>
       <td class="num">${u.reel_dg_pct==null?'–':u.reel_dg_pct+'%'}</td></tr>`;
-  }).join('');
-  if (tbl) tbl.innerHTML = head + '<tbody>'+body+'</tbody>';
+    (u.kategorier||[]).forEach((k,ci)=>{
+      const cc = _trendCol(k.spild_pct);
+      const nV = (k.varer||[]).length;
+      body += `<tr class="btr-cat-${wi}" style="display:none;background:rgba(45,74,45,.05);cursor:pointer;" onclick="_trendFoldC(${wi},${ci})">
+        <td style="text-align:left;padding-left:20px;"><span id="btr-arC-${wi}-${ci}" style="display:inline-block;width:12px;color:var(--ash);">${nV?'▸':''}</span>${k.kategori}</td>
+        <td class="num">${k.bestilt}</td><td class="num">${k.frisk_solgt + k.reddet}</td>
+        <td class="num" style="color:${cc};">${k.spild}</td>
+        <td class="num" style="color:${cc};">${k.spild_pct==null?'–':k.spild_pct+'%'}</td>
+        <td class="num" style="color:#8a3a3a;">${_trendKr(k.spild_kost)}</td>
+        <td class="num">${k.reel_dg_pct==null?'–':k.reel_dg_pct+'%'}</td></tr>`;
+      (k.varer||[]).forEach(v=>{
+        const erRed = v.type==='reddet';
+        body += `<tr class="btr-prod-${wi}-${ci} btr-pw-${wi}" style="display:none;background:rgba(0,0,0,.025);">
+          <td style="text-align:left;padding-left:38px;color:${erRed?'var(--moss)':'var(--ash)'};">${erRed?'↻ ':''}${v.navn}</td>
+          <td class="num" style="color:var(--ash);">${erRed?'–':v.bestilt}</td>
+          <td class="num" style="color:var(--ash);">${erRed?'–':v.frisk_solgt}</td>
+          <td class="num" style="color:var(--moss);">${erRed?(v.reddet||'–'):'–'}</td>
+          <td class="num" style="color:var(--ash);">${erRed?'–':v.rest}</td>
+          <td class="num" style="color:var(--ash);">–</td><td class="num" style="color:var(--ash);">–</td></tr>`;
+      });
+    });
+  });
+  return head + '<tbody>'+body+'</tbody>';
+}
+
+function _trendFoldU(wi){
+  const rows = document.querySelectorAll('.btr-cat-'+wi);
+  if (!rows.length) return;
+  const show = rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = show ? '' : 'none');
+  const ar = document.getElementById('btr-arU-'+wi); if (ar) ar.textContent = show ? '▾' : '▸';
+  if (!show){   // kollaps: skjul også produkter + nulstil kategori-pile
+    document.querySelectorAll('.btr-pw-'+wi).forEach(r => r.style.display='none');
+    document.querySelectorAll('[id^="btr-arC-'+wi+'-"]').forEach(a => { if (a.textContent==='▾') a.textContent='▸'; });
+  }
+}
+
+function _trendFoldC(wi, ci){
+  if (window.event) window.event.stopPropagation();
+  const rows = document.querySelectorAll('.btr-prod-'+wi+'-'+ci);
+  if (!rows.length) return;
+  const show = rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = show ? '' : 'none');
+  const ar = document.getElementById('btr-arC-'+wi+'-'+ci); if (ar) ar.textContent = show ? '▾' : '▸';
+}
+
+function _trendGruppe(d){
+  const KATS = ['Brød','Boller','Wiener','Kage'];
+  const h1 = '<tr><th rowspan="2" style="text-align:left;">Uge</th>'
+    + KATS.map(k=>`<th colspan="3" style="text-align:center;border-left:1px solid var(--border);">${k}</th>`).join('') + '</tr>';
+  const h2 = '<tr>'
+    + KATS.map(()=>`<th class="num" style="border-left:1px solid var(--border);">Købt</th><th class="num">Solgt</th><th class="num">Diff</th>`).join('') + '</tr>';
+  let body = '';
+  d.uger.forEach(u=>{
+    const byk = {}; (u.kategorier||[]).forEach(k=>byk[k.kategori]=k);
+    body += `<tr><td style="text-align:left;">u${u.uge}</td>`
+      + KATS.map(kt=>{
+          const k = byk[kt] || {bestilt:0,frisk_solgt:0,reddet:0};
+          const solgt = (k.frisk_solgt||0)+(k.reddet||0);
+          const diff  = (k.bestilt||0)-solgt;
+          const dc = diff>0 ? 'var(--danger)' : diff<0 ? 'var(--moss)' : 'var(--ash)';
+          return `<td class="num" style="border-left:1px solid var(--border);">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:${dc};font-weight:600;">${diff>0?'+':''}${diff}</td>`;
+        }).join('') + '</tr>';
+  });
+  return `<thead>${h1}${h2}</thead><tbody>${body}</tbody>`;
 }
 
 async function loadSolgtPivot(){

@@ -5542,6 +5542,7 @@ def hent_bageri_spild_trend(antal: int = 8) -> Dict:
                 "spild": t["spild"], "spild_pct": t["spild_pct"],
                 "spild_kost": t["spild_kost"], "reel_dg_pct": t["reel_dg_pct"],
                 "har_bestilt": r["har_bestilt"],
+                "kategorier": r["kategorier"],   # per-gruppe (+ varer) til drill-down/pivot
             })
         d = d - timedelta(days=7)
     uger.reverse()

@@ -4226,7 +4226,7 @@ function _trendGruppe(d){
           const diff  = (k.bestilt||0)-solgt;
           if (komm)
             return `<td class="num" style="${bl}">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:var(--ash);">–</td><td class="num" style="color:var(--ash);">–</td>`;
-          const dc = diff>0 ? 'var(--moss)' : diff<0 ? 'var(--danger)' : 'var(--ash)';
+          const dc = diff>0 ? 'var(--danger)' : diff<0 ? 'var(--moss)' : 'var(--ash)';
           const pct = (k.spild_pct==null) ? '' : ` <span style="font-size:9px;opacity:.8;">(${k.spild_pct}%)</span>`;
           return `<td class="num" style="${bl}">${k.bestilt||0}</td><td class="num">${solgt}</td><td class="num" style="color:${dc};font-weight:600;">${diff>0?'+':''}${diff}${pct}</td><td class="num" style="color:#8a3a3a;">${_trendKr(k.spild_kost)}</td>`;
         }).join('') + '</tr>';

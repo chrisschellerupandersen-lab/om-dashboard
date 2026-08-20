@@ -96,6 +96,41 @@ _ORGANIC_BAKERY = [
 ]
 
 
+def _bakery_kat(n: str) -> Optional[str]:
+    """Grov bagværks-kategori ud fra varenavn (virker for både gammelt og nyt
+    sortiment). None = ikke bagværk."""
+    n = (n or "").lower()
+    if any(k in n for k in ("gulerodskage", "cookie", "kage", "muffin", "brownie",
+                            "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat")):
+        return "Kage"
+    if "bolle" in n:                                          # inkl. tebolle
+        return "Boller"
+    if any(k in n for k in ("brød", "focaccia", "rugbrød", "flute", "ciabatta")):
+        return "Brød"
+    if any(k in n for k in ("tebirkes", "birkes", "croissant", "crossaint", "snurre",
+                            "snegl", "pain", "wiener", "spandauer", "kanelstang", "frøsnapper")):
+        return "Wiener"
+    return None
+
+
+def _bageri_rolle(navn: str):
+    """Klassificér en solgt vare: (rolle, kategori, faktor).
+    rolle = 'reddet' (frost/fra i går) eller 'frisk'. faktor = antal stk pr. salg
+    (frost 5-pak = 5). None hvis ikke bagværk."""
+    n = (navn or "").lower()
+    if "frost" in n:
+        if any(x in n for x in ("grillpøls", "pølse", " ost", "ostestang")):
+            return None                                       # ikke bagværk
+        faktor = 5 if ("5x" in n or "5 x" in n) else 1
+        kat = "Brød" if "brød" in n else "Boller"
+        return ("reddet", kat, faktor)
+    if "i går" in n or "igår" in n:
+        kat = "Brød" if "brød" in n else ("Wiener" if "wien" in n else "Boller")
+        return ("reddet", kat, 1)
+    kat = _bakery_kat(n)
+    return ("frisk", kat, 1) if kat else None
+
+
 def _organic_kat(navn: str) -> str:
     """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
     n = (navn or "").lower()
@@ -5323,6 +5358,107 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         "total_kr":     round(total_indkoeb, 2),
         "faktisk":      False,
     }
+
+
+def hent_bageri_spild(uge: int, aar: int) -> Dict:
+    """Spild & redning pr. uge (Organic Bakery, ingen retur):
+    Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går).
+    Alt hentes automatisk fra Shopbox + ugebestilling — ingen daglig tastning.
+    Kategori-niveau (Brød/Boller/Wiener/Kage). Beløb ex moms."""
+    from datetime import date, timedelta
+    KATS = ["Brød", "Boller", "Wiener", "Kage"]
+    mon = date.fromisocalendar(aar, uge, 1)
+    sun = mon + timedelta(days=6)
+
+    # Gns. indkøbspris pr. kategori (til spild-kost) fra Organic Bakery-kataloget
+    kat_indkoeb: Dict[str, list] = {}
+    for p in _ORGANIC_BAKERY:
+        kat_indkoeb.setdefault(_organic_kat(p["navn"]), []).append(p["indkoeb"])
+    kat_indkoeb = {k: (sum(v) / len(v) if v else 0) for k, v in kat_indkoeb.items()}
+
+    agg = {k: {"frisk_stk": 0.0, "frisk_oms": 0.0, "frisk_db": 0.0,
+               "reddet_stk": 0.0, "reddet_oms": 0.0, "reddet_db": 0.0,
+               "bestilt_stk": 0.0} for k in KATS}
+
+    with _conn() as conn:
+        # Salg denne uge pr. varenavn (ex moms + korrekt DB, inkl. frost VF=0-regel)
+        for r in conn.execute("""
+            SELECT varenavn,
+                   COALESCE(SUM(antal),0)              AS antal,
+                   COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
+                   COALESCE(SUM(db_korrekt),0)         AS db
+            FROM v_transaktioner
+            WHERE dato >= ? AND dato <= ?
+            GROUP BY varenavn
+        """, (mon.isoformat(), sun.isoformat())).fetchall():
+            rolle = _bageri_rolle(r["varenavn"])
+            if not rolle:
+                continue
+            typ, kat, faktor = rolle
+            if kat not in agg:
+                continue
+            if typ == "reddet":
+                agg[kat]["reddet_stk"] += float(r["antal"]) * faktor
+                agg[kat]["reddet_oms"] += float(r["oms"])
+                agg[kat]["reddet_db"]  += float(r["db"])
+            else:
+                agg[kat]["frisk_stk"] += float(r["antal"])
+                agg[kat]["frisk_oms"] += float(r["oms"])
+                agg[kat]["frisk_db"]  += float(r["db"])
+
+        # Bestilt denne uge fra ugebestilling
+        for r in conn.execute("""
+            SELECT varenavn, COALESCE(SUM(man+tir+ons+tor+fre+loe+son),0) AS stk
+            FROM ugebestillinger WHERE uge=? AND aar=? GROUP BY varenavn
+        """, (uge, aar)).fetchall():
+            kat = _bakery_kat(r["varenavn"])
+            if kat in agg:
+                agg[kat]["bestilt_stk"] += float(r["stk"])
+
+    rows, tot = [], {"bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "spild": 0.0,
+                     "db": 0.0, "spild_kost": 0.0, "oms": 0.0}
+    for k in KATS:
+        a = agg[k]
+        bestilt = a["bestilt_stk"]
+        solgt   = a["frisk_stk"] + a["reddet_stk"]
+        spild_stk = max(0.0, bestilt - solgt) if bestilt > 0 else 0.0
+        spild_kost = spild_stk * kat_indkoeb.get(k, 0)
+        db_sales   = a["frisk_db"] + a["reddet_db"]
+        reel_db    = db_sales - spild_kost
+        oms        = a["frisk_oms"] + a["reddet_oms"]
+        rows.append({
+            "kategori":     k,
+            "bestilt":      round(bestilt),
+            "frisk_solgt":  round(a["frisk_stk"]),
+            "reddet":       round(a["reddet_stk"]),
+            "spild":        round(spild_stk),
+            "spild_pct":    round(spild_stk / bestilt * 100, 1) if bestilt > 0 else None,
+            "redningsandel_pct": round(a["reddet_stk"] / solgt * 100, 1) if solgt > 0 else 0.0,
+            "oms_ex":       round(oms),
+            "reel_db":      round(reel_db),
+            "reel_dg_pct":  round(reel_db / oms * 100, 1) if oms > 0 else None,
+            "spild_kost":   round(spild_kost),
+        })
+        tot["bestilt"] += bestilt; tot["frisk"] += a["frisk_stk"]; tot["reddet"] += a["reddet_stk"]
+        tot["spild"] += spild_stk; tot["db"] += db_sales; tot["spild_kost"] += spild_kost
+        tot["oms"] += oms
+
+    reel_db_tot = tot["db"] - tot["spild_kost"]
+    total = {
+        "bestilt":     round(tot["bestilt"]),
+        "frisk_solgt": round(tot["frisk"]),
+        "reddet":      round(tot["reddet"]),
+        "spild":       round(tot["spild"]),
+        "spild_pct":   round(tot["spild"] / tot["bestilt"] * 100, 1) if tot["bestilt"] > 0 else None,
+        "oms_ex":      round(tot["oms"]),
+        "reel_db":     round(reel_db_tot),
+        "reel_dg_pct": round(reel_db_tot / tot["oms"] * 100, 1) if tot["oms"] > 0 else None,
+        "spild_kost":  round(tot["spild_kost"]),
+    }
+    return {"uge": uge, "aar": aar,
+            "dato_range": f"{mon.strftime('%d/%m')}–{sun.strftime('%d/%m')}",
+            "har_bestilt": tot["bestilt"] > 0,
+            "kategorier": rows, "total": total}
 
 
 # ── BASIS BESTILLING (DAGLIG SKABELON) ────────────────────────────────────────

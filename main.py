@@ -1164,6 +1164,14 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.get("/api/bageri/spild")
+async def api_bageri_spild(request: Request, uge: int, aar: int, secret: Optional[str] = None):
+    """Spild & redning pr. uge (Organic Bakery). Login eller webhook-secret."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_bageri_spild(int(uge), int(aar))
+
+
 @app.post("/api/bestilling/management-analyse")
 async def api_management_analyse(
     request: Request,

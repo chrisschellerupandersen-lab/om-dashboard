@@ -5299,14 +5299,30 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     evt = _get_event(maal_uge, maal_aar)
     dag_fak = evt["dag_fak"] if evt else {d: 1.0 for d in DAGE}
 
+    # Vejr — spild-bevidst, asymmetrisk (kun dage inden for udsigten; ellers 1.0).
+    # Dårligt vejr: fuld nedjustering (sikker spild-besparelse). Godt vejr: dæmpet
+    # op (op-gæt kan blive spild). Risiko/kage: næsten neutral (spild = rent tab).
+    _vejr_fc = hent_vejr_forecast().get("forecast", {})
+    def _vejr_faktor(gruppe, dato_iso):
+        v = _vejr_fc.get(dato_iso)
+        f = ((v or {}).get("juster") or {}).get("faktor", 1.0)
+        if not f or f == 1.0:
+            return 1.0
+        if gruppe in ("risiko", "kage"):
+            return min(1.0 + (f - 1.0) * 0.25, 1.05)   # næsten neutral, cap +5%
+        return min(f, 1.10) if f >= 1.0 else f          # standard: fuld ned, cap op +10%
+    vf_dato = {i: (mon_dato + timedelta(days=i)).isoformat() for i in range(7)}
+
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
         seed = p.get("seed")
         if not p["kilde"] and seed:
-            # Ny vare uden historik → brug startbud direkte (ikke skaleret om)
+            # Ny vare uden historik → startbud, justeret for vejr
             basis_dag = {d: float(seed.get(d, 0)) for d in DAGE}
-            anb_dag   = {d: int(seed.get(d, 0))   for d in DAGE}
+            anb_dag = {}
+            for i, dn in enumerate(DAGE):
+                anb_dag[dn] = int(round(seed.get(dn, 0) * _vejr_faktor(p["gruppe"], vf_dato[i])))
         else:
             pr_wd: Dict[int, list] = {i: [] for i in range(7)}
             for d in aabne:
@@ -5316,7 +5332,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             for i, dn in enumerate(DAGE):
                 med = _median(pr_wd[i][-8:])
                 basis_dag[dn] = med
-                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * tgtg_korr * sf))
+                vf = _vejr_faktor(p["gruppe"], vf_dato[i])
+                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * sf * vf))
         # Dage før Organic Bakery-start (fx mandag 31/8 i uge 36 = gammel bager) → 0
         for i, dn in enumerate(DAGE):
             if (mon_dato + timedelta(days=i)).isoformat() < _ORGANIC_START:

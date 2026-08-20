@@ -2894,6 +2894,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <p id="bageri-note" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;"></p>
         </div>
+
+        <div class="card" id="bageri-spild-kort" style="margin-top:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
+            <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild &amp; redning — samme uge</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går) · automatisk fra kassen</span>
+          </div>
+          <div id="bageri-spild-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px;"></div>
+          <div style="overflow-x:auto;">
+            <table class="aar2-tbl" style="width:100%;min-width:640px;" id="bageri-spild-tabel"></table>
+          </div>
+        </div>
       </div>
 
       <div class="panel" id="p-solgtpivot">
@@ -4005,6 +4016,54 @@ async function _bageriRender(){
   document.getElementById('bageri-note').textContent =
     `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
     + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`;
+
+  _bageriSpildRender();
+}
+
+async function _bageriSpildRender(){
+  const tbl = document.getElementById('bageri-spild-tabel');
+  const totBox = document.getElementById('bageri-spild-tot');
+  tbl.innerHTML = '<tr><td style="padding:12px;color:var(--ash);">Henter…</td></tr>';
+  const d = await api(`/api/bageri/spild?uge=${_bageriUge}&aar=${_bageriAar}`);
+  if (!d || !d.kategorier){ tbl.innerHTML=''; totBox.innerHTML=''; return; }
+  const t = d.total, kr = v => Math.round(v||0).toLocaleString('da-DK');
+  if (!d.har_bestilt){
+    totBox.innerHTML = `<div style="grid-column:1/-1;font-size:12px;color:var(--ash);padding:6px;">Ingen bestilling registreret for uge ${d.uge} endnu — spild kan først beregnes når ugen er bestilt og solgt.</div>`;
+  } else {
+    const sClr = (t.spild_pct||0) >= 15 ? 'var(--danger)' : (t.spild_pct||0) >= 8 ? '#e67e22' : 'var(--moss)';
+    const tile=(l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+        <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
+    totBox.innerHTML =
+        tile('Spild', (t.spild||0)+' stk', sClr)
+      + tile('Spild %', (t.spild_pct==null?'—':t.spild_pct+' %'), sClr)
+      + tile('Spild-kost', kr(t.spild_kost)+' kr', '#8a3a3a')
+      + tile('Reddet', (t.reddet||0)+' stk', 'var(--moss)')
+      + tile('Reel DB', kr(t.reel_db)+' kr', (t.reel_db>=0?'var(--moss)':'var(--danger)'))
+      + tile('Reel DG %', (t.reel_dg_pct==null?'—':t.reel_dg_pct+' %'), 'var(--forest)');
+  }
+  let head = `<thead><tr>
+    <th style="text-align:left;">Kategori</th>
+    <th class="num">Bestilt</th><th class="num">Friskt solgt</th><th class="num">Reddet</th>
+    <th class="num">Spild</th><th class="num">Spild %</th><th class="num">Reel DG %</th></tr></thead>`;
+  let body='';
+  d.kategorier.forEach(k=>{
+    const sc = (k.spild_pct==null)?'var(--ash)':(k.spild_pct>=15?'var(--danger)':k.spild_pct>=8?'#e67e22':'var(--moss)');
+    body += `<tr>
+      <td style="text-align:left;font-weight:600;">${k.kategori}</td>
+      <td class="num">${k.bestilt}</td>
+      <td class="num">${k.frisk_solgt}</td>
+      <td class="num" style="color:var(--moss);">${k.reddet||'–'}</td>
+      <td class="num" style="font-weight:700;color:${sc};">${k.spild}</td>
+      <td class="num" style="color:${sc};">${k.spild_pct==null?'–':k.spild_pct+'%'}</td>
+      <td class="num">${k.reel_dg_pct==null?'–':k.reel_dg_pct+'%'}</td></tr>`;
+  });
+  let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+      <td style="text-align:left;">I alt</td>
+      <td class="num">${t.bestilt}</td><td class="num">${t.frisk_solgt}</td><td class="num">${t.reddet}</td>
+      <td class="num">${t.spild}</td><td class="num">${t.spild_pct==null?'–':t.spild_pct+'%'}</td>
+      <td class="num">${t.reel_dg_pct==null?'–':t.reel_dg_pct+'%'}</td></tr></tfoot>`;
+  tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
 }
 
 async function loadSolgtPivot(){

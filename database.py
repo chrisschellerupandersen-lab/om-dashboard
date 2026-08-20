@@ -100,6 +100,14 @@ def _bakery_kat(n: str) -> Optional[str]:
     """Grov bagværks-kategori ud fra varenavn (virker for både gammelt og nyt
     sortiment). None = ikke bagværk."""
     n = (n or "").lower()
+    # Kaffe-combos: bagværks-delen tæller med (tjekkes FØR de generiske regler,
+    # da "wienerbrød" ellers fanges af "brød"). Ren kaffe uden bagværk = None.
+    if "kaffe" in n:
+        if "wien" in n:
+            return "Wiener"                        # Stor kop kaffe + valgfri wienerbrød
+        if "bmo" in n or "bolle" in n:
+            return "Boller"                        # Kaffe m BMO (bolle med ost)
+        return None
     if any(k in n for k in ("gulerodskage", "cookie", "kage", "muffin", "brownie",
                             "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat")):
         return "Kage"

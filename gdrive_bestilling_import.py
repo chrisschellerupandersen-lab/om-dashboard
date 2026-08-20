@@ -338,6 +338,13 @@ def main():
         print("[ADVARSEL] Ingen bestillingslinjer fundet i filen.")
         return
 
+    # Overstyr ugenummer med --uge-argumentet (filnavnet er mere pålideligt end
+    # ark-indholdet, fx når et ark er kopieret fra en tidligere uge).
+    if args.uge:
+        if data["uge"] != args.uge:
+            print(f"[INFO] Overstyrer ugenummer: ark siger {data['uge']}, bruger {args.uge} (fra --uge)")
+        data["uge"] = args.uge
+
     _vis(data)
 
     if args.vis:

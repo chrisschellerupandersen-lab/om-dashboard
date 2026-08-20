@@ -5379,6 +5379,14 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
     agg = {k: {"frisk_stk": 0.0, "frisk_oms": 0.0, "frisk_db": 0.0,
                "reddet_stk": 0.0, "reddet_oms": 0.0, "reddet_db": 0.0,
                "bestilt_stk": 0.0} for k in KATS}
+    # Per-vare i hver kategori (til open/collapse-detaljer)
+    prod = {k: {} for k in KATS}   # kat -> {normkey: {"navn","bestilt","frisk"}}
+
+    def _norm(n):
+        n = (n or "").strip()
+        if n.lower().startswith("øko - "):
+            n = n[6:].strip()
+        return n
 
     with _conn() as conn:
         # Salg denne uge pr. varenavn (ex moms + korrekt DB, inkl. frost VF=0-regel)
@@ -5405,6 +5413,9 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                 agg[kat]["frisk_stk"] += float(r["antal"])
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
+                nn = _norm(r["varenavn"]); key = nn.lower()
+                p = prod[kat].setdefault(key, {"navn": nn, "bestilt": 0.0, "frisk": 0.0})
+                p["frisk"] += float(r["antal"])
 
         # Bestilt denne uge fra ugebestilling
         for r in conn.execute("""
@@ -5414,6 +5425,9 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             kat = _bakery_kat(r["varenavn"])
             if kat in agg:
                 agg[kat]["bestilt_stk"] += float(r["stk"])
+                nn = _norm(r["varenavn"]); key = nn.lower()
+                p = prod[kat].setdefault(key, {"navn": nn, "bestilt": 0.0, "frisk": 0.0})
+                p["bestilt"] += float(r["stk"])
 
     rows, tot = [], {"bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "spild": 0.0,
                      "db": 0.0, "spild_kost": 0.0, "oms": 0.0}
@@ -5426,6 +5440,14 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
         db_sales   = a["frisk_db"] + a["reddet_db"]
         reel_db    = db_sales - spild_kost
         oms        = a["frisk_oms"] + a["reddet_oms"]
+        varer = sorted(prod[k].values(),
+                       key=lambda p: max(0.0, p["bestilt"] - p["frisk"]), reverse=True)
+        varer = [{
+            "navn":        p["navn"],
+            "bestilt":     round(p["bestilt"]),
+            "frisk_solgt": round(p["frisk"]),
+            "rest":        round(max(0.0, p["bestilt"] - p["frisk"])),
+        } for p in varer if (p["bestilt"] or p["frisk"])]
         rows.append({
             "kategori":     k,
             "bestilt":      round(bestilt),
@@ -5438,6 +5460,7 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             "reel_db":      round(reel_db),
             "reel_dg_pct":  round(reel_db / oms * 100, 1) if oms > 0 else None,
             "spild_kost":   round(spild_kost),
+            "varer":        varer,
         })
         tot["bestilt"] += bestilt; tot["frisk"] += a["frisk_stk"]; tot["reddet"] += a["reddet_stk"]
         tot["spild"] += spild_stk; tot["db"] += db_sales; tot["spild_kost"] += spild_kost

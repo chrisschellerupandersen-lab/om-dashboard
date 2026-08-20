@@ -2898,7 +2898,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div class="card" id="bageri-spild-kort" style="margin-top:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
             <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild &amp; redning — samme uge</span>
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går) · automatisk fra kassen</span>
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går) · klik en kategori for varer (rest pr. vare = bestilt − friskt; redning er fælles pr. kategori)</span>
           </div>
           <div id="bageri-spild-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px;"></div>
           <div style="overflow-x:auto;">
@@ -4047,16 +4047,27 @@ async function _bageriSpildRender(){
     <th class="num">Bestilt</th><th class="num">Friskt solgt</th><th class="num">Reddet</th>
     <th class="num">Spild</th><th class="num">Spild %</th><th class="num">Reel DG %</th></tr></thead>`;
   let body='';
-  d.kategorier.forEach(k=>{
+  d.kategorier.forEach((k,idx)=>{
     const sc = (k.spild_pct==null)?'var(--ash)':(k.spild_pct>=15?'var(--danger)':k.spild_pct>=8?'#e67e22':'var(--moss)');
-    body += `<tr>
-      <td style="text-align:left;font-weight:600;">${k.kategori}</td>
+    const nVarer = (k.varer||[]).length;
+    body += `<tr style="cursor:pointer;" onclick="_bageriSpildFold(${idx})" title="Klik for at se varer">
+      <td style="text-align:left;font-weight:600;"><span id="bspild-ar-${idx}" style="display:inline-block;width:12px;color:var(--ash);">${nVarer?'▸':''}</span>${k.kategori}</td>
       <td class="num">${k.bestilt}</td>
       <td class="num">${k.frisk_solgt}</td>
       <td class="num" style="color:var(--moss);">${k.reddet||'–'}</td>
       <td class="num" style="font-weight:700;color:${sc};">${k.spild}</td>
       <td class="num" style="color:${sc};">${k.spild_pct==null?'–':k.spild_pct+'%'}</td>
       <td class="num">${k.reel_dg_pct==null?'–':k.reel_dg_pct+'%'}</td></tr>`;
+    (k.varer||[]).forEach(v=>{
+      body += `<tr class="bspild-det-${idx}" style="display:none;background:rgba(0,0,0,.025);">
+        <td style="text-align:left;padding-left:24px;color:var(--ash);">${v.navn}</td>
+        <td class="num" style="color:var(--ash);">${v.bestilt}</td>
+        <td class="num" style="color:var(--ash);">${v.frisk_solgt}</td>
+        <td class="num" style="color:var(--ash);">–</td>
+        <td class="num" style="color:var(--ash);">${v.rest}</td>
+        <td class="num" style="color:var(--ash);">–</td>
+        <td class="num" style="color:var(--ash);">–</td></tr>`;
+    });
   });
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td>
@@ -4064,6 +4075,15 @@ async function _bageriSpildRender(){
       <td class="num">${t.spild}</td><td class="num">${t.spild_pct==null?'–':t.spild_pct+'%'}</td>
       <td class="num">${t.reel_dg_pct==null?'–':t.reel_dg_pct+'%'}</td></tr></tfoot>`;
   tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
+}
+
+function _bageriSpildFold(idx){
+  const rows = document.querySelectorAll('.bspild-det-'+idx);
+  if (!rows.length) return;
+  const show = rows[0].style.display === 'none';
+  rows.forEach(r => r.style.display = show ? '' : 'none');
+  const ar = document.getElementById('bspild-ar-'+idx);
+  if (ar) ar.textContent = show ? '▾' : '▸';
 }
 
 async function loadSolgtPivot(){

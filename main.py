@@ -1164,6 +1164,31 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.post("/api/bageri/indlaes-kostpriser")
+async def api_bageri_indlaes_kostpriser(request: Request):
+    """Indlæs Organic Bakery-kostpriser dateret 1/9 (vare_pris_periode) og
+    returnér avance på de nye priser. Idempotent."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    gfra = "2026-09-01"
+    with database._conn() as conn:
+        conn.execute("DELETE FROM vare_pris_periode WHERE gyldig_fra=? AND kilde=?",
+                     (gfra, "organic-bakery"))
+    linjer = [{"varenavn": p["navn"], "gyldig_fra": gfra,
+               "pris_ex_moms": p["indkoeb"], "kilde": "organic-bakery"}
+              for p in database._ORGANIC_BAKERY]
+    n = database.gem_prisperiode_bulk(linjer)
+    varer = [{"navn": p["navn"], "indkoeb": p["indkoeb"], "udsalg": p["udsalg"],
+              "avance_kr": round(p["udsalg"] - p["indkoeb"], 2),
+              "avance_pct": round((p["udsalg"] - p["indkoeb"]) / p["udsalg"] * 100, 1) if p["udsalg"] else None}
+             for p in database._ORGANIC_BAKERY]
+    return {"ok": True, "indlaest": n, "gyldig_fra": gfra, "varer": varer}
+
+
 @app.get("/api/bageri/prisstigning")
 async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None):
     """Sammenlign nuværende salgspris (faktisk Shopbox-salg, seneste 8 uger) med

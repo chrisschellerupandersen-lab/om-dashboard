@@ -1189,6 +1189,14 @@ async def api_bageri_indlaes_kostpriser(request: Request):
     return {"ok": True, "indlaest": n, "gyldig_fra": gfra, "varer": varer}
 
 
+# Pris-scenarie (drøftet): udsalgspris INKL moms. Varer der ikke står her = vejl. plan.
+_BAGERI_SCENARIE = {
+    "Surdejsbrød": 53, "Softkernerugbrød": 53, "Surdejsbrød m. sesam": 53,
+    "Tebirkes": 28, "Croissant": 28, "Kardemommesnurre": 28, "Kanelsnurre": 28,
+    "Pain au Chocolate": 30,
+}
+
+
 @app.get("/api/bageri/prisstigning")
 async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None):
     """Sammenlign nuværende salgspris (faktisk Shopbox-salg, seneste 8 uger) med
@@ -1235,12 +1243,19 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
             gl_av_pct = round(float(r["db"]) / float(r["oms"]) * 100, 1) if kilde and float(r["oms"] or 0) > 0 else None
             ny_av_kr = round(ny - p["indkoeb"], 2)
             ny_av_pct = round((ny - p["indkoeb"]) / ny * 100, 1) if ny else None
+            # Scenarie-pris (inkl moms) → ex moms + avance
+            scen_incl = _BAGERI_SCENARIE.get(p["navn"], ny_incl)
+            scen_ex = round(scen_incl / 1.25, 2)
+            scen_av_kr = round(scen_ex - p["indkoeb"], 2)
+            scen_av_pct = round((scen_ex - p["indkoeb"]) / scen_ex * 100, 1) if scen_ex else None
             varer.append({"navn": p["navn"], "gammel": gammel, "ny": ny,
                           "liste_incl": liste_incl, "ny_incl": ny_incl,
                           "stigning_liste_kr": stig_liste, "stigning_liste_pct": pct_liste,
                           "stigning_kr": stig, "stigning_pct": pct, "antal_8u": round(antal),
                           "gl_kost_ex": gl_kost, "gl_av_kr": gl_av_kr, "gl_av_pct": gl_av_pct,
-                          "ny_kost_ex": p["indkoeb"], "ny_av_kr": ny_av_kr, "ny_av_pct": ny_av_pct})
+                          "ny_kost_ex": p["indkoeb"], "ny_av_kr": ny_av_kr, "ny_av_pct": ny_av_pct,
+                          "scen_incl": scen_incl, "scen_av_kr": scen_av_kr, "scen_av_pct": scen_av_pct,
+                          "scen_aendret": scen_incl != ny_incl})
             if gammel and antal:
                 tot_gl += gammel * antal; tot_ny += ny * antal; tot_antal += antal
     vaegtet_pct = round((tot_ny - tot_gl) / tot_gl * 100, 1) if tot_gl else None

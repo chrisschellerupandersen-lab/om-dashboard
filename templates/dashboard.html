@@ -2922,6 +2922,23 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <div class="panel" id="p-priser">
+        <div class="page-hdr">
+          <h2>Priser &amp; avance — Organic Bakery</h2>
+          <p>Overblik over prisstigningen fra 1/9 og et drøftet pris-scenarie · alle priser inkl. moms · avance ex moms</p>
+        </div>
+        <div class="card" id="priser-intro" style="margin-bottom:16px;"></div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">1) Prisstigning — nu → 1/9 (vejl. plan, 50% avance)</div>
+          <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;" id="priser-tabel1"></table></div>
+        </div>
+        <div class="card" style="margin-bottom:16px;">
+          <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">2) Scenarie — plan → drøftet pris (brød 53 · wienerbrød 28 · pain 30)</div>
+          <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;" id="priser-tabel2"></table></div>
+          <p id="priser-note2" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;"></p>
+        </div>
+      </div>
+
       <div class="panel" id="p-solgtpivot">
         <div class="page-hdr">
           <h2>Solgte enheder — kategori &amp; produkt</h2>
@@ -3774,6 +3791,7 @@ function showPanel(id, el) {
   }
   // Load specific page data
   if (id === 'bageri') loadBageri();
+  if (id === 'priser') loadPriser();
   if (id === 'basis') loadBasis();
   if (id === 'social') loadSocial();
   if (id === 'dbshopbox') loadDbShopbox();
@@ -4260,6 +4278,64 @@ function _trendFoldG(wi){
   const show = rows[0].style.display === 'none';
   rows.forEach(r => r.style.display = show ? '' : 'none');
   const ar = document.getElementById('btg-ar-'+wi); if (ar) ar.textContent = show ? '▾' : '▸';
+}
+
+// ── PRISER & AVANCE (Organic Bakery) ─────────────────────────────────────────
+async function loadPriser(){
+  const d = await api('/api/bageri/prisstigning');
+  const varer = (d && d.varer) || [];
+  const kr  = v => (v==null ? '–' : (Math.round(v*10)/10).toLocaleString('da-DK'));
+  const kr0 = v => (v==null ? '–' : Math.round(v).toLocaleString('da-DK'));
+  const pc  = v => (v==null ? '–' : v+'%');
+
+  document.getElementById('priser-intro').innerHTML =
+    `<div style="font-size:13px;line-height:1.6;color:var(--ash);">
+      <b style="color:var(--forest);">Sådan læses siden:</b> Alle salgspriser er <b>inkl. moms</b> (det kunden betaler); avance er <b>ex moms</b> (den reelle margin).
+      <br>• <b>Tabel 1</b> viser prisstigningen fra jeres nuværende priser til Organic Bakerys vejledende priser 1/9 (50% avance).
+      <br>• <b>Tabel 2</b> viser et drøftet scenarie hvor I sætter nogle priser lidt lavere for at være skarpere i Greve.
+      <br>• <b>Vigtigt:</b> avancen 1/9 (50%) er <b>før spild</b>. Uden retur er den reelle avance = 50% − spild, så spild-modulet afgør hvor tæt I lander på de 50%.
+    </div>`;
+
+  // Tabel 1 — nu → 1/9
+  let h1 = `<thead><tr><th style="text-align:left;">Vare</th>
+    <th class="num">Salg nu</th><th class="num">Salg 1/9</th><th class="num">+%</th>
+    <th class="num">Avance nu</th><th class="num">Avance 1/9</th>
+    <th class="num">kr/stk nu</th><th class="num">kr/stk 1/9</th></tr></thead>`;
+  let b1 = varer.map(v=>{
+    const ny = v.gl_av_pct!=null;
+    const stigClr = (v.stigning_liste_pct==null)?'var(--ash)':(v.stigning_liste_pct>0?'var(--moss)':'var(--danger)');
+    return `<tr>
+      <td style="text-align:left;font-weight:600;">${v.navn}${ny?'':' <span class="bageri-badge" style="background:var(--amber);color:#4a3800;">ny</span>'}</td>
+      <td class="num">${kr0(v.liste_incl)}</td>
+      <td class="num" style="font-weight:600;">${kr0(v.ny_incl)}</td>
+      <td class="num" style="color:${stigClr};">${v.stigning_liste_pct==null?'–':(v.stigning_liste_pct>0?'+':'')+v.stigning_liste_pct+'%'}</td>
+      <td class="num" style="color:var(--ash);">${pc(v.gl_av_pct)}</td>
+      <td class="num" style="font-weight:600;color:var(--moss);">${pc(v.ny_av_pct)}</td>
+      <td class="num" style="color:var(--ash);">${kr(v.gl_av_kr)}</td>
+      <td class="num" style="color:var(--moss);">${kr(v.ny_av_kr)}</td></tr>`;
+  }).join('');
+  document.getElementById('priser-tabel1').innerHTML = h1 + '<tbody>'+b1+'</tbody>';
+
+  // Tabel 2 — plan → scenarie
+  let h2 = `<thead><tr><th style="text-align:left;">Vare</th>
+    <th class="num">Plan 1/9</th><th class="num">Scenarie</th>
+    <th class="num">Avance plan</th><th class="num">Avance scenarie</th>
+    <th class="num">kr/stk plan</th><th class="num">kr/stk scenarie</th></tr></thead>`;
+  let b2 = varer.map(v=>{
+    const ae = v.scen_aendret;
+    const avClr = ae ? '#e67e22' : 'var(--moss)';
+    return `<tr${ae?' style="background:rgba(230,126,34,.06);"':''}>
+      <td style="text-align:left;font-weight:600;">${v.navn}${ae?' <span class="bageri-badge" style="background:#e67e22;color:#fff;">ændret</span>':''}</td>
+      <td class="num">${kr0(v.ny_incl)}</td>
+      <td class="num" style="font-weight:600;">${kr0(v.scen_incl)}</td>
+      <td class="num" style="color:var(--ash);">${pc(v.ny_av_pct)}</td>
+      <td class="num" style="font-weight:600;color:${avClr};">${pc(v.scen_av_pct)}</td>
+      <td class="num" style="color:var(--ash);">${kr(v.ny_av_kr)}</td>
+      <td class="num" style="color:${avClr};">${kr(v.scen_av_kr)}</td></tr>`;
+  }).join('');
+  document.getElementById('priser-tabel2').innerHTML = h2 + '<tbody>'+b2+'</tbody>';
+  document.getElementById('priser-note2').textContent =
+    'Scenarie: brød 55→53 · tebirkes/croissant/snurrer 30→28 · pain au chocolate 35→30. Blended avance ~47–48% (vs 50% i planen). Ændrede varer er markeret.';
 }
 
 async function loadSolgtPivot(){
@@ -4760,6 +4836,7 @@ const NAV_DEFAULT = [
   {id:'mobilepay',   label:'MobilePay',             group:'Salg & økonomi',      hidden:false},
   {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},
   {id:'bageri',      label:'Bageri (Organic)',      group:'Bageri & indkøb',     hidden:false},
+  {id:'priser',      label:'Priser & avance',       group:'Bageri & indkøb',     hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'prisaendring',label:'Prisændringer',         group:'Bageri & indkøb',     hidden:false},
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},

@@ -1259,9 +1259,26 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
             if gammel and antal:
                 tot_gl += gammel * antal; tot_ny += ny * antal; tot_antal += antal
     vaegtet_pct = round((tot_ny - tot_gl) / tot_gl * 100, 1) if tot_gl else None
+    # Årlig avance-økonomi (8-ugers volumen → år)
+    F = 52 / 8.0
+    a_gl = a_plan = a_scen = 0.0
+    for v in varer:
+        vol = (v.get("antal_8u") or 0) * F
+        a_gl   += (v.get("gl_av_kr") or 0) * vol
+        a_plan += (v.get("ny_av_kr") or 0) * vol
+        a_scen += (v.get("scen_av_kr") or 0) * vol
+    SPILD = 0.18
+    oekonomi = {
+        "aar_gl": round(a_gl), "aar_plan": round(a_plan), "aar_scen": round(a_scen),
+        "plan_vs_gl": round(a_plan - a_gl), "scen_vs_gl": round(a_scen - a_gl),
+        "scen_vs_plan": round(a_scen - a_plan),
+        "spild_pct": int(SPILD * 100),
+        "plan_netto_vs_gl": round(a_plan * (1 - SPILD) - a_gl),
+    }
     return {"varer": varer, "vaegtet_stigning_pct": vaegtet_pct,
             "vaegtet_gl_snit": round(tot_gl / tot_antal, 2) if tot_antal else None,
-            "vaegtet_ny_snit": round(tot_ny / tot_antal, 2) if tot_antal else None}
+            "vaegtet_ny_snit": round(tot_ny / tot_antal, 2) if tot_antal else None,
+            "oekonomi": oekonomi}
 
 
 @app.get("/api/bageri/spild")

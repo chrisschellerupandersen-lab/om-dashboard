@@ -2928,6 +2928,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <p>Overblik over prisstigningen fra 1/9 og et drøftet pris-scenarie · alle priser inkl. moms · avance ex moms</p>
         </div>
         <div class="card" id="priser-intro" style="margin-bottom:16px;"></div>
+        <div class="card" id="priser-oekonomi" style="margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:16px;">
           <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">1) Prisstigning — nu → 1/9 (vejl. plan, 50% avance)</div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;" id="priser-tabel1"></table></div>
@@ -4295,6 +4296,26 @@ async function loadPriser(){
       <br>• <b>Tabel 2</b> viser et drøftet scenarie hvor I sætter nogle priser lidt lavere for at være skarpere i Greve.
       <br>• <b>Vigtigt:</b> avancen 1/9 (50%) er <b>før spild</b>. Uden retur er den reelle avance = 50% − spild, så spild-modulet afgør hvor tæt I lander på de 50%.
     </div>`;
+
+  // Økonomi-resumé (årlig avance)
+  const o = (d && d.oekonomi) || null;
+  if (o){
+    const tile=(l,v,c,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${l}</div>
+        <div style="font-size:20px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div>
+        ${sub?`<div style="font-size:10px;color:var(--ash);margin-top:4px;">${sub}</div>`:''}</div>`;
+    document.getElementById('priser-oekonomi').innerHTML =
+      `<div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">Økonomisk konsekvens — årlig avance (ved nuværende volumen)</div>
+       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+        ${tile('Avance i dag', kr0(o.aar_gl)+' kr', 'var(--ash)', '~35% realiseret')}
+        ${tile('Plan 1/9 (50%)', kr0(o.aar_plan)+' kr', 'var(--forest)', 'før spild')}
+        ${tile('Scenarie', kr0(o.aar_scen)+' kr', '#e67e22', 'blødere priser')}
+        ${tile('Løft: plan vs i dag', '+'+kr0(o.plan_vs_gl)+' kr', 'var(--moss)', 'brutto, før spild')}
+        ${tile('Netto v/ '+o.spild_pct+'% spild', '+'+kr0(o.plan_netto_vs_gl)+' kr', 'var(--moss)', 'realistisk løft')}
+        ${tile('Scenarie koster', kr0(o.scen_vs_plan)+' kr', 'var(--danger)', 'vs fuld plan')}
+       </div>
+       <p style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;">Antager samme volumen som i dag. De 50% er før spild — hvert %-point mindre spild ≈ +4-5.000 kr/år ekstra.</p>`;
+  }
 
   // Tabel 1 — nu → 1/9
   let h1 = `<thead><tr><th style="text-align:left;">Vare</th>

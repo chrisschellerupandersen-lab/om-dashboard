@@ -1164,6 +1164,42 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.get("/api/bageri/prisstigning")
+async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None):
+    """Sammenlign nuværende salgspris (faktisk Shopbox-salg, seneste 8 uger) med
+    de nye Organic Bakery-udsalgspriser. Ex moms."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    from datetime import date, timedelta
+    fra = (date.today() - timedelta(weeks=8)).isoformat()
+    varer, tot_gl, tot_ny, tot_antal = [], 0.0, 0.0, 0.0
+    with database._conn() as conn:
+        for p in database._ORGANIC_BAKERY:
+            kilde = p["kilde"]
+            gammel, antal = None, 0
+            if kilde:
+                ph = ",".join("?" * len(kilde))
+                r = conn.execute(f"""
+                    SELECT COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
+                           COALESCE(SUM(antal),0) AS antal
+                    FROM v_transaktioner
+                    WHERE dato >= ? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                """, (fra, *kilde)).fetchone()
+                antal = float(r["antal"] or 0)
+                gammel = round(r["oms"] / antal, 2) if antal else None
+            ny = p["udsalg"]
+            stig = round(ny - gammel, 2) if gammel else None
+            pct = round((ny - gammel) / gammel * 100, 1) if gammel else None
+            varer.append({"navn": p["navn"], "gammel": gammel, "ny": ny,
+                          "stigning_kr": stig, "stigning_pct": pct, "antal_8u": round(antal)})
+            if gammel and antal:
+                tot_gl += gammel * antal; tot_ny += ny * antal; tot_antal += antal
+    vaegtet_pct = round((tot_ny - tot_gl) / tot_gl * 100, 1) if tot_gl else None
+    return {"varer": varer, "vaegtet_stigning_pct": vaegtet_pct,
+            "vaegtet_gl_snit": round(tot_gl / tot_antal, 2) if tot_antal else None,
+            "vaegtet_ny_snit": round(tot_ny / tot_antal, 2) if tot_antal else None}
+
+
 @app.get("/api/bageri/spild")
 async def api_bageri_spild(request: Request, uge: int, aar: int, secret: Optional[str] = None):
     """Spild & redning pr. uge (Organic Bakery). Login eller webhook-secret."""

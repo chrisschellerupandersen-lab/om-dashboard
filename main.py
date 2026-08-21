@@ -1206,7 +1206,9 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
                 ph = ",".join("?" * len(kilde))
                 r = conn.execute(f"""
                     SELECT COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
-                           COALESCE(SUM(antal),0) AS antal
+                           COALESCE(SUM(antal),0) AS antal,
+                           COALESCE(SUM(db_korrekt),0) AS db,
+                           COALESCE(SUM(vf_korrekt),0) AS vf
                     FROM v_transaktioner
                     WHERE dato >= ? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
                 """, (fra, *kilde)).fetchone()
@@ -1227,10 +1229,18 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
             pct = round((ny - gammel) / gammel * 100, 1) if gammel else None
             stig_liste = round(ny_incl - liste_incl, 2) if liste_incl else None
             pct_liste = round((ny_incl - liste_incl) / liste_incl * 100, 1) if liste_incl else None
+            # Gamle avancer (faktisk realiseret, ex moms) vs nye (50%)
+            gl_kost = round(float(r["vf"]) / antal, 2) if kilde and antal else None
+            gl_av_kr = round(float(r["db"]) / antal, 2) if kilde and antal else None
+            gl_av_pct = round(float(r["db"]) / float(r["oms"]) * 100, 1) if kilde and float(r["oms"] or 0) > 0 else None
+            ny_av_kr = round(ny - p["indkoeb"], 2)
+            ny_av_pct = round((ny - p["indkoeb"]) / ny * 100, 1) if ny else None
             varer.append({"navn": p["navn"], "gammel": gammel, "ny": ny,
                           "liste_incl": liste_incl, "ny_incl": ny_incl,
                           "stigning_liste_kr": stig_liste, "stigning_liste_pct": pct_liste,
-                          "stigning_kr": stig, "stigning_pct": pct, "antal_8u": round(antal)})
+                          "stigning_kr": stig, "stigning_pct": pct, "antal_8u": round(antal),
+                          "gl_kost_ex": gl_kost, "gl_av_kr": gl_av_kr, "gl_av_pct": gl_av_pct,
+                          "ny_kost_ex": p["indkoeb"], "ny_av_kr": ny_av_kr, "ny_av_pct": ny_av_pct})
             if gammel and antal:
                 tot_gl += gammel * antal; tot_ny += ny * antal; tot_antal += antal
     vaegtet_pct = round((tot_ny - tot_gl) / tot_gl * 100, 1) if tot_gl else None

@@ -1187,10 +1187,24 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
                 """, (fra, *kilde)).fetchone()
                 antal = float(r["antal"] or 0)
                 gammel = round(r["oms"] / antal, 2) if antal else None
+                # Faktisk stykpris (liste) = den pris flest STYK sælges til, inkl moms
+                lr = conn.execute(f"""
+                    SELECT ROUND(omsætning / antal) AS pris, SUM(antal) AS n
+                    FROM transaktioner
+                    WHERE dato >= ? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                      AND antal > 0 AND omsætning > 0
+                    GROUP BY pris ORDER BY n DESC LIMIT 1
+                """, (fra, *kilde)).fetchone()
+            liste_incl = float(lr["pris"]) if kilde and lr and lr["pris"] else None
             ny = p["udsalg"]
+            ny_incl = round(ny * 1.25, 2)
             stig = round(ny - gammel, 2) if gammel else None
             pct = round((ny - gammel) / gammel * 100, 1) if gammel else None
+            stig_liste = round(ny_incl - liste_incl, 2) if liste_incl else None
+            pct_liste = round((ny_incl - liste_incl) / liste_incl * 100, 1) if liste_incl else None
             varer.append({"navn": p["navn"], "gammel": gammel, "ny": ny,
+                          "liste_incl": liste_incl, "ny_incl": ny_incl,
+                          "stigning_liste_kr": stig_liste, "stigning_liste_pct": pct_liste,
                           "stigning_kr": stig, "stigning_pct": pct, "antal_8u": round(antal)})
             if gammel and antal:
                 tot_gl += gammel * antal; tot_ny += ny * antal; tot_antal += antal

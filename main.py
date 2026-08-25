@@ -1164,6 +1164,39 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.get("/api/analyse/ugedag-produkter")
+async def api_ugedag_produkter(request: Request, ugedag: int = 1, uger: int = 32,
+                               kategori: str = "Bagværk", secret: Optional[str] = None):
+    """Typisk salg pr. produkt på en given ugedag (SQLite %w: søn=0..lør=6, man=1).
+    Snit pr. dag = total / antal forekomster af ugedagen. Login eller webhook-secret."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    from datetime import date, timedelta
+    fra_dato = (date.today() - timedelta(weeks=int(uger))).isoformat()
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT varenavn,
+                   COALESCE(SUM(antal),0)     AS antal,
+                   COALESCE(SUM(omsætning),0) AS oms,
+                   COUNT(DISTINCT dato)       AS dage
+            FROM transaktioner
+            WHERE TRIM(kategori) = ? AND dato >= ?
+              AND strftime('%w', dato) = ?
+            GROUP BY varenavn ORDER BY antal DESC
+        """, (kategori, fra_dato, str(int(ugedag)))).fetchall()
+    ndage = max((r["dage"] for r in rows), default=0)
+    prod = [{
+        "navn": r["varenavn"],
+        "snit_antal": round(r["antal"] / r["dage"], 1) if r["dage"] else 0,
+        "snit_oms": round(r["oms"] / r["dage"]) if r["dage"] else 0,
+        "dage": r["dage"],
+    } for r in rows if r["antal"]]
+    tot_stk = round(sum(r["antal"] for r in rows) / ndage, 1) if ndage else 0
+    tot_oms = round(sum(r["oms"] for r in rows) / ndage) if ndage else 0
+    return {"ugedag": ugedag, "uger": uger, "kategori": kategori, "antal_dage": ndage,
+            "produkter": prod, "snit_stk_total": tot_stk, "snit_oms_total": tot_oms}
+
+
 @app.get("/api/analyse/morgenvindue")
 async def api_morgenvindue(request: Request, fra: str = "0600", til: str = "0630",
                            uger: int = 12, secret: Optional[str] = None):

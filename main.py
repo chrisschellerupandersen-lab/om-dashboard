@@ -1164,6 +1164,47 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.get("/api/analyse/morgenvindue")
+async def api_morgenvindue(request: Request, fra: str = "0600", til: str = "0630",
+                           uger: int = 12, secret: Optional[str] = None):
+    """Omsætning i et klokkeslæt-vindue (fx 06:00–06:30), opdelt pr. ugedag.
+    Tidspunktet læses fra bon_nr (…-YYMMDDHHMMSS). Login eller webhook-secret."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    from datetime import date, timedelta
+    fra_dato = (date.today() - timedelta(weeks=int(uger))).isoformat()
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT dato, bon_nr, COALESCE(SUM(omsætning),0) AS oms
+            FROM transaktioner
+            WHERE bon_nr LIKE '%-%' AND dato >= ?
+              AND substr(substr(bon_nr, instr(bon_nr,'-')+1), 7, 4) >= ?
+              AND substr(substr(bon_nr, instr(bon_nr,'-')+1), 7, 4) <  ?
+            GROUP BY dato, bon_nr
+        """, (fra_dato, fra, til)).fetchall()
+    _DAGE = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
+    agg = {i: {"oms": 0.0, "kunder": 0, "dage": set()} for i in range(7)}
+    for r in rows:
+        wd = date.fromisoformat(str(r["dato"])[:10]).weekday()
+        agg[wd]["oms"] += float(r["oms"] or 0)
+        agg[wd]["kunder"] += 1
+        agg[wd]["dage"].add(str(r["dato"])[:10])
+    ud, t_oms, t_kunder, t_dage = [], 0.0, 0, 0
+    for i in range(7):
+        a = agg[i]; nd = len(a["dage"])
+        ud.append({
+            "ugedag": _DAGE[i], "antal_dage": nd,
+            "oms_ialt": round(a["oms"]), "kunder_ialt": a["kunder"],
+            "oms_pr_dag": round(a["oms"] / nd) if nd else 0,
+            "kunder_pr_dag": round(a["kunder"] / nd, 1) if nd else 0,
+            "snit_kurv": round(a["oms"] / a["kunder"]) if a["kunder"] else 0,
+        })
+        t_oms += a["oms"]; t_kunder += a["kunder"]; t_dage += nd
+    return {"fra": fra, "til": til, "uger": uger, "dage": ud,
+            "total": {"oms_ialt": round(t_oms), "kunder_ialt": t_kunder,
+                      "snit_kurv": round(t_oms / t_kunder) if t_kunder else 0}}
+
+
 @app.post("/api/bageri/indlaes-kostpriser")
 async def api_bageri_indlaes_kostpriser(request: Request):
     """Indlæs Organic Bakery-kostpriser dateret 1/9 (vare_pris_periode) og

@@ -2883,9 +2883,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <span id="bageri-uge-lbl" style="font-family:'DM Mono',monospace;font-size:13px;font-weight:600;color:var(--forest);min-width:170px;text-align:center;">Uge —</span>
               <button onclick="bageriUge(1)" style="padding:5px 11px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:14px;">›</button>
             </div>
-            <div style="display:flex;gap:4px;" id="bageri-profil">
-              <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
-              <button class="bageri-prof-btn" data-p="balanceret" onclick="bageriProfil('balanceret')">Balanceret</button>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <div style="display:flex;gap:4px;" id="bageri-profil">
+                <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
+                <button class="bageri-prof-btn" data-p="balanceret" onclick="bageriProfil('balanceret')">Balanceret</button>
+              </div>
+              <button id="bageri-kontrol-btn" onclick="bageriKontrol()" style="padding:6px 13px;border:1px solid var(--forest);border-radius:8px;background:var(--forest);color:#fff;cursor:pointer;font-size:12px;font-weight:600;">Kør kontrol ✓</button>
             </div>
           </div>
           <div id="bageri-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;"></div>
@@ -2893,6 +2896,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <table class="aar2-tbl" style="width:100%;min-width:720px;" id="bageri-tabel"></table>
           </div>
           <p id="bageri-note" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;"></p>
+          <div id="bageri-kontrol-box" style="display:none;margin-top:14px;border-top:1px dashed var(--border);padding-top:14px;"></div>
         </div>
 
         <div class="card" id="bageri-spild-kort" style="margin-top:16px;">
@@ -3985,6 +3989,64 @@ function bageriUge(delta){
   _bageriRender();
 }
 function bageriProfil(p){ _bageriProfil = p; _bageriRender(); }
+
+async function bageriKontrol(){
+  const box = document.getElementById('bageri-kontrol-box');
+  const btn = document.getElementById('bageri-kontrol-btn');
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-family:\'DM Mono\',monospace;font-size:11px;color:var(--ash);padding:6px 0;">Kører kontrol mod faktisk salg…</div>';
+  btn.disabled = true; btn.style.opacity = '.6';
+  const d = await api(`/api/bageri/kontrol?uge=${_bageriUge}&aar=${_bageriAar}&uger=8`);
+  btn.disabled = false; btn.style.opacity = '1';
+  if (!d || d.error){
+    box.innerHTML = `<div style="color:var(--danger);font-size:12px;">${(d&&d.error)||'Kunne ikke køre kontrol'}</div>`;
+    return;
+  }
+  const pct = d.afvigelse_total_pct;
+  const farve = v => v===null?'var(--ash)':(Math.abs(v)<=10?'var(--moss)':(Math.abs(v)<=20?'#b8860b':'#b0413a'));
+  const sgn = v => v===null?'–':(v>0?'+':'')+v.toFixed(1)+'%';
+  const vurder = pct===null ? 'ingen historik'
+      : Math.abs(pct)<=10 ? 'God — forslaget matcher det aktuelle salg tæt'
+      : Math.abs(pct)<=20 ? 'OK — buffer ligger på de fryse-egnede varer'
+      : (pct>0 ? 'Højt — forslaget ligger et stykke over salget, overvej at trimme' : 'Lavt — forslaget ligger under salget, risiko for udsolgt');
+
+  let rows = (d.produkter||[]).filter(p=>p.har_historik).map(p=>{
+    const a = p.afvigelse_pct;
+    return `<tr>
+      <td style="text-align:left;">${p.navn}</td>
+      <td class="num" style="font-weight:600;">${p.anbefalet}</td>
+      <td class="num" style="color:var(--ash);">${p.faktisk_uge}</td>
+      <td class="num" style="color:${farve(a)};font-weight:600;">${sgn(a)}</td></tr>`;
+  }).join('');
+  const nye = (d.produkter||[]).filter(p=>!p.har_historik);
+  if (nye.length){
+    rows += `<tr><td colspan="4" style="text-align:left;padding-top:8px;font-size:9px;color:var(--ash);font-family:'DM Mono',monospace;">Nye varer (ingen historik at måle mod): `
+      + nye.map(p=>`${p.navn} (${p.anbefalet})`).join(' · ') + '</td></tr>';
+  }
+  box.innerHTML = `
+    <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
+      <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Kontrol · anbefalet vs. faktisk salg (${d.sammenlign_dage}, snit seneste 8 uger)</span>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;">
+      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Anbefalet i alt</div>
+        <div style="font-size:19px;font-weight:700;color:var(--forest);">${d.total_anbefalet} stk</div></div>
+      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Faktisk salg (snit)</div>
+        <div style="font-size:19px;font-weight:700;color:var(--ash);">${d.total_faktisk} stk</div></div>
+      <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Samlet afvigelse</div>
+        <div style="font-size:19px;font-weight:700;color:${farve(pct)};">${sgn(pct)}</div></div>
+    </div>
+    <div style="font-size:12px;color:${farve(pct)};margin-bottom:12px;font-weight:600;">${vurder}</div>
+    <div style="overflow-x:auto;">
+      <table class="aar2-tbl" style="width:100%;min-width:460px;">
+        <thead><tr><th style="text-align:left;">Vare</th><th class="num">Anbef.</th><th class="num">Faktisk/uge</th><th class="num">Afvig.</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <p style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;">Grøn ≤10% · gul ≤20% · rød >20%. Buffer på fryse-egnede varer (brød/boller) er bevidst — overskud kan fryses/B2B. Risiko-varer (tebirkes, pain) bør ligge tæt på eller under salget.</p>`;
+}
 
 async function _bageriRender(){
   document.querySelectorAll('#bageri-profil .bageri-prof-btn')

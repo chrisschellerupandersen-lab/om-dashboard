@@ -4084,7 +4084,7 @@ async function _bageriRender(){
 
   let head = `<thead><tr><th style="text-align:left;min-width:170px;">Vare</th>`
     + DAGE.map(dg=>`<th class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${LBL[dg]}</th>`).join('')
-    + `<th class="num">Uge</th><th class="num" style="color:var(--ash);" title="Faktisk solgt i sidste hele uge (N-2). Bestillingsugen er ikke færdig onsdag, så vi viser ugen før den.">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
+    + `<th class="num">Uge</th><th class="num" style="color:var(--ash);" title="Faktisk solgt i sidste hele uge (N-2). Bestillingsugen er ikke færdig onsdag, så vi viser ugen før den. Kun de ugedage anbefalingen dækker tælles med (fx udelades mandag i uge 36).">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
   let body = '';
   let totSidste = 0;
   order.forEach(kat=>{

@@ -1177,7 +1177,11 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
     rec_map = {p["varenavn"]: p for p in rec.get("produkter", [])}
     # Nulstiller anbefalingen mandag? (uge 36 gør)
     man_nul = all(p["anbefalet"].get("man", 0) == 0 for p in rec.get("produkter", []))
-    fra = (date.today() - timedelta(weeks=int(uger))).isoformat()
+    idag = date.today()
+    fra = (idag - timedelta(weeks=int(uger))).isoformat()
+    # Udelad indeværende (ufærdige) uge: kun hele uger op til sidste mandag tæller,
+    # ellers ville en halv uge tælle som en fuld uge i nævneren og trække snittet ned.
+    til = (idag - timedelta(days=idag.weekday())).isoformat()   # mandag i denne uge
     wd_filter = "AND strftime('%w', dato) <> '1'" if man_nul else ""   # udelad mandag
     ud, t_rec, t_fak = [], 0, 0.0
     with database._conn() as conn:
@@ -1190,9 +1194,9 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
                     SELECT COALESCE(SUM(antal),0) AS a,
                            COUNT(DISTINCT strftime('%Y-%W', dato)) AS w
                     FROM transaktioner
-                    WHERE dato >= ? {wd_filter}
+                    WHERE dato >= ? AND dato < ? {wd_filter}
                       AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
-                """, (fra, *kilde)).fetchone()
+                """, (fra, til, *kilde)).fetchone()
                 w = r["w"] or 0
                 fak = round(r["a"] / w, 1) if w else 0.0
             rec_t = rec_map.get(p["navn"], {}).get("total_anbefalet", 0)

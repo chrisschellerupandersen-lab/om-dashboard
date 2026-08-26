@@ -4023,10 +4023,38 @@ async function bageriKontrol(){
     rows += `<tr><td colspan="4" style="text-align:left;padding-top:8px;font-size:9px;color:var(--ash);font-family:'DM Mono',monospace;">Nye varer (ingen historik at måle mod): `
       + nye.map(p=>`${p.navn} (${p.anbefalet})`).join(' · ') + '</td></tr>';
   }
+  // Trend-graf: ugeserie (tir–søn, hele uger) med anbefalings-linje
+  let trendHtml = '';
+  const serie = d.ugeserie || [];
+  if (serie.length){
+    const vals = serie.map(u=>u.stk);
+    const maxv = Math.max(...vals, d.total_anbefalet||0) * 1.08;
+    const H = 96;
+    const recTop = maxv ? (H - (d.total_anbefalet/maxv)*H) : 0;
+    const bars = serie.map((u,i)=>{
+      const sidste = i === serie.length-1;
+      const h = maxv ? Math.max(2,(u.stk/maxv)*H) : 2;
+      const clr = sidste ? 'var(--forest)' : 'var(--moss)';
+      const uge = (u.uge||'').split('-').pop();
+      return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;min-width:22px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:2px;">${u.stk}</div>
+        <div title="Uge ${uge}: ${u.stk} stk (${u.fra}..${u.til})" style="width:70%;height:${h}px;background:${clr};border-radius:3px 3px 0 0;${sidste?'outline:2px solid var(--forest);outline-offset:1px;':''}"></div>
+        <div style="font-family:'DM Mono',monospace;font-size:9px;color:${sidste?'var(--forest)':'var(--ash)'};margin-top:3px;font-weight:${sidste?'700':'400'};">${uge}</div>
+      </div>`;
+    }).join('');
+    trendHtml = `
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:6px;">
+        Ugeserie (${d.sammenlign_dage}, hele uger) · sidste søjle = forrige uge · <span style="color:var(--forest);">— stiplet linje = anbefalet ${d.total_anbefalet}</span></div>
+      <div style="position:relative;display:flex;align-items:flex-end;gap:6px;height:${H+30}px;padding-top:16px;margin-bottom:16px;">
+        <div style="position:absolute;left:0;right:0;top:${recTop+16}px;border-top:1px dashed var(--forest);opacity:.6;pointer-events:none;"></div>
+        ${bars}
+      </div>`;
+  }
   box.innerHTML = `
     <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
       <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Kontrol · anbefalet vs. faktisk salg (${d.sammenlign_dage}, snit seneste 8 uger)</span>
     </div>
+    ${trendHtml}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;">
       <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
         <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Anbefalet i alt</div>

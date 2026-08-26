@@ -1164,6 +1164,53 @@ async def api_bestillings_anbefaling(
         }
 
 
+@app.get("/api/bageri/kontrol")
+async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
+                            uger: int = 8, secret: Optional[str] = None):
+    """Kontrol af Organic-anbefalingen: sammenlign anbefalet mængde pr. vare med
+    faktisk salg (mappede gamle varer). Uge 36 = mandag nulstillet, så faktisk
+    sammenlignes på tir–søn. Login eller webhook-secret."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    from datetime import date, timedelta
+    rec = database.hent_bestillings_uge_organic(int(uge), int(aar))
+    rec_map = {p["varenavn"]: p for p in rec.get("produkter", [])}
+    # Nulstiller anbefalingen mandag? (uge 36 gør)
+    man_nul = all(p["anbefalet"].get("man", 0) == 0 for p in rec.get("produkter", []))
+    fra = (date.today() - timedelta(weeks=int(uger))).isoformat()
+    wd_filter = "AND strftime('%w', dato) <> '1'" if man_nul else ""   # udelad mandag
+    ud, t_rec, t_fak = [], 0, 0.0
+    with database._conn() as conn:
+        for p in database._ORGANIC_BAKERY:
+            kilde = p["kilde"]
+            fak = None
+            if kilde:
+                ph = ",".join("?" * len(kilde))
+                r = conn.execute(f"""
+                    SELECT COALESCE(SUM(antal),0) AS a,
+                           COUNT(DISTINCT strftime('%Y-%W', dato)) AS w
+                    FROM transaktioner
+                    WHERE dato >= ? {wd_filter}
+                      AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                """, (fra, *kilde)).fetchone()
+                w = r["w"] or 0
+                fak = round(r["a"] / w, 1) if w else 0.0
+            rec_t = rec_map.get(p["navn"], {}).get("total_anbefalet", 0)
+            afvig = round((rec_t - fak) / fak * 100, 1) if fak else None
+            ud.append({"navn": p["navn"], "gruppe": p["gruppe"],
+                       "anbefalet": rec_t, "faktisk_uge": fak, "afvigelse_pct": afvig,
+                       "har_historik": bool(kilde),
+                       "dage": {d: rec_map.get(p["navn"], {}).get("anbefalet", {}).get(d, 0)
+                                for d in ["man","tir","ons","tor","fre","loe","son"]}})
+            t_rec += rec_t
+            if fak: t_fak += fak
+    return {"uge": uge, "aar": aar, "mandag_nulstillet": man_nul,
+            "sammenlign_dage": "tir–søn" if man_nul else "man–søn",
+            "total_anbefalet": t_rec, "total_faktisk": round(t_fak),
+            "afvigelse_total_pct": round((t_rec - t_fak) / t_fak * 100, 1) if t_fak else None,
+            "produkter": ud}
+
+
 @app.get("/api/analyse/ugedag-produkter")
 async def api_ugedag_produkter(request: Request, ugedag: int = 1, uger: int = 32,
                                kategori: str = "Bagværk", secret: Optional[str] = None):

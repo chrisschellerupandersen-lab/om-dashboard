@@ -5325,15 +5325,27 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 anb_dag[dn] = int(round(seed.get(dn, 0) * _vejr_faktor(p["gruppe"], vf_dato[i])))
         else:
             pr_wd: Dict[int, list] = {i: [] for i in range(7)}
+            wk_tot: Dict = {}
             for d in aabne:
                 s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
                 pr_wd[wd_af_dato[d]].append(s)
+                wk = date.fromisoformat(d).isocalendar()[:2]
+                wk_tot[wk] = wk_tot.get(wk, 0.0) + s
+            # Trend: seneste 2 uger vs uge 3-5 (cap ±15%) — fanger faldende/stigende salg,
+            # så anbefalingen følger det AKTUELLE niveau, ikke sommerens højere.
+            wv = [wk_tot[w] for w in sorted(wk_tot)]
+            trend = 1.0
+            if len(wv) >= 5:
+                nyere = sum(wv[-2:]) / 2.0
+                aeldre = sum(wv[-5:-2]) / 3.0
+                if aeldre > 0:
+                    trend = max(0.85, min(1.15, nyere / aeldre))
             basis_dag, anb_dag = {}, {}
             for i, dn in enumerate(DAGE):
-                med = _median(pr_wd[i][-8:])
+                med = _median(pr_wd[i][-6:])           # seneste 6 uger = tættere på nu
                 basis_dag[dn] = med
                 vf = _vejr_faktor(p["gruppe"], vf_dato[i])
-                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * sf * vf))
+                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * sf * vf * trend))
         # Dage før Organic Bakery-start (fx mandag 31/8 i uge 36 = gammel bager) → 0
         for i, dn in enumerate(DAGE):
             if (mon_dato + timedelta(days=i)).isoformat() < _ORGANIC_START:

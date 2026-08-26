@@ -5270,19 +5270,13 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     mon_dato     = date.fromisocalendar(maal_aar, maal_uge, 1)
     vindue_start = (mon_dato - timedelta(weeks=13)).isoformat()
     maal_mon     = mon_dato.isoformat()
-    # Udelad indeværende (ufærdige) uge fra historikken: der bestilles onsdag, så
-    # denne uge er ikke slut. Vinduet lukkes ved mandag i denne uge, så trend og
-    # median kun bygger på HELE uger (en halv uge ville trække niveauet ned).
-    idag         = date.today()
-    denne_mandag = (idag - timedelta(days=idag.weekday())).isoformat()
-    vindue_slut  = min(maal_mon, denne_mandag)
     alle_kilde   = sorted({vn for p in _ORGANIC_BAKERY for vn in p["kilde"]})
 
     with _conn() as conn:
         aabne = [r[0] for r in conn.execute("""
             SELECT DISTINCT dato FROM transaktioner
             WHERE dato >= ? AND dato < ? ORDER BY dato
-        """, (vindue_start, vindue_slut)).fetchall()]
+        """, (vindue_start, maal_mon)).fetchall()]
         salg: Dict = {}
         if alle_kilde:
             ph = ",".join("?" * len(alle_kilde))
@@ -5293,7 +5287,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 WHERE dato >= ? AND dato < ?
                   AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
                 GROUP BY vn, dato
-            """, (vindue_start, vindue_slut, *alle_kilde)).fetchall():
+            """, (vindue_start, maal_mon, *alle_kilde)).fetchall():
                 if r["vn"] is not None:
                     salg[(int(r["vn"]), r["dato"])] = float(r["stk"] or 0)
         tg = conn.execute("SELECT tgtg FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()

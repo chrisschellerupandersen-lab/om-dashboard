@@ -1208,11 +1208,28 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
                                 for d in ["man","tir","ons","tor","fre","loe","son"]}})
             t_rec += rec_t
             if fak: t_fak += fak
+        # Ugeserie (samme dage-filter + hele uger) — så man kan se om niveauet
+        # stiger/falder, og om en enkelt uge (fx uge 34) er en top eller trend.
+        alle_kilde = sorted({vn for p in database._ORGANIC_BAKERY for vn in p["kilde"]})
+        ugeserie = []
+        if alle_kilde:
+            ph = ",".join("?" * len(alle_kilde))
+            for r in conn.execute(f"""
+                SELECT strftime('%Y-%W', dato) AS yw,
+                       MIN(dato) AS fra, MAX(dato) AS til,
+                       ROUND(SUM(antal)) AS stk
+                FROM transaktioner
+                WHERE dato >= ? AND dato < ? {wd_filter}
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                GROUP BY yw ORDER BY yw
+            """, (fra, til, *alle_kilde)).fetchall():
+                ugeserie.append({"uge": r["yw"], "fra": r["fra"], "til": r["til"],
+                                 "stk": int(r["stk"] or 0)})
     return {"uge": uge, "aar": aar, "mandag_nulstillet": man_nul,
             "sammenlign_dage": "tir–søn" if man_nul else "man–søn",
             "total_anbefalet": t_rec, "total_faktisk": round(t_fak),
             "afvigelse_total_pct": round((t_rec - t_fak) / t_fak * 100, 1) if t_fak else None,
-            "produkter": ud}
+            "produkter": ud, "ugeserie": ugeserie}
 
 
 @app.get("/api/analyse/ugedag-produkter")

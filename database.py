@@ -5313,6 +5313,10 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         return min(f, 1.10) if f >= 1.0 else f          # standard: fuld ned, cap op +10%
     vf_dato = {i: (mon_dato + timedelta(days=i)).isoformat() for i in range(7)}
 
+    # Sidste uges faktiske salg (kalenderugen før målugen) pr. vare — via kilde-varenumre.
+    sidste_start = (mon_dato - timedelta(days=7)).isoformat()
+    sidste_dage  = [d for d in aabne if sidste_start <= d < maal_mon]
+
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
@@ -5352,6 +5356,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 basis_dag[dn] = 0.0
                 anb_dag[dn] = 0
         total_anb = sum(anb_dag.values())
+        sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in p["kilde"] for d in sidste_dage)
+                      if p["kilde"] else None)
         produkter.append({
             "varenavn":        p["navn"],
             "kategori":        _organic_kat(p["navn"]),
@@ -5362,6 +5368,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "pris_ex_moms":    p["indkoeb"],
             "kilde_varenumre": p["kilde"],
             "har_historik":    bool(p["kilde"]),
+            "sidste_uge":      (round(sidste_uge) if sidste_uge is not None else None),
             "basis":           {d: round(basis_dag[d], 1) for d in DAGE},
             "anbefalet":       anb_dag,
             "total_basis":     round(sum(basis_dag.values())),

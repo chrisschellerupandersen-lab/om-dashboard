@@ -4084,13 +4084,14 @@ async function _bageriRender(){
 
   let head = `<thead><tr><th style="text-align:left;min-width:170px;">Vare</th>`
     + DAGE.map(dg=>`<th class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${LBL[dg]}</th>`).join('')
-    + `<th class="num">Uge</th><th class="num">Kr</th></tr></thead>`;
+    + `<th class="num">Uge</th><th class="num" style="color:var(--ash);" title="Faktisk solgt i ugen før">Sidste uge</th><th class="num">Kr</th></tr></thead>`;
   let body = '';
+  let totSidste = 0;
   order.forEach(kat=>{
     const prods = groups[kat]; if(!prods||!prods.length) return;
     const katDag = {}; DAGE.forEach(dg=>katDag[dg]=0);
-    let katUge = 0, katKr = 0;
-    body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="10" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
+    let katUge = 0, katKr = 0, katSidste = 0, katSidsteHar = false;
+    body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="11" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
     prods.forEach(p=>{
       const risk = p.risikogruppe==='risiko';
       const badge = risk
@@ -4099,6 +4100,8 @@ async function _bageriRender(){
         ? `<span class="bageri-badge" style="background:var(--amber);color:#4a3800;" title="Ny vare — startbud uden historik">nyt</span>` : '';
       DAGE.forEach(dg=>katDag[dg]+=(p.anbefalet[dg]||0));
       katUge += (p.total_anbefalet||0); katKr += (p.total_pris||0);
+      const sidste = (p.sidste_uge==null) ? null : p.sidste_uge;
+      if (sidste!=null){ katSidste += sidste; totSidste += sidste; katSidsteHar = true; }
       body += `<tr>
         <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
         + DAGE.map(dg=>{
@@ -4106,16 +4109,17 @@ async function _bageriRender(){
             return `<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${v||'–'}</td>`;
           }).join('')
         + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
+           <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>
            <td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
     });
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
       + DAGE.map(dg=>`<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${katDag[dg]||'–'}</td>`).join('')
-      + `<td class="num">${katUge}</td><td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
+      + `<td class="num">${katUge}</td><td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td><td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
   });
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
-      <td class="num">${d.total_stk}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
+      <td class="num">${d.total_stk}</td><td class="num" style="color:var(--ash);">${totSidste||'–'}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
   tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
 
   document.getElementById('bageri-note').textContent =

@@ -5313,9 +5313,12 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         return min(f, 1.10) if f >= 1.0 else f          # standard: fuld ned, cap op +10%
     vf_dato = {i: (mon_dato + timedelta(days=i)).isoformat() for i in range(7)}
 
-    # Sidste uges faktiske salg (kalenderugen før målugen) pr. vare — via kilde-varenumre.
-    sidste_start = (mon_dato - timedelta(days=7)).isoformat()
-    sidste_dage  = [d for d in aabne if sidste_start <= d < maal_mon]
+    # Forrige HELE uges faktiske salg pr. vare — via kilde-varenumre.
+    # Der bestilles onsdag i ugen før målugen (N-1), så den uge er ikke færdig.
+    # Vi viser derfor den sidste komplette uge = N-2 (to uger før målugens mandag).
+    sidste_start = (mon_dato - timedelta(days=14)).isoformat()
+    sidste_slut  = (mon_dato - timedelta(days=7)).isoformat()
+    sidste_dage  = [d for d in aabne if sidste_start <= d < sidste_slut]
 
     produkter = []
     for p in _ORGANIC_BAKERY:

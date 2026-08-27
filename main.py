@@ -18,6 +18,7 @@ from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import database
 import social_selling
 import parser as xlsx_parser
+import portal_ordre_parser
 
 # ── Gmail auto-import ─────────────────────────────────────────────────────────
 
@@ -2855,6 +2856,55 @@ async def opdater_rapport(request: Request):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fejl ved behandling: {str(e)}")
+
+
+@app.post("/api/bageri/ordre-mail")
+async def bageri_ordre_mail(request: Request):
+    """Modtager en Organic Bakery portal-ordrebekræftelse (Shopify-mail fra
+    "Min butik"), parser varelinjerne og gemmer dem som ugens bestilling
+    (ugebestillinger) — kilden til spild = bestilt − solgt − reddet.
+
+    Body (JSON): {secret, body|data, dato, afsender?, override_uge?, override_aar?,
+                  dry_run?}. Målugen udledes af bestillingsdatoen (ugen efter),
+                  medmindre override angives. dry_run=true parser uden at gemme."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+
+    # Filtrér på afsender hvis den er med — kun bageri-portalen, ikke B2B-butikken.
+    afsender = (body.get("afsender") or body.get("sender") or "").lower()
+    if afsender and portal_ordre_parser.PORTAL_AFSENDER not in afsender:
+        return {"ok": False, "sprunget_over": True,
+                "grund": f"Afsender '{afsender}' er ikke bageri-portalen — ignoreret."}
+
+    mail_body = body.get("body") or body.get("data") or ""
+    if not mail_body.strip():
+        raise HTTPException(status_code=400, detail="Tom mail-body")
+    mail_dato = (body.get("dato") or datetime.now().isoformat())
+
+    try:
+        r = portal_ordre_parser.parse_ordre_mail(
+            mail_body, mail_dato,
+            override_uge=body.get("override_uge"),
+            override_aar=body.get("override_aar"))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Kunne ikke parse ordre: {e}")
+
+    if not r["linjer"]:
+        raise HTTPException(status_code=422, detail="Ingen varelinjer fundet i mailen")
+
+    if not body.get("dry_run"):
+        database.gem_ugebestilling(r["uge"], r["aar"], r["linjer"])
+    return {"ok": True, "gemt": not body.get("dry_run"),
+            "ordre_nr": r["ordre_nr"], "uge": r["uge"], "aar": r["aar"],
+            "maal_mandag": r["maal_mandag"], "antal_varer": len(r["linjer"]),
+            "total_stk": r["total_stk"], "total_kr": r["total_kr"],
+            "varer": [{"varenavn": l["varenavn"], "total_antal": l["total_antal"]}
+                      for l in r["linjer"]]}
 
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────

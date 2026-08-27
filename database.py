@@ -75,13 +75,17 @@ _SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
 # Snegle + konfekt udgår (ingen kilde-mapping). Grovbirkes foldes ind i Tebirkes.
 _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051]},
-    {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},
+    {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
+    {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [],
+     "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # 10048 flyttet til birkes-bollen; granola-sesam ligger hos Surdejsbolle → startbud fra #1007
     {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158]},
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045]},
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043]},
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044]},
     {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061]},
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062]},
+    {"navn": "Karamelliseret croissant","indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [],
+     "seed": {"man": 0, "tir": 4, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 8}},  # ny vare, ingen historik → startbud fra #1007
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065]},        # + Høj Romsnegle
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063]},

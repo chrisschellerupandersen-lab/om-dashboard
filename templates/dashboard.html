@@ -4110,16 +4110,23 @@ async function _bageriRender(){
   (d.produkter||[]).forEach(p => { const k=p.kategori||'Andet'; (groups[k]=groups[k]||[]).push(p); });
   const order = [...KATO, ...Object.keys(groups).filter(k=>!KATO.includes(k))];
 
+  const harBest = !!d.har_bestilling;
+  // Afvig-farve: + (bestilt mere end anbefalet) = spild-risiko = rød; − (leaner) = grøn
+  const afFarve = v => v==null?'var(--ash)':(v>0?'#b0413a':(v<0?'var(--moss)':'var(--ash)'));
+  const afTxt   = v => v==null?'–':(v>0?'+'+v:''+v);
   let head = `<thead><tr><th style="text-align:left;min-width:170px;">Vare</th>`
     + DAGE.map(dg=>`<th class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${LBL[dg]}</th>`).join('')
-    + `<th class="num">Uge</th><th class="num" style="color:var(--ash);" title="Faktisk solgt i sidste hele uge (N-2). Bestillingsugen er ikke færdig onsdag, så vi viser ugen før den. Kun de ugedage anbefalingen dækker tælles med (fx udelades mandag i uge 36).">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
+    + `<th class="num" title="Anbefalet af motoren">Uge</th>`
+    + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for denne uge)">Bestilt</th>`
+    + `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
+    + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i sidste hele uge (N-2). Bestillingsugen er ikke færdig onsdag, så vi viser ugen før den. Kun de ugedage anbefalingen dækker tælles med (fx udelades mandag i uge 36).">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
   let body = '';
-  let totSidste = 0;
+  let totSidste = 0, totBest = 0;
   order.forEach(kat=>{
     const prods = groups[kat]; if(!prods||!prods.length) return;
     const katDag = {}; DAGE.forEach(dg=>katDag[dg]=0);
-    let katUge = 0, katKr = 0, katSidste = 0, katSidsteHar = false;
-    body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="11" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
+    let katUge = 0, katKr = 0, katSidste = 0, katSidsteHar = false, katBest = 0, katBestHar = false;
+    body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="13" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
     prods.forEach(p=>{
       const risk = p.risikogruppe==='risiko';
       const badge = risk
@@ -4130,6 +4137,9 @@ async function _bageriRender(){
       katUge += (p.total_anbefalet||0); katKr += (p.total_pris||0);
       const sidste = (p.sidste_uge==null) ? null : p.sidste_uge;
       if (sidste!=null){ katSidste += sidste; totSidste += sidste; katSidsteHar = true; }
+      const best = (p.total_bestilt==null) ? null : p.total_bestilt;
+      const afv  = (p.afvig_bestilt==null) ? null : p.afvig_bestilt;
+      if (best!=null){ katBest += best; totBest += best; katBestHar = true; }
       body += `<tr>
         <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
         + DAGE.map(dg=>{
@@ -4137,21 +4147,32 @@ async function _bageriRender(){
             return `<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${v||'–'}</td>`;
           }).join('')
         + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
+           <td class="num" style="font-weight:600;">${best==null?'–':best}</td>
+           <td class="num" style="color:${afFarve(afv)};font-weight:600;">${afTxt(afv)}</td>
            <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>
            <td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
     });
+    const katAfv = katBestHar ? (katBest - katUge) : null;
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
       + DAGE.map(dg=>`<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${katDag[dg]||'–'}</td>`).join('')
-      + `<td class="num">${katUge}</td><td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td><td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
+      + `<td class="num">${katUge}</td>`
+      + `<td class="num">${katBestHar?katBest:'–'}</td>`
+      + `<td class="num" style="color:${afFarve(katAfv)};">${afTxt(katAfv)}</td>`
+      + `<td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td><td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
   });
+  const totAfv = harBest ? (totBest - d.total_stk) : null;
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
-      <td class="num">${d.total_stk}</td><td class="num" style="color:var(--ash);">${totSidste||'–'}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
+      <td class="num">${d.total_stk}</td>
+      <td class="num">${harBest?totBest:'–'}</td>
+      <td class="num" style="color:${afFarve(totAfv)};">${afTxt(totAfv)}</td>
+      <td class="num" style="color:var(--ash);">${totSidste||'–'}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
   tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
 
   document.getElementById('bageri-note').textContent =
     `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
+    + `“Bestilt” = din faktiske portal-ordre for ugen · “Afvig” = bestilt − anbefalet (+ rød = bestilt mere). `
     + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`;
 
   _bageriSpildRender();

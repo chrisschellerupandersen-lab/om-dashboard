@@ -5389,8 +5389,29 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "db_ved_salg":     round(total_anb * (p["udsalg"] - p["indkoeb"]), 2),
         })
 
+    # Faktisk bestilt (fra portal-ordren i ugebestillinger) — matchet på varenavn,
+    # så anbefaling kan holdes op mod hvad der reelt blev bestilt for netop denne uge.
+    with _conn() as conn:
+        best_rows = conn.execute("""
+            SELECT varenavn, man, tir, ons, tor, fre, loe, son, total_antal
+            FROM ugebestillinger WHERE uge=? AND aar=?
+        """, (maal_uge, maal_aar)).fetchall()
+    best_map = {r["varenavn"].strip().lower(): r for r in best_rows}
+    har_bestilling = bool(best_rows)
+    for x in produkter:
+        br = best_map.get(x["varenavn"].strip().lower())
+        if br is not None:
+            x["bestilt"] = {d: int(br[d] or 0) for d in DAGE}
+            x["total_bestilt"] = int(br["total_antal"] or 0)
+            x["afvig_bestilt"] = x["total_bestilt"] - x["total_anbefalet"]  # + = bestilt mere end anbefalet
+        else:
+            x["bestilt"] = None
+            x["total_bestilt"] = None
+            x["afvig_bestilt"] = None
+
     total_stk     = sum(x["total_anbefalet"] for x in produkter)
     total_indkoeb = sum(x["total_pris"] for x in produkter)
+    total_bestilt = sum(x["total_bestilt"] or 0 for x in produkter) if har_bestilling else None
     return {
         "maal_uge":     maal_uge,
         "maal_aar":     maal_aar,
@@ -5412,6 +5433,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         "total_stk":    total_stk,
         "total_indkoeb": round(total_indkoeb, 2),
         "total_kr":     round(total_indkoeb, 2),
+        "har_bestilling": har_bestilling,
+        "total_bestilt": total_bestilt,
         "faktisk":      False,
     }
 

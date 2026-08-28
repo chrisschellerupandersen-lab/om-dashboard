@@ -829,6 +829,16 @@ async def bestilling_opdater(request: Request):
     if not linjer:
         raise HTTPException(status_code=400, detail="Ingen bestillingslinjer")
 
+    # Organic Bakery-uger (fra 1/9) må KUN skrives af portal-mail-importeren
+    # (/api/bageri/ordre-mail). Den gamle bestillings-vej er pensioneret — afvis
+    # så stump gammel automatik ikke overskriver portal-ordren.
+    from datetime import date as _date
+    maal_mon = _date.fromisocalendar(int(aar), int(uge), 1).isoformat()
+    if maal_mon >= database._RETUR_SLUT:
+        return {"ok": False, "afvist": True, "uge": uge, "aar": aar,
+                "grund": "Organic Bakery-uge — bestilling kommer nu fra portal-mailen "
+                         "(/api/bageri/ordre-mail). Gammel bestillings-import er pensioneret."}
+
     antal = database.gem_ugebestilling(int(uge), int(aar), linjer)
 
     # Nye varer → varestamdata (baseline). Ægte prisændringer → daterede priser

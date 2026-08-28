@@ -2887,6 +2887,23 @@ async def bageri_vare_opslag(request: Request, q: str = "", uger: int = 12,
                       for r in rows]}
 
 
+@app.get("/api/bageri/ugebestilling-dump")
+async def bageri_ugebestilling_dump(request: Request, uge: int = 36, aar: int = 2026,
+                                    secret: Optional[str] = None):
+    """Diagnostik: hvad ligger i ugebestillinger for en uge (navne + totaler)."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    with database._conn() as conn:
+        rows = conn.execute("""
+            SELECT varenavn, man, tir, ons, tor, fre, loe, son, total_antal
+            FROM ugebestillinger WHERE uge=? AND aar=? ORDER BY varenavn
+        """, (uge, aar)).fetchall()
+    return {"uge": uge, "aar": aar, "antal": len(rows),
+            "varer": [{"varenavn": r["varenavn"], "total": int(r["total_antal"] or 0),
+                       "dage": {d: int(r[d] or 0) for d in ["man","tir","ons","tor","fre","loe","son"]}}
+                      for r in rows]}
+
+
 @app.post("/api/bageri/ordre-mail")
 async def bageri_ordre_mail(request: Request):
     """Modtager en Organic Bakery portal-ordrebekræftelse (Shopify-mail fra

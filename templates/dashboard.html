@@ -1738,10 +1738,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <h2>Produkt &middot; stk &middot; omsætning pr. dag</h2>
             <p id="dage-sub">Indlæser…</p>
           </div>
-          <div class="periode-tabs" style="margin-bottom:0;" id="dage-tabs">
-            <div class="ptab active" onclick="setDageN(8,this)">8 dage</div>
-            <div class="ptab" onclick="setDageN(14,this)">14 dage</div>
-            <div class="ptab" onclick="setDageN(30,this)">30 dage</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="display:flex;gap:4px;">
+              <button onclick="dageFoldAlle(true)" title="Fold alle dage (vis kun dagssummer)" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:11px;">Fold alle</button>
+              <button onclick="dageFoldAlle(false)" title="Åbn alle dage" style="padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:11px;">Åbn alle</button>
+            </div>
+            <div class="periode-tabs" style="margin-bottom:0;" id="dage-tabs">
+              <div class="ptab active" onclick="setDageN(8,this)">8 dage</div>
+              <div class="ptab" onclick="setDageN(14,this)">14 dage</div>
+              <div class="ptab" onclick="setDageN(30,this)">30 dage</div>
+            </div>
           </div>
         </div>
         <div style="overflow-x:auto;">
@@ -6941,6 +6947,15 @@ async function loadMarginAnalyse() {
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────
 const _dageCache = {};
 let _dageN = 8;
+const _dagFold = {};   // dato_label → true (dag foldet = kun dagssum vises)
+const _katFold = {};   // "dato_label||kat" → true (kategori-gruppe foldet)
+function dagFoldToggle(k){ _dagFold[k] = !_dagFold[k]; renderDageDetaljer(_dageCache[_dageN], _dageN); }
+function katFoldToggle(k){ _katFold[k] = !_katFold[k]; renderDageDetaljer(_dageCache[_dageN], _dageN); }
+function dageFoldAlle(fold){
+  const data = _dageCache[_dageN]; if(!data) return;
+  data.forEach(d => { _dagFold[d.dato_label] = fold; });
+  renderDageDetaljer(data, _dageN);
+}
 
 async function loadDageDetaljer(n) {
   if (_dageCache[n]) { renderDageDetaljer(_dageCache[n], n); return; }
@@ -6969,10 +6984,13 @@ function renderDageDetaljer(dage, n) {
     const katSorted = Object.entries(katMap).sort(
       ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
     );
-    const prodsHtml = katSorted.map(([kat, prods]) => {
+    const dagFoldet = !!_dagFold[dag.dato_label];
+    const prodsHtml = dagFoldet ? '' : katSorted.map(([kat, prods]) => {
       const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);
       const katAntal = prods.reduce((s,p)=>s+p.antal,0);
-      const prodRows = prods.map(p =>
+      const katKey = dag.dato_label + '||' + kat;
+      const katFoldet = !!_katFold[katKey];
+      const prodRows = katFoldet ? '' : prods.map(p =>
         `<div class="dag-prod-row" style="padding-left:20px;">
           <span class="dag-prod-navn" style="font-size:11px;">${p.varenavn}</span>
           <span class="dag-prod-antal">${p.antal}</span>
@@ -6980,7 +6998,8 @@ function renderDageDetaljer(dage, n) {
         </div>`
       ).join('');
       return `<div style="border-bottom:1px solid rgba(30,58,30,.08);">
-        <div style="display:flex;align-items:center;gap:4px;padding:5px 16px 4px;background:rgba(30,58,30,.04);border-bottom:1px solid rgba(30,58,30,.06);">
+        <div onclick="katFoldToggle('${katKey.replace(/'/g,"\\'")}')" title="Klik for at folde produkter" style="display:flex;align-items:center;gap:4px;padding:5px 16px 4px;background:rgba(30,58,30,.04);border-bottom:1px solid rgba(30,58,30,.06);cursor:pointer;user-select:none;">
+          <span style="width:9px;color:var(--ash);font-size:8px;">${katFoldet?'▸':'▾'}</span>
           <span style="flex:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">${kat}</span>
           <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${Math.round(katAntal)} stk</span>
           <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--forest);margin-left:8px;">${Math.round(katOmsat).toLocaleString('da-DK')} kr</span>
@@ -6989,8 +7008,8 @@ function renderDageDetaljer(dage, n) {
       </div>`;
     }).join('');
     return `<div class="dag-col">
-      <div class="dag-col-hdr">
-        <div class="dag-col-dato">${dag.dato_label}</div>
+      <div class="dag-col-hdr" onclick="dagFoldToggle('${dag.dato_label.replace(/'/g,"\\'")}')" title="Klik for at folde dagen" style="cursor:pointer;user-select:none;">
+        <div class="dag-col-dato">${dagFoldet?'▸ ':'▾ '}${dag.dato_label}</div>
         <div class="dag-col-omsat">${Math.round(oms(dag.omsaetning)).toLocaleString('da-DK')} kr</div>
         <div class="dag-col-sub">${dag.linjer} kunder &middot; ${Math.round(dag.snit_per_linje)} kr/kurv</div>
       </div>

@@ -6947,13 +6947,17 @@ async function loadMarginAnalyse() {
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────
 const _dageCache = {};
 let _dageN = 8;
-const _dagFold = {};   // dato_label → true (dag foldet = kun dagssum vises)
-const _katFold = {};   // "dato_label||kat" → true (kategori-gruppe foldet)
-function dagFoldToggle(k){ _dagFold[k] = !_dagFold[k]; renderDageDetaljer(_dageCache[_dageN], _dageN); }
-function katFoldToggle(k){ _katFold[k] = !_katFold[k]; renderDageDetaljer(_dageCache[_dageN], _dageN); }
+// Standard = foldet sammen. Værdi === false betyder "brugeren har åbnet den".
+const _dagFold = {};   // dato_label → false = åbnet
+const _katFold = {};   // "dato_label||kat" → false = åbnet
+function dagFoldToggle(k){ const folded = _dagFold[k] !== false; _dagFold[k] = !folded; renderDageDetaljer(_dageCache[_dageN], _dageN); }
+function katFoldToggle(k){ const folded = _katFold[k] !== false; _katFold[k] = !folded; renderDageDetaljer(_dageCache[_dageN], _dageN); }
 function dageFoldAlle(fold){
   const data = _dageCache[_dageN]; if(!data) return;
-  data.forEach(d => { _dagFold[d.dato_label] = fold; });
+  data.forEach(d => {
+    _dagFold[d.dato_label] = fold;
+    (d.produkter||[]).forEach(p => { _katFold[d.dato_label + '||' + (p.kategori||'Øvrige')] = fold; });
+  });
   renderDageDetaljer(data, _dageN);
 }
 
@@ -6984,12 +6988,12 @@ function renderDageDetaljer(dage, n) {
     const katSorted = Object.entries(katMap).sort(
       ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
     );
-    const dagFoldet = !!_dagFold[dag.dato_label];
+    const dagFoldet = _dagFold[dag.dato_label] !== false;
     const prodsHtml = dagFoldet ? '' : katSorted.map(([kat, prods]) => {
       const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);
       const katAntal = prods.reduce((s,p)=>s+p.antal,0);
       const katKey = dag.dato_label + '||' + kat;
-      const katFoldet = !!_katFold[katKey];
+      const katFoldet = _katFold[katKey] !== false;
       const prodRows = katFoldet ? '' : prods.map(p =>
         `<div class="dag-prod-row" style="padding-left:20px;">
           <span class="dag-prod-navn" style="font-size:11px;">${p.varenavn}</span>

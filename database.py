@@ -28,6 +28,14 @@ _KAFFE_WHERE = """(
     AND LOWER(varenavn) NOT LIKE '%kaps%'
 )"""
 
+# Kaffe-produkt-navn til gruppering: slår synonyme varer sammen. "Stor kop kaffe
+# og valgfri wienerbrød" og "Wienerbrød & stor kaffe" er samme produkt → ét navn.
+_KAFFE_NAVN = """(CASE
+    WHEN LOWER(varenavn) LIKE '%valgfri wienerbr%'
+      OR (LOWER(varenavn) LIKE '%stor%kaffe%' AND LOWER(varenavn) LIKE '%wienerbr%')
+    THEN 'Wienerbrød & stor kaffe'
+    ELSE varenavn END)"""
+
 # Kager — identificeres på varenavn, da kassesystemet IKKE har en Kager-kategori
 # (alt bagværk ligger under "Bagværk"). Wienerbrød/snegle/snurrer/croissant er
 # bevidst holdt ude (= wienerbrød, ikke kager). Bekræftet med butikken.
@@ -1998,13 +2006,13 @@ def hent_kaffe_analyse(aar: int = None) -> Dict:
         ).fetchone()[0]
 
         produkter = conn.execute(f"""
-            SELECT varenavn,
+            SELECT {_KAFFE_NAVN}                                          AS varenavn,
                    ROUND(SUM(antal), 0)                                   AS antal,
                    ROUND(SUM(omsætning), 2)                               AS omsaetning,
                    ROUND((SUM(avance)-SUM(omsætning)*0.2)*1.25/NULLIF(SUM(omsætning),0)*100, 1)    AS db_pct
             FROM transaktioner
             WHERE {_KAFFE_WHERE} {aar_extra}
-            GROUP BY varenavn
+            GROUP BY {_KAFFE_NAVN}
             ORDER BY omsaetning DESC
         """).fetchall()
 
@@ -2031,20 +2039,20 @@ def hent_kaffe_analyse(aar: int = None) -> Dict:
         """).fetchall()
 
         timer_produkter = conn.execute(f"""
-            SELECT time_start, varenavn,
+            SELECT time_start, {_KAFFE_NAVN} AS varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
             WHERE {_KAFFE_WHERE} AND time_start >= 0 {aar_extra}
-            GROUP BY time_start, varenavn
+            GROUP BY time_start, {_KAFFE_NAVN}
             ORDER BY time_start, total_antal DESC
         """).fetchall()
 
         dage_produkter = conn.execute(f"""
-            SELECT dato, varenavn,
+            SELECT dato, {_KAFFE_NAVN} AS varenavn,
                    ROUND(SUM(antal), 0) AS total_antal
             FROM transaktioner
             WHERE {_KAFFE_WHERE} {aar_extra}
-            GROUP BY dato, varenavn
+            GROUP BY dato, {_KAFFE_NAVN}
             ORDER BY dato DESC, total_antal DESC
         """).fetchall()
 

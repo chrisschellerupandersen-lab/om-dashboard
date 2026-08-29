@@ -6947,10 +6947,10 @@ async function loadMarginAnalyse() {
 // ── DAGE DETALJER ────────────────────────────────────────────────────────────
 const _dageCache = {};
 let _dageN = 8;
-// Standard = foldet sammen. Værdi === false betyder "brugeren har åbnet den".
-const _dagFold = {};   // dato_label → false = åbnet
-const _katFold = {};   // "dato_label||kat" → false = åbnet
-function dagFoldToggle(k){ const folded = _dagFold[k] !== false; _dagFold[k] = !folded; renderDageDetaljer(_dageCache[_dageN], _dageN); }
+// Standard: dage ÅBNE (viser grupperne), produktgrupper FOLDET (skjuler produkter).
+const _dagFold = {};   // dato_label → true = foldet (standard: åben)
+const _katFold = {};   // "dato_label||kat" → false = åbnet (standard: foldet)
+function dagFoldToggle(k){ _dagFold[k] = !_dagFold[k]; renderDageDetaljer(_dageCache[_dageN], _dageN); }
 function katFoldToggle(k){ const folded = _katFold[k] !== false; _katFold[k] = !folded; renderDageDetaljer(_dageCache[_dageN], _dageN); }
 function dageFoldAlle(fold){
   const data = _dageCache[_dageN]; if(!data) return;
@@ -6988,7 +6988,7 @@ function renderDageDetaljer(dage, n) {
     const katSorted = Object.entries(katMap).sort(
       ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
     );
-    const dagFoldet = _dagFold[dag.dato_label] !== false;
+    const dagFoldet = !!_dagFold[dag.dato_label];
     const prodsHtml = dagFoldet ? '' : katSorted.map(([kat, prods]) => {
       const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);
       const katAntal = prods.reduce((s,p)=>s+p.antal,0);

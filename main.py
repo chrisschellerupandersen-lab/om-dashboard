@@ -2875,28 +2875,31 @@ async def opdater_rapport(request: Request):
 
 @app.get("/api/bageri/vare-opslag")
 async def bageri_vare_opslag(request: Request, q: str = "", uger: int = 12,
-                             secret: Optional[str] = None):
+                             alle: bool = False, secret: Optional[str] = None):
     """Opslag: varenummer + varenavn + salg (seneste N uger) for navne der matcher q.
     Til mapping af nye Organic-varer mod historiske kasse-varenumre.
+    Kun Bagværk-kategorien som standard (så fx 'Kødboller i tomat' ikke matcher
+    'bolle'); ?alle=true for at søge på tværs af alle kategorier.
     Login eller webhook-secret."""
     if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
         _kræv_login(request)
     from datetime import date, timedelta
     fra = (date.today() - timedelta(weeks=int(uger))).isoformat()
     like = f"%{q.lower()}%"
+    kat_filter = "" if alle else "AND TRIM(kategori) = 'Bagværk'"
     with database._conn() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
                    varenavn,
                    ROUND(SUM(antal)) AS stk,
                    COUNT(DISTINCT dato) AS dage,
                    MAX(dato) AS sidst
             FROM transaktioner
-            WHERE dato >= ? AND LOWER(varenavn) LIKE ?
+            WHERE dato >= ? AND LOWER(varenavn) LIKE ? {kat_filter}
             GROUP BY vn, varenavn
             ORDER BY stk DESC
         """, (fra, like)).fetchall()
-    return {"q": q, "uger": uger, "antal": len(rows),
+    return {"q": q, "uger": uger, "kun_bagvaerk": not alle, "antal": len(rows),
             "varer": [{"varenummer": r["vn"], "varenavn": r["varenavn"],
                        "stk": int(r["stk"] or 0), "dage": r["dage"], "sidst": r["sidst"]}
                       for r in rows]}

@@ -1190,9 +1190,14 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
     man_nul = all(p["anbefalet"].get("man", 0) == 0 for p in rec.get("produkter", []))
     idag = date.today()
     fra = (idag - timedelta(weeks=int(uger))).isoformat()
-    # Udelad indeværende (ufærdige) uge: kun hele uger op til sidste mandag tæller,
-    # ellers ville en halv uge tælle som en fuld uge i nævneren og trække snittet ned.
-    til = (idag - timedelta(days=idag.weekday())).isoformat()   # mandag i denne uge
+    # Udelad kun UFULDSTÆNDIGE uger. En uge (man–søn) er hel når dens søndag er
+    # dækket af data. Vi bruger seneste salgsdato: cutoff = søndagen i sidste hele
+    # uge + 1 dag. Så på en søndag med data tæller den uge med (fanger fx uge 35).
+    with database._conn() as _c:
+        _maxd = _c.execute("SELECT MAX(dato) FROM transaktioner").fetchone()[0]
+    max_date = date.fromisoformat(_maxd) if _maxd else idag
+    sidste_sondag = max_date - timedelta(days=(max_date.weekday() + 1) % 7)
+    til = (sidste_sondag + timedelta(days=1)).isoformat()   # mandag efter sidste hele uge
     wd_filter = "AND strftime('%w', dato) <> '1'" if man_nul else ""   # udelad mandag
     ud, t_rec, t_fak = [], 0, 0.0
     with database._conn() as conn:

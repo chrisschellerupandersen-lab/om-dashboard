@@ -4128,8 +4128,14 @@ async function _bageriRender(){
   // Afvig-farve: + (bestilt mere end anbefalet) = spild-risiko = rød; − (leaner) = grøn
   const afFarve = v => v==null?'var(--ash)':(v>0?'#b0413a':(v<0?'var(--moss)':'var(--ash)'));
   const afTxt   = v => v==null?'–':(v>0?'+'+v:''+v);
-  let head = `<thead><tr><th style="text-align:left;min-width:170px;">Vare</th>`
-    + DAGE.map(dg=>`<th class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${LBL[dg]}</th>`).join('')
+  const visBestilt = _bageriDagVis==='bestilt';
+  const modeBg  = visBestilt ? '#8a3a3a' : 'var(--forest)';
+  const modeLbl = visBestilt ? '▼ DIN BESTILLING pr. dag (portal-ordre)' : '▼ MOTORENS FORSLAG pr. dag';
+  const dayTint = visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)';
+  let head = `<thead>`
+    + `<tr><th></th><th colspan="7" style="text-align:center;background:${modeBg};color:#fff;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;padding:3px 0;border-radius:4px 4px 0 0;">${modeLbl}</th><th colspan="5"></th></tr>`
+    + `<tr><th style="text-align:left;min-width:170px;">Vare</th>`
+    + DAGE.map(dg=>`<th class="num" style="background:${dayTint};">${LBL[dg]}</th>`).join('')
     + `<th class="num" title="Anbefalet af motoren">Uge</th>`
     + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for denne uge)">Bestilt</th>`
     + `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
@@ -4159,7 +4165,7 @@ async function _bageriRender(){
         <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
         + DAGE.map(dg=>{
             const v = dagSrc ? (dagSrc[dg]||0) : null;
-            return `<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${v==null?'–':(v||'–')}</td>`;
+            return `<td class="num" style="background:${dayTint};">${v==null?'–':(v||'–')}</td>`;
           }).join('')
         + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
            <td class="num" style="font-weight:600;">${best==null?'–':best}</td>
@@ -4170,7 +4176,7 @@ async function _bageriRender(){
     const katAfv = katBestHar ? (katBest - katUge) : null;
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
-      + DAGE.map(dg=>`<td class="num"${WKND.has(dg)?' style="background:rgba(45,74,45,.04);"':''}>${katDag[dg]||'–'}</td>`).join('')
+      + DAGE.map(dg=>`<td class="num" style="background:${dayTint};">${katDag[dg]||'–'}</td>`).join('')
       + `<td class="num">${katUge}</td>`
       + `<td class="num">${katBestHar?katBest:'–'}</td>`
       + `<td class="num" style="color:${afFarve(katAfv)};">${afTxt(katAfv)}</td>`

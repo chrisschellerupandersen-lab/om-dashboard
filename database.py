@@ -2320,41 +2320,41 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         if not bestil:
             return {"uge": uge, "aar": aar, "dage": DAGE_NAVNE, "dage_datoer": dage_datoer, "produkter": []}
 
-        skus = [str(b["varenummer"]) for b in bestil if b["varenummer"]]
-
-        # Salg per varenummer per dato for ugen
-        if skus:
-            placeholders_dato = ','.join('?' * len(dage_datoer))
-            placeholders_sku  = ','.join('?' * len(skus))
-            salg_rows = conn.execute(f"""
-                SELECT varenummer, dato, ROUND(SUM(antal), 0) AS antal
+        # Portal-ordren har INGEN varenumre (kun navne) → match solgt via katalogets
+        # navn→SKU-mapping (kilde + salg_kilde), inkl. bundle-opgang (_antal_sql).
+        navn_skus = {p["navn"].strip().lower():
+                     [str(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
+                     for p in _ORGANIC_BAKERY}
+        alle_sku = sorted({sku for b in bestil
+                           for sku in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        salg_map: Dict = {}
+        if alle_sku:
+            ph_d = ','.join('?' * len(dage_datoer))
+            ph_s = ','.join('?' * len(alle_sku))
+            for s in conn.execute(f"""
+                SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
+                       ROUND(SUM({_antal_sql()}),0) AS antal
                 FROM transaktioner
-                WHERE dato IN ({placeholders_dato})
-                  AND varenummer IN ({placeholders_sku})
-                GROUP BY varenummer, dato
-            """, dage_datoer + skus).fetchall()
-        else:
-            salg_rows = []
-
-    salg_map: Dict = {}
-    for s in salg_rows:
-        vnr = str(s["varenummer"])
-        salg_map.setdefault(vnr, {})[s["dato"]] = int(s["antal"] or 0)
+                WHERE dato IN ({ph_d})
+                  AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph_s})
+                GROUP BY vn, dato
+            """, dage_datoer + [int(x) for x in alle_sku]).fetchall():
+                salg_map.setdefault(str(s["vn"]), {})[s["dato"]] = int(s["antal"] or 0)
 
     produkter = []
     for b in bestil:
-        vnr = str(b["varenummer"]) if b["varenummer"] else ""
+        skus_b = navn_skus.get((b["varenavn"] or "").strip().lower(), [])
         dage_data = []
         tot_bestilt = tot_solgt = 0
         for i, dag in enumerate(DAGE):
             bestilt = int(b[dag] or 0)
-            solgt   = salg_map.get(vnr, {}).get(dage_datoer[i], 0)
+            solgt   = sum(salg_map.get(sku, {}).get(dage_datoer[i], 0) for sku in skus_b)
             diff    = solgt - bestilt   # negativt = solgte mindre end bestilt = rødt
             tot_bestilt += bestilt
             tot_solgt   += solgt
             dage_data.append({"bestilt": bestilt, "solgt": solgt, "diff": diff})
         produkter.append({
-            "varenummer":  vnr,
+            "varenummer":  str(b["varenummer"]) if b["varenummer"] else "",
             "varenavn":    b["varenavn"],
             "sektion":     int(b["sektion"] or 1),
             "dage":        dage_data,

@@ -604,6 +604,8 @@ def init_db():
             "ALTER TABLE bager_regnskab ADD COLUMN faktura REAL DEFAULT 0",
             "ALTER TABLE mobilepay_dag ADD COLUMN omsaetning_netto REAL DEFAULT 0",
             "ALTER TABLE mobilepay_dag ADD COLUMN gebyr REAL DEFAULT 0",
+            # Bemanding-type pr. uge: 'fuld' (alle dage) el. 'weekend' (lør+søn)
+            "ALTER TABLE fuld_bemanding_uger ADD COLUMN type TEXT DEFAULT 'fuld'",
         ]:
             try:
                 conn.execute(sql)
@@ -8750,26 +8752,30 @@ _LOEN_START = (2026, 6)
 
 
 def hent_fuld_bemanding_uger() -> List[Dict]:
-    """Alle uger markeret som 'fuld bemanding' (løn alle dage)."""
+    """Alle uger markeret med bemanding: type 'fuld' (løn alle dage) el.
+    'weekend' (løn lør+søn)."""
     with _conn() as conn:
         rows = conn.execute(
-            "SELECT aar, uge FROM fuld_bemanding_uger ORDER BY aar, uge"
+            "SELECT aar, uge, COALESCE(type,'fuld') AS type FROM fuld_bemanding_uger ORDER BY aar, uge"
         ).fetchall()
-    return [{"aar": r["aar"], "uge": r["uge"]} for r in rows]
+    return [{"aar": r["aar"], "uge": r["uge"], "type": r["type"]} for r in rows]
 
 
-def saet_fuld_bemanding(aar: int, uge: int, aktiv: bool = True) -> dict:
-    """Marker (aktiv=True) eller fjern (aktiv=False) en uge som fuld bemanding.
-    Uge = ISO-ugenummer, så det matcher resten af dashboardet."""
+def saet_fuld_bemanding(aar: int, uge: int, aktiv: bool = True, type: str = "fuld") -> dict:
+    """Marker eller fjern bemanding for en uge (ISO-ugenummer).
+    type = 'fuld' (løn alle dage) el. 'weekend' (løn lør+søn). aktiv=False fjerner."""
     aar, uge = int(aar), int(uge)
+    type = "weekend" if str(type).lower().startswith("week") else "fuld"
     with _conn() as conn:
         if aktiv:
-            conn.execute("INSERT OR IGNORE INTO fuld_bemanding_uger (aar, uge) VALUES (?, ?)",
-                         (aar, uge))
+            # Opdatér type hvis ugen allerede findes, ellers indsæt
+            conn.execute("""INSERT INTO fuld_bemanding_uger (aar, uge, type) VALUES (?, ?, ?)
+                            ON CONFLICT(aar, uge) DO UPDATE SET type=excluded.type""",
+                         (aar, uge, type))
         else:
             conn.execute("DELETE FROM fuld_bemanding_uger WHERE aar = ? AND uge = ?",
                          (aar, uge))
-    return {"aar": aar, "uge": uge, "aktiv": bool(aktiv)}
+    return {"aar": aar, "uge": uge, "aktiv": bool(aktiv), "type": type}
 
 
 def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
@@ -8789,9 +8795,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         """).fetchall()
         maaneder = [{"aar": r["y"], "maaned": r["m"],
                      "label": f"{_DK_MDR[r['m']].capitalize()} {r['y']}"} for r in mrows]
-        # Uger med fuld bemanding (løn alle dage) — ISO (år, uge)
-        fuld_bemanding = {(r["aar"], r["uge"]) for r in
-                          conn.execute("SELECT aar, uge FROM fuld_bemanding_uger").fetchall()}
+        # Bemanding pr. ISO-uge → type ('fuld' = alle dage, 'weekend' = lør+søn)
+        bemanding = {(r["aar"], r["uge"]): (r["type"] or "fuld") for r in
+                     conn.execute("SELECT aar, uge, COALESCE(type,'fuld') AS type FROM fuld_bemanding_uger").fetchall()}
         if not maaneder:
             return {"aar": None, "maaned": None, "maaned_navn": "", "dage": [],
                     "total": {}, "maaneder": [], "loen_aktiv": False}
@@ -8831,9 +8837,18 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         oms = float(x["oms_ex"]) if x else 0.0
         db = float(x["db_kr"]) if x else 0.0
         iso_y, iso_w, _ = d.isocalendar()
-        fuld = (iso_y, iso_w) in fuld_bemanding
-        # Fuld bemanding: løn ALLE dage. Ellers kun tir(1)+ons(2). 300 kr/dag begge steder.
-        loen = loen_tir_ons if (loen_aktiv and (fuld or d.weekday() in (1, 2))) else 0.0
+        bem = bemanding.get((iso_y, iso_w))       # None / 'fuld' / 'weekend'
+        fuld = bem == "fuld"
+        wd = d.weekday()                          # 0=man .. 5=lør, 6=søn
+        # Fra 1/9-2026 er der ingen fast tir/ons-bemanding mere. Løn gives kun:
+        #  • uger markeret 'fuld'    → alle dage
+        #  • uger markeret 'weekend' → lør+søn
+        #  • FØR 1/9: den gamle faste tir(1)+ons(2)-bemanding
+        foer_ny = iso < "2026-09-01"
+        loennet_dag = (fuld
+                       or (bem == "weekend" and wd in (5, 6))
+                       or (foer_ny and wd in (1, 2)))
+        loen = loen_tir_ons if (loen_aktiv and loennet_dag) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
         dage.append({
@@ -8846,6 +8861,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "omk":      round(omk),
             "resultat": round(res),
             "fuld_bemanding": fuld,
+            "bemanding": bem,          # None / 'fuld' / 'weekend'
         })
         tot["oms_ex"] += oms; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res

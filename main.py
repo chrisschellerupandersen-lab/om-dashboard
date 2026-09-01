@@ -2607,7 +2607,8 @@ async def api_bemanding_uger(request: Request):
 
 @app.post("/api/bemanding/uger")
 async def api_bemanding_saet(request: Request):
-    """Marker/fjern en uge som fuld bemanding. Body: {aar, uge, aktiv}.
+    """Marker/fjern bemanding for en uge. Body: {aar, uge, aktiv, type}.
+    type = 'fuld' (løn alle dage) el. 'weekend' (løn lør+søn).
     Accepterer login ELLER webhook-secret (til automatisk opsætning)."""
     try:
         body = await request.json()
@@ -2618,7 +2619,8 @@ async def api_bemanding_saet(request: Request):
         _kræv_login(request)
     if body.get("aar") is None or body.get("uge") is None:
         raise HTTPException(status_code=400, detail="Mangler aar/uge")
-    return database.saet_fuld_bemanding(body["aar"], body["uge"], body.get("aktiv", True))
+    return database.saet_fuld_bemanding(body["aar"], body["uge"],
+                                        body.get("aktiv", True), body.get("type", "fuld"))
 
 
 @app.get("/api/db-shopbox/poster")

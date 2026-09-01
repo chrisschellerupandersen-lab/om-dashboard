@@ -4608,9 +4608,10 @@ async function loadDbsMaaned(val){
   (d.dage||[]).slice().reverse().forEach(x=>{
     const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
     const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
-    const fuldBadge = x.fuld_bemanding
-      ? ' <span title="Fuld bemanding — løn alle dage" style="font-family:\'DM Mono\',monospace;font-size:8px;letter-spacing:.05em;text-transform:uppercase;background:#8a3a3a;color:#fff;border-radius:4px;padding:1px 4px;">fuld</span>'
-      : '';
+    const _bemBadge = (bg,txt,ttl)=>` <span title="${ttl}" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.05em;text-transform:uppercase;background:${bg};color:#fff;border-radius:4px;padding:1px 4px;">${txt}</span>`;
+    const fuldBadge = x.bemanding==='fuld'    ? _bemBadge('#8a3a3a','fuld','Fuld bemanding — løn alle dage')
+                    : x.bemanding==='weekend' ? _bemBadge('#b8860b','weekend','Weekend-bemanding — løn lør+søn')
+                    : '';
     html += `<tr${weekend?' style="background:rgba(0,0,0,.02);"':''}>
       <td style="text-align:left;">${fmtDato(x.dato)}</td>
       <td style="text-align:left;color:var(--ash);">${x.ugedag}${fuldBadge}</td>
@@ -4634,39 +4635,46 @@ async function loadDbsMaaned(val){
   dbsRenderBemanding(d);
 }
 
-// Uge-toggles: marker uger som FULD bemanding (løn alle dage, ikke kun tir/ons)
+// Uge-vælger: bemanding pr. uge — ingen → weekend (lør+søn) → fuld (alle dage).
+// Fra 1/9 er der ingen fast tir/ons-bemanding; løn gives kun for markerede uger.
 function dbsRenderBemanding(d){
   const box = document.getElementById('dbs-bemanding');
   if (!box) return;
-  // Find de ISO-uger måneden rører, + om de er fuldt bemandede (fra dagenes flag)
-  const uger = new Map();  // "aar-uge" -> {aar, uge, fuld}
+  const uger = new Map();  // "aar-uge" -> {aar, uge, type}
   (d.dage||[]).forEach(x=>{
     const w = _tgIsoUge(x.dato);
     const k = w.aar + '-' + w.uge;
-    const cur = uger.get(k) || {aar:w.aar, uge:w.uge, fuld:false};
-    if (x.fuld_bemanding) cur.fuld = true;
+    const cur = uger.get(k) || {aar:w.aar, uge:w.uge, type:null};
+    if (x.bemanding) cur.type = x.bemanding;
     uger.set(k, cur);
   });
   const liste = [...uger.values()].sort((a,b)=>a.uge-b.uge);
+  const STIL = {
+    'null':    ['transparent','var(--ash)','var(--border)','—'],
+    'weekend': ['#b8860b','#fff','#b8860b','Weekend'],
+    'fuld':    ['#8a3a3a','#fff','#8a3a3a','Fuld'],
+  };
+  const NEXT = {'null':'weekend','weekend':'fuld','fuld':'none'};
   const chips = liste.map(w=>{
-    const on = w.fuld;
-    return `<button onclick="dbsToggleBemanding(${w.aar},${w.uge},${on?0:1})"
-      title="${on?'Fjern':'Marker'} fuld bemanding for uge ${w.uge}"
+    const t = w.type || 'null';
+    const [bg,fg,bd,lbl] = STIL[t];
+    return `<button onclick="dbsCycleBemanding(${w.aar},${w.uge},'${NEXT[t]}')"
+      title="Uge ${w.uge}: klik for at skifte (ingen → weekend → fuld)"
       style="font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;border-radius:8px;
-             padding:5px 10px;border:1px solid ${on?'#8a3a3a':'var(--border)'};
-             background:${on?'#8a3a3a':'transparent'};color:${on?'#fff':'var(--ash)'};">
-      ${on?'✓ ':''}Uge ${w.uge}</button>`;
+             padding:5px 10px;border:1px solid ${bd};background:${bg};color:${fg};">
+      Uge ${w.uge}: ${lbl}</button>`;
   }).join(' ');
   box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Fuld bemanding (løn alle dage)</span>
+      <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Bemanding (løn 300 kr/dag) · klik: ingen → weekend (lør+søn) → fuld (alle dage)</span>
       ${chips}</div>`;
 }
 
-async function dbsToggleBemanding(aar, uge, aktiv){
+async function dbsCycleBemanding(aar, uge, target){
+  const aktiv = target !== 'none';
   try {
     await fetch('/api/bemanding/uger', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({aar, uge, aktiv: !!aktiv})
+      body: JSON.stringify({aar, uge, aktiv, type: aktiv ? target : 'fuld'})
     });
   } catch(e){ return; }
   const sel = document.getElementById('dbs-maaned-vaelg');

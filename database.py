@@ -105,7 +105,7 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 3, "loe": 5, "son": 4}},  # offensivt startbud (hero-kage; banan-muffin-historik undervurderer)
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},
-    {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075]},
+    {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},
 ]
 
 # Bundle-varer: sælges som 1 kasselinje, men er reelt N stk af en basisvare.

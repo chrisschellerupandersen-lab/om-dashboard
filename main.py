@@ -1207,7 +1207,7 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
             if kilde:
                 ph = ",".join("?" * len(kilde))
                 r = conn.execute(f"""
-                    SELECT COALESCE(SUM(antal),0) AS a,
+                    SELECT COALESCE(SUM({database._antal_sql()}),0) AS a,
                            COUNT(DISTINCT strftime('%Y-%W', dato)) AS w
                     FROM transaktioner
                     WHERE dato >= ? AND dato < ? {wd_filter}
@@ -1233,7 +1233,7 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
             for r in conn.execute(f"""
                 SELECT strftime('%Y-%W', dato) AS yw,
                        MIN(dato) AS fra, MAX(dato) AS til,
-                       ROUND(SUM(antal)) AS stk
+                       ROUND(SUM({database._antal_sql()})) AS stk
                 FROM transaktioner
                 WHERE dato >= ? AND dato < ? {wd_filter}
                   AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})

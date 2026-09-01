@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import math
+import re
 from typing import List, Dict, Any, Optional
 
 DB_PATH = os.environ.get("DB_PATH", "dashboard.db")
@@ -82,7 +83,7 @@ _SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
 #   kilde = gamle varenumre hvis sell-through mappes fra (bro til historik).
 # Snegle + konfekt udgår (ingen kilde-mapping). Grovbirkes foldes ind i Tebirkes.
 _ORGANIC_BAKERY = [
-    {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051]},
+    {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051, 10424, 10445]},  # +10424 nyt SKU, +10445 bundle "4 x surdejsboller" (×4)
     {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [],
      "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # 10048 flyttet til birkes-bollen; granola-sesam ligger hos Surdejsbolle → startbud fra #1007
@@ -106,6 +107,18 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075]},
 ]
+
+# Bundle-varer: sælges som 1 kasselinje, men er reelt N stk af en basisvare.
+# Nyt SKU → antal-faktor. Ganges op i alle solgt-/spild-/forslag-optællinger,
+# og SKU'et lægges i basisvarens kilde (fx 10445 i Surdejsbolle).
+_BAGERI_BUNDLE = {10445: 4}   # "4 x surdejsboller" = 4 Surdejsboller pr. salg
+
+def _antal_sql(vn_expr: str = "CAST(CAST(varenummer AS REAL) AS INTEGER)") -> str:
+    """SQL-udtryk for antal, hvor bundle-varer ganges op til reelt stk-antal."""
+    if not _BAGERI_BUNDLE:
+        return "antal"
+    whens = " ".join(f"WHEN {vn_expr}={k} THEN antal*{v}" for k, v in _BAGERI_BUNDLE.items())
+    return f"(CASE {whens} ELSE antal END)"
 
 
 def _bakery_kat(n: str) -> Optional[str]:
@@ -147,6 +160,11 @@ def _bageri_rolle(navn: str):
     if "i går" in n or "igår" in n:
         kat = "Brød" if "brød" in n else ("Wiener" if "wien" in n else "Boller")
         return ("reddet", kat, 1)
+    # Bundle "N x <vare>" (fx "4 x surdejsboller") = N stk friskt salg af basisvaren
+    m = re.match(r"\s*(\d+)\s*x\s+(.+)", n)
+    if m:
+        kat = _bakery_kat(m.group(2))
+        return ("frisk", kat, int(m.group(1))) if kat else None
     kat = _bakery_kat(n)
     return ("frisk", kat, 1) if kat else None
 
@@ -5294,7 +5312,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             ph = ",".join("?" * len(alle_kilde))
             for r in conn.execute(f"""
                 SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
-                       ROUND(SUM(antal),0) AS stk
+                       ROUND(SUM({_antal_sql()}),0) AS stk
                 FROM transaktioner
                 WHERE dato >= ? AND dato < ?
                   AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})

@@ -85,22 +85,22 @@ _SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
 _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051, 10424, 10445]},  # +10424 nyt SKU, +10445 bundle "4 x surdejsboller" (×4)
     {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
-    {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [],
-     "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # 10048 flyttet til birkes-bollen; granola-sesam ligger hos Surdejsbolle → startbud fra #1007
+    {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
+     "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # startbud til forslag; nyt SKU 10426 til solgt/spild
     {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158]},
-    {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045]},
-    {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043]},
-    {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044]},
-    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061]},
-    {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062]},
-    {"navn": "Karamelliseret croissant","indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [],
-     "seed": {"man": 0, "tir": 4, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 8}},  # ny vare, ingen historik → startbud fra #1007
-    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065]},        # + Høj Romsnegle
-    {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069]}, # + Kanel snegl + Høj Kanel snegl m. creme
-    {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063]},
-    {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [],
+    {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
+    {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
+    {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},
+    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436]},
+    {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
+    {"navn": "Karamelliseret croissant","indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [], "salg_kilde": [10418],
+     "seed": {"man": 0, "tir": 4, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 8}},  # startbud til forslag; nyt SKU 10418 til solgt/spild
+    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420]},        # + Høj Romsnegle
+    {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
+    {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
+    {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
-    {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055]},
+    {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
     {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [],
      "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 3, "loe": 5, "son": 4}},  # offensivt startbud (hero-kage; banan-muffin-historik undervurderer)
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [],
@@ -5300,7 +5300,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     mon_dato     = date.fromisocalendar(maal_aar, maal_uge, 1)
     vindue_start = (mon_dato - timedelta(weeks=13)).isoformat()
     maal_mon     = mon_dato.isoformat()
-    alle_kilde   = sorted({vn for p in _ORGANIC_BAKERY for vn in p["kilde"]})
+    alle_kilde   = sorted({vn for p in _ORGANIC_BAKERY
+                           for vn in (p["kilde"] + p.get("salg_kilde", []))})
 
     with _conn() as conn:
         aabne = [r[0] for r in conn.execute("""
@@ -5394,8 +5395,9 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 basis_dag[dn] = 0.0
                 anb_dag[dn] = 0
         total_anb = sum(anb_dag.values())
-        sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in p["kilde"] for d in sidste_dage)
-                      if p["kilde"] else None)
+        _salg_kilde = p["kilde"] + p.get("salg_kilde", [])   # solgt-side: inkl. nye SKU'er for startbud-varer
+        sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in _salg_kilde for d in sidste_dage)
+                      if _salg_kilde else None)
         produkter.append({
             "varenavn":        p["navn"],
             "kategori":        _organic_kat(p["navn"]),

@@ -1202,7 +1202,7 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
     ud, t_rec, t_fak = [], 0, 0.0
     with database._conn() as conn:
         for p in database._ORGANIC_BAKERY:
-            kilde = p["kilde"]
+            kilde = p["kilde"] + p.get("salg_kilde", [])   # solgt-side: inkl. nye SKU'er for startbud-varer
             fak = None
             if kilde:
                 ph = ",".join("?" * len(kilde))
@@ -1226,7 +1226,8 @@ async def api_bageri_kontrol(request: Request, uge: int = 36, aar: int = 2026,
             if fak: t_fak += fak
         # Ugeserie (samme dage-filter + hele uger) — så man kan se om niveauet
         # stiger/falder, og om en enkelt uge (fx uge 34) er en top eller trend.
-        alle_kilde = sorted({vn for p in database._ORGANIC_BAKERY for vn in p["kilde"]})
+        alle_kilde = sorted({vn for p in database._ORGANIC_BAKERY
+                             for vn in (p["kilde"] + p.get("salg_kilde", []))})
         ugeserie = []
         if alle_kilde:
             ph = ",".join("?" * len(alle_kilde))

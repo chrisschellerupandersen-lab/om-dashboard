@@ -87,7 +87,7 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
      "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # startbud til forslag; nyt SKU 10426 til solgt/spild
-    {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158]},
+    {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158, 10434]},
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},

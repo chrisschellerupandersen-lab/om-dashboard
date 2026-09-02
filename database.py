@@ -5478,6 +5478,9 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
     KATS = ["Brød", "Boller", "Wiener", "Kage"]
     mon = date.fromisocalendar(aar, uge, 1)
     sun = mon + timedelta(days=6)
+    # Fra 1/9 medregnes KUN Organic-sortimentet i friskt salg — gamle konfekt-varer
+    # (romkugler, træstammer, napoleonshat osv.) filtreres fra så de ikke støjer.
+    organic_uge = mon.isoformat() >= _ORGANIC_START
 
     # Gns. indkøbspris pr. kategori (til spild-kost) fra Organic Bakery-kataloget
     kat_indkoeb: Dict[str, list] = {}
@@ -5545,10 +5548,13 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "reddet"})
                 p["reddet"] += float(r["antal"]) * faktor
             else:
+                canon = _canon(r["varenummer"], r["varenavn"])
+                # Fra 1/9: spring gamle ikke-Organic konfekt-varer over i friskt salg
+                if organic_uge and not canon:
+                    continue
                 agg[kat]["frisk_stk"] += float(r["antal"]) * faktor   # bundle "N x" ganges op
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
-                canon = _canon(r["varenummer"], r["varenavn"])
                 key = canon or ("navn:" + _norm(r["varenavn"]).lower())
                 p = prod[kat].setdefault(key, {"navn": canon or _norm(r["varenavn"]),
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})

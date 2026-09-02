@@ -5015,13 +5015,10 @@ const NAV_DEFAULT = [
   {id:'bestilling',  label:'Ugebestilling',         group:'Bageri & indkøb',     hidden:false},
   {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
-  {id:'retur',       label:'Retur registrering',    group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',     hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',     hidden:false},
   {id:'bagvaerkoek', label:'Bagværks-økonomi',      group:'Bageri & indkøb',     hidden:false},
-  {id:'tgtg',        label:'Too Good To Go',        group:'Bageri & indkøb',     hidden:false},
-  {id:'returtgtg',   label:'Retur & TGTG forslag',  group:'Bageri & indkøb',     hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
   {id:'kaffe',       label:'Kaffe',                 group:'Analyse & rapporter',  hidden:false},
   {id:'social',      label:'Social selling',        group:'Marketing',            hidden:false},
@@ -13269,6 +13266,11 @@ async function mgmtSpørg() {
 
 // ── FORSIDE: RETUR STATUS KPI ─────────────────────────────────────────────────
 async function loadReturStatus() {
+  // Retur udgået 1/9-2026 (Organic Bakery tager ingen retur) — kortet vises ikke mere.
+  const _c = document.getElementById('ret-status-card');
+  if (_c) _c.style.display = 'none';
+  return;
+  /* eslint-disable no-unreachable */
   try {
     const d      = await fetch('/api/retur/status').then(r => r.json());
     const card   = document.getElementById('ret-status-card');

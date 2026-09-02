@@ -5489,13 +5489,26 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                "reddet_stk": 0.0, "reddet_oms": 0.0, "reddet_db": 0.0,
                "bestilt_stk": 0.0} for k in KATS}
     # Per-vare i hver kategori (til open/collapse-detaljer)
-    prod = {k: {} for k in KATS}   # kat -> {normkey: {"navn","bestilt","frisk"}}
+    prod = {k: {} for k in KATS}   # kat -> {kanonisk-navn: {"navn","bestilt","frisk"}}
+
+    # Forén solgt (nøgles på nyt SKU) med bestilt (nøgles på navn) via kataloget,
+    # så samme vare ikke får to rækker (fx Cookie solgt på 10408 + Cookie bestilt).
+    _sku2navn = {}
+    _navn2canon = {}
+    for _p in _ORGANIC_BAKERY:
+        _navn2canon[_p["navn"].strip().lower()] = _p["navn"]
+        for _vn in (_p["kilde"] + _p.get("salg_kilde", [])):
+            _sku2navn[str(_vn)] = _p["navn"]
 
     def _norm(n):
         n = (n or "").strip()
         if n.lower().startswith("øko - "):
             n = n[6:].strip()
         return n
+
+    def _canon(varenummer, varenavn):
+        """Kanonisk katalog-navn for en vare (SKU først, ellers navn). None hvis ukendt."""
+        return _sku2navn.get(_vnr(varenummer)) or _navn2canon.get(_norm(varenavn).lower())
 
     def _vnr(x):
         s = str(x or "").strip()
@@ -5532,13 +5545,14 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "reddet"})
                 p["reddet"] += float(r["antal"]) * faktor
             else:
-                agg[kat]["frisk_stk"] += float(r["antal"])
+                agg[kat]["frisk_stk"] += float(r["antal"]) * faktor   # bundle "N x" ganges op
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
-                key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
-                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]),
+                canon = _canon(r["varenummer"], r["varenavn"])
+                key = canon or ("navn:" + _norm(r["varenavn"]).lower())
+                p = prod[kat].setdefault(key, {"navn": canon or _norm(r["varenavn"]),
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
-                p["frisk"] += float(r["antal"])
+                p["frisk"] += float(r["antal"]) * faktor
 
         # Bestilt denne uge fra ugebestilling
         for r in conn.execute("""
@@ -5548,11 +5562,12 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
             kat = _bakery_kat(r["varenavn"])
             if kat in agg:
                 agg[kat]["bestilt_stk"] += float(r["stk"])
-                key = _vnr(r["varenummer"]) or ("navn:" + _norm(r["varenavn"]).lower())
-                p = prod[kat].setdefault(key, {"navn": _norm(r["varenavn"]),
+                canon = _canon(r["varenummer"], r["varenavn"])
+                key = canon or ("navn:" + _norm(r["varenavn"]).lower())
+                p = prod[kat].setdefault(key, {"navn": canon or _norm(r["varenavn"]),
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
                 p["bestilt"] += float(r["stk"])
-                p["navn"] = _norm(r["varenavn"])   # foretræk ordre-arkets navn
+                p["navn"] = canon or _norm(r["varenavn"])   # foretræk katalog-navn
 
     rows, tot = [], {"bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "spild": 0.0,
                      "db": 0.0, "spild_kost": 0.0, "oms": 0.0}

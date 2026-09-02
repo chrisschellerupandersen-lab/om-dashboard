@@ -101,10 +101,10 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [],
-     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 3, "loe": 5, "son": 4}},  # offensivt startbud (hero-kage; banan-muffin-historik undervurderer)
-    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [],
-     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},
+    {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [], "salg_kilde": [10412],
+     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 3, "loe": 5, "son": 4}},  # offensivt startbud; nyt SKU 10412 til solgt/spild
+    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
+     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},
 ]
 

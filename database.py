@@ -2986,9 +2986,10 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
     """
     from datetime import date as _d, timedelta as _td
     idag = _d.today().isoformat()
-    # Organic Bakery-æra (fra 1/9): ren katalog-matchet beregning uden TGTG/retur.
+    # Organic Bakery-æra (uge 36+, grænse = _RETUR_SLUT/31-08): ren katalog-matchet
+    # beregning uden TGTG/retur. (Uge 36's mandag er 31/8 = sidste gamle-bager-dag.)
     try:
-        if _d.fromisocalendar(aar, uge, 1).isoformat() >= _ORGANIC_START:
+        if _d.fromisocalendar(aar, uge, 1).isoformat() >= _RETUR_SLUT:
             return _spild_uge_organic(uge, aar, idag)
     except Exception:
         pass
@@ -3422,6 +3423,71 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     if next_uge > 52:
         next_uge = 1
         next_aar = aar + 1
+
+    # ── Organic Bakery-æra (uge 36+): ren katalog-matchet spild, INGEN TGTG/retur/KW/KBMO.
+    # Solgt matches via katalog (ikke navne), totaler tælles kun for afsluttede dage (ekskl. i dag).
+    if man.isoformat() >= _RETUR_SLUT:
+        idag = _date.today().isoformat()
+        cmp = hent_bagvaerk_dag_sammenligning(uge, aar)
+        prod = cmp.get("produkter", [])
+        datoer_iso = cmp.get("dage_datoer") or [d.isoformat() for d in datoer]
+        dage_out = []
+        tot_b = tot_k = tot_sv = 0
+        for i, dag in enumerate(dag_navne):
+            b = sum(p["dage"][i]["bestilt"] for p in prod)
+            k = sum(p["dage"][i]["solgt"]   for p in prod)
+            komplet = datoer_iso[i] < idag
+            har = (b > 0 or k > 0)
+            rester = max(0, b - k)
+            if komplet and b > 0:
+                svind = max(0, b - k); svind_pct = round(svind / b * 100, 1)
+            else:
+                svind = None; svind_pct = None      # i dag + fremtidige dage = afventer
+            if komplet and har:
+                tot_b += b; tot_k += k
+                if svind:
+                    tot_sv += svind
+            dage_out.append({
+                'dag': dag, 'dag_label': dag_labels[i], 'dato': datoer_iso[i],
+                'bestilt': b, 'kassesalg': k, 'kw': 0, 'kbmo': 0,
+                'rester': rester, 'rester_pct': round(rester / b * 100, 1) if b > 0 else None,
+                'tgtg': 0, 'tgtg_poser': 0, 'retur_mulig': 0,
+                'retur_reg_boller': 0, 'retur_reg_wiener': 0, 'retur_reg_total': 0,
+                'effektivt': k, 'svind': svind, 'svind_pct': svind_pct,
+                'har_data': har, 'avg_bestilt_4u': None, 'avg_svind_pct_4u': None,
+            })
+        kat_map = {}
+        kage = {'bestilt': 0, 'kassesalg': 0, 'varer': []}
+        for p in prod:
+            kt = _organic_kat(p['varenavn']) or 'Andet'
+            pb = sum(dg['bestilt'] for dg in p['dage'])
+            pk = sum(dg['solgt']   for dg in p['dage'])
+            m = kat_map.setdefault(kt, {'kat': kt, 'kassesalg': 0, 'omsaetning': 0})
+            m['kassesalg'] += pk
+            if kt == 'Kage':
+                sv = max(0, pb - pk)
+                kage['bestilt'] += pb; kage['kassesalg'] += pk
+                kage['varer'].append({'varenavn': p['varenavn'], 'bestilt': pb, 'solgt': pk,
+                                      'svind': sv, 'svind_pct': round(sv / pb * 100, 1) if pb > 0 else None})
+        kage['svind'] = max(0, kage['bestilt'] - kage['kassesalg'])
+        kage['svind_pct'] = round(kage['svind'] / kage['bestilt'] * 100, 1) if kage['bestilt'] > 0 else None
+        tot_rester = sum(d['rester'] for d in dage_out)
+        return {
+            'uge': uge, 'aar': aar, 'dato_start': dato_start, 'dato_slut': dato_slut,
+            'dage': dage_out, 'kategorier': list(kat_map.values()), 'kager': kage,
+            'total_bestilt': tot_b, 'total_kassesalg': tot_k,
+            'total_rester': tot_rester,
+            'total_rester_pct': round(tot_rester / tot_b * 100, 1) if tot_b > 0 else None,
+            'total_tgtg': 0, 'total_tgtg_poser': 0, 'total_kw': 0, 'total_kbmo': 0,
+            'total_effektivt': tot_k, 'total_retur': 0,
+            'retur_registreret': [], 'retur_registreret_total': 0,
+            'retur_boller_reg': 0, 'retur_wiener_reg': 0,
+            'total_svind': tot_sv,
+            'total_svind_pct': round(tot_sv / tot_b * 100, 1) if tot_b > 0 else None,
+            'anbefalinger': [],
+            'prev_uge': prev_uge, 'prev_aar': prev_aar,
+            'next_uge': next_uge, 'next_aar': next_aar,
+        }
 
     # Samme kaffe-definition som _KAFFE_WHERE: proteinkaffe, flødeis m. kaffe
     # og chai latte tæller IKKE som kaffe.
@@ -5569,9 +5635,9 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
     KATS = ["Brød", "Boller", "Wiener", "Kage"]
     mon = date.fromisocalendar(aar, uge, 1)
     sun = mon + timedelta(days=6)
-    # Fra 1/9 medregnes KUN Organic-sortimentet i friskt salg — gamle konfekt-varer
-    # (romkugler, træstammer, napoleonshat osv.) filtreres fra så de ikke støjer.
-    organic_uge = mon.isoformat() >= _ORGANIC_START
+    # Fra uge 36 (grænse _RETUR_SLUT/31-08) medregnes KUN Organic-sortimentet i
+    # friskt salg — gamle konfekt-varer (romkugler, træstammer …) filtreres fra.
+    organic_uge = mon.isoformat() >= _RETUR_SLUT
 
     # Gns. indkøbspris pr. kategori (til spild-kost) fra Organic Bakery-kataloget
     kat_indkoeb: Dict[str, list] = {}

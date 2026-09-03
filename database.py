@@ -2945,7 +2945,8 @@ def _spild_uge_organic(uge: int, aar: int, idag: str) -> Dict:
     dnav   = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
     labels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
     idx = [i for i, dt in enumerate(datoer) if dt and dt < idag]   # kun afsluttede dage
-    prod = d.get("produkter", [])
+    # Kager holdes UDE af spild — de sælges over 3-4 dage, så daglig spild passer ikke.
+    prod = [p for p in d.get("produkter", []) if _organic_kat(p["varenavn"]) != "Kage"]
     if not idx or not prod:
         return {"uge": uge, "aar": aar, "har_data": False}
     bestilt = sum(p["dage"][i]["bestilt"] for p in prod for i in idx)
@@ -3431,7 +3432,9 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
     if man.isoformat() >= _RETUR_SLUT:
         idag = _date.today().isoformat()
         cmp = hent_bagvaerk_dag_sammenligning(uge, aar)
-        prod = cmp.get("produkter", [])
+        prod_all = cmp.get("produkter", [])
+        # Kager holdes UDE af daglig spild (sælges over 3-4 dage) — vises separat i kager-sektionen.
+        prod = [p for p in prod_all if _organic_kat(p["varenavn"]) != "Kage"]
         datoer_iso = cmp.get("dage_datoer") or [d.isoformat() for d in datoer]
         _dl = [d.isoformat() for d in datoer]
         _ph = ','.join('?' * len(_dl))
@@ -3490,7 +3493,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             })
         kat_map = {}
         kage = {'bestilt': 0, 'kassesalg': 0, 'varer': []}
-        for p in prod:
+        for p in prod_all:   # inkl. kager (til separat kager-sektion + kategori-graf)
             kt = _organic_kat(p['varenavn']) or 'Andet'
             pb = sum(dg['bestilt'] for dg in p['dage'])
             pk = sum(dg['solgt']   for dg in p['dage'])
@@ -5664,7 +5667,7 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
     Alt hentes automatisk fra Shopbox + ugebestilling — ingen daglig tastning.
     Kategori-niveau (Brød/Boller/Wiener/Kage). Beløb ex moms."""
     from datetime import date, timedelta
-    KATS = ["Brød", "Boller", "Wiener", "Kage"]
+    KATS = ["Brød", "Boller", "Wiener"]   # Kager holdes ude af spild (sælges over 3-4 dage)
     mon = date.fromisocalendar(aar, uge, 1)
     sun = mon + timedelta(days=6)
     # Fra uge 36 (grænse _RETUR_SLUT/31-08) medregnes KUN Organic-sortimentet i
@@ -5829,7 +5832,7 @@ def _trend_uge_fra_anbefaling(w: int, y: int) -> Dict:
     så planlagte bestillinger vises som kommende uger i trenden."""
     from datetime import date, timedelta
     rec = hent_bestillings_uge_organic(w, y)
-    KATS = ["Brød", "Boller", "Wiener", "Kage"]
+    KATS = ["Brød", "Boller", "Wiener"]   # Kager holdes ude af spild (sælges over 3-4 dage)
     kat_best = {k: 0.0 for k in KATS}
     kat_varer = {k: [] for k in KATS}
     for p in rec.get("produkter", []):

@@ -3424,36 +3424,68 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
         next_uge = 1
         next_aar = aar + 1
 
-    # ── Organic Bakery-æra (uge 36+): ren katalog-matchet spild, INGEN TGTG/retur/KW/KBMO.
-    # Solgt matches via katalog (ikke navne), totaler tælles kun for afsluttede dage (ekskl. i dag).
+    # ── Organic Bakery-æra (uge 36+): ren katalog-matchet spild, INGEN TGTG/retur.
+    # KW (kaffe+wienerbrød) og KBMO (kaffe+bolle m. ost) TÆLLER STADIG — comboen
+    # forbruger et wienerbrød/bolle som ikke fanges af katalog-matchet salg.
+    # Solgt matches via katalog (ikke navne); totaler kun for afsluttede dage (ekskl. i dag).
     if man.isoformat() >= _RETUR_SLUT:
         idag = _date.today().isoformat()
         cmp = hent_bagvaerk_dag_sammenligning(uge, aar)
         prod = cmp.get("produkter", [])
         datoer_iso = cmp.get("dage_datoer") or [d.isoformat() for d in datoer]
+        _dl = [d.isoformat() for d in datoer]
+        _ph = ','.join('?' * len(_dl))
+        _KAFFE_L = ("( LOWER(varenavn) LIKE '%kaffe%' OR LOWER(varenavn) LIKE '%flat white%' "
+                    "OR LOWER(varenavn) LIKE '%cappuccino%' OR LOWER(varenavn) LIKE '%americano%' "
+                    "OR LOWER(varenavn) LIKE '%latte%' OR LOWER(varenavn) LIKE '%espresso%' "
+                    "OR LOWER(varenavn) LIKE '%macchiato%' OR LOWER(varenavn) LIKE '%cortado%' "
+                    "OR LOWER(varenavn) LIKE '%lungo%' OR LOWER(varenavn) LIKE '%mocha%' ) "
+                    "AND LOWER(varenavn) NOT LIKE '%protein%' AND LOWER(varenavn) NOT LIKE '%chai%' "
+                    "AND LOWER(varenavn) NOT LIKE '%kaps%'")
+        _WIEN_L = ("LOWER(varenavn) LIKE '%wiener%' OR LOWER(varenavn) LIKE '%kanelsnegl%' "
+                   "OR LOWER(varenavn) LIKE '%spandauer%' OR LOWER(varenavn) LIKE '%croissant%'")
+        _BMO_L  = ("LOWER(varenavn) LIKE '%bolle%ost%' OR LOWER(varenavn) LIKE '%ost%bolle%' "
+                   "OR LOWER(varenavn) LIKE '%bmo%'")
+        kw_map, kbmo_map = {}, {}
+        with _conn() as _c:
+            for r in _c.execute(f"""SELECT dato, COUNT(DISTINCT bon_nr) AS n FROM transaktioner
+                WHERE dato IN ({_ph}) AND bon_nr != ''
+                  AND bon_nr IN (SELECT bon_nr FROM transaktioner WHERE dato IN ({_ph}) AND ({_KAFFE_L}))
+                  AND bon_nr IN (SELECT bon_nr FROM transaktioner WHERE dato IN ({_ph}) AND ({_WIEN_L}))
+                GROUP BY dato""", _dl + _dl + _dl).fetchall():
+                kw_map[r['dato']] = int(r['n'] or 0)
+            for r in _c.execute(f"""SELECT dato, COUNT(DISTINCT bon_nr) AS n FROM transaktioner
+                WHERE dato IN ({_ph}) AND bon_nr != ''
+                  AND bon_nr IN (SELECT bon_nr FROM transaktioner WHERE dato IN ({_ph}) AND ({_KAFFE_L}))
+                  AND bon_nr IN (SELECT bon_nr FROM transaktioner WHERE dato IN ({_ph}) AND ({_BMO_L}))
+                GROUP BY dato""", _dl + _dl + _dl).fetchall():
+                kbmo_map[r['dato']] = int(r['n'] or 0)
         dage_out = []
-        tot_b = tot_k = tot_sv = 0
+        tot_b = tot_k = tot_sv = tot_kw = tot_kbmo = tot_eff = 0
         for i, dag in enumerate(dag_navne):
             b = sum(p["dage"][i]["bestilt"] for p in prod)
             k = sum(p["dage"][i]["solgt"]   for p in prod)
+            kw   = kw_map.get(datoer_iso[i], 0)
+            kbmo = kbmo_map.get(datoer_iso[i], 0)
+            eff  = k + kw + kbmo               # forbrugt = kassesalg + combo-forbrug
             komplet = datoer_iso[i] < idag
-            har = (b > 0 or k > 0)
-            rester = max(0, b - k)
+            har = (b > 0 or k > 0 or kw > 0 or kbmo > 0)
+            rester = max(0, b - eff)
             if komplet and b > 0:
-                svind = max(0, b - k); svind_pct = round(svind / b * 100, 1)
+                svind = max(0, b - eff); svind_pct = round(svind / b * 100, 1)
             else:
                 svind = None; svind_pct = None      # i dag + fremtidige dage = afventer
             if komplet and har:
-                tot_b += b; tot_k += k
+                tot_b += b; tot_k += k; tot_kw += kw; tot_kbmo += kbmo; tot_eff += eff
                 if svind:
                     tot_sv += svind
             dage_out.append({
                 'dag': dag, 'dag_label': dag_labels[i], 'dato': datoer_iso[i],
-                'bestilt': b, 'kassesalg': k, 'kw': 0, 'kbmo': 0,
+                'bestilt': b, 'kassesalg': k, 'kw': kw, 'kbmo': kbmo,
                 'rester': rester, 'rester_pct': round(rester / b * 100, 1) if b > 0 else None,
                 'tgtg': 0, 'tgtg_poser': 0, 'retur_mulig': 0,
                 'retur_reg_boller': 0, 'retur_reg_wiener': 0, 'retur_reg_total': 0,
-                'effektivt': k, 'svind': svind, 'svind_pct': svind_pct,
+                'effektivt': eff, 'svind': svind, 'svind_pct': svind_pct,
                 'har_data': har, 'avg_bestilt_4u': None, 'avg_svind_pct_4u': None,
             })
         kat_map = {}
@@ -3478,8 +3510,8 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             'total_bestilt': tot_b, 'total_kassesalg': tot_k,
             'total_rester': tot_rester,
             'total_rester_pct': round(tot_rester / tot_b * 100, 1) if tot_b > 0 else None,
-            'total_tgtg': 0, 'total_tgtg_poser': 0, 'total_kw': 0, 'total_kbmo': 0,
-            'total_effektivt': tot_k, 'total_retur': 0,
+            'total_tgtg': 0, 'total_tgtg_poser': 0, 'total_kw': tot_kw, 'total_kbmo': tot_kbmo,
+            'total_effektivt': tot_eff, 'total_retur': 0,
             'retur_registreret': [], 'retur_registreret_total': 0,
             'retur_boller_reg': 0, 'retur_wiener_reg': 0,
             'total_svind': tot_sv,

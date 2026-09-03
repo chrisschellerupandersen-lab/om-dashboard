@@ -2895,12 +2895,61 @@ def hent_mangler_kostpris() -> Dict:
 
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
+def _spild_uge_organic(uge: int, aar: int, idag: str) -> Dict:
+    """Spild-overblik for en Organic Bakery-uge (fra 1/9): katalog-matchet
+    bestilt-vs-solgt pr. dag, KUN afsluttede dage (ekskl. i dag), ingen TGTG/retur."""
+    d = hent_bagvaerk_dag_sammenligning(uge, aar)
+    datoer = d.get("dage_datoer", [])
+    dnav   = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    labels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
+    idx = [i for i, dt in enumerate(datoer) if dt and dt < idag]   # kun afsluttede dage
+    prod = d.get("produkter", [])
+    if not idx or not prod:
+        return {"uge": uge, "aar": aar, "har_data": False}
+    bestilt = sum(p["dage"][i]["bestilt"] for p in prod for i in idx)
+    solgt   = sum(p["dage"][i]["solgt"]   for p in prod for i in idx)
+    svind   = max(0, bestilt - solgt)
+    svind_pct = round(svind / bestilt * 100, 1) if bestilt > 0 else None
+    with _conn() as _c:
+        kp = _c.execute("""SELECT SUM((man+tir+ons+tor+fre+loe+son)*pris_ex_moms) AS kr,
+                                  SUM(man+tir+ons+tor+fre+loe+son) AS stk
+                           FROM ugebestillinger WHERE uge=? AND aar=?""", (uge, aar)).fetchone()
+    kostpris_stk = round((kp["kr"] or 0) / kp["stk"], 4) if (kp and kp["stk"]) else 0.0
+    dag_detalje = []
+    for i in idx:
+        b = sum(p["dage"][i]["bestilt"] for p in prod)
+        s = sum(p["dage"][i]["solgt"]   for p in prod)
+        sv = max(0, b - s)
+        dag_detalje.append({"dag": dnav[i], "dag_label": labels[i], "dato": datoer[i],
+                            "bestilt": b, "solgt": s, "tgtg": 0, "svind": sv,
+                            "svind_pct": round(sv / b * 100, 1) if b > 0 else None,
+                            "svind_pct_foer_tgtg": round(sv / b * 100, 1) if b > 0 else None})
+    return {
+        "uge": uge, "aar": aar, "har_data": bestilt > 0,
+        "bestilt": bestilt, "kassesalg": solgt, "tgtg": 0,
+        "svind": svind, "svind_pct": svind_pct,
+        "svind_foer_tgtg": svind, "svind_pct_foer_tgtg": svind_pct,
+        "kostpris_stk": kostpris_stk,
+        "solgt_kr": round(solgt * kostpris_stk, 2), "tgtg_kr": 0.0,
+        "spild_kr": round(svind * kostpris_stk, 2), "netto_spild_kr": round(svind * kostpris_stk, 2),
+        "faktura_kr": 0.0, "retur_bager_kr": 0.0, "netto_faktura_kr": 0.0,
+        "n_dage": len(idx), "er_komplet": len(idx) >= 6,
+        "dage": dag_detalje,
+    }
+
+
 def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
     """Spild-overblik for én uge — bruger samme beregning som spild-rapporten.
     Ekskluderer dags dato (uafsluttet dag) fra beregningen.
     """
     from datetime import date as _d, timedelta as _td
     idag = _d.today().isoformat()
+    # Organic Bakery-æra (fra 1/9): ren katalog-matchet beregning uden TGTG/retur.
+    try:
+        if _d.fromisocalendar(aar, uge, 1).isoformat() >= _ORGANIC_START:
+            return _spild_uge_organic(uge, aar, idag)
+    except Exception:
+        pass
     try:
         d = hent_spild_dagsniveau(uge, aar)
         if "error" in d:

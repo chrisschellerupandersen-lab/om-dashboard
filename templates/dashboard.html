@@ -1093,16 +1093,11 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </div>
             </div>
             <!-- Uge KPI'er -->
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
               <div>
                 <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">WTD OMSÆTNING</div>
                 <div style="font-size:18px;font-weight:500;color:var(--charcoal);" id="mb-wtd-oms">—</div>
                 <div style="font-size:10px;color:var(--ash);" id="mb-wtd-dage">— dage</div>
-              </div>
-              <div>
-                <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">TGTG DENNE UGE</div>
-                <div style="font-size:18px;font-weight:500;" id="mb-tgtg-kr">—</div>
-                <div style="font-size:10px;" id="mb-tgtg-sub">mål: under 800 kr</div>
               </div>
               <div>
                 <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">DB% DENNE UGE</div>
@@ -10175,17 +10170,6 @@ async function mbLoad(force = false) {
   document.getElementById('mb-wtd-dage').textContent = `${d.wtd_dage} dage med data`
     + ((d.wtd_ekstra_mp > 0 || d.wtd_ekstra_faktura > 0) ? ` · +${dk(d.wtd_ekstra_mp)} MP +${dk(d.wtd_ekstra_faktura)} B2B` : '');
 
-  const tgtgEl = document.getElementById('mb-tgtg-kr');
-  tgtgEl.textContent = d.tgtg_kr > 0 ? dk(d.tgtg_kr) : '0 kr';
-  tgtgEl.style.color = d.tgtg_ok ? 'var(--moss)' : d.tgtg_advarsel ? 'var(--danger)' : 'var(--gold)';
-  if (d.uge && d.aar) {
-    tgtgEl.style.cursor = 'pointer';
-    tgtgEl.title = 'Klik for TGTG-specifikation';
-    tgtgEl.onclick = () => tgtgSpec(d.uge, d.aar);
-  }
-  document.getElementById('mb-tgtg-sub').textContent = d.tgtg_ok ? `✓ ${d.tgtg_poser} poser · under mål` : `⚠ ${d.tgtg_poser} poser · over mål`;
-  document.getElementById('mb-tgtg-sub').style.color = d.tgtg_ok ? 'var(--moss)' : 'var(--danger)';
-
   const dbUgeEl = document.getElementById('mb-wtd-db');
   dbUgeEl.textContent = d.wtd_db_pct != null ? d.wtd_db_pct.toFixed(1) + '%' : '—';
   dbUgeEl.style.color = (d.wtd_db_pct || 0) >= 35 ? 'var(--moss)' : (d.wtd_db_pct || 0) >= 28 ? 'var(--gold)' : 'var(--charcoal)';
@@ -10198,9 +10182,6 @@ async function mbLoad(force = false) {
     { lbl: 'DB%', val: d.dag_db_pct > 0 ? d.dag_db_pct.toFixed(1)+'%' : '—',
       sub: 'mål ≥35%',
       status: d.dag_db_pct >= 35 ? 'green' : d.dag_db_pct >= 28 ? 'amber' : d.dag_db_pct > 0 ? 'red' : 'neutral' },
-    { lbl: 'TGTG', val: d.tgtg_kr > 0 ? Math.round(d.tgtg_kr).toLocaleString('da-DK')+' kr' : '0 kr',
-      sub: 'mål under 800 kr',
-      status: d.tgtg_ok ? 'green' : d.tgtg_advarsel ? 'red' : 'amber' },
     { lbl: 'Spild', val: d.spild_pct != null ? d.spild_pct.toFixed(1)+'%' : '—',
       sub: 'mål under 15%',
       status: d.spild_pct == null ? 'neutral' : d.spild_ok ? 'green' : d.spild_pct < 22 ? 'amber' : 'red' },

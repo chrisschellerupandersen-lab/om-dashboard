@@ -3337,9 +3337,6 @@ async def api_morgenbriefing(request: Request):
             top = sidst["udsolgt_tidligt"][0]
             smart_alert = {"type": "udsolgt", "ikon": "🔴",
                 "tekst": f"{top['varenavn']} sælger ud kl. {top['snit_time']:02d}:00 — {top['tomme_timer']} tomme timer. Bestil mere."}
-        elif tgtg_kr > 1200:
-            smart_alert = {"type": "tgtg", "ikon": "🟡",
-                "tekst": f"TGTG {tgtg_kr:,} kr denne uge — over 1.200 kr. Reducer bestillingen på svage dage."}
         elif (spild_d.get("svind_pct") or 0) > 22:
             smart_alert = {"type": "spild", "ikon": "🔴",
                 "tekst": f"Spild {spild_d['svind_pct']:.1f}% — kritisk. Tjek hvilke dage der driver spildet."}

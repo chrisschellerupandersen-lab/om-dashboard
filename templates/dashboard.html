@@ -9891,7 +9891,7 @@ async function _spildHent(uge, aar) {
         <td class="num" style="${MONO}font-size:13px;padding:10px;color:var(--forest);">${dag.kassesalg > 0 ? dag.kassesalg : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kwTxt}</td>
         <td class="num" style="${MONO}font-size:12px;padding:10px;color:var(--ash);">${kbmoTxt}</td>
-        <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${dag.rester > 0 ? '#e67e22' : 'var(--ash)'};" title="Rester ved lukketid: ${dag.rester_pct != null ? dag.rester_pct+'%' : '—'}">${dag.rester > 0 ? dag.rester : '<span style="color:var(--ash);">0</span>'}</td>
+        <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${dag.rester > 0 ? '#e67e22' : 'var(--ash)'};" title="Rester ved lukketid: ${dag.rester_pct != null ? dag.rester_pct+'%' : '—'}">${dag.rester == null ? '<span style="color:var(--ash);">—</span>' : (dag.rester > 0 ? dag.rester : '<span style="color:var(--ash);">0</span>')}</td>
         <td class="num" style="${MONO}font-size:13px;padding:10px;" title="Kassesalg + KW + KBMO">${dag.effektivt > 0 ? dag.effektivt : '<span style="color:var(--ash);">0</span>'}</td>
         <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:10px;color:${txtClr};">${dag.svind != null ? dag.svind : '—'}</td>
         <td style="padding:10px;">${bar}${deltaIcon}</td>

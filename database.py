@@ -3462,11 +3462,12 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             eff  = k + kw + kbmo               # forbrugt = kassesalg + combo-forbrug
             komplet = datoer_iso[i] < idag
             har = (b > 0 or k > 0 or kw > 0 or kbmo > 0)
-            rester = max(0, b - eff)
             if komplet and b > 0:
                 svind = max(0, b - eff); svind_pct = round(svind / b * 100, 1)
+                rester = max(0, b - eff)
             else:
                 svind = None; svind_pct = None      # i dag + fremtidige dage = afventer
+                rester = None
             if komplet and har:
                 tot_b += b; tot_k += k; tot_kw += kw; tot_kbmo += kbmo; tot_eff += eff
                 if svind:
@@ -3474,7 +3475,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
             dage_out.append({
                 'dag': dag, 'dag_label': dag_labels[i], 'dato': datoer_iso[i],
                 'bestilt': b, 'kassesalg': k, 'kw': kw, 'kbmo': kbmo,
-                'rester': rester, 'rester_pct': round(rester / b * 100, 1) if b > 0 else None,
+                'rester': rester, 'rester_pct': round(rester / b * 100, 1) if (rester is not None and b > 0) else None,
                 'tgtg': 0, 'tgtg_poser': 0, 'retur_mulig': 0,
                 'retur_reg_boller': 0, 'retur_reg_wiener': 0, 'retur_reg_total': 0,
                 'effektivt': eff, 'svind': svind, 'svind_pct': svind_pct,
@@ -3495,7 +3496,7 @@ def hent_spild_dagsniveau(uge: int, aar: int) -> Dict:
                                       'svind': sv, 'svind_pct': round(sv / pb * 100, 1) if pb > 0 else None})
         kage['svind'] = max(0, kage['bestilt'] - kage['kassesalg'])
         kage['svind_pct'] = round(kage['svind'] / kage['bestilt'] * 100, 1) if kage['bestilt'] > 0 else None
-        tot_rester = sum(d['rester'] for d in dage_out)
+        tot_rester = sum(d['rester'] or 0 for d in dage_out)
         return {
             'uge': uge, 'aar': aar, 'dato_start': dato_start, 'dato_slut': dato_slut,
             'dage': dage_out, 'kategorier': list(kat_map.values()), 'kager': kage,

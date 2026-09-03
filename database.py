@@ -2938,46 +2938,35 @@ def hent_mangler_kostpris() -> Dict:
 # ── SPILD-RAPPORT ─────────────────────────────────────────────────────────────
 
 def _spild_uge_organic(uge: int, aar: int, idag: str) -> Dict:
-    """Spild-overblik for en Organic Bakery-uge (fra 1/9): katalog-matchet
-    bestilt-vs-solgt pr. dag, KUN afsluttede dage (ekskl. i dag), ingen TGTG/retur."""
-    d = hent_bagvaerk_dag_sammenligning(uge, aar)
-    datoer = d.get("dage_datoer", [])
-    dnav   = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
-    labels = ['Mandag', 'Tirsdag', 'Onsdag', 'Torsdag', 'Fredag', 'Lørdag', 'Søndag']
-    idx = [i for i, dt in enumerate(datoer) if dt and dt < idag]   # kun afsluttede dage
-    # Kager holdes UDE af spild — de sælges over 3-4 dage, så daglig spild passer ikke.
-    prod = [p for p in d.get("produkter", []) if _organic_kat(p["varenavn"]) != "Kage"]
-    if not idx or not prod:
+    """Spild-overblik for en Organic Bakery-uge (fra 1/9). Delegerer til
+    hent_spild_dagsniveau (samme kilde som spild-rapporten), så morgenbriefing og
+    rapport ALTID matcher. Spild regnes PR. DAG (Σ max(0, bestilt−forbrugt)) — så en
+    dags oversalg (fx mandags gamle-bager-salg) ikke udligner en anden dags spild."""
+    dn = hent_spild_dagsniveau(uge, aar)
+    if not dn or dn.get("error"):
         return {"uge": uge, "aar": aar, "har_data": False}
-    bestilt = sum(p["dage"][i]["bestilt"] for p in prod for i in idx)
-    solgt   = sum(p["dage"][i]["solgt"]   for p in prod for i in idx)
-    svind   = max(0, bestilt - solgt)
-    svind_pct = round(svind / bestilt * 100, 1) if bestilt > 0 else None
+    bestilt   = dn.get("total_bestilt", 0)
+    kassesalg = dn.get("total_effektivt", dn.get("total_kassesalg", 0))   # inkl. KW/KBMO
+    svind     = dn.get("total_svind", 0)
+    svind_pct = dn.get("total_svind_pct")
+    n_dage = sum(1 for d in dn.get("dage", [])
+                 if d.get("har_data") and (d.get("dato") or "") < idag)
     with _conn() as _c:
         kp = _c.execute("""SELECT SUM((man+tir+ons+tor+fre+loe+son)*pris_ex_moms) AS kr,
                                   SUM(man+tir+ons+tor+fre+loe+son) AS stk
                            FROM ugebestillinger WHERE uge=? AND aar=?""", (uge, aar)).fetchone()
     kostpris_stk = round((kp["kr"] or 0) / kp["stk"], 4) if (kp and kp["stk"]) else 0.0
-    dag_detalje = []
-    for i in idx:
-        b = sum(p["dage"][i]["bestilt"] for p in prod)
-        s = sum(p["dage"][i]["solgt"]   for p in prod)
-        sv = max(0, b - s)
-        dag_detalje.append({"dag": dnav[i], "dag_label": labels[i], "dato": datoer[i],
-                            "bestilt": b, "solgt": s, "tgtg": 0, "svind": sv,
-                            "svind_pct": round(sv / b * 100, 1) if b > 0 else None,
-                            "svind_pct_foer_tgtg": round(sv / b * 100, 1) if b > 0 else None})
     return {
         "uge": uge, "aar": aar, "har_data": bestilt > 0,
-        "bestilt": bestilt, "kassesalg": solgt, "tgtg": 0,
+        "bestilt": bestilt, "kassesalg": kassesalg, "tgtg": 0,
         "svind": svind, "svind_pct": svind_pct,
         "svind_foer_tgtg": svind, "svind_pct_foer_tgtg": svind_pct,
         "kostpris_stk": kostpris_stk,
-        "solgt_kr": round(solgt * kostpris_stk, 2), "tgtg_kr": 0.0,
+        "solgt_kr": round(kassesalg * kostpris_stk, 2), "tgtg_kr": 0.0,
         "spild_kr": round(svind * kostpris_stk, 2), "netto_spild_kr": round(svind * kostpris_stk, 2),
         "faktura_kr": 0.0, "retur_bager_kr": 0.0, "netto_faktura_kr": 0.0,
-        "n_dage": len(idx), "er_komplet": len(idx) >= 6,
-        "dage": dag_detalje,
+        "n_dage": n_dage, "er_komplet": n_dage >= 6,
+        "dage": dn.get("dage", []),
     }
 
 

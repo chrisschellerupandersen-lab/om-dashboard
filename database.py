@@ -5821,10 +5821,27 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
         "reel_dg_pct": round(reel_db_tot / tot["oms"] * 100, 1) if tot["oms"] > 0 else None,
         "spild_kost":  round(tot["spild_kost"]),
     }
+    # Kager: separat UGE-opsummering (bestilt vs. solgt over hele ugen) — IKKE spild,
+    # da de sælges over 3-4 dage. Katalog-matchet via dag-sammenligningen.
+    kage_varer, kage_best, kage_solgt = [], 0, 0
+    try:
+        _cmp = hent_bagvaerk_dag_sammenligning(uge, aar)
+        for p in _cmp.get("produkter", []):
+            if _organic_kat(p["varenavn"]) != "Kage":
+                continue
+            pb = sum(dg["bestilt"] for dg in p["dage"])
+            ps = sum(dg["solgt"] for dg in p["dage"])
+            if pb or ps:
+                kage_varer.append({"navn": p["varenavn"], "bestilt": pb, "solgt": ps})
+                kage_best += pb; kage_solgt += ps
+    except Exception:
+        pass
+    kager = {"bestilt": kage_best, "solgt": kage_solgt, "varer": kage_varer,
+             "har_data": bool(kage_varer)}
     return {"uge": uge, "aar": aar,
             "dato_range": f"{mon.strftime('%d/%m')}–{sun.strftime('%d/%m')}",
             "har_bestilt": tot["bestilt"] > 0,
-            "kategorier": rows, "total": total}
+            "kategorier": rows, "kager": kager, "total": total}
 
 
 def _trend_uge_fra_anbefaling(w: int, y: int) -> Dict:

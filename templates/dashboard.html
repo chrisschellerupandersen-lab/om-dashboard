@@ -2914,6 +2914,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:640px;" id="bageri-spild-tabel"></table>
           </div>
+          <div id="bageri-kager" style="display:none;margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;"></div>
         </div>
 
         <div class="card" id="bageri-trend-kort" style="margin-top:16px;">
@@ -4238,6 +4239,24 @@ async function _bageriSpildRender(){
       <td class="num">${t.spild}</td><td class="num">${t.spild_pct==null?'–':t.spild_pct+'%'}</td>
       <td class="num">${t.reel_dg_pct==null?'–':t.reel_dg_pct+'%'}</td></tr></tfoot>`;
   tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
+
+  // Kager — separat uge-linje (bestilt vs. solgt over ugen), IKKE spild (sælges over 3-4 dage)
+  const kBox = document.getElementById('bageri-kager');
+  if (kBox){
+    const kg = d.kager;
+    if (kg && kg.har_data){
+      const varer = (kg.varer||[]).map(v =>
+        `<span style="display:inline-block;margin-right:14px;"><span style="color:var(--ash);">${v.navn}:</span> <strong>${v.bestilt}</strong> best · <strong style="color:var(--forest);">${v.solgt}</strong> solgt</span>`
+      ).join('');
+      kBox.style.display = 'block';
+      kBox.innerHTML =
+        `<div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Kager — uge i alt (holdes ude af spild · sælges over 3-4 dage)</div>`
+      + `<div style="font-size:12px;">I alt: <strong>${kg.bestilt}</strong> bestilt · <strong style="color:var(--forest);">${kg.solgt}</strong> solgt over ugen</div>`
+      + `<div style="font-size:11px;color:var(--ash);margin-top:5px;">${varer}</div>`;
+    } else {
+      kBox.style.display = 'none';
+    }
+  }
 }
 
 function _bageriSpildFold(idx){

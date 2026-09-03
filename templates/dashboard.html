@@ -9960,39 +9960,37 @@ async function _spildHent(uge, aar) {
   if (!kg || kg.bestilt === 0) {
     kageEl.innerHTML = '<div class="empty" style="padding:12px;">Ingen kager i bestillingen denne uge</div>';
   } else {
-    const kSpildClr = kg.svind_pct > 25 ? '#c0392b' : kg.svind_pct > 12 ? '#e67e22' : 'var(--moss)';
+    // Kager tælles IKKE som spild (sælges over 3-4 dage). Ren bestilt-vs-solgt-oversigt.
+    const usolgt = Math.max(0, (kg.bestilt||0) - (kg.kassesalg||0));
+    const solgtPct = kg.bestilt > 0 ? Math.round((kg.kassesalg||0) / kg.bestilt * 100) : 0;
     let kRows = (kg.varer || []).map(v => {
-      const vPct = v.svind_pct != null ? v.svind_pct : 0;
-      const vClr = vPct > 25 ? '#c0392b' : vPct > 12 ? '#e67e22' : 'var(--ash)';
+      const u = Math.max(0, (v.bestilt||0) - (v.solgt||0));
       return `<tr style="border-bottom:1px solid rgba(30,58,30,.06);">
         <td style="padding:7px 10px;font-size:13px;">${v.varenavn}</td>
         <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;">${v.bestilt}</td>
         <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;color:var(--forest);">${v.solgt}</td>
-        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;font-weight:600;color:${vClr};">${v.svind}</td>
-        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;color:${vClr};">${v.svind_pct != null ? v.svind_pct.toFixed(1)+' %' : '—'}</td>
+        <td style="${MONO}text-align:right;padding:7px 10px;font-size:13px;color:var(--ash);">${u}</td>
       </tr>`;
     }).join('');
     kageEl.innerHTML = `
-      <div style="display:flex;gap:20px;padding:12px 10px 8px;border-bottom:1px solid rgba(30,58,30,.10);">
-        <div style="text-align:center;min-width:70px;">
+      <div style="font-size:11px;color:var(--ash);padding:8px 10px 4px;">🎂 Kager sælges over 3-4 dage og tælles <strong>ikke</strong> som spild — her er blot bestilt vs. solgt så langt i ugen.</div>
+      <div style="display:flex;gap:20px;padding:6px 10px 8px;border-bottom:1px solid rgba(30,58,30,.10);">
+        <div style="text-align:center;min-width:80px;">
           <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">BESTILT UGE</div>
           <div style="font-size:22px;font-weight:700;color:var(--ink);">${kg.bestilt}</div>
         </div>
-        <div style="text-align:center;min-width:70px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SOLGT</div>
+        <div style="text-align:center;min-width:80px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SOLGT SÅ LANGT</div>
           <div style="font-size:22px;font-weight:700;color:var(--forest);">${kg.kassesalg}</div>
         </div>
-        <div style="text-align:center;min-width:70px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD STK</div>
-          <div style="font-size:22px;font-weight:700;color:${kSpildClr};">${kg.svind}</div>
+        <div style="text-align:center;min-width:80px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">ENDNU USOLGT</div>
+          <div style="font-size:22px;font-weight:700;color:var(--ash);">${usolgt}</div>
         </div>
-        <div style="text-align:center;min-width:70px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.07em;color:var(--ash);">SPILD %</div>
-          <div style="font-size:22px;font-weight:700;color:${kSpildClr};">${kg.svind_pct != null ? kg.svind_pct.toFixed(1)+' %' : '—'}</div>
-        </div>
-        <div style="flex:1;display:flex;align-items:center;padding-left:10px;">
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding-left:10px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-bottom:3px;">${solgtPct}% solgt</div>
           <div style="width:100%;height:8px;background:rgba(30,58,30,.08);border-radius:4px;overflow:hidden;">
-            <div style="width:${Math.min(100,kg.svind_pct||0)}%;height:100%;background:${kSpildClr};border-radius:4px;"></div>
+            <div style="width:${Math.min(100,solgtPct)}%;height:100%;background:var(--moss);border-radius:4px;"></div>
           </div>
         </div>
       </div>
@@ -10001,8 +9999,7 @@ async function _spildHent(uge, aar) {
           <th style="text-align:left;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">VARENAVN</th>
           <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">BESTILT UGE</th>
           <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SOLGT</th>
-          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SPILD STK</th>
-          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">SPILD %</th>
+          <th style="text-align:right;padding:6px 10px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">ENDNU USOLGT</th>
         </tr></thead>
         <tbody>${kRows}</tbody>
       </table>`;

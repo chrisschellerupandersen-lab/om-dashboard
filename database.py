@@ -2204,6 +2204,48 @@ def hent_dashboard_data() -> Dict:
     }
 
 
+def juster_ugebestilling_dag(uge: int, aar: int, varenavn: str, dag: str,
+                             antal: float, mode: str = "add") -> Dict:
+    """Justér én vares antal på én ugedag i ugebestillingen — til ekstra-leveringer
+    der ikke stod på portal-ordren. mode='add' lægger til, 'set' overskriver dagen.
+    Opretter rækken hvis varen ikke findes (pris fra Organic-kataloget)."""
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    d = (dag or "").strip().lower()[:3]
+    d = {"lør": "loe", "lor": "loe", "søn": "son", "son": "son"}.get(d, d)
+    if d not in DAGE:
+        raise ValueError(f"Ugyldig ugedag: {dag}")
+    antal = float(antal)
+    with _conn() as conn:
+        row = conn.execute(
+            "SELECT * FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(TRIM(varenavn))=LOWER(TRIM(?))",
+            (uge, aar, varenavn)).fetchone()
+        if row:
+            ny_dag = (row[d] or 0) + antal if mode == "add" else antal
+            conn.execute(f"UPDATE ugebestillinger SET {d}=? WHERE id=?", (ny_dag, row["id"]))
+            pris = row["pris_ex_moms"] or 0
+        else:
+            kat = next((p for p in _ORGANIC_BAKERY
+                        if p["navn"].strip().lower() == varenavn.strip().lower()), None)
+            pris = kat["indkoeb"] if kat else 0
+            vals = {dd: (antal if dd == d else 0) for dd in DAGE}
+            conn.execute("""INSERT INTO ugebestillinger
+                (uge, aar, varenummer, varenavn, pris_ex_moms, man, tir, ons, tor, fre, loe, son,
+                 total_antal, total_pris, sektion)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (uge, aar, "", varenavn, pris, vals["man"], vals["tir"], vals["ons"], vals["tor"],
+                 vals["fre"], vals["loe"], vals["son"], antal, antal * pris, 1))
+        # Genberegn totaler fra dag-kolonnerne
+        r2 = conn.execute(
+            "SELECT man,tir,ons,tor,fre,loe,son FROM ugebestillinger WHERE uge=? AND aar=? AND LOWER(TRIM(varenavn))=LOWER(TRIM(?))",
+            (uge, aar, varenavn)).fetchone()
+        tot = sum(r2[dd] or 0 for dd in DAGE)
+        conn.execute(
+            "UPDATE ugebestillinger SET total_antal=?, total_pris=? WHERE uge=? AND aar=? AND LOWER(TRIM(varenavn))=LOWER(TRIM(?))",
+            (tot, round(tot * pris, 2), uge, aar, varenavn))
+    return {"uge": uge, "aar": aar, "varenavn": varenavn, "dag": d,
+            "ny_total": tot, "pris_ex_moms": pris}
+
+
 def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
     with _conn() as conn:
         # Ryd eksisterende rækker først — forhindrer dubletter ved force-sync

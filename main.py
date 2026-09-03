@@ -2925,6 +2925,28 @@ async def bageri_ugebestilling_dump(request: Request, uge: int = 36, aar: int = 
                       for r in rows]}
 
 
+@app.post("/api/bageri/ordre-juster")
+async def bageri_ordre_juster(request: Request):
+    """Justér én vares antal på én ugedag (ekstra-levering ikke på portal-ordren).
+    Body: {secret, uge, aar, varenavn, dag, antal, mode:'add'|'set'}."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    for f in ("uge", "aar", "varenavn", "dag", "antal"):
+        if body.get(f) is None:
+            raise HTTPException(status_code=400, detail=f"Mangler {f}")
+    try:
+        return database.juster_ugebestilling_dag(
+            int(body["uge"]), int(body["aar"]), body["varenavn"],
+            body["dag"], body["antal"], body.get("mode", "add"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @app.post("/api/bageri/ordre-mail")
 async def bageri_ordre_mail(request: Request):
     """Modtager en Organic Bakery portal-ordrebekræftelse (Shopify-mail fra

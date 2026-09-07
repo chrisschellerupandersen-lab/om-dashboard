@@ -8177,6 +8177,7 @@ def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
     """
     from datetime import date as _d, timedelta as _td
     fra = (_d.today() - _td(weeks=uger)).isoformat()
+    nylig = (_d.today() - _td(days=6)).isoformat()   # varen skal have solgt for nylig (ekskl. udgåede varer)
     _KAGE_EXCL = (
         "LOWER(t.varenavn) LIKE '%kage%' OR LOWER(t.varenavn) LIKE '%cookie%' "
         "OR LOWER(t.varenavn) LIKE '%muffin%' OR LOWER(t.varenavn) LIKE '%brownie%' "
@@ -8188,6 +8189,7 @@ def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
             SELECT t.varenavn,
                    ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
                    COUNT(DISTINCT dato)       AS dage_med_salg,
+                   MAX(dato)                  AS sidst_dato,
                    MIN(sidst_time)            AS min_tid,
                    MAX(sidst_time)            AS max_tid
             FROM (
@@ -8206,9 +8208,9 @@ def hent_sidst_solgt_moenster(uger: int = 4) -> Dict:
                 GROUP BY t.dato, t.varenavn
             ) t
             GROUP BY t.varenavn
-            HAVING dage_med_salg >= 3
+            HAVING dage_med_salg >= 3 AND sidst_dato >= ?
             ORDER BY snit_sidst_time ASC
-        """, (fra,)).fetchall()
+        """, (fra, nylig)).fetchall()
 
     udsolgt = []
     overskud = []

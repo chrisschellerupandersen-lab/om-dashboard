@@ -2392,6 +2392,12 @@ def hent_faktura_afstemning(fakturanr: int = None,
         hdr = dict(hdr)
         u, a = hdr["uge"], hdr["aar"]
 
+        # Nyeste faktura for ugen (korrektion) — så frontend kan advare hvis man ser en ældre
+        seneste = conn.execute(
+            "SELECT MAX(fakturanr) AS mx FROM bageri_fakturaer WHERE uge=? AND aar=?",
+            (u, a)).fetchone()
+        seneste_nr = seneste["mx"] if seneste else hdr["fakturanr"]
+
         fak = conn.execute("""SELECT varenavn, pris_ex_moms, total_antal, total_pris
                               FROM bageri_faktura_linjer WHERE fakturanr=?""",
                            (hdr["fakturanr"],)).fetchall()
@@ -2434,6 +2440,8 @@ def hent_faktura_afstemning(fakturanr: int = None,
         "betalt": hdr["betalt"],
         "godkendt": hdr["godkendt"] if "godkendt" in hdr.keys() else 0,
         "godkendt_dato": hdr["godkendt_dato"] if "godkendt_dato" in hdr.keys() else "",
+        "seneste_fakturanr": seneste_nr,
+        "er_seneste": (seneste_nr == hdr["fakturanr"]),
         "har_bestilling": len(best) > 0,
         "bestilt_total_stk": round(sum(r["total_antal"] for r in best), 2),
         "bestilt_total_kr":  round(sum(r["total_pris"]  for r in best), 2),
@@ -3237,10 +3245,11 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
             faktura_kr     = round(float(br["faktura"]), 2) if (br and br["faktura"]) else 0.0
             retur_bager_kr = round(float(br["retur_wiener"] or 0) + float(br["retur_boller"] or 0), 2) if br else 0.0
             netto_faktura_kr = round(faktura_kr - float(br["retur_ialt"] or 0), 2) if br else 0.0
-            # Organic Bakery-faktura for ugen (reel ugekost: varer ex fragt + fragt separat)
+            # Organic Bakery-faktura for ugen (reel ugekost: varer ex fragt + fragt separat).
+            # Hvis der er flere fakturaer for ugen (korrektion), bruges den NYESTE.
             fak = _c.execute(
                 "SELECT varer_ex_fragt, fragt_kr, total_kr FROM bageri_fakturaer "
-                "WHERE uge=? AND aar=?", (uge, aar)).fetchone()
+                "WHERE uge=? AND aar=? ORDER BY fakturanr DESC LIMIT 1", (uge, aar)).fetchone()
         fak_varer_kr = round(float(fak["varer_ex_fragt"]), 2) if fak else None
         fak_fragt_kr = round(float(fak["fragt_kr"]), 2) if fak else None
         spild_foer_stk  = svind_stk + tgtg                       # overskud før TGTG (stk)

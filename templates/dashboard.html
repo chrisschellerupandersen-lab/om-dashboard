@@ -6366,9 +6366,13 @@ async function loadBagvaerkOek() {
     <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.5;">${konk.join(' ')}</div>`;
 
   // KPI'er
+  const fragtKpi = (O.antal_uger_fragt > 0) ? `
+    <div class="kpi-card"><div class="kpi-label">Fragt / uge (snit)</div><div class="kpi-val">${dk(O.snit_fragt)} kr</div><div class="kpi-sub">separat omk. · ${O.antal_uger_fragt} uger</div></div>
+    <div class="kpi-card"><div class="kpi-label">DB% efter fragt</div><div class="kpi-val">${O.snit_db_efter_fragt_pct != null ? O.snit_db_efter_fragt_pct + '%' : '—'}</div><div class="kpi-sub">${dk(O.snit_db_efter_fragt)} kr/uge</div></div>` : '';
   document.getElementById('boek-kpi').innerHTML = `
-    <div class="kpi-card"><div class="kpi-label">DB / uge (snit)</div><div class="kpi-val">${dk(O.snit_db)} kr</div><div class="kpi-sub">${uger.length} uger m. faktura</div></div>
-    <div class="kpi-card"><div class="kpi-label">DB%</div><div class="kpi-val">${O.snit_db_pct != null ? O.snit_db_pct + '%' : '—'}</div><div class="kpi-sub">af bagværks-omsætning</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vare-DB / uge (snit)</div><div class="kpi-val">${dk(O.snit_db)} kr</div><div class="kpi-sub">${uger.length} uger m. faktura · før fragt</div></div>
+    <div class="kpi-card"><div class="kpi-label">Vare-DB%</div><div class="kpi-val">${O.snit_db_pct != null ? O.snit_db_pct + '%' : '—'}</div><div class="kpi-sub">omsætning − varer</div></div>
+    ${fragtKpi}
     <div class="kpi-card"><div class="kpi-label">Sell-through</div><div class="kpi-val">${O.snit_sellthrough != null ? O.snit_sellthrough + '%' : '—'}</div><div class="kpi-sub">solgt ÷ bestilt</div></div>
     <div class="kpi-card"><div class="kpi-label">Svind (snit)</div><div class="kpi-val">${O.snit_svind_pct != null ? O.snit_svind_pct + '%' : '—'}</div><div class="kpi-sub">efter TGTG</div></div>`;
 

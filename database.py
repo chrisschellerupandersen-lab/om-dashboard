@@ -3184,6 +3184,12 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
             faktura_kr     = round(float(br["faktura"]), 2) if (br and br["faktura"]) else 0.0
             retur_bager_kr = round(float(br["retur_wiener"] or 0) + float(br["retur_boller"] or 0), 2) if br else 0.0
             netto_faktura_kr = round(faktura_kr - float(br["retur_ialt"] or 0), 2) if br else 0.0
+            # Organic Bakery-faktura for ugen (reel ugekost: varer ex fragt + fragt separat)
+            fak = _c.execute(
+                "SELECT varer_ex_fragt, fragt_kr, total_kr FROM bageri_fakturaer "
+                "WHERE uge=? AND aar=?", (uge, aar)).fetchone()
+        fak_varer_kr = round(float(fak["varer_ex_fragt"]), 2) if fak else None
+        fak_fragt_kr = round(float(fak["fragt_kr"]), 2) if fak else None
         spild_foer_stk  = svind_stk + tgtg                       # overskud før TGTG (stk)
         solgt_kr        = round(kassesalg * kostpris_stk, 2)
         spild_kr        = round(spild_foer_stk * kostpris_stk, 2)  # brutto før TGTG
@@ -3214,6 +3220,8 @@ def hent_spild_uge_overblik(uge: int, aar: int) -> Dict:
             "spild_kr": spild_kr, "netto_spild_kr": netto_spild_kr,
             "faktura_kr": faktura_kr, "retur_bager_kr": retur_bager_kr,
             "netto_faktura_kr": netto_faktura_kr,
+            "fak_varer_kr": fak_varer_kr, "fak_fragt_kr": fak_fragt_kr,
+            "har_organic_faktura": fak is not None,
             "n_dage": n_dage, "er_komplet": n_dage >= 6,
             "dage": dag_detalje,
         }
@@ -3249,6 +3257,9 @@ def hent_spild_uge_serie(antal_uger: int = 24) -> List[Dict]:
             "faktura_kr":       o.get("faktura_kr"),
             "retur_bager_kr":   o.get("retur_bager_kr"),
             "netto_faktura_kr": o.get("netto_faktura_kr"),
+            "fak_varer_kr":     o.get("fak_varer_kr"),
+            "fak_fragt_kr":     o.get("fak_fragt_kr"),
+            "har_organic_faktura": o.get("har_organic_faktura", False),
             "n_dage":     o.get("n_dage", 0),
             "er_komplet": o.get("er_komplet", False),
             "har_data":   o.get("har_data", False),
@@ -3281,16 +3292,22 @@ def hent_bagvaerk_oekonomi(antal_uger: int = 20) -> Dict:
     from datetime import date as _d
     serie = hent_spild_uge_serie(antal_uger + 6)
 
-    # Bagværk butiksomsætning (inkl. moms) pr. ISO-uge
+    # Bagværk butiksomsætning (inkl. moms) pr. ISO-uge. Gamle uger identificeres via
+    # ugebestillingernes varenumre; Organic-uger (portal-ordre uden varenumre) fanges
+    # via katalogets SKU'er (kilde + salg_kilde) så Organic-omsætning også tælles med.
+    _organic_skus = sorted({int(vn) for p in _ORGANIC_BAKERY
+                            for vn in (p["kilde"] + p.get("salg_kilde", []))})
+    _ph = ",".join("?" * len(_organic_skus)) if _organic_skus else "NULL"
     with _conn() as conn:
-        rows = conn.execute("""
+        rows = conn.execute(f"""
             SELECT dato, ROUND(SUM(omsætning), 2) AS oms
             FROM transaktioner
             WHERE CAST(CAST(varenummer AS REAL) AS INTEGER) IN (
                 SELECT DISTINCT CAST(CAST(varenummer AS REAL) AS INTEGER)
                 FROM ugebestillinger WHERE varenummer != '' AND varenummer != '0')
+               OR CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({_ph})
             GROUP BY dato
-        """).fetchall()
+        """, _organic_skus).fetchall()
     salg_uge: Dict = {}
     for r in rows:
         iso = _d.fromisoformat(r["dato"]).isocalendar()
@@ -3301,20 +3318,33 @@ def hent_bagvaerk_oekonomi(antal_uger: int = 20) -> Dict:
         if not s.get("har_data"):
             continue
         oms_ex   = round(salg_uge.get((s["uge"], s["aar"]), 0.0) / 1.25, 2)
-        vf       = s.get("netto_faktura_kr")            # ex moms, kun hvis faktura
-        har_fak  = (s.get("faktura_kr") or 0) > 0
-        db       = round(oms_ex - vf, 2) if (har_fak and oms_ex > 0) else None
+        # Organic-uger: brug fakturaens reelle tal. Fragt holdes SEPARAT fra vare-DB.
+        if s.get("har_organic_faktura"):
+            vf      = s.get("fak_varer_kr") or 0.0    # varer ex moms, ex fragt
+            fragt   = s.get("fak_fragt_kr") or 0.0
+            har_fak = vf > 0
+            indkoeb = round(vf + fragt, 2) if har_fak else None   # samlet faktura ex moms
+        else:
+            vf      = s.get("netto_faktura_kr")       # gammel bager-faktura (ex moms)
+            fragt   = 0.0
+            har_fak = (s.get("faktura_kr") or 0) > 0
+            indkoeb = s.get("faktura_kr") if har_fak else None
+        db       = round(oms_ex - vf, 2) if (har_fak and oms_ex > 0) else None   # vare-DB (før fragt)
         db_pct   = round(db / oms_ex * 100, 1) if (db is not None and oms_ex > 0) else None
+        db_ef    = round(db - fragt, 2) if db is not None else None              # DB efter fragt
+        db_ef_pct= round(db_ef / oms_ex * 100, 1) if (db_ef is not None and oms_ex > 0) else None
         bestilt  = s.get("bestilt") or 0
         kassesalg= s.get("kassesalg") or 0
         sell     = round(kassesalg / bestilt * 100, 1) if bestilt > 0 else None
         uger.append({
             "uge": s["uge"], "aar": s["aar"],
             "oms_ex": oms_ex, "vareforbrug": vf if har_fak else None, "db": db, "db_pct": db_pct,
-            "indkoeb_kr": s.get("faktura_kr") if har_fak else None,
+            "fragt_kr": fragt if har_fak else None,
+            "db_efter_fragt": db_ef, "db_efter_fragt_pct": db_ef_pct,
+            "indkoeb_kr": indkoeb,
             "bestilt": bestilt, "svind_pct": s.get("svind_pct"),
             "sell_through": sell, "tgtg_kr": s.get("tgtg_kr"), "spild_kr": s.get("spild_kr"),
-            "har_faktura": har_fak,
+            "har_faktura": har_fak, "har_organic_faktura": s.get("har_organic_faktura", False),
         })
 
     # Korrelationer — kun uger med DB (dvs. faktura + salg)
@@ -3340,6 +3370,12 @@ def hent_bagvaerk_oekonomi(antal_uger: int = 20) -> Dict:
         opsummering["snit_sellthrough"] = round(sum(u["sell_through"] for u in m) / ndb, 1)
         opsummering["snit_indkoeb"]     = round(sum(u["indkoeb_kr"] for u in m) / ndb)
         opsummering["snit_tgtg"]        = round(sum((u["tgtg_kr"] or 0) for u in m) / ndb)
+        # Fragt holdes SEPARAT: gennemsnitlig fragt/uge + DB efter fragt (kun uger m. fragt tæller i snit_fragt)
+        _mf = [u for u in m if (u.get("fragt_kr") or 0) > 0]
+        opsummering["snit_fragt"]       = round(sum(u["fragt_kr"] for u in _mf) / len(_mf)) if _mf else 0
+        opsummering["snit_db_efter_fragt"]     = round(sum((u.get("db_efter_fragt") if u.get("db_efter_fragt") is not None else u["db"]) for u in m) / ndb)
+        opsummering["snit_db_efter_fragt_pct"] = round(sum((u.get("db_efter_fragt_pct") if u.get("db_efter_fragt_pct") is not None else u["db_pct"]) for u in m) / ndb, 1)
+        opsummering["antal_uger_fragt"] = len(_mf)
         sort = sorted(m, key=lambda u: u["db"])
         k = max(1, ndb // 3)
         bedste, daarlig = sort[-k:], sort[:k]

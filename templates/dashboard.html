@@ -1745,6 +1745,10 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
           </div>
         </div>
+        <!-- Seneste dag (åbner først, udfoldet) -->
+        <div id="dag-seneste"></div>
+        <!-- Tidligere dage · produkter (egen sektion) -->
+        <div id="dag-tidligere-hdr" style="display:none;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin:18px 0 8px;padding-top:14px;border-top:1px solid var(--border);">Tidligere dage &middot; produkter</div>
         <div style="overflow-x:auto;">
           <div class="dag-grid" id="dag-grid" style="align-items:start;"></div>
         </div>
@@ -6981,25 +6985,71 @@ async function loadDageDetaljer(n) {
   if (data) { _dageCache[n] = data; renderDageDetaljer(data, n); }
 }
 
+// Gruppér en dags produkter efter kategori, sorteret på omsætning (desc).
+function _dagKatSorted(dag){
+  const katMap = {};
+  (dag.produkter||[]).forEach(p => {
+    const k = p.kategori || 'Øvrige';
+    (katMap[k] = katMap[k] || []).push(p);
+  });
+  return Object.entries(katMap).sort(
+    ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
+  );
+}
+
+// Seneste dag — udfoldet "hero"-kort øverst (kategorier + produkter altid synlige).
+function _renderSenesteDag(dag){
+  const kort = _dagKatSorted(dag).map(([kat, prods]) => {
+    const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);
+    const katAntal = prods.reduce((s,p)=>s+p.antal,0);
+    const rows = prods.map(p =>
+      `<div style="display:flex;justify-content:space-between;gap:12px;padding:3px 0;font-size:12px;">
+        <span>${p.varenavn}</span>
+        <span style="font-family:'DM Mono',monospace;color:var(--ash);white-space:nowrap;">${p.antal} stk &middot; ${Math.round(oms(p.omsaetning)).toLocaleString('da-DK')} kr</span>
+      </div>`).join('');
+    return `<div style="min-width:240px;flex:1;border:1px solid var(--border);border-radius:10px;padding:10px 14px;background:var(--card,#fff);">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(30,58,30,.08);">
+        <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">${kat}</span>
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--forest);white-space:nowrap;">${Math.round(katAntal)} stk &middot; ${Math.round(katOmsat).toLocaleString('da-DK')} kr</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+  return `<div style="border:1px solid var(--forest);border-radius:14px;padding:16px 18px;background:rgba(30,58,30,.03);">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:14px;">
+      <div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);margin-bottom:2px;">Seneste dag</div>
+        <div style="font-size:18px;font-weight:600;">${dag.dato_label}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:20px;font-weight:700;color:var(--forest);">${Math.round(oms(dag.omsaetning)).toLocaleString('da-DK')} kr</div>
+        <div style="font-size:11px;color:var(--ash);">${dag.linjer} kunder &middot; ${Math.round(dag.snit_per_linje)} kr/kurv</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;">${kort}</div>
+  </div>`;
+}
+
 function renderDageDetaljer(dage, n) {
   document.getElementById('dage-sub').textContent = 'Seneste ' + n + ' dage · produkt · stk · omsætning';
+  const senesteEl = document.getElementById('dag-seneste');
+  const tidligereHdr = document.getElementById('dag-tidligere-hdr');
   const grid = document.getElementById('dag-grid');
   if (!dage || !dage.length) {
+    senesteEl.innerHTML = '';
+    tidligereHdr.style.display = 'none';
     grid.innerHTML = '<div class="empty" style="padding:40px;">Ingen data</div>';
     return;
   }
-  grid.style.gridTemplateColumns = `repeat(${dage.length}, minmax(200px, 1fr))`;
-  grid.innerHTML = dage.map(dag => {
-    // Gruppér produkter efter kategori
-    const katMap = {};
-    dag.produkter.forEach(p => {
-      const k = p.kategori || 'Øvrige';
-      if (!katMap[k]) katMap[k] = [];
-      katMap[k].push(p);
-    });
-    const katSorted = Object.entries(katMap).sort(
-      ([,a],[,b]) => b.reduce((s,p)=>s+p.omsaetning,0) - a.reduce((s,p)=>s+p.omsaetning,0)
-    );
+  // Øverst: seneste dag udfoldet
+  senesteEl.innerHTML = _renderSenesteDag(dage[0]);
+  // Nedenunder: tidligere dage i grid (egen sektion)
+  const rest = dage.slice(1);
+  tidligereHdr.style.display = rest.length ? '' : 'none';
+  if (!rest.length) { grid.innerHTML = ''; return; }
+  grid.style.gridTemplateColumns = `repeat(${rest.length}, minmax(200px, 1fr))`;
+  grid.innerHTML = rest.map(dag => {
+    const katSorted = _dagKatSorted(dag);
     const dagFoldet = !!_dagFold[dag.dato_label];
     const prodsHtml = dagFoldet ? '' : katSorted.map(([kat, prods]) => {
       const katOmsat = prods.reduce((s,p)=>s+p.omsaetning,0);

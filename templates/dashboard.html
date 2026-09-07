@@ -1750,6 +1750,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         </div>
       </div>
 
+      <!-- FAKTURA & AFSTEMNING (Organic Bakery) -->
+      <div class="panel" id="p-fakturaafstemning">
+        <div class="page-hdr">
+          <h2>Faktura &amp; afstemning — Organic Bakery</h2>
+          <p>Fakturaer fra bageren (e-conomic) med fragt + reel ugekost, afstemt mod portal-bestillingen.</p>
+        </div>
+        <div id="fak-wrap">
+          <div class="empty" style="padding:40px;">Indlæser…</div>
+        </div>
+      </div>
+
       <!-- ÅRSPLAN -->
       <div class="panel" id="p-aar">
         <div class="page-hdr">
@@ -4989,6 +5000,7 @@ const NAV_SVG = {
   prisvagt:     '<path d="M8 1L2 3.5v4c0 3.5 2.6 6.4 6 7.5 3.4-1.1 6-4 6-7.5v-4L8 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V5h1.5v3.5z"/>',
   mobilepay:    '<path d="M11 2H5a2 2 0 00-2 2v8a2 2 0 002 2h6a2 2 0 002-2V4a2 2 0 00-2-2zm-3 9a1 1 0 110-2 1 1 0 010 2zm3-4H5V4h6v3z"/>',
   fakturasalg:  '<path d="M3 1h7l3 3v11H3V1zm6 1v3h3M5 8h6M5 10h6M5 12h4"/>',
+  fakturaafstemning: '<path d="M2 1h9l3 3v11H2V1zm2 6h8v1H4V7zm0 2h8v1H4V9zm0 2h5v1H4v-1zm6.5-.5l1 1 2-2 .7.7-2.7 2.7-1.7-1.7.7-.7z"/>',
   kostpris:     '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm0-3h-1.5V4h1.5v4.5z"/>',
   stamdata:     '<path d="M2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/>',
   hjaelp:       '<path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.75 10.5h-1.5v-1.5h1.5v1.5zm.25-3.2c0 .4-.3.7-.7.7H7.7a.7.7 0 01-.7-.7v-.3c0-1 .6-1.7 1.3-2.1.4-.2.7-.6.7-1 0-.6-.4-1-1-1s-1 .4-1 1H5.5C5.5 4 6.6 3 8 3s2.5 1 2.5 2.3c0 .9-.5 1.7-1.3 2.1-.3.2-.5.5-.5.9h.3v.02z"/>',
@@ -5018,6 +5030,7 @@ const NAV_DEFAULT = [
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',     hidden:false},
+  {id:'fakturaafstemning', label:'Faktura & afstemning', group:'Bageri & indkøb', hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',     hidden:false},
   {id:'bagvaerkoek', label:'Bagværks-økonomi',      group:'Bageri & indkøb',     hidden:false},
   {id:'trend',       label:'Trend & bestilling',    group:'Analyse & rapporter',  hidden:false},
@@ -7040,6 +7053,122 @@ function setDageN(n, el) {
   _dageN = n;
   loadDageDetaljer(n);
 }
+
+// ── FAKTURA & AFSTEMNING (Organic Bakery) ─────────────────────────────────────
+let _fakListe = null, _fakValgt = null;
+// Fakturabeløb er kostpris ex moms — MOMS-toggle må IKKE gælde her.
+function _fkr(v){ return (v==null?'—':Math.round(v).toLocaleString('da-DK')+' kr'); }
+function _fdato(s){ if(!s) return '—'; const p=String(s).slice(0,10).split('-'); return p.length===3?`${p[2]}.${p[1]}.${p[0]}`:s; }
+
+async function loadFakturaAfstemning(){
+  const wrap = document.getElementById('fak-wrap');
+  if(!_fakListe){
+    const d = await api('/api/bageri/fakturaer?limit=30');
+    _fakListe = (d && d.fakturaer) || [];
+  }
+  if(!_fakListe.length){
+    wrap.innerHTML = `<div class="empty" style="padding:40px;">Ingen fakturaer indlæst endnu.<br>
+      <span style="font-size:12px;color:var(--ash);">Fakturaerne importeres automatisk fra Gmail (Organic Bakery / e-conomic).</span></div>`;
+    return;
+  }
+  if(_fakValgt==null) _fakValgt = _fakListe[0].fakturanr;
+  const af = await api('/api/bageri/faktura-afstemning?fakturanr='+_fakValgt);
+  renderFakturaAfstemning(af);
+}
+
+function renderFakturaAfstemning(af){
+  const wrap = document.getElementById('fak-wrap');
+  if(!af || !af.fundet){ wrap.innerHTML = '<div class="empty" style="padding:40px;">Faktura ikke fundet.</div>'; return; }
+  const mono = "font-family:'DM Mono',monospace;";
+
+  // Faktura-vælger (chips)
+  const chips = _fakListe.map(f => {
+    const on = f.fakturanr===_fakValgt;
+    return `<button onclick="fakVaelg(${f.fakturanr})" style="padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;
+      border:1px solid ${on?'var(--forest)':'var(--border)'};background:${on?'var(--forest)':'transparent'};color:${on?'#fff':'var(--charcoal)'};">
+      #${f.fakturanr} · uge ${f.uge}</button>`;
+  }).join('');
+
+  // KPI-kort
+  const kort = [
+    ['Varer (ex moms)', _fkr(af.varer_ex_fragt)],
+    ['Fragt', _fkr(af.fragt_kr)],
+    ['Subtotal (ex moms)', _fkr(af.subtotal_ex_moms)],
+    ['Moms 25%', _fkr(af.moms_kr)],
+    ['Total inkl. moms', _fkr(af.total_kr)],
+  ].map(([l,v],i)=>`<div style="flex:1;min-width:120px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;
+      ${i===4?'background:var(--forest);color:#fff;':''}">
+      <div style="font-size:10px;${mono}letter-spacing:.06em;text-transform:uppercase;opacity:.7;margin-bottom:3px;">${l}</div>
+      <div style="font-size:16px;font-weight:700;">${v}</div></div>`).join('');
+
+  // Afstemnings-total-linje
+  const afvigStk = Math.round(af.total_stk - af.bestilt_total_stk);
+  const afvigKr  = Math.round(af.varer_ex_fragt - af.bestilt_total_kr);
+  const afvigFarve = (afvigStk===0 && afvigKr===0) ? 'var(--forest)' : 'var(--gold)';
+
+  // Vare-tabel
+  const rows = af.varer.map(v => {
+    const av = v.afvig_antal;
+    const farve = Math.abs(av)<0.001 ? 'var(--ash)' : (av>0?'#3e7a3e':'#b3541e');
+    const badge = v.kun_paa ? `<span style="font-size:9px;${mono}color:var(--gold);"> (kun ${v.kun_paa==='faktura'?'faktura':'bestilt'})</span>` : '';
+    const prisAfvig = (v.pris_afvig!=null && Math.abs(v.pris_afvig)>0.001)
+      ? `<span style="color:#b3541e;">${v.pris_afvig>0?'+':''}${v.pris_afvig.toLocaleString('da-DK')}</span>` : '';
+    return `<tr style="${Math.abs(av)>0.001?'background:rgba(200,168,75,.06);':''}">
+      <td style="font-size:12px;">${v.varenavn}${badge}</td>
+      <td class="num" style="${mono}">${Math.round(v.bestilt_antal)}</td>
+      <td class="num" style="${mono}">${Math.round(v.faktura_antal)}</td>
+      <td class="num" style="${mono}font-weight:600;color:${farve};">${av>0?'+':''}${Math.round(av)}</td>
+      <td class="num" style="${mono}font-size:11px;color:var(--ash);">${v.faktura_pris!=null?v.faktura_pris.toLocaleString('da-DK')+' kr':'—'} ${prisAfvig}</td>
+      <td class="num" style="${mono}">${_fkr(v.faktura_kr)}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px;">${chips}</div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ash);margin-bottom:12px;">
+      <span>Faktura <b style="color:var(--charcoal);">#${af.fakturanr}</b></span>
+      <span>Dato <b style="color:var(--charcoal);">${_fdato(af.faktura_dato)}</b></span>
+      <span>Uge <b style="color:var(--charcoal);">${af.uge}</b></span>
+      <span>Portal-ordre <b style="color:var(--charcoal);">#${af.ref_ordre||'—'}</b></span>
+      <span>Betalingsfrist <b style="color:${'var(--charcoal)'};">${_fdato(af.forfald)}</b></span>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;">${kort}</div>
+
+    <div style="border:1px solid ${afvigFarve};border-radius:10px;padding:12px 16px;margin-bottom:16px;background:rgba(30,58,30,.03);">
+      <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Afstemning mod portal-bestilling ${af.antal_afvig===0?'✓':'⚠️'}</div>
+      <div style="font-size:12px;color:var(--ash);">
+        Bestilt <b style="color:var(--charcoal);">${Math.round(af.bestilt_total_stk)} stk</b> / ${_fkr(af.bestilt_total_kr)} —
+        faktureret <b style="color:var(--charcoal);">${Math.round(af.total_stk)} stk</b> / ${_fkr(af.varer_ex_fragt)} (ex fragt).
+        ${af.antal_afvig===0
+          ? ' Alt stemmer.'
+          : ` <b style="color:${afvigFarve};">${af.antal_afvig} vare(r) afviger</b> — samlet ${afvigStk>0?'+':''}${afvigStk} stk / ${afvigKr>0?'+':''}${afvigKr} kr.`}
+      </div>
+    </div>
+
+    <div style="overflow-x:auto;">
+      <table class="data-tbl" style="width:100%;border-collapse:collapse;">
+        <thead><tr style="text-align:left;border-bottom:2px solid var(--border);">
+          <th style="padding:6px 8px;">Vare</th>
+          <th class="num" style="padding:6px 8px;">Bestilt</th>
+          <th class="num" style="padding:6px 8px;">Faktureret</th>
+          <th class="num" style="padding:6px 8px;">Afvig</th>
+          <th class="num" style="padding:6px 8px;">Stk. pris</th>
+          <th class="num" style="padding:6px 8px;">Beløb</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr style="border-top:2px solid var(--border);font-weight:600;">
+          <td style="padding:6px 8px;">I alt (varer ex fragt)</td>
+          <td class="num" style="padding:6px 8px;${mono}">${Math.round(af.bestilt_total_stk)}</td>
+          <td class="num" style="padding:6px 8px;${mono}">${Math.round(af.total_stk)}</td>
+          <td class="num" style="padding:6px 8px;${mono}color:${afvigFarve};">${afvigStk>0?'+':''}${afvigStk}</td>
+          <td class="num" style="padding:6px 8px;"></td>
+          <td class="num" style="padding:6px 8px;${mono}">${_fkr(af.varer_ex_fragt)}</td>
+        </tr></tfoot>
+      </table>
+    </div>`;
+}
+
+function fakVaelg(nr){ _fakValgt = nr; loadFakturaAfstemning(); }
 
 // ── ÅRSPLAN ───────────────────────────────────────────────────────────────────
 const AAR_MND_NAVNE = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
@@ -11796,6 +11925,7 @@ window.showPanel = function(id, el) {
   if (id === 'svind')        loadSvind();
   if (id === 'bagvaerkoek')  loadBagvaerkOek();
   if (id === 'spild')        loadSpild();
+  if (id === 'fakturaafstemning') loadFakturaAfstemning();
   if (id === 'returtgtg')    loadReturTgtg();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();

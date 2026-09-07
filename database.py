@@ -136,12 +136,14 @@ def _bakery_kat(n: str) -> Optional[str]:
     if any(k in n for k in ("gulerodskage", "cookie", "kage", "muffin", "brownie",
                             "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat")):
         return "Kage"
+    if "wien" in n:                                           # wienerbrød/wienerstang → Wiener (FØR 'brød')
+        return "Wiener"
     if "bolle" in n:                                          # inkl. tebolle
         return "Boller"
     if any(k in n for k in ("brød", "focaccia", "rugbrød", "flute", "ciabatta")):
         return "Brød"
     if any(k in n for k in ("tebirkes", "birkes", "croissant", "crossaint", "snurre",
-                            "snegl", "pain", "wiener", "spandauer", "kanelstang", "frøsnapper")):
+                            "snegl", "pain", "spandauer", "kanelstang", "frøsnapper")):
         return "Wiener"
     return None
 
@@ -5738,8 +5740,9 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
                 p["reddet"] += float(r["antal"]) * faktor
             else:
                 canon = _canon(r["varenummer"], r["varenavn"])
-                # Fra 1/9: spring gamle ikke-Organic konfekt-varer over i friskt salg
-                if organic_uge and not canon:
+                # Fra 1/9: spring gamle ikke-Organic konfekt-varer over i friskt salg.
+                # MEN behold bundles (faktor>1, fx "3 x wienerbrød") — ægte bagværks-forbrug.
+                if organic_uge and not canon and faktor <= 1:
                     continue
                 agg[kat]["frisk_stk"] += float(r["antal"]) * faktor   # bundle "N x" ganges op
                 agg[kat]["frisk_oms"] += float(r["oms"])

@@ -5529,14 +5529,21 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     vf_dato = {i: (mon_dato + timedelta(days=i)).isoformat() for i in range(7)}
 
     # Forrige HELE uges faktiske salg pr. vare — via kilde-varenumre.
-    # Der bestilles onsdag i ugen før målugen (N-1), så den uge er ikke færdig.
-    # Vi viser derfor den sidste komplette uge = N-2 (to uger før målugens mandag).
+    # "Forrige uge" = seneste HELE uge før målugen. Normalt målugen − 1, MEN aldrig
+    # en uge der ikke er færdig endnu: bestiller man i uge N-1 til uge N, er uge N-1
+    # ikke slut → så vises N-2. Ser man på den AKTUELLE uge (fx uge 37 mens vi er i
+    # uge 37), er forrige uge = uge 36 (netop afsluttet). Regel: min(måluge−1, sidste
+    # helt afsluttede uge).
+    _idag       = date.today()
+    _denne_mon  = _idag - timedelta(days=_idag.weekday())        # mandag i indeværende uge
+    _sidste_hele_mon = _denne_mon - timedelta(days=7)            # ugen før = seneste hele uge
+    forrige_mon = min(mon_dato - timedelta(days=7), _sidste_hele_mon)
     # Udelad de ugedage anbefalingen IKKE dækker (fx mandag 31/8 i uge 36 = gammel
     # bager, anbefalet=0), så forrige-uge-tallet kan sammenlignes æble-til-æble.
     nul_wd = {i for i in range(7)
               if (mon_dato + timedelta(days=i)).isoformat() < _ORGANIC_START}
-    sidste_start = (mon_dato - timedelta(days=14)).isoformat()
-    sidste_slut  = (mon_dato - timedelta(days=7)).isoformat()
+    sidste_start = forrige_mon.isoformat()
+    sidste_slut  = (forrige_mon + timedelta(days=7)).isoformat()
     sidste_dage  = [d for d in aabne if sidste_start <= d < sidste_slut
                     and date.fromisoformat(d).weekday() not in nul_wd]
 

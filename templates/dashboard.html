@@ -4122,7 +4122,7 @@ async function _bageriRender(){
     + `<th class="num" title="Anbefalet af motoren">Uge</th>`
     + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for denne uge)">Bestilt</th>`
     + `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
-    + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i sidste hele uge (N-2). Bestillingsugen er ikke færdig onsdag, så vi viser ugen før den. Kun de ugedage anbefalingen dækker tælles med (fx udelades mandag i uge 36).">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
+    + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge før den viste uge. Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
   let body = '';
   let totSidste = 0, totBest = 0;
   order.forEach(kat=>{

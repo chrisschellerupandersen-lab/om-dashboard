@@ -295,6 +295,47 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_bestil_uge ON ugebestillinger(uge, aar);
 
+            -- Organic Bakery-fakturaer (PDF fra e-conomic). Header + varelinjer.
+            -- Kilden til reel ugekost (varer + fragt) og afstemning mod portal-ordren.
+            CREATE TABLE IF NOT EXISTS bageri_fakturaer (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                fakturanr        INTEGER NOT NULL,
+                faktura_dato     TEXT    DEFAULT '',
+                forfald          TEXT    DEFAULT '',
+                kundenr          INTEGER DEFAULT 0,
+                ref_ordre        TEXT    DEFAULT '',   -- portal-ordrenr, fx '1007'
+                uge              INTEGER NOT NULL,
+                aar              INTEGER NOT NULL,
+                varer_ex_fragt   REAL    DEFAULT 0,
+                fragt_kr         REAL    DEFAULT 0,
+                subtotal_ex_moms REAL    DEFAULT 0,
+                moms_kr          REAL    DEFAULT 0,
+                total_kr         REAL    DEFAULT 0,
+                total_stk        REAL    DEFAULT 0,
+                betalt           INTEGER DEFAULT 0,
+                indlæst          TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(fakturanr) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_faktura_uge ON bageri_fakturaer(uge, aar);
+
+            CREATE TABLE IF NOT EXISTS bageri_faktura_linjer (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                fakturanr     INTEGER NOT NULL,
+                prod_kode     TEXT    DEFAULT '',
+                varenavn      TEXT    NOT NULL,
+                pris_ex_moms  REAL    DEFAULT 0,
+                man           REAL    DEFAULT 0,
+                tir           REAL    DEFAULT 0,
+                ons           REAL    DEFAULT 0,
+                tor           REAL    DEFAULT 0,
+                fre           REAL    DEFAULT 0,
+                loe           REAL    DEFAULT 0,
+                son           REAL    DEFAULT 0,
+                total_antal   REAL    DEFAULT 0,
+                total_pris    REAL    DEFAULT 0
+            );
+            CREATE INDEX IF NOT EXISTS idx_faktura_linjer_nr ON bageri_faktura_linjer(fakturanr);
+
             CREATE TABLE IF NOT EXISTS bager_regnskab (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 uge           INTEGER NOT NULL,
@@ -2271,6 +2312,126 @@ def gem_ugebestilling(uge: int, aar: int, linjer: List[Dict]) -> int:
                 linje.get("sektion", 1),
             ))
     return len(linjer)
+
+
+# ── ORGANIC BAKERY-FAKTURAER ─────────────────────────────────────────────────
+def gem_faktura(f: Dict) -> Dict:
+    """Gemmer en parset Organic Bakery-faktura (header + varelinjer).
+    Nøgle = fakturanr (ON CONFLICT REPLACE), så genindlæsning er idempotent.
+    Forventer dict fra faktura_parser.parse_faktura_*()."""
+    fnr = f.get("fakturanr")
+    if not fnr:
+        raise ValueError("Faktura mangler fakturanr")
+    uge, aar = f.get("uge"), f.get("aar")
+    if not uge or not aar:
+        raise ValueError("Faktura mangler uge/aar")
+    with _conn() as conn:
+        conn.execute("DELETE FROM bageri_fakturaer      WHERE fakturanr=?", (fnr,))
+        conn.execute("DELETE FROM bageri_faktura_linjer WHERE fakturanr=?", (fnr,))
+        conn.execute("""
+            INSERT INTO bageri_fakturaer
+                (fakturanr, faktura_dato, forfald, kundenr, ref_ordre, uge, aar,
+                 varer_ex_fragt, fragt_kr, subtotal_ex_moms, moms_kr, total_kr, total_stk)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        """, (
+            fnr, f.get("faktura_dato", ""), f.get("forfald", ""),
+            f.get("kundenr", 0), f.get("ref_ordre", "") or "", uge, aar,
+            f.get("varer_ex_fragt", 0), f.get("fragt_kr", 0),
+            f.get("subtotal_ex_moms", 0), f.get("moms_kr") or 0,
+            f.get("total_kr") or 0, f.get("total_stk", 0),
+        ))
+        for l in f.get("linjer", []):
+            conn.execute("""
+                INSERT INTO bageri_faktura_linjer
+                    (fakturanr, prod_kode, varenavn, pris_ex_moms,
+                     man, tir, ons, tor, fre, loe, son, total_antal, total_pris)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                fnr, l.get("prod_kode", ""), l["varenavn"], l.get("pris_ex_moms", 0),
+                l.get("man", 0), l.get("tir", 0), l.get("ons", 0), l.get("tor", 0),
+                l.get("fre", 0), l.get("loe", 0), l.get("son", 0),
+                l.get("total_antal", 0), l.get("total_pris", 0),
+            ))
+    return {"fakturanr": fnr, "uge": uge, "aar": aar,
+            "antal_linjer": len(f.get("linjer", []))}
+
+
+def hent_fakturaer(limit: int = 30) -> List[Dict]:
+    """Liste over indlæste fakturaer (nyeste først) — til overblik/betalingskontrol."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT fakturanr, faktura_dato, forfald, ref_ordre, uge, aar,
+                   varer_ex_fragt, fragt_kr, subtotal_ex_moms, moms_kr, total_kr,
+                   total_stk, betalt, indlæst
+            FROM bageri_fakturaer
+            ORDER BY aar DESC, uge DESC, fakturanr DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def hent_faktura_afstemning(fakturanr: int = None,
+                            uge: int = None, aar: int = None) -> Dict:
+    """Afstemning: faktura (hvad vi betaler) vs. portal-bestilling (hvad vi bestilte).
+    Matcher vare for vare på varenavn for fakturaens uge/aar. Angiv enten fakturanr
+    eller uge+aar. Returnerer per-vare afvig + header-totaler + fragt."""
+    with _conn() as conn:
+        if fakturanr:
+            hdr = conn.execute("SELECT * FROM bageri_fakturaer WHERE fakturanr=?",
+                               (fakturanr,)).fetchone()
+        else:
+            hdr = conn.execute("""SELECT * FROM bageri_fakturaer WHERE uge=? AND aar=?
+                                  ORDER BY fakturanr DESC LIMIT 1""", (uge, aar)).fetchone()
+        if not hdr:
+            return {"fundet": False}
+        hdr = dict(hdr)
+        u, a = hdr["uge"], hdr["aar"]
+
+        fak = conn.execute("""SELECT varenavn, pris_ex_moms, total_antal, total_pris
+                              FROM bageri_faktura_linjer WHERE fakturanr=?""",
+                           (hdr["fakturanr"],)).fetchall()
+        best = conn.execute("""SELECT varenavn, pris_ex_moms, total_antal, total_pris
+                               FROM ugebestillinger WHERE uge=? AND aar=?""",
+                            (u, a)).fetchall()
+
+    def _key(navn): return (navn or "").strip().lower()
+    fak_map  = {_key(r["varenavn"]): dict(r) for r in fak}
+    best_map = {_key(r["varenavn"]): dict(r) for r in best}
+
+    varer: List[Dict] = []
+    for k in sorted(set(fak_map) | set(best_map)):
+        fv = fak_map.get(k); bv = best_map.get(k)
+        navn = (fv or bv)["varenavn"]
+        f_ant = fv["total_antal"] if fv else 0
+        b_ant = bv["total_antal"] if bv else 0
+        f_pris = fv["pris_ex_moms"] if fv else None
+        b_pris = bv["pris_ex_moms"] if bv else None
+        varer.append({
+            "varenavn": navn,
+            "bestilt_antal": b_ant, "faktura_antal": f_ant,
+            "afvig_antal": round(f_ant - b_ant, 2),
+            "bestilt_pris": b_pris, "faktura_pris": f_pris,
+            "pris_afvig": (round(f_pris - b_pris, 2)
+                           if (f_pris is not None and b_pris is not None) else None),
+            "faktura_kr": fv["total_pris"] if fv else 0,
+            "kun_paa": None if (fv and bv) else ("faktura" if fv else "bestilling"),
+        })
+
+    antal_afvig = sum(1 for v in varer if abs(v["afvig_antal"]) > 0.001)
+    return {
+        "fundet": True,
+        "fakturanr": hdr["fakturanr"], "faktura_dato": hdr["faktura_dato"],
+        "forfald": hdr["forfald"], "ref_ordre": hdr["ref_ordre"],
+        "uge": u, "aar": a,
+        "varer_ex_fragt": hdr["varer_ex_fragt"], "fragt_kr": hdr["fragt_kr"],
+        "subtotal_ex_moms": hdr["subtotal_ex_moms"], "moms_kr": hdr["moms_kr"],
+        "total_kr": hdr["total_kr"], "total_stk": hdr["total_stk"],
+        "betalt": hdr["betalt"],
+        "bestilt_total_stk": round(sum(r["total_antal"] for r in best), 2),
+        "bestilt_total_kr":  round(sum(r["total_pris"]  for r in best), 2),
+        "antal_afvig": antal_afvig,
+        "varer": varer,
+    }
 
 
 def hent_bestilling_uger(aar: int = None) -> List[Dict]:

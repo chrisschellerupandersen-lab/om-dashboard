@@ -19,6 +19,7 @@ import database
 import social_selling
 import parser as xlsx_parser
 import portal_ordre_parser
+import faktura_parser
 
 # ── Gmail auto-import ─────────────────────────────────────────────────────────
 
@@ -2994,6 +2995,93 @@ async def bageri_ordre_mail(request: Request):
             "total_stk": r["total_stk"], "total_kr": r["total_kr"],
             "varer": [{"varenavn": l["varenavn"], "total_antal": l["total_antal"]}
                       for l in r["linjer"]]}
+
+
+@app.post("/api/bageri/faktura-mail")
+async def bageri_faktura_mail(request: Request):
+    """Modtager en Organic Bakery-faktura (e-conomic PDF) fra Gmail-scriptet,
+    parser PDF'en og gemmer den (header + varelinjer). Kilden til reel ugekost
+    (varer + fragt) og afstemning mod portal-bestillingen.
+
+    Body (JSON): {secret, pdf_base64, afsender?, override_uge?, override_aar?, dry_run?}.
+    Ugen udledes som ugen der lige er afsluttet før fakturadatoen (override vinder).
+    dry_run=true parser uden at gemme."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+
+    # Filtrér på afsender hvis den er med — kun Organic Bakery/e-conomic-fakturaer.
+    afsender = (body.get("afsender") or body.get("sender") or "").lower()
+    if afsender and (faktura_parser.FAKTURA_AFSENDER not in afsender
+                     and faktura_parser.FAKTURA_REPLY_TO not in afsender):
+        return {"ok": False, "sprunget_over": True,
+                "grund": f"Afsender '{afsender}' er ikke Organic Bakery-faktura — ignoreret."}
+
+    b64 = body.get("pdf_base64") or body.get("pdf") or ""
+    if not b64.strip():
+        raise HTTPException(status_code=400, detail="Mangler pdf_base64")
+    try:
+        pdf_bytes = base64.b64decode(b64)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig base64 i pdf_base64")
+
+    try:
+        r = faktura_parser.parse_faktura_pdf(
+            pdf_bytes,
+            override_uge=body.get("override_uge"),
+            override_aar=body.get("override_aar"))
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Kunne ikke parse faktura: {e}")
+
+    if not r.get("fakturanr") or not r.get("linjer"):
+        raise HTTPException(status_code=422,
+                            detail="Ingen fakturanr/varelinjer fundet i PDF")
+
+    # Integritetstjek: varer + fragt skal = subtotal.
+    diff = abs(r["varer_ex_fragt"] + r["fragt_kr"] - r["subtotal_ex_moms"])
+    advarsel = None
+    if diff > 1.0:
+        advarsel = (f"Sum af varelinjer ({r['varer_ex_fragt']}) + fragt ({r['fragt_kr']}) "
+                    f"≠ subtotal ({r['subtotal_ex_moms']}) — afvig {round(diff,2)} kr")
+
+    gemt = False
+    if not body.get("dry_run"):
+        database.gem_faktura(r)
+        gemt = True
+    return {"ok": True, "gemt": gemt, "advarsel": advarsel,
+            "fakturanr": r["fakturanr"], "faktura_dato": r["faktura_dato"],
+            "ref_ordre": r["ref_ordre"], "uge": r["uge"], "aar": r["aar"],
+            "antal_varer": len(r["linjer"]), "total_stk": r["total_stk"],
+            "varer_ex_fragt": r["varer_ex_fragt"], "fragt_kr": r["fragt_kr"],
+            "subtotal_ex_moms": r["subtotal_ex_moms"],
+            "moms_kr": r["moms_kr"], "total_kr": r["total_kr"]}
+
+
+def _faktura_auth(request: Request):
+    """Tillad enten login (browser) eller ?secret= (så importen kan verificeres eksternt)."""
+    if request.query_params.get("secret") == WEBHOOK_SECRET:
+        return
+    _kræv_login(request)
+
+
+@app.get("/api/bageri/fakturaer")
+async def bageri_fakturaer(request: Request, limit: int = 30):
+    """Liste over indlæste fakturaer (nyeste først)."""
+    _faktura_auth(request)
+    return {"fakturaer": database.hent_fakturaer(limit)}
+
+
+@app.get("/api/bageri/faktura-afstemning")
+async def bageri_faktura_afstemning(request: Request, fakturanr: int = None,
+                                    uge: int = None, aar: int = None):
+    """Afstemning: faktura vs. portal-bestilling for fakturaens uge. Angiv fakturanr
+    eller uge+aar."""
+    _faktura_auth(request)
+    return database.hent_faktura_afstemning(fakturanr=fakturanr, uge=uge, aar=aar)
 
 
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────

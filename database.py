@@ -6823,7 +6823,8 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
         sidst_solgt_rows = conn.execute("""
             SELECT varenavn,
                    ROUND(AVG(sidst_time), 0) AS snit_sidst_time,
-                   COUNT(DISTINCT dato) AS dage_med_salg
+                   COUNT(DISTINCT dato) AS dage_med_salg,
+                   MAX(dato) AS sidst_dato
             FROM (
                 SELECT dato, varenavn, MAX(time_start) AS sidst_time
                 FROM transaktioner
@@ -6833,9 +6834,9 @@ def generer_beregner_kontekst(maal_uge: int, maal_aar: int, api_key: str,
                 GROUP BY dato, varenavn
             )
             GROUP BY varenavn
-            HAVING dage_med_salg >= 3
+            HAVING dage_med_salg >= 3 AND sidst_dato >= date(?, '-6 days')
             ORDER BY snit_sidst_time ASC
-        """, (mon.isoformat(), mon.isoformat())).fetchall()
+        """, (mon.isoformat(), mon.isoformat(), mon.isoformat())).fetchall()
         # Butik lukker kl. 20 — ubemandet.
         # Sidst solgt < 14 = udsolgt tidligt (tabt salg 14-20). > 18 = overskud tæt på lukketid.
         udsolgt_tidligt = [r for r in sidst_solgt_rows if r['snit_sidst_time'] is not None and r['snit_sidst_time'] < 14]

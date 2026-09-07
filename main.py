@@ -3088,6 +3088,26 @@ async def bageri_faktura_afstemning(request: Request, fakturanr: int = None,
     return database.hent_faktura_afstemning(fakturanr=fakturanr, uge=uge, aar=aar)
 
 
+@app.post("/api/bageri/faktura-godkend")
+async def bageri_faktura_godkend(request: Request):
+    """Godkender en faktura → opdaterer ugens bestilling til fakturaens faktiske
+    linjer (antal/dag + reel stk. pris), så bestilling og faktura stemmer overens.
+    Body (JSON): {fakturanr}. Kræver login eller ?secret=."""
+    _faktura_auth(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    fnr = body.get("fakturanr") or request.query_params.get("fakturanr")
+    if not fnr:
+        raise HTTPException(status_code=400, detail="Mangler fakturanr")
+    try:
+        r = database.godkend_faktura_til_bestilling(int(fnr))
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    return {"ok": True, **r}
+
+
 # ── MANAGEMENT REVIEW ────────────────────────────────────────────────────────
 
 @app.get("/api/management/review")

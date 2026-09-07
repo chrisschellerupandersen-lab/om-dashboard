@@ -313,6 +313,8 @@ def init_db():
                 total_kr         REAL    DEFAULT 0,
                 total_stk        REAL    DEFAULT 0,
                 betalt           INTEGER DEFAULT 0,
+                godkendt         INTEGER DEFAULT 0,
+                godkendt_dato    TEXT    DEFAULT '',
                 indlæst          TEXT    DEFAULT (datetime('now','localtime')),
                 UNIQUE(fakturanr) ON CONFLICT REPLACE
             );
@@ -649,6 +651,9 @@ def init_db():
             "ALTER TABLE mobilepay_dag ADD COLUMN gebyr REAL DEFAULT 0",
             # Bemanding-type pr. uge: 'fuld' (alle dage) el. 'weekend' (lør+søn)
             "ALTER TABLE fuld_bemanding_uger ADD COLUMN type TEXT DEFAULT 'fuld'",
+            # Faktura godkendt → ugebestilling opdateret til faktisk leveret
+            "ALTER TABLE bageri_fakturaer ADD COLUMN godkendt INTEGER DEFAULT 0",
+            "ALTER TABLE bageri_fakturaer ADD COLUMN godkendt_dato TEXT DEFAULT ''",
         ]:
             try:
                 conn.execute(sql)
@@ -2362,7 +2367,7 @@ def hent_fakturaer(limit: int = 30) -> List[Dict]:
         rows = conn.execute("""
             SELECT fakturanr, faktura_dato, forfald, ref_ordre, uge, aar,
                    varer_ex_fragt, fragt_kr, subtotal_ex_moms, moms_kr, total_kr,
-                   total_stk, betalt, indlæst
+                   total_stk, betalt, godkendt, godkendt_dato, indlæst
             FROM bageri_fakturaer
             ORDER BY aar DESC, uge DESC, fakturanr DESC
             LIMIT ?
@@ -2427,11 +2432,59 @@ def hent_faktura_afstemning(fakturanr: int = None,
         "subtotal_ex_moms": hdr["subtotal_ex_moms"], "moms_kr": hdr["moms_kr"],
         "total_kr": hdr["total_kr"], "total_stk": hdr["total_stk"],
         "betalt": hdr["betalt"],
+        "godkendt": hdr["godkendt"] if "godkendt" in hdr.keys() else 0,
+        "godkendt_dato": hdr["godkendt_dato"] if "godkendt_dato" in hdr.keys() else "",
+        "har_bestilling": len(best) > 0,
         "bestilt_total_stk": round(sum(r["total_antal"] for r in best), 2),
         "bestilt_total_kr":  round(sum(r["total_pris"]  for r in best), 2),
         "antal_afvig": antal_afvig,
         "varer": varer,
     }
+
+
+def godkend_faktura_til_bestilling(fakturanr: int) -> Dict:
+    """Godkender en faktura → overskriver ugens bestilling med fakturaens faktiske
+    linjer (antal pr. dag + reel stk. pris), så bestilling og faktura er ens og
+    spild regnes på det reelt leverede. Bevarer eksisterende sektion pr. vare.
+    Idempotent: kan køres igen."""
+    DAGE_ = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    with _conn() as conn:
+        hdr = conn.execute("SELECT uge, aar FROM bageri_fakturaer WHERE fakturanr=?",
+                           (fakturanr,)).fetchone()
+        if not hdr:
+            raise ValueError(f"Faktura #{fakturanr} findes ikke")
+        uge, aar = hdr["uge"], hdr["aar"]
+        flinjer = conn.execute("""
+            SELECT prod_kode, varenavn, pris_ex_moms, man, tir, ons, tor, fre, loe, son,
+                   total_antal, total_pris
+            FROM bageri_faktura_linjer WHERE fakturanr=?
+        """, (fakturanr,)).fetchall()
+        if not flinjer:
+            raise ValueError(f"Faktura #{fakturanr} har ingen varelinjer")
+        # Bevar sektion + varenummer fra eksisterende bestilling (match på varenavn)
+        eksist = conn.execute(
+            "SELECT varenavn, sektion, varenummer FROM ugebestillinger WHERE uge=? AND aar=?",
+            (uge, aar)).fetchall()
+    meta = {(r["varenavn"] or "").strip().lower(): r for r in eksist}
+
+    linjer: List[Dict] = []
+    for l in flinjer:
+        m = meta.get((l["varenavn"] or "").strip().lower())
+        linjer.append({
+            "varenavn":     l["varenavn"],
+            "varenummer":   (m["varenummer"] if m else ""),
+            "pris_ex_moms": l["pris_ex_moms"],
+            **{d: l[d] for d in DAGE_},
+            "total_antal":  l["total_antal"],
+            "total_pris":   l["total_pris"],
+            "sektion":      (m["sektion"] if m else 1),
+        })
+    gem_ugebestilling(uge, aar, linjer)
+    with _conn() as conn:
+        conn.execute(
+            "UPDATE bageri_fakturaer SET godkendt=1, godkendt_dato=datetime('now','localtime') "
+            "WHERE fakturanr=?", (fakturanr,))
+    return {"fakturanr": fakturanr, "uge": uge, "aar": aar, "antal_linjer": len(linjer)}
 
 
 def hent_bestilling_uger(aar: int = None) -> List[Dict]:

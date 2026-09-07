@@ -185,6 +185,7 @@ def parse_faktura_tekst(tekst: str, override_uge: Optional[int] = None,
     subtotal_kr = _tal(subtotal) if subtotal else round(varer_ex_fragt + fragt_kr, 2)
 
     return {
+        "er_bakery":     ("organic bakery" in tekst.lower()),
         "fakturanr":     int(fakturanr) if fakturanr else None,
         "faktura_dato":  fak_dato,
         "kundenr":       int(kundenr) if kundenr else None,

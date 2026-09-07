@@ -3037,9 +3037,13 @@ async def bageri_faktura_mail(request: Request):
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Kunne ikke parse faktura: {e}")
 
-    if not r.get("fakturanr") or not r.get("linjer"):
-        raise HTTPException(status_code=422,
-                            detail="Ingen fakturanr/varelinjer fundet i PDF")
+    # Værn: post@e-conomic.com sender også andre leverandørers fakturaer.
+    # Kun Organic Bakery-fakturaer (markør + PROD-varelinjer) importeres.
+    if not r.get("er_bakery") or not r.get("linjer"):
+        return {"ok": False, "sprunget_over": True,
+                "grund": "PDF er ikke en Organic Bakery-faktura (ingen bageri-markør/varelinjer) — ignoreret."}
+    if not r.get("fakturanr"):
+        raise HTTPException(status_code=422, detail="Intet fakturanr fundet i PDF")
 
     # Integritetstjek: varer + fragt skal = subtotal.
     diff = abs(r["varer_ex_fragt"] + r["fragt_kr"] - r["subtotal_ex_moms"])

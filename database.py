@@ -1743,6 +1743,61 @@ def hent_dagens_bonner(dato: str = None) -> Dict:
             "total_kr": total_kr}
 
 
+def hent_dagens_rest_kategori(dato: str = None) -> Dict:
+    """Dagens restlager pr. kategori (Brød/Boller/Wiener/Kage): bestilt (dagens
+    levering fra ugebestillingen) − solgt friskt i dag = rest. Sell-through styrer
+    farven (rød → grøn mod udsolgt). Bruges som 'termometer' på Seneste dag."""
+    from datetime import date as _d
+    DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    KAT_ORDEN = ["Brød", "Boller", "Wiener", "Kage"]
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        if not dato:
+            row = conn.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()
+            dato = row["d"] if row else None
+        if not dato:
+            return {"dato": None, "kategorier": []}
+        d = _d.fromisoformat(str(dato)[:10])
+        iso_y, iso_w, _ = d.isocalendar()
+        col = DAGCOL[d.weekday()]
+
+        # Bestilt (dagens levering) pr. kategori — fra ugens bestilling, dagens kolonne
+        best = conn.execute(
+            f"SELECT varenavn, {col} AS ant FROM ugebestillinger WHERE uge=? AND aar=?",
+            (iso_w, iso_y)).fetchall()
+        # Solgt i dag pr. varenavn (bundles/combos håndteres via _bageri_rolle)
+        solgt_rows = conn.execute(
+            "SELECT varenavn, SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn",
+            (str(dato)[:10],)).fetchall()
+
+    bestilt = {k: 0.0 for k in KAT_ORDEN}
+    for r in best:
+        kat = _organic_kat(r["varenavn"]) or _bakery_kat(r["varenavn"])
+        if kat in bestilt:
+            bestilt[kat] += float(r["ant"] or 0)
+
+    solgt = {k: 0.0 for k in KAT_ORDEN}
+    for r in solgt_rows:
+        rolle = _bageri_rolle(r["varenavn"])
+        if rolle and rolle[0] == "frisk" and rolle[1] in solgt:
+            solgt[rolle[1]] += float(r["ant"] or 0) * rolle[2]
+
+    kategorier = []
+    for k in KAT_ORDEN:
+        b = round(bestilt[k]); s = round(solgt[k])
+        if b <= 0 and s <= 0:
+            continue
+        rest = b - s
+        pct = round(s / b * 100) if b > 0 else (100 if s > 0 else 0)
+        kategorier.append({"kategori": k, "bestilt": b, "solgt": s,
+                           "rest": rest, "pct": pct})
+    tot_b = sum(k["bestilt"] for k in kategorier)
+    tot_s = sum(k["solgt"] for k in kategorier)
+    return {"dato": str(dato)[:10], "kategorier": kategorier,
+            "total": {"bestilt": tot_b, "solgt": tot_s, "rest": tot_b - tot_s,
+                      "pct": round(tot_s / tot_b * 100) if tot_b > 0 else 0}}
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:

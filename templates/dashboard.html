@@ -1564,6 +1564,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
 
         </div>
+        <div class="card" id="dag-rest-card" hidden>
+          <div class="aar2-chart-hdr">
+            <span class="aar2-chart-ttl">Rest i dag pr. kategori</span>
+            <span class="aar2-chart-sub" id="dag-rest-sub">bestilt → solgt · tæller ned mod udsolgt</span>
+          </div>
+          <div id="dag-rest"></div>
+        </div>
         <div class="card">
           <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Salg per time</span></div>
           <div id="dag-chart-wrap" style="position:relative;height:220px;"><canvas id="c-dag"></canvas></div>
@@ -6583,6 +6590,7 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
     _dagBonnerLoaded = false;
     const _bonEl = document.getElementById('dag-bonner');
     if (_bonEl && !_bonEl.hidden) loadDagBonner();
+    loadDagRest();
     if (dagDato) {
       const d = new Date(dagDato);
       const DAGE = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
@@ -7353,6 +7361,45 @@ function renderFakturaAfstemning(af){
         </tr></tfoot>
       </table>
     </div>`;
+}
+
+// ── REST PR. KATEGORI (termometer på Seneste dag) ─────────────────────────────
+async function loadDagRest(){
+  const d = await api('/api/salg/rest-kategori' + (_senesteDagDato ? ('?dato=' + _senesteDagDato) : ''));
+  renderDagRest(d);
+}
+function _restFarve(pct){          // 0% rød → 100% grøn (lysere tæt på målet)
+  const h = Math.min(120, pct * 1.2);
+  const l = pct >= 85 ? 52 : 45;
+  return `hsl(${h} 62% ${l}%)`;
+}
+function renderDagRest(d){
+  const card = document.getElementById('dag-rest-card');
+  const wrap = document.getElementById('dag-rest');
+  const sub  = document.getElementById('dag-rest-sub');
+  if (!card || !wrap) return;
+  if (!d || !d.kategorier || !d.kategorier.length){ card.hidden = true; return; }
+  card.hidden = false;
+  const t = d.total || {};
+  if (sub) sub.textContent = `I alt ${t.solgt} af ${t.bestilt} solgt · ${t.rest} tilbage`;
+  const mono = "font-family:'DM Mono',monospace;";
+  wrap.innerHTML = d.kategorier.map(k => {
+    const pct = Math.max(0, Math.min(100, k.pct));
+    const c = _restFarve(pct);
+    const restTxt = k.rest > 0 ? `${k.rest} tilbage` : (k.rest === 0 ? 'udsolgt 🎉' : `${-k.rest} over`);
+    return `<div style="margin:12px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
+        <span style="font-weight:600;font-size:14px;">${k.kategori}</span>
+        <span style="${mono}font-size:13px;color:${c};font-weight:700;">${restTxt}</span>
+      </div>
+      <div style="position:relative;height:18px;border-radius:9px;background:rgba(30,58,30,.08);overflow:hidden;">
+        <div style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:${c};border-radius:9px;transition:width .6s ease,background .6s ease;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;${mono}font-size:10px;color:var(--ash);margin-top:3px;">
+        <span>solgt ${k.solgt} af ${k.bestilt} bestilt</span><span>${pct}% solgt</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function fakVaelg(nr){ _fakValgt = nr; loadFakturaAfstemning(); }

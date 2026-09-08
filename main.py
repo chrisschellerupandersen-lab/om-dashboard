@@ -742,6 +742,14 @@ async def api_dagens_bonner(request: Request, dato: Optional[str] = None):
     return database.hent_dagens_bonner(dato)
 
 
+@app.get("/api/salg/rest-kategori")
+async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None):
+    """Dagens restlager pr. kategori (bestilt − solgt) med sell-through til
+    'termometer' på Seneste dag. Uden dato bruges seneste dag."""
+    _kræv_login(request)
+    return database.hent_dagens_rest_kategori(dato)
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

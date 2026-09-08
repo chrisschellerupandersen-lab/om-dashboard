@@ -9345,6 +9345,20 @@ def saet_fuld_bemanding(aar: int, uge: int, aktiv: bool = True, type: str = "ful
     return {"aar": aar, "uge": uge, "aktiv": bool(aktiv), "type": type}
 
 
+def _db_loennet_dag(iso: str, wd: int, fuld: bool) -> bool:
+    """Er dagen en løn-dag i DB-Shopbox-modellen?
+      • FØR 1/9-2026: gammel fast bemanding tirsdag(1)+onsdag(2).
+      • FRA 1/9-2026: weekend-bemanding som standard — ansatte lør(5)+søn(6),
+        butikken klarer selv man-fre. (Bruger-besked 8/9-2026.)
+      • Uger markeret 'fuld' → løn alle dage (uanset æra).
+    wd: 0=man … 5=lør, 6=søn."""
+    if fuld:
+        return True
+    if iso < "2026-09-01":
+        return wd in (1, 2)
+    return wd in (5, 6)
+
+
 def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
                            loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
     """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
@@ -9407,15 +9421,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         bem = bemanding.get((iso_y, iso_w))       # None / 'fuld' / 'weekend'
         fuld = bem == "fuld"
         wd = d.weekday()                          # 0=man .. 5=lør, 6=søn
-        # Fra 1/9-2026 er der ingen fast tir/ons-bemanding mere. Løn gives kun:
-        #  • uger markeret 'fuld'    → alle dage
-        #  • uger markeret 'weekend' → lør+søn
-        #  • FØR 1/9: den gamle faste tir(1)+ons(2)-bemanding
-        foer_ny = iso < "2026-09-01"
-        loennet_dag = (fuld
-                       or (bem == "weekend" and wd in (5, 6))
-                       or (foer_ny and wd in (1, 2)))
-        loen = loen_tir_ons if (loen_aktiv and loennet_dag) else 0.0
+        loen = loen_tir_ons if (loen_aktiv and _db_loennet_dag(iso, wd, fuld)) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
         dage.append({
@@ -9443,11 +9449,66 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
         "antal_dage": len(dage),
     }
+
+    # ── Forecast for månedens resterende dage (kun når der er dage tilbage) ────
+    # Baseret på indeværende måneds egne dage: omsætning = snit pr. ugedag (fald
+    # tilbage til dag-snit hvis en ugedag mangler); DB = omsætning × månedens DG.
+    # Samme løn/omk-regler som de faktiske dage.
+    slut_maaned = _d(y, m, _cal.monthrange(y, m)[1])
+    forecast_dage = []
+    ft = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0}
+    if sidste < slut_maaned and tot["oms_ex"] > 0:
+        wd_oms: Dict[int, list] = {}
+        for dd in dage:
+            if dd["oms_ex"] > 0:
+                wd_oms.setdefault(_d.fromisoformat(dd["dato"]).weekday(), []).append(dd["oms_ex"])
+        alle = [v for lst in wd_oms.values() for v in lst]
+        snit_alle = sum(alle) / len(alle) if alle else 0.0
+        dg_frac = tot["db_kr"] / tot["oms_ex"] if tot["oms_ex"] > 0 else 0.0
+        d = sidste + _td(days=1)
+        while d <= slut_maaned:
+            iso = d.isoformat()
+            iso_y, iso_w, _ = d.isocalendar()
+            bem = bemanding.get((iso_y, iso_w))
+            fuld = bem == "fuld"
+            wd = d.weekday()
+            loen = loen_tir_ons if (loen_aktiv and _db_loennet_dag(iso, wd, fuld)) else 0.0
+            lst = wd_oms.get(wd)
+            oms = (sum(lst) / len(lst)) if lst else snit_alle
+            db = oms * dg_frac
+            res = db - loen - omk_pr_dag
+            forecast_dage.append({
+                "dato": iso, "ugedag": _DK_DAGE[wd],
+                "oms_ex": round(oms), "db_kr": round(db),
+                "dg_pct": round(dg_frac * 100, 1),
+                "loen": round(loen), "omk": round(omk_pr_dag), "resultat": round(res),
+                "bemanding": bem, "forecast": True,
+            })
+            ft["oms_ex"] += oms; ft["db_kr"] += db
+            ft["loen"] += loen; ft["omk"] += omk_pr_dag; ft["resultat"] += res
+            d += _td(days=1)
+
+    forecast_total = {k: round(v) for k, v in ft.items()}
+    forecast_total["antal_dage"] = len(forecast_dage)
+    prognose_total = {
+        "oms_ex":   round(tot["oms_ex"] + ft["oms_ex"]),
+        "db_kr":    round(tot["db_kr"] + ft["db_kr"]),
+        "loen":     round(tot["loen"] + ft["loen"]),
+        "omk":      round(tot["omk"] + ft["omk"]),
+        "resultat": round(tot["resultat"] + ft["resultat"]),
+    }
+    prognose_total["dg_pct"] = (round(prognose_total["db_kr"] / prognose_total["oms_ex"] * 100, 1)
+                                if prognose_total["oms_ex"] > 0 else 0.0)
+
     return {"aar": foerste.year, "maaned": foerste.month,
             "maaned_navn": _DK_MDR[foerste.month].capitalize(),
             "loen_aktiv": loen_aktiv,
             "maaneder": maaneder,
-            "dage": dage, "total": total}
+            "dage": dage, "total": total,
+            "har_forecast": bool(forecast_dage),
+            "forecast_dage": forecast_dage,
+            "forecast_total": forecast_total,
+            "prognose_total": prognose_total}
 
 
 def hent_db_shopbox_poster(slags: str, periode: str) -> dict:

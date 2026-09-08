@@ -6741,23 +6741,48 @@ function renderDagBonner(d){
   }
   if (sub) sub.textContent = d.antal_bonner + ' bonner · ' + kr(d.total_kr);
   const mono = "font-family:'DM Mono',monospace;";
-  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;padding-top:6px;">` +
-    d.bonner.map(b => {
-      const linjer = b.linjer.map(l =>
-        `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;">
-          <span>${l.antal>1?('<b>'+Math.round(l.antal)+'×</b> '):''}${l.varenavn}</span>
-          <span style="${mono}color:var(--ash);white-space:nowrap;">${kr(l.omsaetning)}</span>
-        </div>`).join('');
-      const tid = b.tid || (b.bon_nr ? '—' : 'Uden bon-nr');
-      return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 13px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(30,58,30,.08);">
-          <span style="font-weight:700;font-size:15px;">🧾 ${tid}</span>
-          <span style="${mono}font-size:13px;color:var(--forest);font-weight:600;">${kr(b.total_kr)}</span>
-        </div>
-        ${linjer}
-        <div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">${Math.round(b.antal_varer)} vare(r)</div>
-      </div>`;
-    }).join('') + `</div>`;
+
+  // Gruppér bonner pr. time (fra tidspunkt HH:MM). Uden tidspunkt → egen gruppe sidst.
+  const grupper = {};       // "HH" → {bonner, total, key}
+  d.bonner.forEach(b => {
+    const t = b.tid || '';
+    const key = /^\d{2}:/.test(t) ? t.slice(0,2) : 'uden';
+    (grupper[key] = grupper[key] || {bonner:[], total:0}).bonner.push(b);
+    grupper[key].total += b.total_kr;
+  });
+  const kortHtml = b => {
+    const linjer = b.linjer.map(l =>
+      `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;">
+        <span>${l.antal>1?('<b>'+Math.round(l.antal)+'×</b> '):''}${l.varenavn}</span>
+        <span style="${mono}color:var(--ash);white-space:nowrap;">${kr(l.omsaetning)}</span>
+      </div>`).join('');
+    const tid = b.tid || (b.bon_nr ? '—' : 'Uden bon-nr');
+    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 13px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(30,58,30,.08);">
+        <span style="font-weight:700;font-size:15px;">🧾 ${tid}</span>
+        <span style="${mono}font-size:13px;color:var(--forest);font-weight:600;">${kr(b.total_kr)}</span>
+      </div>
+      ${linjer}
+      <div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">${Math.round(b.antal_varer)} vare(r)</div>
+    </div>`;
+  };
+  // Timer med tal først (nyeste time øverst), 'uden' til sidst
+  const keys = Object.keys(grupper).filter(k => k !== 'uden').sort((a,b) => b.localeCompare(a));
+  if (grupper['uden']) keys.push('uden');
+  el.innerHTML = keys.map(k => {
+    const g = grupper[k];
+    const titel = k === 'uden' ? 'Uden tidspunkt' : `kl. ${k}–${String((parseInt(k)+1)%24).padStart(2,'0')}`;
+    return `<div style="margin-top:14px;">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
+        <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--forest);font-weight:600;">${titel}</span>
+        <span style="flex:1;height:1px;background:rgba(30,58,30,.12);"></span>
+        <span style="${mono}font-size:11px;color:var(--ash);">${g.bonner.length} bonner · ${kr(g.total)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
+        ${g.bonner.map(kortHtml).join('')}
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function buildUge(uger) {

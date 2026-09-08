@@ -124,11 +124,13 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
         # Kategori er feltet umiddelbart før dato; tid er feltet umiddelbart efter
         kategori = str(row[dato_idx - 1]).strip() if dato_idx > 0 else ""
         time_start = -1
+        tid = ""
         if dato_idx + 1 < n:
             t = str(row[dato_idx + 1]).strip()
             if len(t) >= 5 and ":" in t:
                 try:
                     time_start = int(t[:2])
+                    tid = t[:5]              # fuldt klokkeslæt "HH:MM" (til bon-visning)
                 except ValueError:
                     pass
 
@@ -154,6 +156,7 @@ def _parse_rækker_shopbox(alle_rækker: List[List]) -> List[Dict[str, Any]]:
             "avance":     _tal(row[col["avance"]]),
             "avance_pct": _tal(row[col["avance_pct"]]),
             "time_start": time_start,
+            "tid":        tid,
             "bon_nr":     bon_nr,
         })
 

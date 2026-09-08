@@ -261,6 +261,7 @@ def init_db():
                 avance      REAL    DEFAULT 0,
                 avance_pct  REAL    DEFAULT 0,
                 time_start  INTEGER DEFAULT -1,
+                tid         TEXT    DEFAULT '',
                 bon_nr      TEXT    DEFAULT ''
             );
 
@@ -641,6 +642,7 @@ def init_db():
         # Migrationer til eksisterende tabeller
         for sql in [
             "ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1",
+            "ALTER TABLE transaktioner ADD COLUMN tid TEXT DEFAULT ''",
             "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
             "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
             "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
@@ -820,13 +822,13 @@ def gem_transaktioner_dage(transaktioner: List[Dict]) -> Dict:
             conn.execute("DELETE FROM transaktioner WHERE dato = ?", (d,))
             conn.executemany("""
                 INSERT INTO transaktioner
-                    (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, tid, bon_nr)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, [(
                 t["dato"][:10], t.get("varenummer", ""), t.get("varenavn", ""),
                 t.get("kategori", ""), t.get("antal", 0), t.get("omsætning", 0),
                 t.get("kostpris", 0), t.get("avance", 0), t.get("avance_pct", 0),
-                t.get("time_start", -1), t.get("bon_nr", ""),
+                t.get("time_start", -1), t.get("tid", ""), t.get("bon_nr", ""),
             ) for t in pr_dato[d]])
             opdateret.append(d)
         # Opdatér "sidst indlæst"-markør uden at nulstille uploads-historik
@@ -850,8 +852,8 @@ def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
 
         conn.executemany("""
             INSERT INTO transaktioner
-                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, bon_nr)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, tid, bon_nr)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, [
             (
                 t["dato"],
@@ -864,6 +866,7 @@ def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:
                 t.get("avance", 0),
                 t.get("avance_pct", 0),
                 t.get("time_start", -1),
+                t.get("tid", ""),
                 t.get("bon_nr", ""),
             )
             for t in transaktioner
@@ -1660,15 +1663,14 @@ def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
     return result
 
 
-def _bon_tid(bon_nr: str, time_start) -> str:
-    """Udtræk klokkeslæt HH:MM fra order-hash 'NNNNN-YYMMDDHHMMSS'.
-    Fallback: time_start (kun timen) → 'HH:00'. '' hvis intet."""
-    if bon_nr and "-" in bon_nr:
-        suf = bon_nr.split("-", 1)[1]
-        if suf.isdigit() and len(suf) >= 12:
-            hh, mm = suf[6:8], suf[8:10]
-            if hh.isdigit() and mm.isdigit() and 0 <= int(hh) <= 23 and 0 <= int(mm) <= 59:
-                return f"{hh}:{mm}"
+def _bon_tid(tid: str, time_start) -> str:
+    """Klokkeslæt til bon-visning. Bruger rapportens tidsfelt (fuldt 'HH:MM'), ellers
+    time_start (kun timen) → 'HH:00'. '' hvis intet. (Order-hashens tal-hale er IKKE
+    salgstidspunkt — det er et Shopbox backend-/sync-tidsstempel — så det bruges ikke.)"""
+    if tid and ":" in tid:
+        t = tid.strip()[:5]
+        if len(t) == 5 and t[:2].isdigit() and t[3:5].isdigit():
+            return t
     try:
         if time_start is not None and int(time_start) >= 0:
             return f"{int(time_start):02d}:00"
@@ -1687,7 +1689,7 @@ def hent_dagens_bonner(dato: str = None) -> Dict:
         if not dato:
             return {"dato": None, "bonner": [], "antal_bonner": 0, "total_kr": 0}
         rows = conn.execute("""
-            SELECT bon_nr, time_start, varenavn, kategori,
+            SELECT bon_nr, time_start, tid, varenavn, kategori,
                    ROUND(antal, 0) AS antal, ROUND(omsætning, 2) AS oms
             FROM transaktioner
             WHERE dato = ?
@@ -1708,11 +1710,8 @@ def hent_dagens_bonner(dato: str = None) -> Dict:
             continue
         b = bon_map.get(bnr)
         if not b:
-            tid = _bon_tid(bnr, r["time_start"])
-            # Sorteringsnøgle: fuldt tidsstempel fra hash hvis muligt, ellers tid
-            suf = bnr.split("-", 1)[1] if "-" in bnr else ""
-            sort = suf if (suf.isdigit() and len(suf) >= 12) else tid
-            b = bon_map[bnr] = {"bon_nr": bnr, "tid": tid, "sort": sort,
+            tid = _bon_tid(r["tid"], r["time_start"])
+            b = bon_map[bnr] = {"bon_nr": bnr, "tid": tid, "sort": tid + bnr,
                                 "linjer": [], "total_kr": 0.0, "antal_varer": 0.0}
         b["linjer"].append(linje)
         b["total_kr"] += linje["omsaetning"]

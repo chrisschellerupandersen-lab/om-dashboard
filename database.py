@@ -1786,6 +1786,23 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             """, [dato] + [int(x) for x in alle_sku]).fetchall():
                 solgt_pr_sku[int(r["vn"])] = int(r["ant"] or 0)
 
+        # Ekstra friskt bagværks-forbrug UDEN eget katalog-SKU — primært kaffe-comboer
+        # ("Stor kop kaffe og valgfri wienerbrød" o.l.), der spiser en valgfri
+        # wienerbrød/bolle fra kategoriens pulje. Trækkes fra kategoriens rest.
+        _sku_set = set(alle_sku)
+        alle_solgt = conn.execute(
+            "SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, "
+            "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn",
+            (dato,)).fetchall()
+    extra = {k: [] for k in KAT_ORDEN}   # kat → [{varenavn, antal}]
+    for r in alle_solgt:
+        if r["vn"] in _sku_set:
+            continue                       # allerede talt via katalog-SKU
+        rolle = _bageri_rolle(r["varenavn"])
+        if rolle and rolle[0] == "frisk" and rolle[1] in extra:
+            extra[rolle[1]].append({"varenavn": r["varenavn"],
+                                    "antal": int((r["ant"] or 0) * rolle[2])})
+
     # Pr. vare: bestilt (dagens kolonne) og solgt (sum af varens SKU'er) → rest
     agg = {k: {"bestilt": 0, "solgt_eff": 0, "rest": 0, "varer": []} for k in KAT_ORDEN}
     for b in best:
@@ -1803,18 +1820,28 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         agg[kat]["solgt_eff"] += min(solgt_p, bestilt_p)   # kappet, så pct ≤ 100 pr. vare
         agg[kat]["rest"]      += rest_p
         agg[kat]["varer"].append({"varenavn": navn, "bestilt": bestilt_p,
-                                  "solgt": solgt_p, "rest": rest_p, "pct": pct_p})
+                                  "solgt": solgt_p, "rest": rest_p, "pct": pct_p,
+                                  "type": "vare"})
 
     kategorier = []
     for k in KAT_ORDEN:
         a = agg[k]
-        if a["bestilt"] <= 0 and a["solgt_eff"] <= 0:
+        ex_list = extra.get(k, [])
+        ex_tot = sum(e["antal"] for e in ex_list)
+        if a["bestilt"] <= 0 and a["solgt_eff"] <= 0 and ex_tot <= 0:
             continue
-        pct = round(a["solgt_eff"] / a["bestilt"] * 100) if a["bestilt"] > 0 else 0
+        prod_rest = a["rest"]
+        rest = max(0, prod_rest - ex_tot)                  # comboer spiser af kategoriens rest
+        solgt = min(a["bestilt"], a["solgt_eff"] + ex_tot) if a["bestilt"] > 0 else a["solgt_eff"] + ex_tot
+        pct = round(solgt / a["bestilt"] * 100) if a["bestilt"] > 0 else 100
         varer = sorted(a["varer"], key=lambda v: (-v["rest"], -v["bestilt"]))
+        # Combo-linjer sidst i drill-down (trækker fra kategoriens rest)
+        for e in sorted(ex_list, key=lambda e: -e["antal"]):
+            varer.append({"varenavn": e["varenavn"], "bestilt": 0, "solgt": e["antal"],
+                          "rest": 0, "pct": 100, "type": "combo"})
         kategorier.append({"kategori": k, "bestilt": a["bestilt"],
-                           "solgt": a["solgt_eff"], "rest": a["rest"], "pct": pct,
-                           "varer": varer})
+                           "solgt": solgt, "rest": rest, "pct": pct,
+                           "combo_antal": ex_tot, "varer": varer})
     tot_b = sum(k["bestilt"] for k in kategorier)
     tot_s = sum(k["solgt"] for k in kategorier)
     tot_r = sum(k["rest"] for k in kategorier)

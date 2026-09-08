@@ -7394,6 +7394,12 @@ function renderDagRest(d){
     const varer = k.varer || [];
     const varerHtml = !open ? '' : `<div style="margin:6px 0 2px;padding:8px 10px;border-radius:8px;background:rgba(30,58,30,.03);">` +
       varer.map(v => {
+        if (v.type === 'combo'){
+          return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0;font-size:12px;color:var(--ash);border-top:1px dashed rgba(30,58,30,.12);margin-top:3px;">
+            <span style="flex:1;">☕ ${v.varenavn}</span>
+            <span style="${mono}font-size:11px;white-space:nowrap;">−${v.solgt} <span style="font-size:9px;">fra rest</span></span>
+          </div>`;
+        }
         const vp = Math.max(0, Math.min(100, v.pct));
         const vc = _restFarve(vp);
         const vrest = v.rest > 0 ? `${v.rest} tilbage` : 'udsolgt';
@@ -7414,7 +7420,7 @@ function renderDagRest(d){
         <div style="position:absolute;inset:0 auto 0 0;width:${pct}%;background:${c};border-radius:9px;transition:width .6s ease,background .6s ease;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;${mono}font-size:10px;color:var(--ash);margin-top:3px;">
-        <span>solgt ${k.solgt} af ${k.bestilt} bestilt</span><span>${pct}% solgt</span>
+        <span>solgt ${k.solgt} af ${k.bestilt} bestilt${k.combo_antal>0?` · inkl. ${k.combo_antal} ☕combo`:''}</span><span>${pct}% solgt</span>
       </div>
       ${varerHtml}
     </div>`;

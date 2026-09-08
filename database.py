@@ -1745,8 +1745,11 @@ def hent_dagens_bonner(dato: str = None) -> Dict:
 
 def hent_dagens_rest_kategori(dato: str = None) -> Dict:
     """Dagens restlager pr. kategori (Brød/Boller/Wiener/Kage): bestilt (dagens
-    levering fra ugebestillingen) − solgt friskt i dag = rest. Sell-through styrer
-    farven (rød → grøn mod udsolgt). Bruges som 'termometer' på Seneste dag."""
+    levering) − solgt friskt i dag = rest. Regnes PR. VARE og summeres derefter
+    (rest = Σ max(0, bestilt − solgt)), så én udsolgt vare ikke skjuler en anden
+    vares rest (fx rugbrød tilbage selvom surdejsbrød er udsolgt). Sell-through
+    (kappet pr. vare) styrer farven rød→grøn. Solgt matches via katalogets
+    navn→SKU + bundle-opgang; kaffe-combos/frost indgår ikke (kun friske SKU'er)."""
     from datetime import date as _d
     DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
     KAT_ORDEN = ["Brød", "Boller", "Wiener", "Kage"]
@@ -1757,44 +1760,59 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             dato = row["d"] if row else None
         if not dato:
             return {"dato": None, "kategorier": []}
-        d = _d.fromisoformat(str(dato)[:10])
+        dato = str(dato)[:10]
+        d = _d.fromisoformat(dato)
         iso_y, iso_w, _ = d.isocalendar()
         col = DAGCOL[d.weekday()]
 
-        # Bestilt (dagens levering) pr. kategori — fra ugens bestilling, dagens kolonne
         best = conn.execute(
             f"SELECT varenavn, {col} AS ant FROM ugebestillinger WHERE uge=? AND aar=?",
             (iso_w, iso_y)).fetchall()
-        # Solgt i dag pr. varenavn (bundles/combos håndteres via _bageri_rolle)
-        solgt_rows = conn.execute(
-            "SELECT varenavn, SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn",
-            (str(dato)[:10],)).fetchall()
+        # Katalog navn→SKU (kilde + salg_kilde) til at matche dagens salg pr. vare
+        navn_skus = {p["navn"].strip().lower():
+                     [int(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
+                     for p in _ORGANIC_BAKERY}
+        alle_sku = sorted({s for b in best
+                           for s in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        solgt_pr_sku: Dict[int, int] = {}
+        if alle_sku:
+            ph = ",".join("?" * len(alle_sku))
+            for r in conn.execute(f"""
+                SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       ROUND(SUM({_antal_sql()}),0) AS ant
+                FROM transaktioner
+                WHERE dato=? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                GROUP BY vn
+            """, [dato] + [int(x) for x in alle_sku]).fetchall():
+                solgt_pr_sku[int(r["vn"])] = int(r["ant"] or 0)
 
-    bestilt = {k: 0.0 for k in KAT_ORDEN}
-    for r in best:
-        kat = _organic_kat(r["varenavn"]) or _bakery_kat(r["varenavn"])
-        if kat in bestilt:
-            bestilt[kat] += float(r["ant"] or 0)
-
-    solgt = {k: 0.0 for k in KAT_ORDEN}
-    for r in solgt_rows:
-        rolle = _bageri_rolle(r["varenavn"])
-        if rolle and rolle[0] == "frisk" and rolle[1] in solgt:
-            solgt[rolle[1]] += float(r["ant"] or 0) * rolle[2]
+    # Pr. vare: bestilt (dagens kolonne) og solgt (sum af varens SKU'er) → rest
+    agg = {k: {"bestilt": 0, "solgt_eff": 0, "rest": 0} for k in KAT_ORDEN}
+    for b in best:
+        navn = (b["varenavn"] or "")
+        kat = _organic_kat(navn) or _bakery_kat(navn)
+        if kat not in agg:
+            continue
+        bestilt_p = int(b["ant"] or 0)
+        solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
+        rest_p = max(0, bestilt_p - solgt_p)
+        agg[kat]["bestilt"]   += bestilt_p
+        agg[kat]["solgt_eff"] += min(solgt_p, bestilt_p)   # kappet, så pct ≤ 100 pr. vare
+        agg[kat]["rest"]      += rest_p
 
     kategorier = []
     for k in KAT_ORDEN:
-        b = round(bestilt[k]); s = round(solgt[k])
-        if b <= 0 and s <= 0:
+        a = agg[k]
+        if a["bestilt"] <= 0 and a["solgt_eff"] <= 0:
             continue
-        rest = b - s
-        pct = round(s / b * 100) if b > 0 else (100 if s > 0 else 0)
-        kategorier.append({"kategori": k, "bestilt": b, "solgt": s,
-                           "rest": rest, "pct": pct})
+        pct = round(a["solgt_eff"] / a["bestilt"] * 100) if a["bestilt"] > 0 else 0
+        kategorier.append({"kategori": k, "bestilt": a["bestilt"],
+                           "solgt": a["solgt_eff"], "rest": a["rest"], "pct": pct})
     tot_b = sum(k["bestilt"] for k in kategorier)
     tot_s = sum(k["solgt"] for k in kategorier)
-    return {"dato": str(dato)[:10], "kategorier": kategorier,
-            "total": {"bestilt": tot_b, "solgt": tot_s, "rest": tot_b - tot_s,
+    tot_r = sum(k["rest"] for k in kategorier)
+    return {"dato": dato, "kategorier": kategorier,
+            "total": {"bestilt": tot_b, "solgt": tot_s, "rest": tot_r,
                       "pct": round(tot_s / tot_b * 100) if tot_b > 0 else 0}}
 
 

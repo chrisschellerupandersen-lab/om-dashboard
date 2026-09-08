@@ -1787,7 +1787,7 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
                 solgt_pr_sku[int(r["vn"])] = int(r["ant"] or 0)
 
     # Pr. vare: bestilt (dagens kolonne) og solgt (sum af varens SKU'er) → rest
-    agg = {k: {"bestilt": 0, "solgt_eff": 0, "rest": 0} for k in KAT_ORDEN}
+    agg = {k: {"bestilt": 0, "solgt_eff": 0, "rest": 0, "varer": []} for k in KAT_ORDEN}
     for b in best:
         navn = (b["varenavn"] or "")
         kat = _organic_kat(navn) or _bakery_kat(navn)
@@ -1795,10 +1795,15 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             continue
         bestilt_p = int(b["ant"] or 0)
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
+        if bestilt_p <= 0 and solgt_p <= 0:
+            continue
         rest_p = max(0, bestilt_p - solgt_p)
+        pct_p = round(min(solgt_p, bestilt_p) / bestilt_p * 100) if bestilt_p > 0 else 0
         agg[kat]["bestilt"]   += bestilt_p
         agg[kat]["solgt_eff"] += min(solgt_p, bestilt_p)   # kappet, så pct ≤ 100 pr. vare
         agg[kat]["rest"]      += rest_p
+        agg[kat]["varer"].append({"varenavn": navn, "bestilt": bestilt_p,
+                                  "solgt": solgt_p, "rest": rest_p, "pct": pct_p})
 
     kategorier = []
     for k in KAT_ORDEN:
@@ -1806,8 +1811,10 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         if a["bestilt"] <= 0 and a["solgt_eff"] <= 0:
             continue
         pct = round(a["solgt_eff"] / a["bestilt"] * 100) if a["bestilt"] > 0 else 0
+        varer = sorted(a["varer"], key=lambda v: (-v["rest"], -v["bestilt"]))
         kategorier.append({"kategori": k, "bestilt": a["bestilt"],
-                           "solgt": a["solgt_eff"], "rest": a["rest"], "pct": pct})
+                           "solgt": a["solgt_eff"], "rest": a["rest"], "pct": pct,
+                           "varer": varer})
     tot_b = sum(k["bestilt"] for k in kategorier)
     tot_s = sum(k["solgt"] for k in kategorier)
     tot_r = sum(k["rest"] for k in kategorier)

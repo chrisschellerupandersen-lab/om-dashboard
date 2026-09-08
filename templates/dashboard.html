@@ -7364,8 +7364,10 @@ function renderFakturaAfstemning(af){
 }
 
 // ── REST PR. KATEGORI (termometer på Seneste dag) ─────────────────────────────
+let _dagRestData = null;
 async function loadDagRest(){
   const d = await api('/api/salg/rest-kategori' + (_senesteDagDato ? ('?dato=' + _senesteDagDato) : ''));
+  _dagRestData = d;
   renderDagRest(d);
 }
 function _restFarve(pct){          // 0% rød → 100% grøn (lysere tæt på målet)
@@ -7387,9 +7389,25 @@ function renderDagRest(d){
     const pct = Math.max(0, Math.min(100, k.pct));
     const c = _restFarve(pct);
     const restTxt = k.rest > 0 ? `${k.rest} tilbage` : (k.rest === 0 ? 'udsolgt 🎉' : `${-k.rest} over`);
+    const key = k.kategori;
+    const open = !!_restFold[key];
+    const varer = k.varer || [];
+    const varerHtml = !open ? '' : `<div style="margin:6px 0 2px;padding:8px 10px;border-radius:8px;background:rgba(30,58,30,.03);">` +
+      varer.map(v => {
+        const vp = Math.max(0, Math.min(100, v.pct));
+        const vc = _restFarve(vp);
+        const vrest = v.rest > 0 ? `${v.rest} tilbage` : 'udsolgt';
+        return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0;font-size:12px;">
+          <span style="flex:1;">${v.varenavn}</span>
+          <span style="${mono}font-size:10px;color:var(--ash);white-space:nowrap;">${v.solgt}/${v.bestilt}</span>
+          <span style="width:70px;height:8px;border-radius:4px;background:rgba(30,58,30,.1);overflow:hidden;position:relative;flex:none;">
+            <span style="position:absolute;inset:0 auto 0 0;width:${vp}%;background:${vc};border-radius:4px;"></span></span>
+          <span style="${mono}font-size:11px;color:${vc};font-weight:700;width:74px;text-align:right;white-space:nowrap;">${vrest}</span>
+        </div>`;
+      }).join('') + `</div>`;
     return `<div style="margin:12px 0;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;">
-        <span style="font-weight:600;font-size:14px;">${k.kategori}</span>
+      <div onclick="restFoldToggle('${key.replace(/'/g,"\\'")}')" title="Klik for varer" style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px;cursor:pointer;user-select:none;">
+        <span style="font-weight:600;font-size:14px;"><span style="color:var(--ash);font-size:9px;">${open?'▾':'▸'}</span> ${k.kategori}</span>
         <span style="${mono}font-size:13px;color:${c};font-weight:700;">${restTxt}</span>
       </div>
       <div style="position:relative;height:18px;border-radius:9px;background:rgba(30,58,30,.08);overflow:hidden;">
@@ -7398,9 +7416,12 @@ function renderDagRest(d){
       <div style="display:flex;justify-content:space-between;${mono}font-size:10px;color:var(--ash);margin-top:3px;">
         <span>solgt ${k.solgt} af ${k.bestilt} bestilt</span><span>${pct}% solgt</span>
       </div>
+      ${varerHtml}
     </div>`;
   }).join('');
 }
+const _restFold = {};
+function restFoldToggle(k){ _restFold[k] = !_restFold[k]; if (_dagRestData) renderDagRest(_dagRestData); }
 
 function fakVaelg(nr){ _fakValgt = nr; loadFakturaAfstemning(); }
 

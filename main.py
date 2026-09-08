@@ -2632,6 +2632,24 @@ async def api_bemanding_saet(request: Request):
                                         body.get("aktiv", True), body.get("type", "fuld"))
 
 
+@app.post("/api/db-shopbox/loen-override")
+async def api_db_loen_override(request: Request):
+    """Skift løn til/fra for én dag i DB-Shopbox (undtagelse fra weekend-standarden).
+    Body: {dato}. Ét klik flipper effektiv løn; næste klik nulstiller til auto.
+    Login ELLER webhook-secret."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    dato = body.get("dato")
+    if not dato:
+        raise HTTPException(status_code=400, detail="Mangler dato")
+    return database.toggle_db_loen_override(str(dato)[:10])
+
+
 @app.get("/api/db-shopbox/poster")
 async def api_db_shopbox_poster(request: Request, slags: str, periode: str):
     """Drill-down: varer/poster bag DB for én periode."""

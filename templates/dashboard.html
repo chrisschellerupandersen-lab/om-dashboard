@@ -4587,6 +4587,32 @@ async function loadDbShopbox(){
   dbsSetMode(_dbsMode);
 }
 
+// Løn-celle med per-dag override: klik = flip løn til/fra (I var der selv / ekstra dag),
+// klik igen = tilbage til auto (weekend-standard). loen_override: null=auto, 0=fra, 1=til.
+function _dbsLoenCell(x){
+  const on = x.loen > 0;
+  const ov = x.loen_override;
+  const badge = ov===0
+      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
+    : ov===1
+      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--moss);color:#fff;border-radius:4px;padding:1px 4px;">+løn</span>`
+      : '';
+  const tip = (on ? 'Klik: fjern løn (I var der selv)' : 'Klik: sæt løn (ekstra dag med hjælp)')
+            + (ov!=null ? ' · klik igen = auto' : '');
+  return `<td onclick="dbsLoenToggle('${x.dato}')" title="${tip}" style="text-align:right;cursor:pointer;color:${on?'#8a3a3a':'var(--ash)'};white-space:nowrap;">${on?_dbsKr(x.loen):'—'}${badge}</td>`;
+}
+
+async function dbsLoenToggle(dato){
+  try {
+    await fetch('/api/db-shopbox/loen-override', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dato})
+    });
+  } catch(e){}
+  const sel = document.getElementById('dbs-maaned-vaelg');
+  loadDbsMaaned(sel && sel.value ? sel.value : undefined);
+}
+
 async function loadDbsMaaned(val){
   let url = '/api/db-shopbox/maaned';
   if (val) { const [a,m] = String(val).split('-'); url += `?aar=${a}&maaned=${m}`; }
@@ -4646,7 +4672,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
       <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
       <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
-      <td style="text-align:right;color:${x.loen>0?'#8a3a3a':'var(--ash)'};">${x.loen>0?_dbsKr(x.loen):'—'}</td>
+      ${_dbsLoenCell(x)}
       <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
   });
@@ -4663,7 +4689,7 @@ async function loadDbsMaaned(val){
         <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
         <td style="text-align:right;">${_dbsKr(x.db_kr)}</td>
         <td style="text-align:right;">${_dbsPct(x.dg_pct)}</td>
-        <td style="text-align:right;color:${x.loen>0?'#8a3a3a':'var(--ash)'};">${x.loen>0?_dbsKr(x.loen):'—'}</td>
+        ${_dbsLoenCell(x)}
         <td style="text-align:right;">${_dbsKr(x.omk)}</td>
         <td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
     });

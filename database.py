@@ -275,6 +275,14 @@ def init_db():
                 PRIMARY KEY (aar, uge)
             );
 
+            -- Per-dag løn-override i DB-Shopbox (undtagelser fra weekend-standarden):
+            -- loennet=0 → tvungen INGEN løn (vi var der selv); 1 → tvungen løn (ekstra dag).
+            -- Ingen række = følg standardreglen (_db_loennet_dag).
+            CREATE TABLE IF NOT EXISTS db_loen_override (
+                dato     TEXT    PRIMARY KEY,
+                loennet  INTEGER NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS ugebestillinger (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 uge           INTEGER NOT NULL,
@@ -9359,6 +9367,33 @@ def _db_loennet_dag(iso: str, wd: int, fuld: bool) -> bool:
     return wd in (5, 6)
 
 
+def _db_default_loennet(conn, dato: str) -> bool:
+    """Standard-løndag for datoen (uden per-dag override) — inkl. 'fuld'-ugemarkering."""
+    from datetime import date as _d
+    d = _d.fromisoformat(dato)
+    iso_y, iso_w, _ = d.isocalendar()
+    row = conn.execute("SELECT COALESCE(type,'fuld') AS type FROM fuld_bemanding_uger "
+                       "WHERE aar=? AND uge=?", (iso_y, iso_w)).fetchone()
+    fuld = bool(row) and (row["type"] if hasattr(row, "keys") else row[0]) == "fuld"
+    return _db_loennet_dag(dato, d.weekday(), fuld)
+
+
+def toggle_db_loen_override(dato: str) -> dict:
+    """Skift løn for én dag i DB-Shopbox. Uden override → sæt modsat af standarden
+    (fravælg en weekenddag / tilføj en hverdag). Med override → ryd (tilbage til auto).
+    Ét klik flipper altså den effektive tilstand; næste klik nulstiller."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        ex = conn.execute("SELECT loennet FROM db_loen_override WHERE dato=?", (dato,)).fetchone()
+        if ex is not None:
+            conn.execute("DELETE FROM db_loen_override WHERE dato=?", (dato,))
+            return {"dato": dato, "tilstand": "auto"}
+        default = _db_default_loennet(conn, dato)
+        ny = 0 if default else 1          # flip den effektive tilstand
+        conn.execute("INSERT INTO db_loen_override (dato, loennet) VALUES (?, ?)", (dato, ny))
+    return {"dato": dato, "tilstand": ("loen" if ny else "ingen"), "loennet": ny}
+
+
 def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
                            loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
     """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
@@ -9405,6 +9440,11 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             WHERE dato >= ? AND dato <= ?
             GROUP BY dato
         """, (foerste.isoformat(), sidste.isoformat())).fetchall()
+        # Per-dag løn-overrides for hele kalendermåneden (dækker også forecast-dage)
+        _md_slut = _d(y, m, _cal.monthrange(y, m)[1]).isoformat()
+        loen_ov = {r["dato"]: r["loennet"] for r in conn.execute(
+            "SELECT dato, loennet FROM db_loen_override WHERE dato>=? AND dato<=?",
+            (foerste.isoformat(), _md_slut)).fetchall()}
     per = {str(x["dato"])[:10]: x for x in rows}
 
     loen_aktiv = (y, m) >= _LOEN_START
@@ -9421,7 +9461,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         bem = bemanding.get((iso_y, iso_w))       # None / 'fuld' / 'weekend'
         fuld = bem == "fuld"
         wd = d.weekday()                          # 0=man .. 5=lør, 6=søn
-        loen = loen_tir_ons if (loen_aktiv and _db_loennet_dag(iso, wd, fuld)) else 0.0
+        ov = loen_ov.get(iso)                     # None / 0 / 1 (per-dag undtagelse)
+        loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
+        loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
         dage.append({
@@ -9435,6 +9477,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "resultat": round(res),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
+            "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
         })
         tot["oms_ex"] += oms; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res
@@ -9472,7 +9515,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             bem = bemanding.get((iso_y, iso_w))
             fuld = bem == "fuld"
             wd = d.weekday()
-            loen = loen_tir_ons if (loen_aktiv and _db_loennet_dag(iso, wd, fuld)) else 0.0
+            ov = loen_ov.get(iso)
+            loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
+            loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
             lst = wd_oms.get(wd)
             oms = (sum(lst) / len(lst)) if lst else snit_alle
             db = oms * dg_frac
@@ -9482,7 +9527,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
                 "oms_ex": round(oms), "db_kr": round(db),
                 "dg_pct": round(dg_frac * 100, 1),
                 "loen": round(loen), "omk": round(omk_pr_dag), "resultat": round(res),
-                "bemanding": bem, "forecast": True,
+                "bemanding": bem, "loen_override": ov, "forecast": True,
             })
             ft["oms_ex"] += oms; ft["db_kr"] += db
             ft["loen"] += loen; ft["omk"] += omk_pr_dag; ft["resultat"] += res

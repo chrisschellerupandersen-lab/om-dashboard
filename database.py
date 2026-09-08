@@ -1660,6 +1660,82 @@ def hent_dage_detaljer(n: int = 8, aar: int = None) -> List[Dict]:
     return result
 
 
+def _bon_tid(bon_nr: str, time_start) -> str:
+    """Udtræk klokkeslæt HH:MM fra order-hash 'NNNNN-YYMMDDHHMMSS'.
+    Fallback: time_start (kun timen) → 'HH:00'. '' hvis intet."""
+    if bon_nr and "-" in bon_nr:
+        suf = bon_nr.split("-", 1)[1]
+        if suf.isdigit() and len(suf) >= 12:
+            hh, mm = suf[6:8], suf[8:10]
+            if hh.isdigit() and mm.isdigit() and 0 <= int(hh) <= 23 and 0 <= int(mm) <= 59:
+                return f"{hh}:{mm}"
+    try:
+        if time_start is not None and int(time_start) >= 0:
+            return f"{int(time_start):02d}:00"
+    except (TypeError, ValueError):
+        pass
+    return ""
+
+
+def hent_dagens_bonner(dato: str = None) -> Dict:
+    """Alle kassebonner for en dag, grupperet på bon_nr, med klokkeslæt + varelinjer.
+    Bruges på 'Seneste dag'. Uden dato bruges seneste dag med data. Nyeste bon først."""
+    with _conn() as conn:
+        if not dato:
+            row = conn.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()
+            dato = row["d"] if row else None
+        if not dato:
+            return {"dato": None, "bonner": [], "antal_bonner": 0, "total_kr": 0}
+        rows = conn.execute("""
+            SELECT bon_nr, time_start, varenavn, kategori,
+                   ROUND(antal, 0) AS antal, ROUND(omsætning, 2) AS oms
+            FROM transaktioner
+            WHERE dato = ?
+            ORDER BY bon_nr, varenavn
+        """, (dato,)).fetchall()
+
+    bon_map: Dict[str, Dict] = {}
+    uden_bon = {"bon_nr": "", "tid": "", "sort": "", "linjer": [],
+                "total_kr": 0.0, "antal_varer": 0.0}
+    for r in rows:
+        bnr = r["bon_nr"] or ""
+        linje = {"varenavn": r["varenavn"], "kategori": r["kategori"] or "",
+                 "antal": r["antal"] or 0, "omsaetning": r["oms"] or 0.0}
+        if not bnr:
+            uden_bon["linjer"].append(linje)
+            uden_bon["total_kr"] += linje["omsaetning"]
+            uden_bon["antal_varer"] += linje["antal"]
+            continue
+        b = bon_map.get(bnr)
+        if not b:
+            tid = _bon_tid(bnr, r["time_start"])
+            # Sorteringsnøgle: fuldt tidsstempel fra hash hvis muligt, ellers tid
+            suf = bnr.split("-", 1)[1] if "-" in bnr else ""
+            sort = suf if (suf.isdigit() and len(suf) >= 12) else tid
+            b = bon_map[bnr] = {"bon_nr": bnr, "tid": tid, "sort": sort,
+                                "linjer": [], "total_kr": 0.0, "antal_varer": 0.0}
+        b["linjer"].append(linje)
+        b["total_kr"] += linje["omsaetning"]
+        b["antal_varer"] += linje["antal"]
+
+    bonner = list(bon_map.values())
+    bonner.sort(key=lambda b: b["sort"], reverse=True)   # nyeste først
+    for b in bonner:
+        b["total_kr"]    = round(b["total_kr"], 2)
+        b["antal_varer"] = round(b["antal_varer"], 0)
+        b.pop("sort", None)
+    if uden_bon["linjer"]:
+        uden_bon["total_kr"]    = round(uden_bon["total_kr"], 2)
+        uden_bon["antal_varer"] = round(uden_bon["antal_varer"], 0)
+        uden_bon.pop("sort", None)
+        bonner.append(uden_bon)   # altid til sidst
+
+    total_kr = round(sum(b["total_kr"] for b in bonner), 2)
+    return {"dato": dato, "bonner": bonner,
+            "antal_bonner": len([b for b in bonner if b["bon_nr"]]),
+            "total_kr": total_kr}
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:

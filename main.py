@@ -734,6 +734,14 @@ async def api_dage_detaljer(request: Request, n: int = 8, aar: Optional[int] = N
     return database.hent_dage_detaljer(min(n, 30), aar)
 
 
+@app.get("/api/salg/bonner")
+async def api_dagens_bonner(request: Request, dato: Optional[str] = None):
+    """Kassebonner for en dag (grupperet på bon_nr, klokkeslæt + varelinjer).
+    Uden dato bruges seneste dag med data. Bruges på 'Seneste dag'-siden."""
+    _kræv_login(request)
+    return database.hent_dagens_bonner(dato)
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

@@ -1569,6 +1569,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div id="dag-chart-wrap" style="position:relative;height:220px;"><canvas id="c-dag"></canvas></div>
           <div id="dag-no-time" class="empty" style="display:none;">Tidsdata ikke tilgængeligt i denne rapport</div>
         </div>
+        <div class="card">
+          <div class="aar2-chart-hdr" style="cursor:pointer;user-select:none;" onclick="dagBonnerToggle()">
+            <span class="aar2-chart-ttl"><span id="dag-bonner-caret">▸</span> Bonner — klokkeslæt &amp; indhold</span>
+            <span class="aar2-chart-sub" id="dag-bonner-sub">klik for at vise</span>
+          </div>
+          <div id="dag-bonner" hidden></div>
+        </div>
       </div>
 
       <!-- UGEOVERSIGT -->
@@ -6506,6 +6513,11 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
 
     // Sæt dato i header
     const dagDato = dag.dato || kpi.dag_dato;
+    // Bonner: gem dagens dato; genindlæs hvis sektionen er åben, ellers lazy ved åbning
+    _senesteDagDato = dagDato || null;
+    _dagBonnerLoaded = false;
+    const _bonEl = document.getElementById('dag-bonner');
+    if (_bonEl && !_bonEl.hidden) loadDagBonner();
     if (dagDato) {
       const d = new Date(dagDato);
       const DAGE = ['Søndag','Mandag','Tirsdag','Onsdag','Torsdag','Fredag','Lørdag'];
@@ -6697,6 +6709,55 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
     document.getElementById('dag-chart-wrap').style.display = 'none';
     document.getElementById('dag-no-time').style.display = '';
   }
+}
+
+// ── BONNER (Seneste dag) ──────────────────────────────────────────────────────
+let _senesteDagDato = null, _dagBonnerLoaded = false;
+
+function dagBonnerToggle(){
+  const el = document.getElementById('dag-bonner');
+  const caret = document.getElementById('dag-bonner-caret');
+  const aabner = el.hidden;
+  el.hidden = !aabner;
+  if (caret) caret.textContent = aabner ? '▾' : '▸';
+  if (aabner && !_dagBonnerLoaded) loadDagBonner();
+}
+
+async function loadDagBonner(){
+  const el = document.getElementById('dag-bonner');
+  el.innerHTML = '<div class="empty" style="padding:20px;">Indlæser…</div>';
+  const d = await api('/api/salg/bonner' + (_senesteDagDato ? ('?dato=' + _senesteDagDato) : ''));
+  _dagBonnerLoaded = true;
+  renderDagBonner(d);
+}
+
+function renderDagBonner(d){
+  const el  = document.getElementById('dag-bonner');
+  const sub = document.getElementById('dag-bonner-sub');
+  if (!d || !d.bonner || !d.bonner.length){
+    el.innerHTML = '<div class="empty" style="padding:20px;">Ingen bonner for dagen</div>';
+    if (sub) sub.textContent = '';
+    return;
+  }
+  if (sub) sub.textContent = d.antal_bonner + ' bonner · ' + kr(d.total_kr);
+  const mono = "font-family:'DM Mono',monospace;";
+  el.innerHTML = `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;padding-top:6px;">` +
+    d.bonner.map(b => {
+      const linjer = b.linjer.map(l =>
+        `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;">
+          <span>${l.antal>1?('<b>'+Math.round(l.antal)+'×</b> '):''}${l.varenavn}</span>
+          <span style="${mono}color:var(--ash);white-space:nowrap;">${kr(l.omsaetning)}</span>
+        </div>`).join('');
+      const tid = b.tid || (b.bon_nr ? '—' : 'Uden bon-nr');
+      return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 13px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(30,58,30,.08);">
+          <span style="font-weight:700;font-size:15px;">🧾 ${tid}</span>
+          <span style="${mono}font-size:13px;color:var(--forest);font-weight:600;">${kr(b.total_kr)}</span>
+        </div>
+        ${linjer}
+        <div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">${Math.round(b.antal_varer)} vare(r)</div>
+      </div>`;
+    }).join('') + `</div>`;
 }
 
 function buildUge(uger) {

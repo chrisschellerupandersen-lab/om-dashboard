@@ -1923,7 +1923,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     return total
 
 
-def hent_kage_analyse(fra_dato: str = "2026-09-01") -> Dict:
+def hent_kage_organic_analyse(fra_dato: str = "2026-09-01") -> Dict:
     """Analyse af kager (Gulerodskage 1p/5-6p, Cookie) siden Organic-skiftet 1/9.
     Bestilt vs. faktisk solgt (kager sælges over flere dage → periode-tal, ikke dag),
     spild, sell-through, omsætning, kostpris/DB og spild-værdi — pr. vare + pr. uge.

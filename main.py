@@ -756,7 +756,7 @@ async def api_kage_analyse(request: Request, fra: str = "2026-09-01"):
     Login ELLER ?secret=."""
     if request.query_params.get("secret") != WEBHOOK_SECRET:
         _kræv_login(request)
-    return database.hent_kage_analyse(fra)
+    return database.hent_kage_organic_analyse(fra)
 
 
 @app.get("/api/rapport-status")

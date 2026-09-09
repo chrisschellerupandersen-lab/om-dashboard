@@ -750,6 +750,15 @@ async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None)
     return database.hent_dagens_rest_kategori(dato)
 
 
+@app.get("/api/bageri/kage-analyse")
+async def api_kage_analyse(request: Request, fra: str = "2026-09-01"):
+    """Kage-analyse siden Organic-skiftet (bestilt vs. solgt, spild, sell-through, DB).
+    Login ELLER ?secret=."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_kage_analyse(fra)
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

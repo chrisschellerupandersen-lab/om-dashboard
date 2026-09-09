@@ -1923,6 +1923,98 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     return total
 
 
+def hent_kage_analyse(fra_dato: str = "2026-09-01") -> Dict:
+    """Analyse af kager (Gulerodskage 1p/5-6p, Cookie) siden Organic-skiftet 1/9.
+    Bestilt vs. faktisk solgt (kager sælges over flere dage → periode-tal, ikke dag),
+    spild, sell-through, omsætning, kostpris/DB og spild-værdi — pr. vare + pr. uge.
+    Til brug i dialog med Organic Bakery om mængder/sortiment."""
+    from datetime import date as _d, timedelta as _td
+    DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    kage = [p for p in _ORGANIC_BAKERY if _organic_kat(p["navn"]) == "Kage"]
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT MAX(dato) AS d FROM transaktioner WHERE dato>=?",
+                           (fra_dato,)).fetchone()
+        til = row["d"] if row and row["d"] else None
+        if not til:
+            return {"fra": fra_dato, "til": None, "varer": [], "uger": [], "total": {}}
+        fra_d = _d.fromisoformat(fra_dato)
+        til_d = _d.fromisoformat(til)
+        best_map = {}
+        for r in conn.execute("""SELECT uge, aar, varenavn, pris_ex_moms,
+                                        man, tir, ons, tor, fre, loe, son
+                                 FROM ugebestillinger""").fetchall():
+            best_map[(r["uge"], r["aar"], (r["varenavn"] or "").strip().lower())] = r
+        all_sku = sorted({int(s) for p in kage
+                          for s in (p["kilde"] + (p.get("salg_kilde") or []))})
+        salg_sku, oms_sku = {}, {}
+        if all_sku:
+            ph = ",".join("?" * len(all_sku))
+            for r in conn.execute(f"""
+                SELECT dato, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       SUM(antal) AS ant, SUM(omsaetning_ex_moms) AS oms
+                FROM v_transaktioner
+                WHERE dato>=? AND dato<=? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                GROUP BY dato, vn
+            """, [fra_dato, til] + all_sku).fetchall():
+                salg_sku[(r["dato"], int(r["vn"]))] = int(r["ant"] or 0)
+                oms_sku[(r["dato"], int(r["vn"]))] = float(r["oms"] or 0)
+
+    per = {p["navn"]: {"bestilt": 0, "solgt": 0, "oms": 0.0, "pris": 0.0} for p in kage}
+    uge_agg: Dict = {}
+    d = fra_d
+    while d <= til_d:
+        iso_y, iso_w, _ = d.isocalendar()
+        col = DAGCOL[d.weekday()]
+        iso = d.isoformat()
+        for p in kage:
+            navn = p["navn"]
+            skus = [int(s) for s in (p["kilde"] + (p.get("salg_kilde") or []))]
+            br = best_map.get((iso_w, iso_y, navn.strip().lower()))
+            b = int(br[col] or 0) if br else 0
+            if br and br["pris_ex_moms"]:
+                per[navn]["pris"] = float(br["pris_ex_moms"])
+            s = sum(salg_sku.get((iso, sk), 0) for sk in skus)
+            o = sum(oms_sku.get((iso, sk), 0.0) for sk in skus)
+            per[navn]["bestilt"] += b
+            per[navn]["solgt"]   += s
+            per[navn]["oms"]     += o
+            ua = uge_agg.setdefault((iso_y, iso_w), {"bestilt": 0, "solgt": 0})
+            ua["bestilt"] += b
+            ua["solgt"]   += s
+        d += _td(days=1)
+
+    varer = []
+    for p in kage:
+        navn = p["navn"]
+        x = per[navn]
+        pris = x["pris"] or 0.0
+        spild = max(0, x["bestilt"] - x["solgt"])
+        varer.append({
+            "varenavn": navn, "bestilt": x["bestilt"], "solgt": x["solgt"], "spild": spild,
+            "sell_through": round(x["solgt"] / x["bestilt"] * 100) if x["bestilt"] > 0 else None,
+            "kostpris": pris, "omsaetning": round(x["oms"]),
+            "vareforbrug": round(x["solgt"] * pris), "spild_vaerdi": round(spild * pris),
+            "db": round(x["oms"] - x["solgt"] * pris),
+        })
+    varer.sort(key=lambda v: -v["bestilt"])
+    t_best = sum(v["bestilt"] for v in varer)
+    t_solgt = sum(v["solgt"] for v in varer)
+    t_oms = sum(v["omsaetning"] for v in varer)
+    t_vf = sum(v["vareforbrug"] for v in varer)
+    total = {
+        "bestilt": t_best, "solgt": t_solgt, "spild": sum(v["spild"] for v in varer),
+        "sell_through": round(t_solgt / t_best * 100) if t_best > 0 else None,
+        "omsaetning": t_oms, "vareforbrug": t_vf, "db": t_oms - t_vf,
+        "spild_vaerdi": sum(v["spild_vaerdi"] for v in varer),
+        "dg_pct": round((t_oms - t_vf) / t_oms * 100, 1) if t_oms > 0 else None,
+    }
+    uger = [{"aar": k[0], "uge": k[1], "bestilt": v["bestilt"], "solgt": v["solgt"],
+             "sell_through": round(v["solgt"] / v["bestilt"] * 100) if v["bestilt"] > 0 else None}
+            for k, v in sorted(uge_agg.items())]
+    return {"fra": fra_dato, "til": til, "varer": varer, "uger": uger, "total": total}
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:

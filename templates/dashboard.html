@@ -3026,6 +3026,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
           </div>
+          <div id="dbs-spild-kat" style="margin-top:12px;"></div>
           <div id="dbs-bemanding" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);"></div>
         </div>
 
@@ -4729,6 +4730,26 @@ async function loadDbsMaaned(val){
   }
   html += `</tfoot>`;
   tbl.innerHTML = html;
+  // Værdi spild fordelt på kategori (måneden)
+  const sk = d.spild_kategori || {};
+  const skBox = document.getElementById('dbs-spild-kat');
+  if (skBox){
+    const skTot = (sk['Brød']||0)+(sk['Boller']||0)+(sk['Wiener']||0);
+    if (skTot > 0){
+      const farve = {'Brød':'#8a6d3a','Boller':'#b8860b','Wiener':'#a0703a'};
+      const chip = k => {
+        const v = sk[k]||0; const pct = skTot>0?Math.round(v/skTot*100):0;
+        return `<div style="flex:1;min-width:120px;border:1px solid var(--border);border-left:3px solid ${farve[k]};border-radius:8px;padding:8px 12px;">
+          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);">${k}</div>
+          <div style="font-size:16px;font-weight:700;color:${farve[k]};">${_dbsKr(v)}</div>
+          <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${pct}% af spild</div></div>`;
+      };
+      skBox.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild fordelt (måneden · ekskl. kager)</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">${chip('Brød')}${chip('Boller')}${chip('Wiener')}</div>`;
+    } else {
+      skBox.innerHTML = '';
+    }
+  }
   dbsRenderBemanding(d);
 }
 

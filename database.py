@@ -1850,11 +1850,12 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
                       "pct": round(tot_s / tot_b * 100) if tot_b > 0 else 0}}
 
 
-def hent_dagens_spild_vaerdi(dato: str) -> float:
+def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     """Værdi (kr ex moms) af dagens bagværks-spild = Σ (bestilt − solgt friskt) ×
     kostpris pr. vare, ekskl. kager (sælges over flere dage). Kaffe-comboer tæller
     som solgt (trækker fra kategoriens spild-værdi til kategoriens gns. kostpris).
-    Returnerer 0.0 hvis ingen bestilling for ugen. Bruges i DB-Shopbox-tabellen."""
+    Returnerer 0.0 hvis ingen bestilling for ugen. Med detaljer=True returneres
+    {'total': kr, 'kategorier': {Brød/Boller/Wiener: kr}}. Bruges i DB-Shopbox."""
     from datetime import date as _d
     DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
     KAT = ["Brød", "Boller", "Wiener"]          # kager ekskluderet fra spild
@@ -1862,13 +1863,14 @@ def hent_dagens_spild_vaerdi(dato: str) -> float:
     d = _d.fromisoformat(dato)
     iso_y, iso_w, _ = d.isocalendar()
     col = DAGCOL[d.weekday()]
+    _tom = {"total": 0.0, "kategorier": {k: 0.0 for k in KAT}}
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         best = conn.execute(
             f"SELECT varenavn, {col} AS ant, pris_ex_moms FROM ugebestillinger "
             f"WHERE uge=? AND aar=?", (iso_w, iso_y)).fetchall()
         if not best:
-            return 0.0
+            return _tom if detaljer else 0.0
         navn_skus = {p["navn"].strip().lower():
                      [int(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
                      for p in _ORGANIC_BAKERY}
@@ -1915,7 +1917,10 @@ def hent_dagens_spild_vaerdi(dato: str) -> float:
             n = int((r["ant"] or 0) * rolle[2])
             avg = kat_cost_sum[kat] / kat_units[kat] if kat_units[kat] > 0 else 0.0
             kat_spild_kr[kat] = max(0.0, kat_spild_kr[kat] - n * avg)
-    return round(sum(kat_spild_kr.values()), 2)
+    total = round(sum(kat_spild_kr.values()), 2)
+    if detaljer:
+        return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_spild_kr.items()}}
+    return total
 
 
 def hent_aarsdata(aar: int = None) -> Dict:
@@ -9627,6 +9632,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     dage = []
     tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0,
            "vaerdi_spild": 0.0}
+    spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
     d = foerste
     while d <= sidste:
         iso = d.isoformat()
@@ -9642,7 +9648,11 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
-        vspild = hent_dagens_spild_vaerdi(iso) if x else 0.0   # kun dage med salg
+        vspild_d = hent_dagens_spild_vaerdi(iso, detaljer=True) if x else {"total": 0.0, "kategorier": {}}
+        vspild = vspild_d["total"]
+        for _kk, _kv in vspild_d.get("kategorier", {}).items():
+            if _kk in spild_kat:
+                spild_kat[_kk] += _kv
         dage.append({
             "dato":     iso,
             "ugedag":   _DK_DAGE[d.weekday()],
@@ -9730,6 +9740,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "loen_aktiv": loen_aktiv,
             "maaneder": maaneder,
             "dage": dage, "total": total,
+            "spild_kategori": {k: round(v) for k, v in spild_kat.items()},
             "har_forecast": bool(forecast_dage),
             "forecast_dage": forecast_dage,
             "forecast_total": forecast_total,

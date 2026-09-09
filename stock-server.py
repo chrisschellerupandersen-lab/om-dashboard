@@ -235,15 +235,21 @@ def index():
     })
 
 if __name__ == "__main__":
+    import os
+
     print("🚀 Ratepension Live Data Server starter...")
     print("📊 Henter live data fra Yahoo Finance...")
 
     # Initial load
     update_cache()
 
-    print("\n✅ Server klar! Åben http://localhost:5000")
-    print("📡 API dokumentation: http://localhost:5000/")
-    print("🔄 Data opdateres automatisk hver 5 minutter")
-    print("📱 Dashboard kalder: http://localhost:5000/api/portfolio\n")
+    # Railway bruger PORT miljøvariabel, localhost bruger 5000
+    port = int(os.environ.get("PORT", 5000))
+    host = "0.0.0.0"  # Railway kræver 0.0.0.0, ikke 127.0.0.1
 
-    app.run(debug=True, port=5000, host="127.0.0.1")
+    print(f"\n✅ Server klar på port {port}!")
+    print(f"📡 API dokumentation: http://localhost:{port}/")
+    print("🔄 Data opdateres automatisk hver 5 minutter")
+    print(f"📱 Dashboard kalder: http://localhost:{port}/api/portfolio\n")
+
+    app.run(debug=False, port=port, host=host)

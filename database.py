@@ -2015,6 +2015,60 @@ def hent_kage_organic_analyse(fra_dato: str = "2026-09-01") -> Dict:
     return {"fra": fra_dato, "til": til, "varer": varer, "uger": uger, "total": total}
 
 
+def hent_kage_foer_efter(skift: str = "2026-09-01", gl_uger: int = 8) -> Dict:
+    """Sammenligner kagesalg (antal + omsætning ex moms) pr. uge FØR vs. EFTER
+    leverandørskiftet (default 1/9). Bruger samme kage-definition som Kager-siden
+    (_KAGE_WHERE, på varenavn). NB: det gamle sortiment havde flere kage-typer
+    (træstammer, muffins, brownies m.m.); Organic = cookies + gulerodskage."""
+    from datetime import date as _d
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(f"""
+            SELECT dato, SUM(antal) AS antal, SUM(omsætning) AS oms
+            FROM transaktioner WHERE {_KAGE_WHERE}
+            GROUP BY dato ORDER BY dato
+        """).fetchall()
+    uger: Dict = {}
+    for r in rows:
+        d = _d.fromisoformat(r["dato"])
+        iy, iw, _ = d.isocalendar()
+        u = uger.setdefault((iy, iw), {"antal": 0.0, "oms": 0.0, "sidste": d})
+        u["antal"] += float(r["antal"] or 0)
+        u["oms"]   += float(r["oms"] or 0)
+        if d > u["sidste"]:
+            u["sidste"] = d
+    skift_d = _d.fromisoformat(skift)
+    wk = []
+    for (iy, iw), v in sorted(uger.items()):
+        man = _d.fromisocalendar(iy, iw, 1)
+        wk.append({"aar": iy, "uge": iw, "antal": int(v["antal"]),
+                   "oms_ex": round(v["oms"] / 1.25), "man": man.isoformat(),
+                   "era": "organic" if man >= skift_d else "gammel",
+                   "delvis": v["sidste"].isoweekday() != 7})
+
+    def _snit(seg, key):
+        s = [x for x in seg if not x["delvis"]]
+        return (round(sum(x[key] for x in s) / len(s), 1) if s else 0), len(s)
+
+    organic = [w for w in wk if w["era"] == "organic"]
+    gammel_alle = [w for w in wk if w["era"] == "gammel"]
+    gammel_nyeste = [w for w in gammel_alle if not w["delvis"]][-gl_uger:]
+    o_oms, o_n = _snit(organic, "oms_ex")
+    o_ant, _   = _snit(organic, "antal")
+    g_oms, _   = _snit(gammel_nyeste, "oms_ex")
+    g_ant, _   = _snit(gammel_nyeste, "antal")
+
+    def _delta(a, b):
+        return round((a - b) / b * 100) if b else None
+    return {
+        "skift": skift, "uger": wk,
+        "organic": {"hele_uger": o_n, "snit_oms": o_oms, "snit_antal": o_ant},
+        "gammel":  {"hele_uger": len(gammel_nyeste), "snit_oms": g_oms, "snit_antal": g_ant},
+        "delta_oms_pct": _delta(o_oms, g_oms),
+        "delta_antal_pct": _delta(o_ant, g_ant),
+    }
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:

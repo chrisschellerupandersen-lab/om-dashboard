@@ -9625,13 +9625,26 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         loen_ov = {r["dato"]: r["loennet"] for r in conn.execute(
             "SELECT dato, loennet FROM db_loen_override WHERE dato>=? AND dato<=?",
             (foerste.isoformat(), _md_slut)).fetchall()}
+        # Frost-salg pr. dag (omsætning ex moms af nedfrosset bagværk solgt igen).
+        # Bredt LIKE '%rost%' + Python-filter via _bageri_rolle (frost, ekskl. pølse/ost).
+        frost_per: Dict[str, float] = {}
+        for fr in conn.execute("""
+            SELECT dato, varenavn, COALESCE(SUM(omsaetning_ex_moms),0) AS kr
+            FROM v_transaktioner
+            WHERE dato>=? AND dato<=? AND LOWER(varenavn) LIKE '%rost%'
+            GROUP BY dato, varenavn
+        """, (foerste.isoformat(), sidste.isoformat())).fetchall():
+            navn = fr["varenavn"] or ""
+            rolle = _bageri_rolle(navn)
+            if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
+                frost_per[fr["dato"]] = frost_per.get(fr["dato"], 0.0) + float(fr["kr"] or 0)
     per = {str(x["dato"])[:10]: x for x in rows}
 
     loen_aktiv = (y, m) >= _LOEN_START
 
     dage = []
     tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0,
-           "vaerdi_spild": 0.0}
+           "vaerdi_spild": 0.0, "frost_salg": 0.0}
     spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
     d = foerste
     while d <= sidste:
@@ -9663,6 +9676,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "omk":      round(omk),
             "resultat": round(res),
             "vaerdi_spild": round(vspild),
+            "frost_salg": round(frost_per.get(iso, 0.0)),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
             "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
@@ -9670,6 +9684,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         tot["oms_ex"] += oms; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res
         tot["vaerdi_spild"] += vspild
+        tot["frost_salg"] += frost_per.get(iso, 0.0)
         d += _td(days=1)
 
     total = {
@@ -9679,6 +9694,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "omk":      round(tot["omk"]),
         "resultat": round(tot["resultat"]),
         "vaerdi_spild": round(tot["vaerdi_spild"]),
+        "frost_salg": round(tot["frost_salg"]),
         "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
         "antal_dage": len(dage),
     }

@@ -4658,6 +4658,7 @@ async function loadDbsMaaned(val){
     + tile('Omk i alt', t.omk, '#8a3a3a')
     + tile('Resultat (til dato)', t.resultat, resClr)
     + tile('Omsætning', t.oms_ex, 'var(--ash)')
+    + tile('Værdi spild', t.vaerdi_spild, '#8a6d3a')
     + prognoseTile;
   // Dag-tabel
   const tbl = document.getElementById('dbs-maaned-tabel');
@@ -4665,7 +4666,8 @@ async function loadDbsMaaned(val){
     <th style="text-align:left;">Dato</th><th style="text-align:left;">Dag</th>
     <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
     <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
-    <th style="text-align:right;">Omk</th><th style="text-align:right;">Resultat</th></tr></thead><tbody>`;
+    <th style="text-align:right;">Omk</th><th style="text-align:right;">Resultat</th>
+    <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th></tr></thead><tbody>`;
   (d.dage||[]).slice().reverse().forEach(x=>{
     const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
     const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -4681,12 +4683,13 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
       ${_dbsLoenCell(x)}
       <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
-      <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
+      <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
+      <td style="text-align:right;color:var(--ash);">${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td></tr>`;
   });
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];
   if (d.har_forecast && fc.length){
-    html += `<tr><td colspan="8" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
+    html += `<tr><td colspan="9" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
     fc.forEach(x=>{
       const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
       const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -4698,7 +4701,8 @@ async function loadDbsMaaned(val){
         <td style="text-align:right;">${_dbsPct(x.dg_pct)}</td>
         ${_dbsLoenCell(x)}
         <td style="text-align:right;">${_dbsKr(x.omk)}</td>
-        <td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
+        <td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td>
+        <td style="text-align:right;">—</td></tr>`;
     });
   }
   html += `</tbody>
@@ -4709,7 +4713,8 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${t.oms_ex>0?_dbsPct(t.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(t.loen)}</td>
       <td style="text-align:right;">${_dbsKr(t.omk)}</td>
-      <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td></tr>`;
+      <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td>
+      <td style="text-align:right;color:var(--ash);">${_dbsKr(t.vaerdi_spild)}</td></tr>`;
   if (d.har_forecast && (d.prognose_total)){
     const p = d.prognose_total; const pClr = p.resultat>=0?'var(--moss)':'var(--danger)';
     html += `<tr style="font-weight:700;color:var(--forest);background:rgba(30,58,30,.05);">
@@ -4719,7 +4724,8 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${p.oms_ex>0?_dbsPct(p.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(p.loen)}</td>
       <td style="text-align:right;">${_dbsKr(p.omk)}</td>
-      <td style="text-align:right;color:${pClr};">${_dbsKr(p.resultat)}</td></tr>`;
+      <td style="text-align:right;color:${pClr};">${_dbsKr(p.resultat)}</td>
+      <td style="text-align:right;">—</td></tr>`;
   }
   html += `</tfoot>`;
   tbl.innerHTML = html;

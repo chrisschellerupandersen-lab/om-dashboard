@@ -1850,6 +1850,74 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
                       "pct": round(tot_s / tot_b * 100) if tot_b > 0 else 0}}
 
 
+def hent_dagens_spild_vaerdi(dato: str) -> float:
+    """Værdi (kr ex moms) af dagens bagværks-spild = Σ (bestilt − solgt friskt) ×
+    kostpris pr. vare, ekskl. kager (sælges over flere dage). Kaffe-comboer tæller
+    som solgt (trækker fra kategoriens spild-værdi til kategoriens gns. kostpris).
+    Returnerer 0.0 hvis ingen bestilling for ugen. Bruges i DB-Shopbox-tabellen."""
+    from datetime import date as _d
+    DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    KAT = ["Brød", "Boller", "Wiener"]          # kager ekskluderet fra spild
+    dato = str(dato)[:10]
+    d = _d.fromisoformat(dato)
+    iso_y, iso_w, _ = d.isocalendar()
+    col = DAGCOL[d.weekday()]
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        best = conn.execute(
+            f"SELECT varenavn, {col} AS ant, pris_ex_moms FROM ugebestillinger "
+            f"WHERE uge=? AND aar=?", (iso_w, iso_y)).fetchall()
+        if not best:
+            return 0.0
+        navn_skus = {p["navn"].strip().lower():
+                     [int(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
+                     for p in _ORGANIC_BAKERY}
+        alle_sku = sorted({s for b in best
+                           for s in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        solgt_pr_sku: Dict[int, int] = {}
+        if alle_sku:
+            ph = ",".join("?" * len(alle_sku))
+            for r in conn.execute(f"""
+                SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       ROUND(SUM({_antal_sql()}),0) AS ant
+                FROM transaktioner
+                WHERE dato=? AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})
+                GROUP BY vn
+            """, [dato] + [int(x) for x in alle_sku]).fetchall():
+                solgt_pr_sku[int(r["vn"])] = int(r["ant"] or 0)
+        _sku_set = set(alle_sku)
+        alle_solgt = conn.execute(
+            "SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, "
+            "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn",
+            (dato,)).fetchall()
+
+    kat_spild_kr = {k: 0.0 for k in KAT}
+    kat_units    = {k: 0 for k in KAT}
+    kat_cost_sum = {k: 0.0 for k in KAT}
+    for b in best:
+        navn = b["varenavn"] or ""
+        kat = _organic_kat(navn) or _bakery_kat(navn)
+        if kat not in KAT:
+            continue
+        bestilt_p = int(b["ant"] or 0)
+        pris = float(b["pris_ex_moms"] or 0)
+        solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
+        kat_spild_kr[kat] += max(0, bestilt_p - solgt_p) * pris
+        kat_units[kat]    += bestilt_p
+        kat_cost_sum[kat] += bestilt_p * pris
+    # Comboer (kaffe+wienerbrød/BMO) uden eget katalog-SKU spiser af spildet
+    for r in alle_solgt:
+        if r["vn"] in _sku_set:
+            continue
+        rolle = _bageri_rolle(r["varenavn"])
+        if rolle and rolle[0] == "frisk" and rolle[1] in KAT:
+            kat = rolle[1]
+            n = int((r["ant"] or 0) * rolle[2])
+            avg = kat_cost_sum[kat] / kat_units[kat] if kat_units[kat] > 0 else 0.0
+            kat_spild_kr[kat] = max(0.0, kat_spild_kr[kat] - n * avg)
+    return round(sum(kat_spild_kr.values()), 2)
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:
@@ -9557,7 +9625,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     loen_aktiv = (y, m) >= _LOEN_START
 
     dage = []
-    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0}
+    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0,
+           "vaerdi_spild": 0.0}
     d = foerste
     while d <= sidste:
         iso = d.isoformat()
@@ -9573,6 +9642,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
         omk = omk_pr_dag
         res = db - loen - omk
+        vspild = hent_dagens_spild_vaerdi(iso) if x else 0.0   # kun dage med salg
         dage.append({
             "dato":     iso,
             "ugedag":   _DK_DAGE[d.weekday()],
@@ -9582,12 +9652,14 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "loen":     round(loen),
             "omk":      round(omk),
             "resultat": round(res),
+            "vaerdi_spild": round(vspild),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
             "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
         })
         tot["oms_ex"] += oms; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res
+        tot["vaerdi_spild"] += vspild
         d += _td(days=1)
 
     total = {
@@ -9596,6 +9668,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "loen":     round(tot["loen"]),
         "omk":      round(tot["omk"]),
         "resultat": round(tot["resultat"]),
+        "vaerdi_spild": round(tot["vaerdi_spild"]),
         "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
         "antal_dage": len(dage),
     }

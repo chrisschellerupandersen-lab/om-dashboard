@@ -1495,6 +1495,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Seneste dag · <span id="hdr-dag-dato" style="font-weight:400;color:var(--ash);">—</span></h2>
           <p id="hdr-dag-sub">Omsætning, kunder og avance for dagen · sammenligning med samme dag forrige uge</p>
         </div>
+        <div id="dag-top" style="margin-bottom:18px;"></div>
         <div class="kpi-row dag-kpi-row">
 
           <!-- Omsætning -->
@@ -5531,6 +5532,7 @@ async function loadAll() {
   buildForside(kpi, dage, uger, idag, katUge);
   if (kpi) { buildAlerts(kpi); buildDagProgress(kpi); }
   buildDag(kpi, timer, timerForrige, timerSnit);
+  buildDagTop(kpi, dage);
   buildUge(uger);
   buildTime(timerSnit);
   buildKategorier(kategorier);
@@ -6827,6 +6829,60 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
     document.getElementById('dag-chart-wrap').style.display = 'none';
     document.getElementById('dag-no-time').style.display = '';
   }
+}
+
+// ── TOP-STRIBE (Seneste dag): vækst + trend ───────────────────────────────────
+function _vaekstChip(label, nu, foer, sub){
+  const har = (foer != null && foer > 0 && nu != null);
+  const pct = har ? ((nu / foer - 1) * 100) : null;
+  const up  = pct != null && pct >= 0;
+  const arrow = pct == null ? '·' : (up ? '▲' : '▼');
+  const clr = pct == null ? 'var(--ash)' : (up ? 'var(--moss)' : 'var(--danger)');
+  const foerTxt = (foer != null && foer > 0) ? kr(foer) : '—';
+  return `<div style="flex:1;min-width:150px;background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:13px 15px;">
+    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">${label}</div>
+    <div style="display:flex;align-items:baseline;gap:7px;margin-top:6px;">
+      <span style="font-size:24px;font-weight:700;color:${clr};line-height:1;">${pct==null?'—':(up?'+':'')+pct.toFixed(0)+'%'}</span>
+      <span style="color:${clr};font-size:13px;">${arrow}</span>
+    </div>
+    <div style="font-size:11px;color:var(--ash);margin-top:5px;">${sub} · ${foerTxt}</div>
+  </div>`;
+}
+
+function buildDagTop(kpi, dage){
+  const el = document.getElementById('dag-top');
+  if (!el || !kpi) return;
+  const D = kpi.dag||{}, PD = kpi.prev_dag||{}, U = kpi.uge||{}, PU = kpi.prev_uge||{}, M = kpi.mtd||{}, PM = kpi.prev_mtd||{};
+  const chips =
+      _vaekstChip('I dag',          D.omsaetning, PD.omsaetning, 'vs. samme dag sidste uge')
+    + _vaekstChip('Uge til dato',   U.omsaetning, PU.omsaetning, 'vs. sidste uge (samme tid)')
+    + _vaekstChip('Måned til dato', M.omsaetning, PM.omsaetning, 'vs. sidste måned (samme tid)');
+
+  // Sparkline: omsætning seneste 14 dage
+  const arr = (dage||[]).filter(x=>x && x.dato && x.omsaetning!=null)
+                .slice().sort((a,b)=> a.dato < b.dato ? -1 : 1).slice(-14);
+  let spark = '';
+  if (arr.length >= 2){
+    const vals = arr.map(x=>oms(x.omsaetning)||0);
+    const max = Math.max(1, ...vals);
+    const bars = arr.map((x,i)=>{
+      const v = vals[i]; const h = Math.max(4, Math.round(v/max*52));
+      const last = i === arr.length-1;
+      const dd = x.dato.slice(8,10)+'/'+x.dato.slice(5,7);
+      return `<div title="${dd}: ${kr(x.omsaetning)}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
+        <div style="height:${h}px;border-radius:3px 3px 0 0;background:${last?'var(--amber)':'rgba(47,90,48,.5)'};"></div></div>`;
+    }).join('');
+    const foerste = vals[0], sidste = vals[vals.length-1];
+    const dpct = foerste>0 ? ((sidste/foerste-1)*100) : null;
+    const dtxt = dpct==null ? '' : `<span style="color:${dpct>=0?'var(--moss)':'var(--danger)'};font-family:'DM Mono',monospace;font-size:11px;">${dpct>=0?'▲':'▼'} ${Math.abs(dpct).toFixed(0)}%</span>`;
+    spark = `<div style="flex:2;min-width:240px;background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:12px 15px;display:flex;flex-direction:column;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">Omsætning · seneste 14 dage</span>${dtxt}</div>
+      <div style="display:flex;align-items:flex-end;gap:2px;height:56px;">${bars}</div>
+    </div>`;
+  }
+
+  el.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">${chips}${spark}</div>`;
 }
 
 // ── BONNER (Seneste dag) ──────────────────────────────────────────────────────

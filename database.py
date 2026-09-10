@@ -1201,6 +1201,8 @@ def hent_kpi(aar: int = None) -> Dict:
 
     return {
         "dag":              dag_a,
+        "dag_dato":         seneste_dato,   # dato for seneste dag (til header m.m.)
+        "seneste_dato":     seneste_dato,
         "uge":              uge_a,
         "uge_mandag":       uge_mandag,
         "prev_uge":         prev_uge_a,

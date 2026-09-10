@@ -36,6 +36,8 @@ _NAVN_MAP = {
     "cookie":                         "Cookie",
     "pain au chocolate":              "Pain au Chocolate",
     "tebirkes":                       "Tebirkes",
+    "tebirkes snegl m. citron":       "Tebirkes",   # bagerens nye portalnavn (samme vare)
+    "tebirkes snegl m citron":        "Tebirkes",
     "tebolle":                        "Tebolle alm",
     "tebolle med choko":              "Tebolle m. chokolade",
     "karamelliseret croissant":       "Karamelliseret croissant",

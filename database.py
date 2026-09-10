@@ -2074,6 +2074,69 @@ def hent_kage_foer_efter(skift: str = "2026-09-01", gl_dage: int = 56) -> Dict:
     }
 
 
+def hent_wiener_afterhours(fra: str = "2026-09-01") -> Dict:
+    """Datagrundlag til at vurdere et 'wienerbrød efter kl. 18: 2 for 40'-tilbud.
+    Salg pr. time (så man ser demand sent på dagen + lukketid), snitpris/kostpris,
+    andel solgt efter kl. 18, og estimeret restlager sidst på dagen (fryse-kandidat)."""
+    from datetime import date as _d
+    wiener = [p for p in _ORGANIC_BAKERY if _organic_kat(p["navn"]) == "Wiener"]
+    skus = sorted({int(s) for p in wiener for s in (p["kilde"] + (p.get("salg_kilde") or []))})
+    DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        ph = ",".join("?" * len(skus))
+        sku_where = f"CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({ph})"
+        til = conn.execute("SELECT MAX(dato) AS d FROM transaktioner WHERE dato>=?", (fra,)).fetchone()["d"]
+        timer = conn.execute(f"""
+            SELECT time_start AS h, SUM({_antal_sql()}) AS ant, SUM(omsætning) AS oms
+            FROM transaktioner WHERE dato>=? AND time_start>=0 AND {sku_where}
+            GROUP BY time_start ORDER BY time_start""", [fra] + skus).fetchall()
+        dg = conn.execute(f"""
+            SELECT COUNT(DISTINCT dato) AS n, SUM({_antal_sql()}) AS ant, SUM(omsætning) AS oms
+            FROM transaktioner WHERE dato>=? AND {sku_where}""", [fra] + skus).fetchone()
+        a18 = conn.execute(f"""
+            SELECT SUM({_antal_sql()}) AS ant FROM transaktioner
+            WHERE dato>=? AND time_start>=18 AND {sku_where}""", [fra] + skus).fetchone()
+        # Restlager-estimat: bestilt wiener (dagens kolonne) − frisk solgt via SKU, pr. dag
+        best = conn.execute("SELECT uge, aar, varenavn, man,tir,ons,tor,fre,loe,son FROM ugebestillinger").fetchall()
+        salg_dag = {}
+        for r in conn.execute(f"""SELECT dato, SUM({_antal_sql()}) AS ant FROM transaktioner
+            WHERE dato>=? AND {sku_where} GROUP BY dato""", [fra] + skus).fetchall():
+            salg_dag[r["dato"]] = int(r["ant"] or 0)
+    bmap = {}
+    for r in best:
+        if _organic_kat(r["varenavn"]) == "Wiener":
+            bmap[(r["uge"], r["aar"])] = bmap.get((r["uge"], r["aar"]), {})
+            for c in DAGCOL:
+                bmap[(r["uge"], r["aar"])][c] = bmap[(r["uge"], r["aar"])].get(c, 0) + int(r[c] or 0)
+    rest_dage = []
+    if til:
+        d = _d.fromisoformat(fra)
+        while d <= _d.fromisoformat(til):
+            iso_y, iso_w, _ = d.isocalendar()
+            b = (bmap.get((iso_w, iso_y)) or {}).get(DAGCOL[d.weekday()], 0)
+            s = salg_dag.get(d.isoformat(), 0)
+            if b > 0:
+                rest_dage.append(max(0, b - s))
+            d = _d.fromordinal(d.toordinal() + 1)
+    n = dg["n"] or 1
+    tot = int(dg["ant"] or 0)
+    oms = float(dg["oms"] or 0)
+    pris_incl = round(oms / tot, 1) if tot else 0.0
+    kost = round(sum(p["indkoeb"] for p in wiener) / len(wiener), 1)
+    a18n = int((a18["ant"] if a18 else 0) or 0)
+    return {
+        "fra": fra, "til": til, "n_dage": n,
+        "total_antal": tot, "solgt_pr_dag": round(tot / n, 1),
+        "pris_incl_snit": pris_incl, "pris_ex_snit": round(pris_incl / 1.25, 1),
+        "kostpris_snit": kost,
+        "after18_antal": a18n, "after18_pr_dag": round(a18n / n, 1),
+        "after18_andel_pct": round(a18n / tot * 100) if tot else 0,
+        "rest_pr_dag_est": round(sum(rest_dage) / len(rest_dage), 1) if rest_dage else None,
+        "timer": [{"time": int(t["h"]), "antal": int(t["ant"] or 0)} for t in timer],
+    }
+
+
 def hent_aarsdata(aar: int = None) -> Dict:
     from datetime import datetime, date as _date
     if aar is None:

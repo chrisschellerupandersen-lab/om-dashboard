@@ -283,6 +283,14 @@ def init_db():
                 loennet  INTEGER NOT NULL
             );
 
+            -- Generisk nøgle-værdi til app-indstillinger delt på tværs af enheder
+            -- (fx sidepanel-opsætning, så desktop-ændringer slår igennem på mobil).
+            CREATE TABLE IF NOT EXISTS app_kv (
+                key      TEXT PRIMARY KEY,
+                value    TEXT,
+                updated  TEXT DEFAULT (datetime('now','localtime'))
+            );
+
             CREATE TABLE IF NOT EXISTS ugebestillinger (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 uge           INTEGER NOT NULL,
@@ -2072,6 +2080,20 @@ def hent_kage_foer_efter(skift: str = "2026-09-01", gl_dage: int = 56) -> Dict:
         "delta_pr_uge_oms_pct": _delta(org["pr_uge_oms"], gl["pr_uge_oms"]),
         "delta_pr_uge_antal_pct": _delta(org["pr_uge_antal"], gl["pr_uge_antal"]),
     }
+
+
+def hent_app_kv(key: str):
+    with _conn() as conn:
+        r = conn.execute("SELECT value FROM app_kv WHERE key=?", (key,)).fetchone()
+        return r["value"] if r else None
+
+
+def saet_app_kv(key: str, value: str) -> None:
+    with _conn() as conn:
+        conn.execute(
+            "INSERT INTO app_kv (key, value, updated) VALUES (?, ?, datetime('now','localtime')) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated=excluded.updated",
+            (key, value))
 
 
 def hent_wiener_afterhours(fra: str = "2026-09-01") -> Dict:

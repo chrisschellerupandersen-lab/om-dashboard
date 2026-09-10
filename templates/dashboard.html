@@ -5204,6 +5204,7 @@ function _navGrpSetCollapsed(grp, val) {
 function _navToggleGrp(grp) {
   _navGrpSetCollapsed(grp, !_navGrpCollapsed(grp));
   _buildNav();
+  _navSyncServer();   // gem fold-tilstand på tværs af enheder
 }
 let _navItems = null, _navEditMode = false, _navDragIdx = null;
 
@@ -5230,13 +5231,46 @@ function _navSave() {
   localStorage.setItem('om_nav_v1', JSON.stringify(
     _navItems.map(n => ({ id:n.id, label:n.label, hidden:n.hidden, group:n.group }))
   ));
+  _navSyncServer();
+}
+
+// Gem opsætning på serveren, så ændringer slår igennem på alle enheder (mobil m.m.)
+function _navSyncServer() {
+  try {
+    fetch('/api/nav-config', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nav: localStorage.getItem('om_nav_v1') || '',
+        grp: localStorage.getItem('om_nav_grp_v1') || ''
+      })
+    });
+  } catch (e) {}
+}
+
+// Hent server-opsætning ved opstart; server er kilden (så desktop-ændringer ses på mobil).
+async function _navLoadServer() {
+  let d;
+  try { d = await fetch('/api/nav-config').then(r => r.ok ? r.json() : null); }
+  catch (e) { return; }
+  if (!d) return;
+  const lNav = localStorage.getItem('om_nav_v1');
+  const lGrp = localStorage.getItem('om_nav_grp_v1');
+  let aendret = false;
+  if (d.nav) {                                  // server har en opsætning → brug den
+    if (d.nav !== lNav) { localStorage.setItem('om_nav_v1', d.nav); aendret = true; }
+  } else if (lNav) {                            // server tom, men lokal findes → seed serveren
+    _navSyncServer();
+  }
+  if (d.grp && d.grp !== lGrp) { localStorage.setItem('om_nav_grp_v1', d.grp); aendret = true; }
+  if (aendret) { _navLoad(); _buildNav(); }
 }
 
 function _navReset() {
-  if (!confirm('Nulstil sidepanel til standard?')) return;
+  if (!confirm('Nulstil sidepanel til standard? (gælder alle dine enheder)')) return;
   localStorage.removeItem('om_nav_v1');
+  localStorage.removeItem('om_nav_grp_v1');
   _navLoad();
-  _navSave();
+  _navSave();          // skriver default + synkroniserer til server
   _buildNav();
 }
 
@@ -12761,6 +12795,7 @@ async function loadVnrKontrol() {
 }
 
 _navLoad(); _buildNav();
+_navLoadServer();   // synk sidepanel-opsætning fra serveren (samme på alle enheder)
 _initMomsBtn();
 loadAll();
 setInterval(loadAll, 10 * 60 * 1000);

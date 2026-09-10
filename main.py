@@ -750,6 +750,29 @@ async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None)
     return database.hent_dagens_rest_kategori(dato)
 
 
+@app.get("/api/nav-config")
+async def api_nav_config_get(request: Request):
+    """Sidepanel-opsætning gemt på serveren (deles på tværs af enheder)."""
+    _kræv_login(request)
+    return {"nav": database.hent_app_kv("nav_v1"),
+            "grp": database.hent_app_kv("nav_grp_v1")}
+
+
+@app.post("/api/nav-config")
+async def api_nav_config_set(request: Request):
+    """Gem sidepanel-opsætning (nav-rækkefølge/grupper + gruppe-fold) server-side."""
+    _kræv_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if "nav" in body:
+        database.saet_app_kv("nav_v1", body.get("nav") or "")
+    if "grp" in body:
+        database.saet_app_kv("nav_grp_v1", body.get("grp") or "")
+    return {"ok": True}
+
+
 @app.get("/api/bageri/wiener-afterhours")
 async def api_wiener_afterhours(request: Request, fra: str = "2026-09-01"):
     """Datagrundlag til vurdering af 'wienerbrød efter 18: 2 for 40'. Login/secret."""

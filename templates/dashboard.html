@@ -588,6 +588,16 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 .nav-grp-sel{font-family:'DM Mono',monospace;font-size:7px;color:rgba(240,238,230,.6);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:2px;padding:2px 3px;cursor:pointer;flex-shrink:0;max-width:80px;outline:none;}
 .nav-grp-sel:focus{border-color:var(--amber);}
 .nav-grp-new-inp{font-family:'DM Mono',monospace;font-size:8px;border:none;border-bottom:1px solid var(--amber);background:transparent;color:rgba(240,238,230,.9);padding:0 2px;outline:none;width:70px;flex-shrink:0;}
+/* Touch/mobil: gør rediger-rækken og gruppe-vælgeren til at ramme med fingeren */
+@media (max-width: 768px){
+  .nav-edit-item{gap:8px;padding:11px 10px;font-size:14px;}
+  .nav-drag{font-size:19px;padding:6px 3px;}
+  .nav-vis{font-size:16px;width:24px;}
+  .nav-edit-lbl{font-size:14px;}
+  .nav-grp-chip{font-size:9px;max-width:56px;}
+  .nav-grp-sel{font-size:13px;max-width:130px;padding:7px 7px;border-radius:6px;}
+  .nav-grp-new-inp{font-size:13px;width:110px;}
+}
 .nav-rename-inp{flex:1;border:none;border-bottom:1px solid var(--amber);background:transparent;font-size:12px;color:rgba(240,238,230,.9);padding:0;outline:none;min-width:0;font-family:'DM Sans',sans-serif;}
 
 /* ── ALERTS & DAGSOVERBLIK ──────────────────────────────────────────────────── */
@@ -5175,10 +5185,14 @@ const NAV_GRP_IKON = {
   'Analyse & rapporter':'📊',
   'Marketing':          '📣',
   'Administration':     '⚙️',
+  'Arkiv':              '📦',
 };
 // Collapse-tilstand gemt i localStorage
 function _navGrpCollapsed(grp) {
-  try { return JSON.parse(localStorage.getItem('om_nav_grp_v1') || '{}')[grp] === true; } catch { return false; }
+  try {
+    const s = JSON.parse(localStorage.getItem('om_nav_grp_v1') || '{}');
+    return grp in s ? s[grp] === true : (grp === 'Arkiv');   // Arkiv starter foldet sammen
+  } catch { return grp === 'Arkiv'; }
 }
 function _navGrpSetCollapsed(grp, val) {
   try {
@@ -5200,7 +5214,8 @@ function _navLoad() {
       const saved = JSON.parse(s);
       _navItems = saved.map(sv => {
         const def = NAV_DEFAULT.find(d => d.id === sv.id);
-        return def ? { ...def, label: sv.label ?? def.label, hidden: !!sv.hidden } : null;
+        return def ? { ...def, label: sv.label ?? def.label, hidden: !!sv.hidden,
+                       group: sv.group ?? def.group } : null;
       }).filter(Boolean);
       NAV_DEFAULT.forEach(def => {
         if (!_navItems.find(n => n.id === def.id)) _navItems.push({ ...def });
@@ -5213,7 +5228,7 @@ function _navLoad() {
 
 function _navSave() {
   localStorage.setItem('om_nav_v1', JSON.stringify(
-    _navItems.map(n => ({ id:n.id, label:n.label, hidden:n.hidden }))
+    _navItems.map(n => ({ id:n.id, label:n.label, hidden:n.hidden, group:n.group }))
   ));
 }
 
@@ -5257,9 +5272,13 @@ function _buildNav() {
       if (!groups[item.group]) groups[item.group] = [];
       groups[item.group].push(item);
     });
-    // Bevar gruppe-rækkefølge fra NAV_DEFAULT
+    // Bevar gruppe-rækkefølge fra NAV_DEFAULT, tilføj custom-grupper (fx Arkiv) til sidst
     const grpOrder = [];
     NAV_DEFAULT.forEach(d => { if (!grpOrder.includes(d.group)) grpOrder.push(d.group); });
+    _navItems.forEach(n => { if (n.group && !grpOrder.includes(n.group)) grpOrder.push(n.group); });
+    // 'Arkiv' ligger altid nederst
+    const _iArk = grpOrder.indexOf('Arkiv');
+    if (_iArk >= 0) { grpOrder.splice(_iArk, 1); grpOrder.push('Arkiv'); }
 
     let html = '';
     grpOrder.forEach(grp => {
@@ -5348,6 +5367,7 @@ function _navAllGroups() {
   // Preserve NAV_DEFAULT group order, then any custom ones
   NAV_DEFAULT.forEach(d => { if (!seen.has(d.group)) { seen.add(d.group); out.push(d.group); }});
   _navItems.forEach(n => { if (!seen.has(n.group)) { seen.add(n.group); out.push(n.group); }});
+  if (!seen.has('Arkiv')) out.push('Arkiv');   // altid et klar-til-brug valg
   return out;
 }
 

@@ -5383,6 +5383,7 @@ function _buildNav() {
     });
     container.innerHTML = html;
   }
+  if (typeof _bnavBuild === 'function') _bnavBuild();   // hold bund-nav (mobil) i sync
 }
 
 function _navToggleEdit() {
@@ -12977,22 +12978,10 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') vfModalLuk(); 
 <!-- BOTTOM NAVIGATION -->
 <nav class="bnav" id="bnav">
   <div class="bnav-inner">
-    <button class="bnav-item" id="bn-forside" onclick="_bnavGo('forside',this)">
-      <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L1.5 7v8h4.5v-4.5h4V15h4.5V7L8 1.5z"/></svg>
-      <span class="bnav-lbl">Forside</span>
-    </button>
-    <button class="bnav-item" id="bn-dag" onclick="_bnavGo('dag',this)">
-      <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm.5 7.5V4h-1v5l3.5 2 .5-.87L8.5 8.5z"/></svg>
-      <span class="bnav-lbl">I dag</span>
-    </button>
-    <button class="bnav-item" id="bn-beregner" onclick="_bnavGo('beregner',this)">
-      <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1zm1 2v2h8V4H4zm0 4v1h2V8H4zm3 0v1h2V8H7zm3 0v1h2V8h-2zm-6 2v1h2v-1H4zm3 0v1h2v-1H7zm3 0v1h2v-1h-2z"/></svg>
-      <span class="bnav-lbl">Bestilling</span>
-    </button>
-    <button class="bnav-item" id="bn-uge" onclick="_bnavGo('uge',this)">
-      <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M1 11h2v3H1zm3-4h2v7H4zm3-3h2v10H7zm3 2h2v8h-2zm3-4h2v12h-2z"/></svg>
-      <span class="bnav-lbl">Uger</span>
-    </button>
+    <button class="bnav-item" id="bn-0"></button>
+    <button class="bnav-item" id="bn-1"></button>
+    <button class="bnav-item" id="bn-2"></button>
+    <button class="bnav-item" id="bn-3"></button>
     <button class="bnav-item" id="bn-menu" onclick="_bnavMenu(this)">
       <svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor"><path d="M1 3h14v2H1zm0 4h14v2H1zm0 4h14v2H1z"/></svg>
       <span class="bnav-lbl">Mere</span>
@@ -13000,7 +12989,32 @@ document.addEventListener('keydown', e => { if (e.key==='Escape') vfModalLuk(); 
   </div>
 </nav>
 <script>
-const _BNAV_MAP = {forside:'bn-forside', dag:'bn-dag', beregner:'bn-beregner', uge:'bn-uge'};
+// Bund-nav = de 4 første synlige sider i Dagsoverblik-gruppen (følger brugerens rækkefølge)
+let _BNAV_MAP = {};
+const _BNAV_KORT = {
+  dag:'I dag', dbshopbox:'DB', dagedetaljer:'Dage', morgenbriefing:'Briefing',
+  forside:'Overblik', management:'Review', time:'Timer',
+};
+function _bnavKort(it){ return _BNAV_KORT[it.id] || (it.label||'').split(' ')[0].slice(0,10); }
+function _bnavBuild(){
+  const items = ((typeof _navItems !== 'undefined' && _navItems) ? _navItems : NAV_DEFAULT)
+                  .filter(n => n.group === 'Dagsoverblik' && !n.hidden).slice(0, 4);
+  _BNAV_MAP = {};
+  for (let i = 0; i < 4; i++){
+    const btn = document.getElementById('bn-' + i);
+    if (!btn) continue;
+    const it = items[i];
+    if (!it){ btn.style.display = 'none'; btn.onclick = null; continue; }
+    btn.style.display = '';
+    _BNAV_MAP[it.id] = 'bn-' + i;
+    btn.onclick = () => _bnavGo(it.id, btn);
+    btn.innerHTML = `<svg class="bnav-svg" viewBox="0 0 16 16" fill="currentColor">${(typeof NAV_SVG!=='undefined' && NAV_SVG[it.id])||''}</svg>`
+                  + `<span class="bnav-lbl">${_bnavKort(it)}</span>`;
+  }
+  document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
+  const cur = document.getElementById(_BNAV_MAP[_navCurrentId]);
+  if (cur) cur.classList.add('active');
+}
 
 function _bnavGo(id, el) {
   // Find sidebar nav-item og brug den som el (synkroniserer sidebar)
@@ -13041,6 +13055,8 @@ document.getElementById('sidebar-backdrop').addEventListener('click', function()
   document.querySelectorAll('.bnav-item').forEach(b => b.classList.remove('active'));
   if (curBn) curBn.classList.add('active');
 });
+
+_bnavBuild();   // byg bund-nav fra Dagsoverblik (og igen når sidepanelet ændres via _buildNav)
 </script>
 
 <script>

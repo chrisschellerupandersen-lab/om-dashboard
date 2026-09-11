@@ -4691,6 +4691,46 @@ async function dbsLoenToggle(dato){
   loadDbsMaaned(sel && sel.value ? sel.value : undefined);
 }
 
+// Drill-down bag 'Værdi spild' / 'Frost salg' pr. dag
+async function dbsDagDetalje(dato, type, cell){
+  const tr = cell.closest('tr');
+  const key = dato + '|' + type;
+  const nxt = tr.nextElementSibling;
+  if (nxt && nxt.dataset && nxt.dataset.detkey === key){ nxt.remove(); return; }  // toggle luk
+  document.querySelectorAll('tr[data-detrow]').forEach(r => r.remove());           // kun én åben
+  const cols = tr.children.length;
+  const stripe = type === 'frost' ? 'var(--moss)' : '#8a6d3a';
+  const det = document.createElement('tr');
+  det.setAttribute('data-detrow', '1'); det.dataset.detkey = key;
+  det.innerHTML = `<td colspan="${cols}" style="padding:0;"><div style="padding:10px 14px 12px 24px;background:rgba(30,58,30,.03);border-left:3px solid ${stripe};">Indlæser…</div></td>`;
+  tr.after(det);
+  const d = await api('/api/db-shopbox/dag-detalje?dato=' + dato);
+  const box = det.querySelector('div');
+  if (!d){ box.textContent = 'Kunne ikke hente detaljer.'; return; }
+  box.innerHTML = (type === 'spild') ? _dbsSpildDet(d.spild) : _dbsFrostDet(d.frost);
+}
+function _dbsDetLinje(venstre, hoejre, faded){
+  const mono = "font-family:'DM Mono',monospace;";
+  return `<div style="display:flex;justify-content:space-between;gap:12px;font-size:12.5px;padding:2px 0;${faded?'color:var(--ash);':''}">
+    <span>${venstre}</span><span style="${mono}">${hoejre}</span></div>`;
+}
+function _dbsSpildDet(s){
+  if (!s || !s.varer || !s.varer.length) return '<span style="color:var(--ash);font-size:12px;">Intet spild denne dag 🎉</span>';
+  const mono = "font-family:'DM Mono',monospace;";
+  const rows  = s.varer.map(v => _dbsDetLinje(`${v.navn} <span style="color:var(--ash);">· ${v.spild} stk × ${v.kostpris} kr</span>`, _dbsKr(v.vaerdi))).join('');
+  const combo = (s.combo||[]).map(c => _dbsDetLinje(`☕ ${c.navn} (${c.antal}) — solgt i combo`, '−' + _dbsKr(c.fratraek), true)).join('');
+  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild — ikke solgt friskt (× kostpris)</div>${rows}${combo}
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(s.total)}</span></div>`;
+}
+function _dbsFrostDet(f){
+  if (!f || !f.length) return '<span style="color:var(--ash);font-size:12px;">Intet frost-salg denne dag.</span>';
+  const mono = "font-family:'DM Mono',monospace;";
+  const tot = f.reduce((a,x)=>a + (x.oms_ex||0), 0);
+  const rows = f.map(x => _dbsDetLinje(`${x.varenavn} <span style="color:var(--ash);">· ${x.antal} stk</span>`, _dbsKr(x.oms_ex))).join('');
+  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Frost salg — solgt af nedfrosset (ex moms)</div>${rows}
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(tot)}</span></div>`;
+}
+
 async function loadDbsMaaned(val){
   let url = '/api/db-shopbox/maaned';
   if (val) { const [a,m] = String(val).split('-'); url += `?aar=${a}&maaned=${m}`; }
@@ -4757,8 +4797,8 @@ async function loadDbsMaaned(val){
       ${_dbsLoenCell(x)}
       <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
-      <td style="text-align:right;color:var(--ash);">${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
-      <td style="text-align:right;color:var(--moss);">${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td></tr>`;
+      <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
+      <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td></tr>`;
   });
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];

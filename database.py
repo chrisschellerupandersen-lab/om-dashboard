@@ -1910,6 +1910,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     kat_spild_kr = {k: 0.0 for k in KAT}
     kat_units    = {k: 0 for k in KAT}
     kat_cost_sum = {k: 0.0 for k in KAT}
+    varer_det, combo_det = [], []
     for b in best:
         navn = b["varenavn"] or ""
         kat = _organic_kat(navn) or _bakery_kat(navn)
@@ -1918,9 +1919,14 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         bestilt_p = int(b["ant"] or 0)
         pris = float(b["pris_ex_moms"] or 0)
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
-        kat_spild_kr[kat] += max(0, bestilt_p - solgt_p) * pris
+        spild_p = max(0, bestilt_p - solgt_p)
+        kat_spild_kr[kat] += spild_p * pris
         kat_units[kat]    += bestilt_p
         kat_cost_sum[kat] += bestilt_p * pris
+        if detaljer and spild_p > 0:
+            varer_det.append({"navn": navn, "kategori": kat, "bestilt": bestilt_p,
+                              "solgt": solgt_p, "spild": spild_p, "kostpris": round(pris, 2),
+                              "vaerdi": round(spild_p * pris, 2)})
     # Comboer (kaffe+wienerbrød/BMO) uden eget katalog-SKU spiser af spildet
     for r in alle_solgt:
         if r["vn"] in _sku_set:
@@ -1930,11 +1936,46 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
             kat = rolle[1]
             n = int((r["ant"] or 0) * rolle[2])
             avg = kat_cost_sum[kat] / kat_units[kat] if kat_units[kat] > 0 else 0.0
-            kat_spild_kr[kat] = max(0.0, kat_spild_kr[kat] - n * avg)
+            foer = kat_spild_kr[kat]
+            kat_spild_kr[kat] = max(0.0, foer - n * avg)
+            if detaljer and (foer - kat_spild_kr[kat]) > 0.01:
+                combo_det.append({"navn": r["varenavn"], "kategori": kat, "antal": n,
+                                  "fratraek": round(foer - kat_spild_kr[kat], 2)})
     total = round(sum(kat_spild_kr.values()), 2)
     if detaljer:
-        return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_spild_kr.items()}}
+        varer_det.sort(key=lambda v: -v["vaerdi"])
+        return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_spild_kr.items()},
+                "varer": varer_det, "combo": combo_det}
     return total
+
+
+def hent_dagens_frost_detalje(dato: str) -> List[Dict]:
+    """Frost-salg pr. vare for én dag (omsætning ex moms) — bag 'Frost salg'-tallet."""
+    dato = str(dato)[:10]
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT varenavn, ROUND(SUM(antal),0) AS antal,
+                   COALESCE(SUM(omsaetning_ex_moms),0) AS oms
+            FROM v_transaktioner
+            WHERE dato=? AND LOWER(varenavn) LIKE '%rost%'
+            GROUP BY varenavn ORDER BY oms DESC
+        """, (dato,)).fetchall()
+    ud = []
+    for r in rows:
+        navn = r["varenavn"] or ""
+        rolle = _bageri_rolle(navn)
+        if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
+            ud.append({"varenavn": navn, "antal": int(r["antal"] or 0),
+                       "oms_ex": round(float(r["oms"] or 0))})
+    return ud
+
+
+def hent_dag_detalje(dato: str) -> Dict:
+    """Drill-down bag 'Værdi spild' og 'Frost salg' for én dag i DB-Shopbox."""
+    return {"dato": str(dato)[:10],
+            "spild": hent_dagens_spild_vaerdi(dato, detaljer=True),
+            "frost": hent_dagens_frost_detalje(dato)}
 
 
 def hent_kage_organic_analyse(fra_dato: str = "2026-09-01") -> Dict:

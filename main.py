@@ -2682,6 +2682,13 @@ async def api_bemanding_saet(request: Request):
                                         body.get("aktiv", True), body.get("type", "fuld"))
 
 
+@app.get("/api/db-shopbox/dag-detalje")
+async def api_db_dag_detalje(request: Request, dato: str):
+    """Drill-down bag 'Værdi spild' og 'Frost salg' for én dag."""
+    _kræv_login(request)
+    return database.hent_dag_detalje(dato)
+
+
 @app.post("/api/db-shopbox/loen-override")
 async def api_db_loen_override(request: Request):
     """Skift løn til/fra for én dag i DB-Shopbox (undtagelse fra weekend-standarden).

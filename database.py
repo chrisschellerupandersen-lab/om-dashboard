@@ -1298,7 +1298,11 @@ def hent_dage(n: int = 14, aar: int = None) -> List[Dict]:
         where = "WHERE strftime('%Y', dato) = ?" if aar else ""
         params = (str(aar), n) if aar else (n,)
         rows = conn.execute(f"""
-            SELECT dato, SUM(omsætning) AS omsaetning
+            SELECT dato, SUM(omsætning) AS omsaetning,
+                   CASE WHEN COUNT(CASE WHEN bon_nr != '' THEN 1 END) > 0
+                        THEN COUNT(DISTINCT CASE WHEN bon_nr != '' THEN bon_nr END)
+                        ELSE COUNT(*)
+                   END AS transak
             FROM transaktioner
             {where}
             GROUP BY dato

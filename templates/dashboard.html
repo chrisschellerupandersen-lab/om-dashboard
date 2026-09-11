@@ -7589,7 +7589,27 @@ function fakVaelg(nr){ _fakValgt = nr; loadFakturaAfstemning(); }
 // ── UGE: BESTILT VS. SOLGT (grupper + drill-down) ─────────────────────────────
 let _buWeeks = null, _buSel = null, _buData = null;
 const _buFold = {};
+let _buEdit = null;   // navn på vare der reguleres lige nu
 function buFoldToggle(k){ _buFold[k] = !_buFold[k]; if (_buData) renderBageriUge(_buData); }
+function buEdit(navn){ _buEdit = navn; if (_buData) renderBageriUge(_buData); }
+
+async function buGem(navn){
+  const dag = document.getElementById('bu-ed-dag').value;
+  const raw = document.getElementById('bu-ed-ant').value;
+  if (raw === '' || isNaN(+raw) || +raw < 0){ alert('Indtast et gyldigt antal'); return; }
+  const r = await api('/api/bageri/ordre-juster', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ uge: _buSel.uge, aar: _buSel.aar, varenavn: navn, dag: dag, antal: +raw, mode: 'set' })
+  });
+  if (r){
+    _buEdit = null;
+    // ryd caches så spild/rest også afspejler reguleringen
+    if (typeof _dagRestData !== 'undefined') _dagRestData = null;
+    loadBageriUge(_buSel.aar + '-' + _buSel.uge);
+  } else {
+    alert('Kunne ikke gemme reguleringen. Prøv igen.');
+  }
+}
 
 function _isoMonday(y, w){
   const jan4 = new Date(Date.UTC(y, 0, 4));
@@ -7639,9 +7659,12 @@ function renderBageriUge(d){
   });
 
   const komplet = _weekComplete(_buSel.aar, _buSel.uge);
-  const note = komplet ? '' :
-    `<div style="border:1px solid var(--gold);background:rgba(200,168,75,.08);border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--charcoal);">
+  const ufuldstaendig = komplet ? '' :
+    `<div style="border:1px solid var(--gold);background:rgba(200,168,75,.08);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12.5px;color:var(--charcoal);">
       ⏳ <b>Ugen er ikke afsluttet endnu</b> — "solgt" og afvigelse stiger dagen ud. Bestilt er hele ugens levering.</div>`;
+  const note = ufuldstaendig +
+    `<div style="border:1px dashed var(--border);border-radius:10px;padding:9px 14px;margin-bottom:14px;font-size:12px;color:var(--ash);">
+      ✎ <b style="color:var(--charcoal);">Regulér undervejs:</b> fik I mere/mindre end bestilt? Fold en gruppe ud og tryk <b>✎ justér</b> på varen for at sætte dagens faktiske antal. Reguleringen står, indtil ugens faktura godkendes (som overskriver til de fakturerede tal).</div>`;
 
   const afvigCelle = (bestilt, solgt)=>{
     const av = solgt - bestilt;
@@ -7658,14 +7681,33 @@ function renderBageriUge(d){
     const open = !!_buFold[g.navn];
     const pct = g.bestilt>0 ? Math.round(g.solgt/g.bestilt*100) : 0;
     const varer = (g.varer||[]).slice().sort((a,b)=> (b.bestilt-b.solgt)-(a.bestilt-a.solgt));
-    const sub = !open ? '' : varer.map(v=>`
-      <tr style="background:rgba(30,58,30,.02);font-size:12.5px;">
-        <td style="padding:5px 8px 5px 30px;">${v.navn}</td>
-        <td class="num" style="${mono}">${Math.round(v.bestilt)}</td>
-        <td class="num" style="${mono}">${Math.round(v.solgt)}</td>
-        <td class="num">${afvigCelle(v.bestilt,v.solgt)}</td>
-        <td class="num">${barFor(v.bestilt,v.solgt)} <span style="${mono}font-size:11px;color:var(--ash);">${v.bestilt>0?Math.round(v.solgt/v.bestilt*100):0}%</span></td>
-      </tr>`).join('');
+    const sub = !open ? '' : varer.map(v=>{
+      const editing = _buEdit === v.navn;
+      const editor = !editing ? '' : `
+        <tr style="background:rgba(200,168,75,.08);font-size:12.5px;">
+          <td colspan="5" style="padding:9px 8px 11px 30px;">
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span>Regulér <b>${v.navn}</b> — sæt dagens antal:</span>
+              <select id="bu-ed-dag" style="padding:6px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;">
+                <option value="man">Man</option><option value="tir">Tir</option><option value="ons">Ons</option>
+                <option value="tor">Tor</option><option value="fre">Fre</option><option value="loe">Lør</option><option value="son">Søn</option>
+              </select>
+              <input id="bu-ed-ant" type="number" min="0" inputmode="numeric" placeholder="antal"
+                style="width:82px;padding:6px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:inherit;">
+              <button onclick='buGem(${JSON.stringify(v.navn)})' style="padding:6px 13px;border:none;border-radius:6px;background:var(--forest);color:#fff;font-weight:600;cursor:pointer;">Gem</button>
+              <button onclick="buEdit(null)" style="padding:6px 11px;border:1px solid var(--border);border-radius:6px;background:transparent;cursor:pointer;">Annullér</button>
+            </div>
+          </td></tr>`;
+      return `
+        <tr style="background:rgba(30,58,30,.02);font-size:12.5px;">
+          <td style="padding:5px 8px 5px 30px;">${v.navn}
+            <button onclick='buEdit(${JSON.stringify(v.navn)})' title="Regulér bestilt antal" style="margin-left:6px;font-size:10px;padding:2px 8px;border:1px solid var(--border);border-radius:10px;background:transparent;cursor:pointer;color:var(--ash);">✎ justér</button></td>
+          <td class="num" style="${mono}">${Math.round(v.bestilt)}</td>
+          <td class="num" style="${mono}">${Math.round(v.solgt)}</td>
+          <td class="num">${afvigCelle(v.bestilt,v.solgt)}</td>
+          <td class="num">${barFor(v.bestilt,v.solgt)} <span style="${mono}font-size:11px;color:var(--ash);">${v.bestilt>0?Math.round(v.solgt/v.bestilt*100):0}%</span></td>
+        </tr>${editor}`;
+    }).join('');
     return `<tr onclick="buFoldToggle('${g.navn.replace(/'/g,"\\'")}')" style="cursor:pointer;font-weight:600;border-top:1px solid var(--border);">
         <td style="padding:9px 8px;"><span style="color:var(--ash);font-size:9px;">${open?'▾':'▸'}</span> ${g.navn}</td>
         <td class="num" style="${mono}">${Math.round(g.bestilt)}</td>

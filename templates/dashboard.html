@@ -3772,25 +3772,25 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
             <!-- FASTE RUTER -->
             <div class="card">
-              <div class="card-title">Faste Ruter</div>
-              <p style="font-size:12px;margin-bottom:12px;color:var(--ash);">Omkostning pr. km estimat: <strong>7-8 kr/km</strong></p>
+              <div class="card-title">Faste Ruter <span style="font-size:8px;font-weight:700;letter-spacing:.08em;color:var(--moss);border:1px solid var(--moss);border-radius:4px;padding:0 4px;vertical-align:middle;">AUTOMATISK</span></div>
+              <p style="font-size:12px;margin-bottom:12px;color:var(--ash);">Disse lægges automatisk ind hver dag efter skemaet. Omkostning pr. km estimat: <strong>7,5 kr/km</strong>. Knapperne bruges kun hvis du kører en ekstra tur.</p>
 
               <div style="margin-bottom:16px;">
-                <strong style="font-size:13px;color:var(--forest);">Karlslunde-tour</strong>
-                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Mandag-torsdag: Hentning af bagværk til butik (2x daglig ca. 60 km/dag)</p>
-                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Karlslunde-tour', new Date(), 60)">+ Tilføj i dag</button>
+                <strong style="font-size:13px;color:var(--forest);">Karlslunde-tour <span style="font-size:11px;color:var(--ash);">· man–tor</span></strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Selv-hentning af brød hos Organic Bakery, Karlslunde Industri (ca. 60 km/dag)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Karlslunde-tour', new Date(), 60)">+ Tilføj ekstra i dag</button>
               </div>
 
               <div style="margin-bottom:16px;">
-                <strong style="font-size:13px;color:var(--forest);">Glostrup Inco</strong>
-                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Ugentlig: Besøg hos Inco (ca. 40 km/tur)</p>
-                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Glostrup Inco', new Date(), 40)">+ Tilføj i dag</button>
+                <strong style="font-size:13px;color:var(--forest);">Glostrup Inco <span style="font-size:11px;color:var(--ash);">· lør</span></strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Inco 1 gang pr. uge (ca. 40 km/tur)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Glostrup Inco', new Date(), 40)">+ Tilføj ekstra i dag</button>
               </div>
 
               <div>
-                <strong style="font-size:13px;color:var(--forest);">Mælk-indkøb</strong>
-                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Diverse ca. 100 kr/mdr (estimat)</p>
-                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Mælk-indkøb', new Date(), 15)">+ Tilføj i dag</button>
+                <strong style="font-size:13px;color:var(--forest);">Mælk-indkøb <span style="font-size:11px;color:var(--ash);">· søn</span></strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Mælk i SuperBrugsen Karlslunde hver søndag (ca. 15 km)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Mælk-indkøb', new Date(), 15)">+ Tilføj ekstra i dag</button>
               </div>
             </div>
           </div>
@@ -14411,6 +14411,44 @@ function loadKorsler() {
 function saveKorsler(korsler) {
   localStorage.setItem('korsler', JSON.stringify(korsler));
 }
+// Faste ugentlige kørsler (auto). getDay(): 0=søn,1=man…6=lør
+const KR_PR_KM = 7.5;
+const KORSEL_START = '2026-09-01';
+const FASTE_KORSLER = {
+  1: [{ rute: 'Karlslunde-tour', km: 60 }],  // man — selv-hentning brød hos Organic Bakery, Karlslunde Industri
+  2: [{ rute: 'Karlslunde-tour', km: 60 }],  // tir
+  3: [{ rute: 'Karlslunde-tour', km: 60 }],  // ons
+  4: [{ rute: 'Karlslunde-tour', km: 60 }],  // tor
+  6: [{ rute: 'Glostrup Inco',   km: 40 }],  // lør — Inco 1x/uge
+  0: [{ rute: 'Mælk-indkøb',     km: 15 }],  // søn — mælk i SuperBrugsen Karlslunde
+};
+function _korselSlettetSet() {
+  try { return new Set(JSON.parse(localStorage.getItem('korsler_auto_slettet') || '[]')); }
+  catch (e) { return new Set(); }
+}
+// Lægger automatisk faste kørsler ind fra 1/9-2026 t.o.m. i dag (idempotent;
+// dubletter og manuelt slettede auto-kørsler springes over).
+function autoGenFasteKorsler() {
+  const korsler = loadKorsler();
+  const findes = new Set(korsler.map(k => k.dato + '|' + k.rute));
+  const slettet = _korselSlettetSet();
+  const start = new Date(KORSEL_START + 'T00:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let idx = 0, tilfoejet = 0;
+  for (let d = new Date(start); d <= today; d.setDate(d.getDate() + 1)) {
+    const ruter = FASTE_KORSLER[d.getDay()] || [];
+    const dato = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    for (const fr of ruter) {
+      const key = dato + '|' + fr.rute;
+      if (findes.has(key) || slettet.has(key)) continue;
+      korsler.push({ dato, rute: fr.rute, km: fr.km, cost: +(fr.km * KR_PR_KM).toFixed(2),
+                     id: Date.now() * 100 + (idx++), auto: true });
+      findes.add(key); tilfoejet++;
+    }
+  }
+  if (tilfoejet > 0) saveKorsler(korsler);
+  return tilfoejet;
+}
 function addKorsel() {
   const dato = document.getElementById('dato-input').value;
   const rute = document.getElementById('rute-select').value;
@@ -14437,6 +14475,12 @@ function addFastRute(rute, date, km) {
 function deleteKorsel(id) {
   if (!confirm('Slet denne kørsel?')) return;
   let korsler = loadKorsler();
+  const k = korsler.find(x => x.id === id);
+  if (k && k.auto) {   // husk sletningen så auto-generatoren ikke lægger den ind igen
+    const slettet = _korselSlettetSet();
+    slettet.add(k.dato + '|' + k.rute);
+    localStorage.setItem('korsler_auto_slettet', JSON.stringify([...slettet]));
+  }
   korsler = korsler.filter(k => k.id !== id);
   saveKorsler(korsler);
   renderKorselUI();
@@ -14461,7 +14505,7 @@ function renderDagTab() {
   list.innerHTML = filtered.map(k => `
     <li>
       <div>
-        <strong>${k.rute}</strong><br/>
+        <strong>${k.rute}</strong>${k.auto ? ' <span style="font-size:8px;font-weight:700;letter-spacing:.08em;color:var(--ash);border:1px solid rgba(30,58,30,.2);border-radius:4px;padding:0 4px;vertical-align:middle;">AUTO</span>' : ''}<br/>
         <span style="font-size:11px;color:var(--ash);">${new Date(k.dato).toLocaleDateString('da-DK')}</span>
       </div>
       <span class="dl-km">${k.km} km</span>
@@ -14535,6 +14579,7 @@ function renderKorselUI() {
 }
 // Init kørsel regnskab ved load
 document.addEventListener('DOMContentLoaded', function() {
+  autoGenFasteKorsler();   // læg faste man-tor/lør/søn kørsler ind automatisk
   if (document.getElementById('p-korsel')) {
     initKorselDateInput();
     renderKorselUI();

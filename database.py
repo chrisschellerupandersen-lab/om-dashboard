@@ -191,6 +191,26 @@ def _organic_kat(navn: str) -> str:
     return ""
 
 
+# Varianter der er SAMME fysiske vare i disken og ringes vilkårligt op på
+# hinandens/generiske SKU'er ved kassen (fx "Surdejsbolle", "m. sesam", "m. birkes"
+# og 4-pakken). De skal POOLES ved spild-beregning — ellers ser en variant som
+# usolgt (spild) mens salget lander på den generiske linje. Nøgle = fælles familie.
+_SPILD_FAMILIE_GRUPPER = {
+    "surdejsbolle": ("surdejsbolle", "surdejsbolle m. birkes", "surdejsbolle m. sesam"),
+    "surdejsbrød":  ("surdejsbrød", "surdejsbrød m. sesam"),
+}
+_SPILD_FAMILIE = {v: fam for fam, navne in _SPILD_FAMILIE_GRUPPER.items() for v in navne}
+_SPILD_FAMILIE_LABEL = {"surdejsbolle": "Surdejsbolle", "surdejsbrød": "Surdejsbrød"}
+
+
+def _spild_familie(navn: str) -> str:
+    """Poole-nøgle til spild: varianter af samme vare (surdejsbolle m.fl.) samles,
+    så salg på den generiske/4-pak-linje modregnes variant-bestillingen. Øvrige
+    varer po:oler kun med sig selv (nøgle = eget navn)."""
+    n = (navn or "").strip().lower()
+    return _SPILD_FAMILIE.get(n, n)
+
+
 def _bestil_risikogruppe(varenavn: str, kat: str) -> str:
     """Klassificér en vare til spild-risikogruppe (styrer bestillings-bufferen)."""
     n = (varenavn or "").lower()
@@ -1901,8 +1921,16 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         navn_skus = {p["navn"].strip().lower():
                      [int(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
                      for p in _ORGANIC_BAKERY}
-        alle_sku = sorted({s for b in best
-                           for s in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        # Familie → alle SKU'er (poole varianter: surdejsbolle m.fl., se _spild_familie).
+        # Salg lander vilkårligt på generisk/4-pak/variant-SKU ved kassen; poolet solgt
+        # modregnes den samlede variant-bestilling, så en variant ikke ser falsk spild.
+        fam_skus: Dict[str, list] = {}
+        for p in _ORGANIC_BAKERY:
+            fam = _spild_familie(p["navn"])
+            fam_skus.setdefault(fam, []).extend(
+                int(v) for v in (p["kilde"] + p.get("salg_kilde", [])))
+        best_fam = {_spild_familie(b["varenavn"] or "") for b in best}
+        alle_sku = sorted({s for fam in best_fam for s in fam_skus.get(fam, [])})
         solgt_pr_sku: Dict[int, int] = {}
         if alle_sku:
             ph = ",".join("?" * len(alle_sku))
@@ -1920,22 +1948,30 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
             "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn",
             (dato,)).fetchall()
 
-    # Brutto-spild pr. vare (bestilt − eget SKU-salg), grupperet på kategori
+    # Brutto-spild pr. familie (bestilt − familiens samlede SKU-salg), på kategori.
+    # Varianter (surdejsbolle m.fl.) pooles, så salg på den generiske linje modregner
+    # variant-bestillingen i stedet for at efterlade falsk spild.
     kat_prod = {k: [] for k in KAT}
     ex = {k: 0 for k in KAT}          # bundle/combo-forbrug pr. kategori (valgfri varer)
     ex_lines = {k: [] for k in KAT}
+    fam_agg: Dict[str, Dict] = {}     # fam -> {kat, bestilt, pris, navne}
     for b in best:
         navn = b["varenavn"] or ""
         kat = _organic_kat(navn) or _bakery_kat(navn)
         if kat not in KAT:
             continue
-        bestilt_p = int(b["ant"] or 0)
-        pris = float(b["pris_ex_moms"] or 0)
-        solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
-        spild_p = max(0, bestilt_p - solgt_p)
-        if spild_p > 0:
-            kat_prod[kat].append({"navn": navn, "pris": pris, "stk": spild_p,
-                                  "bestilt": bestilt_p, "solgt": solgt_p})
+        fam = _spild_familie(navn)
+        a = fam_agg.setdefault(fam, {"kat": kat, "bestilt": 0, "pris": 0.0, "navne": []})
+        a["bestilt"] += int(b["ant"] or 0)
+        a["pris"] = max(a["pris"], float(b["pris_ex_moms"] or 0))
+        a["navne"].append(navn)
+    for fam, a in fam_agg.items():
+        solgt_f = sum(solgt_pr_sku.get(s, 0) for s in fam_skus.get(fam, []))
+        spild_f = max(0, a["bestilt"] - solgt_f)
+        if spild_f > 0:
+            label = _SPILD_FAMILIE_LABEL.get(fam) or a["navne"][0]
+            kat_prod[a["kat"]].append({"navn": label, "pris": a["pris"], "stk": spild_f,
+                                       "bestilt": a["bestilt"], "solgt": solgt_f})
     # Bundle/combo uden eget katalog-SKU (fx "3 x Valgfri Wienerbrød", kaffe+BMO):
     # de spiser generiske varer fra kategorien.
     for r in alle_solgt:

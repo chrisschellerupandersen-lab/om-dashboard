@@ -1499,24 +1499,6 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
             "oekonomi": oekonomi}
 
 
-@app.get("/api/_diag/raw-salg")
-async def api_diag_raw_salg(request: Request, dato: str, q: str = "", secret: Optional[str] = None):
-    """MIDLERTIDIG diagnose: rå salg pr. varenavn+varenummer for en dag."""
-    if secret != WEBHOOK_SECRET:
-        _kræv_login(request)
-    import sqlite3 as _sq
-    con = _sq.connect(database.DB_PATH); con.row_factory = _sq.Row
-    rows = con.execute(
-        "SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, "
-        "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn "
-        "ORDER BY varenavn", (dato[:10],)).fetchall()
-    con.close()
-    ql = q.lower()
-    return {"dato": dato[:10], "salg": [
-        {"navn": r["varenavn"], "vn": r["vn"], "ant": int(r["ant"] or 0)}
-        for r in rows if not ql or ql in (r["varenavn"] or "").lower()]}
-
-
 @app.get("/api/bageri/spild")
 async def api_bageri_spild(request: Request, uge: int, aar: int, secret: Optional[str] = None):
     """Spild & redning pr. uge (Organic Bakery). Login eller webhook-secret."""

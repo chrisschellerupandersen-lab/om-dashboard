@@ -4691,6 +4691,31 @@ async function dbsLoenToggle(dato){
   loadDbsMaaned(sel && sel.value ? sel.value : undefined);
 }
 
+// Levering-celle med per-dag override: klik = flip leveret/selv-hentet, klik igen = auto.
+// levering_override: null=auto (standard fre-søn), 0=selv hentet, 1=leveret.
+function _dbsLevCell(x){
+  const on = x.levering > 0;
+  const ov = x.levering_override;
+  const badge = ov===0
+      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
+    : ov===1
+      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:#8a6d3a;color:#fff;border-radius:4px;padding:1px 4px;">lev</span>`
+      : '';
+  const tip = (on ? 'Klik: I hentede selv (fjern levering)' : 'Klik: leveret (tilføj 175 kr)')
+            + (ov!=null ? ' · klik igen = auto' : '');
+  return `<td onclick="dbsLevToggle('${x.dato}')" title="${tip}" style="text-align:right;cursor:pointer;color:${on?'#8a3a3a':'var(--ash)'};white-space:nowrap;">${on?_dbsKr(x.levering):'—'}${badge}</td>`;
+}
+async function dbsLevToggle(dato){
+  try {
+    await fetch('/api/db-shopbox/levering-override', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dato})
+    });
+  } catch(e){}
+  const sel = document.getElementById('dbs-maaned-vaelg');
+  loadDbsMaaned(sel && sel.value ? sel.value : undefined);
+}
+
 // Drill-down bag 'Værdi spild' / 'Frost salg' pr. dag
 async function dbsDagDetalje(dato, type, cell){
   const tr = cell.closest('tr');
@@ -4754,7 +4779,7 @@ async function loadDbsMaaned(val){
   document.getElementById('dbs-maaned-titel').textContent = d.maaned_navn ? (d.maaned_navn + ' ' + d.aar) : 'Månedsresultat';
   const hint = document.getElementById('dbs-maaned-hint');
   if (hint) hint.textContent = d.loen_aktiv
-    ? 'Løn 300 kr/dag lør+søn (ansatte i weekenden, selv man–fre) · omk 500 kr/dag · resultat = DB − løn − omk'
+    ? 'Løn 300 kr/dag lør+søn · omk 500 kr/dag · levering 175 kr/dag fre–søn (selv man–tor) · resultat = DB − løn − omk − levering'
     : 'Ingen løn (før juni 2026) · omk 500 kr/dag · resultat = DB − omk';
   // Totaler i toppen
   const tile=(lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
@@ -4773,6 +4798,7 @@ async function loadDbsMaaned(val){
       tile('DB i alt', t.db_kr)
     + tile('Løn i alt', t.loen, '#8a3a3a')
     + tile('Omk i alt', t.omk, '#8a3a3a')
+    + tile('Levering i alt', t.levering, '#8a3a3a')
     + tile('Resultat (til dato)', t.resultat, resClr)
     + tile('Omsætning', t.oms_ex, 'var(--ash)')
     + tile('Værdi spild', t.vaerdi_spild, '#8a6d3a')
@@ -4784,7 +4810,9 @@ async function loadDbsMaaned(val){
     <th style="text-align:left;">Dato</th><th style="text-align:left;">Dag</th>
     <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
     <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
-    <th style="text-align:right;">Omk</th><th style="text-align:right;">Resultat</th>
+    <th style="text-align:right;">Omk</th>
+    <th style="text-align:right;" title="Levering 175 kr/dag. Standard fre–søn (I henter selv man–tor). Klik en dag for at rette.">Levering</th>
+    <th style="text-align:right;">Resultat</th>
     <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th>
     <th style="text-align:right;" title="Omsætning ex moms af nedfrosset bagværk solgt igen som frost.">Frost salg</th></tr></thead><tbody>`;
   (d.dage||[]).slice().reverse().forEach(x=>{
@@ -4802,6 +4830,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
       ${_dbsLoenCell(x)}
       <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
+      ${_dbsLevCell(x)}
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td></tr>`;
@@ -4809,7 +4838,7 @@ async function loadDbsMaaned(val){
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];
   if (d.har_forecast && fc.length){
-    html += `<tr><td colspan="10" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
+    html += `<tr><td colspan="11" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
     fc.forEach(x=>{
       const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
       const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -4821,6 +4850,7 @@ async function loadDbsMaaned(val){
         <td style="text-align:right;">${_dbsPct(x.dg_pct)}</td>
         ${_dbsLoenCell(x)}
         <td style="text-align:right;">${_dbsKr(x.omk)}</td>
+        ${_dbsLevCell(x)}
         <td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td>
         <td style="text-align:right;">—</td><td style="text-align:right;">—</td></tr>`;
     });
@@ -4833,6 +4863,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${t.oms_ex>0?_dbsPct(t.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(t.loen)}</td>
       <td style="text-align:right;">${_dbsKr(t.omk)}</td>
+      <td style="text-align:right;">${_dbsKr(t.levering)}</td>
       <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${_dbsKr(t.vaerdi_spild)}</td>
       <td style="text-align:right;color:var(--moss);">${_dbsKr(t.frost_salg)}</td></tr>`;
@@ -4845,6 +4876,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${p.oms_ex>0?_dbsPct(p.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(p.loen)}</td>
       <td style="text-align:right;">${_dbsKr(p.omk)}</td>
+      <td style="text-align:right;">${_dbsKr(p.levering)}</td>
       <td style="text-align:right;color:${pClr};">${_dbsKr(p.resultat)}</td>
       <td style="text-align:right;">—</td><td style="text-align:right;">—</td></tr>`;
   }

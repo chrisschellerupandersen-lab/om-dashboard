@@ -289,6 +289,13 @@ def init_db():
                 loennet  INTEGER NOT NULL
             );
 
+            -- Per-dag levering-override (fragt 175 kr/dag). Standard: leveret fre-søn,
+            -- selv-afhentet man-tor. 1 = leveret (kost), 0 = selv hentet (ingen kost).
+            CREATE TABLE IF NOT EXISTS db_levering_override (
+                dato     TEXT    PRIMARY KEY,
+                leveret  INTEGER NOT NULL
+            );
+
             -- Generisk nøgle-værdi til app-indstillinger delt på tværs af enheder
             -- (fx sidepanel-opsætning, så desktop-ændringer slår igennem på mobil).
             CREATE TABLE IF NOT EXISTS app_kv (
@@ -9879,12 +9886,39 @@ def toggle_db_loen_override(dato: str) -> dict:
     return {"dato": dato, "tilstand": ("loen" if ny else "ingen"), "loennet": ny}
 
 
+def _db_leveret_dag(iso: str, wd: int) -> bool:
+    """Standard: Organic Bakery leverer fre(4)+lør(5)+søn(6); butikken henter selv
+    man-tor. Levering koster 175 kr/dag. Gælder fra 1/9-2026 (Organic-æraen).
+    wd: 0=man … 4=fre, 5=lør, 6=søn."""
+    if iso < "2026-09-01":
+        return False
+    return wd in (4, 5, 6)
+
+
+def toggle_db_levering_override(dato: str) -> dict:
+    """Skift levering for én dag. Uden override → sæt modsat af standarden (fx marker
+    at I selv hentede en fredag, eller fik leveret en hverdag). Med override → ryd."""
+    from datetime import date as _d
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        ex = conn.execute("SELECT leveret FROM db_levering_override WHERE dato=?", (dato,)).fetchone()
+        if ex is not None:
+            conn.execute("DELETE FROM db_levering_override WHERE dato=?", (dato,))
+            return {"dato": dato, "tilstand": "auto"}
+        d = _d.fromisoformat(dato)
+        default = _db_leveret_dag(dato, d.weekday())
+        ny = 0 if default else 1
+        conn.execute("INSERT INTO db_levering_override (dato, leveret) VALUES (?, ?)", (dato, ny))
+    return {"dato": dato, "tilstand": ("leveret" if ny else "selv"), "leveret": ny}
+
+
 def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
-                           loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
-    """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk.
-    Løn på tirsdage+onsdage (kun fra juni 2026 og frem), omk hver dag. Uden
-    (aar, maaned) vælges seneste måned med data. Beløb ex moms. Returnerer også
-    listen af tilgængelige måneder til vælgeren."""
+                           loen_tir_ons: float = 300.0, omk_pr_dag: float = 500.0,
+                           levering_pr_dag: float = 175.0) -> dict:
+    """Én måned dag-for-dag (Shopbox) med resultat = DB − løn − omk − levering.
+    Løn (weekend-standard), omk hver dag, levering 175 kr på leveringsdage (standard
+    fre-søn; man-tor henter I selv). Uden (aar, maaned) vælges seneste måned med data.
+    Beløb ex moms. Returnerer også listen af tilgængelige måneder til vælgeren."""
     import calendar as _cal
     from datetime import date as _d, timedelta as _td
     with _conn() as conn:
@@ -9930,6 +9964,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         loen_ov = {r["dato"]: r["loennet"] for r in conn.execute(
             "SELECT dato, loennet FROM db_loen_override WHERE dato>=? AND dato<=?",
             (foerste.isoformat(), _md_slut)).fetchall()}
+        lev_ov = {r["dato"]: r["leveret"] for r in conn.execute(
+            "SELECT dato, leveret FROM db_levering_override WHERE dato>=? AND dato<=?",
+            (foerste.isoformat(), _md_slut)).fetchall()}
         # Frost-salg pr. dag (omsætning ex moms af nedfrosset bagværk solgt igen).
         # Bredt LIKE '%rost%' + Python-filter via _bageri_rolle (frost, ekskl. pølse/ost).
         frost_per: Dict[str, float] = {}
@@ -9948,8 +9985,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     loen_aktiv = (y, m) >= _LOEN_START
 
     dage = []
-    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0,
-           "vaerdi_spild": 0.0, "frost_salg": 0.0}
+    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0,
+           "resultat": 0.0, "vaerdi_spild": 0.0, "frost_salg": 0.0}
     spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
     d = foerste
     while d <= sidste:
@@ -9965,7 +10002,10 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
         loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
         omk = omk_pr_dag
-        res = db - loen - omk
+        lov = lev_ov.get(iso)                      # None / 0 / 1 (levering-undtagelse)
+        leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
+        levering = levering_pr_dag if leveret else 0.0
+        res = db - loen - omk - levering
         vspild_d = hent_dagens_spild_vaerdi(iso, detaljer=True) if x else {"total": 0.0, "kategorier": {}}
         vspild = vspild_d["total"]
         for _kk, _kv in vspild_d.get("kategorier", {}).items():
@@ -9979,15 +10019,17 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "dg_pct":   round(db / oms * 100, 1) if oms > 0 else 0.0,
             "loen":     round(loen),
             "omk":      round(omk),
+            "levering": round(levering),
             "resultat": round(res),
             "vaerdi_spild": round(vspild),
             "frost_salg": round(frost_per.get(iso, 0.0)),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
             "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
+            "levering_override": lov,  # None=auto · 0=selv hentet · 1=leveret
         })
         tot["oms_ex"] += oms; tot["db_kr"] += db
-        tot["loen"] += loen; tot["omk"] += omk; tot["resultat"] += res
+        tot["loen"] += loen; tot["omk"] += omk; tot["levering"] += levering; tot["resultat"] += res
         tot["vaerdi_spild"] += vspild
         tot["frost_salg"] += frost_per.get(iso, 0.0)
         d += _td(days=1)
@@ -9997,6 +10039,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "db_kr":    round(tot["db_kr"]),
         "loen":     round(tot["loen"]),
         "omk":      round(tot["omk"]),
+        "levering": round(tot["levering"]),
         "resultat": round(tot["resultat"]),
         "vaerdi_spild": round(tot["vaerdi_spild"]),
         "frost_salg": round(tot["frost_salg"]),
@@ -10010,7 +10053,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     # Samme løn/omk-regler som de faktiske dage.
     slut_maaned = _d(y, m, _cal.monthrange(y, m)[1])
     forecast_dage = []
-    ft = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "resultat": 0.0}
+    ft = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0, "resultat": 0.0}
     if sidste < slut_maaned and tot["oms_ex"] > 0:
         wd_oms: Dict[int, list] = {}
         for dd in dage:
@@ -10029,19 +10072,23 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             ov = loen_ov.get(iso)
             loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
             loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
+            lov = lev_ov.get(iso)
+            leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
+            levering = levering_pr_dag if leveret else 0.0
             lst = wd_oms.get(wd)
             oms = (sum(lst) / len(lst)) if lst else snit_alle
             db = oms * dg_frac
-            res = db - loen - omk_pr_dag
+            res = db - loen - omk_pr_dag - levering
             forecast_dage.append({
                 "dato": iso, "ugedag": _DK_DAGE[wd],
                 "oms_ex": round(oms), "db_kr": round(db),
                 "dg_pct": round(dg_frac * 100, 1),
-                "loen": round(loen), "omk": round(omk_pr_dag), "resultat": round(res),
-                "bemanding": bem, "loen_override": ov, "forecast": True,
+                "loen": round(loen), "omk": round(omk_pr_dag), "levering": round(levering),
+                "resultat": round(res),
+                "bemanding": bem, "loen_override": ov, "levering_override": lov, "forecast": True,
             })
             ft["oms_ex"] += oms; ft["db_kr"] += db
-            ft["loen"] += loen; ft["omk"] += omk_pr_dag; ft["resultat"] += res
+            ft["loen"] += loen; ft["omk"] += omk_pr_dag; ft["levering"] += levering; ft["resultat"] += res
             d += _td(days=1)
 
     forecast_total = {k: round(v) for k, v in ft.items()}
@@ -10051,6 +10098,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "db_kr":    round(tot["db_kr"] + ft["db_kr"]),
         "loen":     round(tot["loen"] + ft["loen"]),
         "omk":      round(tot["omk"] + ft["omk"]),
+        "levering": round(tot["levering"] + ft["levering"]),
         "resultat": round(tot["resultat"] + ft["resultat"]),
     }
     prognose_total["dg_pct"] = (round(prognose_total["db_kr"] / prognose_total["oms_ex"] * 100, 1)

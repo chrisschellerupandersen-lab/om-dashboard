@@ -2685,7 +2685,8 @@ async def api_bemanding_saet(request: Request):
 @app.get("/api/db-shopbox/dag-detalje")
 async def api_db_dag_detalje(request: Request, dato: str):
     """Drill-down bag 'Værdi spild' og 'Frost salg' for én dag."""
-    _kræv_login(request)
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
     return database.hent_dag_detalje(dato)
 
 

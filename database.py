@@ -125,6 +125,12 @@ def _bakery_kat(n: str) -> Optional[str]:
     """Grov bagværks-kategori ud fra varenavn (virker for både gammelt og nyt
     sortiment). None = ikke bagværk."""
     n = (n or "").lower()
+    # Ikke-bagværk der ellers fanges af 'bolle'/'brød' (flødeboller, kødboller,
+    # boller i karry/tomat, frikadeller osv.) — udelukkes eksplicit.
+    if any(k in n for k in ("flødebolle", "flodebolle", "fløde bolle",
+                            "kødbolle", "kodbolle", "kød bolle", "frikadelle",
+                            "boller i karry", "boller i tomat", "fiskefrikadelle")):
+        return None
     # Kaffe-combos: bagværks-delen tæller med (tjekkes FØR de generiske regler,
     # da "wienerbrød" ellers fanges af "brød"). Ren kaffe uden bagværk = None.
     if "kaffe" in n:
@@ -1817,8 +1823,9 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             extra[rolle[1]].append({"varenavn": r["varenavn"],
                                     "antal": int((r["ant"] or 0) * rolle[2])})
 
-    # Pr. vare: bestilt (dagens kolonne) og solgt (sum af varens SKU'er) → rest
-    agg = {k: {"bestilt": 0, "solgt_eff": 0, "rest": 0, "varer": []} for k in KAT_ORDEN}
+    # Pr. vare: rest = bestilt − solgt (MÅ gå i minus, så totalen bliver korrekt når
+    # der sælges mere end indkøbt). Solgt tælles ukappet.
+    agg = {k: {"bestilt": 0, "solgt": 0, "rest": 0, "varer": []} for k in KAT_ORDEN}
     for b in best:
         navn = (b["varenavn"] or "")
         kat = _organic_kat(navn) or _bakery_kat(navn)
@@ -1828,11 +1835,11 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
         if bestilt_p <= 0 and solgt_p <= 0:
             continue
-        rest_p = max(0, bestilt_p - solgt_p)
-        pct_p = round(min(solgt_p, bestilt_p) / bestilt_p * 100) if bestilt_p > 0 else 0
-        agg[kat]["bestilt"]   += bestilt_p
-        agg[kat]["solgt_eff"] += min(solgt_p, bestilt_p)   # kappet, så pct ≤ 100 pr. vare
-        agg[kat]["rest"]      += rest_p
+        rest_p = bestilt_p - solgt_p                        # signeret (kan være negativ)
+        pct_p = round(solgt_p / bestilt_p * 100) if bestilt_p > 0 else (100 if solgt_p > 0 else 0)
+        agg[kat]["bestilt"] += bestilt_p
+        agg[kat]["solgt"]   += solgt_p
+        agg[kat]["rest"]    += rest_p
         agg[kat]["varer"].append({"varenavn": navn, "bestilt": bestilt_p,
                                   "solgt": solgt_p, "rest": rest_p, "pct": pct_p,
                                   "type": "vare"})
@@ -1842,12 +1849,11 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         a = agg[k]
         ex_list = extra.get(k, [])
         ex_tot = sum(e["antal"] for e in ex_list)
-        if a["bestilt"] <= 0 and a["solgt_eff"] <= 0 and ex_tot <= 0:
+        if a["bestilt"] <= 0 and a["solgt"] <= 0 and ex_tot <= 0:
             continue
-        prod_rest = a["rest"]
-        rest = max(0, prod_rest - ex_tot)                  # comboer spiser af kategoriens rest
-        solgt = min(a["bestilt"], a["solgt_eff"] + ex_tot) if a["bestilt"] > 0 else a["solgt_eff"] + ex_tot
-        pct = round(solgt / a["bestilt"] * 100) if a["bestilt"] > 0 else 100
+        rest  = a["rest"] - ex_tot                          # comboer spiser af resten (signeret)
+        solgt = a["solgt"] + ex_tot                         # ukappet
+        pct = round(solgt / a["bestilt"] * 100) if a["bestilt"] > 0 else (100 if solgt > 0 else 0)
         varer = sorted(a["varer"], key=lambda v: (-v["rest"], -v["bestilt"]))
         # Combo-linjer sidst i drill-down (trækker fra kategoriens rest)
         for e in sorted(ex_list, key=lambda e: -e["antal"]):

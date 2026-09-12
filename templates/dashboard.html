@@ -7648,7 +7648,7 @@ function renderDagRest(d){
         }
         const vp = Math.max(0, Math.min(100, v.pct));
         const vc = _restFarve(vp);
-        const vrest = v.rest > 0 ? `${v.rest} tilbage` : 'udsolgt';
+        const vrest = v.rest > 0 ? `${v.rest} tilbage` : (v.rest === 0 ? 'udsolgt' : `${-v.rest} over`);
         return `<div style="display:flex;align-items:center;gap:10px;padding:3px 0;font-size:12px;">
           <span style="flex:1;">${v.varenavn}</span>
           <span style="${mono}font-size:10px;color:var(--ash);white-space:nowrap;">${v.solgt}/${v.bestilt}</span>

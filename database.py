@@ -1913,10 +1913,10 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
             "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn",
             (dato,)).fetchall()
 
-    kat_spild_kr = {k: 0.0 for k in KAT}
-    kat_units    = {k: 0 for k in KAT}
-    kat_cost_sum = {k: 0.0 for k in KAT}
-    varer_det, combo_det = [], []
+    # Brutto-spild pr. vare (bestilt − eget SKU-salg), grupperet på kategori
+    kat_prod = {k: [] for k in KAT}
+    ex = {k: 0 for k in KAT}          # bundle/combo-forbrug pr. kategori (valgfri varer)
+    ex_lines = {k: [] for k in KAT}
     for b in best:
         navn = b["varenavn"] or ""
         kat = _organic_kat(navn) or _bakery_kat(navn)
@@ -1926,14 +1926,11 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         pris = float(b["pris_ex_moms"] or 0)
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
         spild_p = max(0, bestilt_p - solgt_p)
-        kat_spild_kr[kat] += spild_p * pris
-        kat_units[kat]    += bestilt_p
-        kat_cost_sum[kat] += bestilt_p * pris
-        if detaljer and spild_p > 0:
-            varer_det.append({"navn": navn, "kategori": kat, "bestilt": bestilt_p,
-                              "solgt": solgt_p, "spild": spild_p, "kostpris": round(pris, 2),
-                              "vaerdi": round(spild_p * pris, 2)})
-    # Comboer (kaffe+wienerbrød/BMO) uden eget katalog-SKU spiser af spildet
+        if spild_p > 0:
+            kat_prod[kat].append({"navn": navn, "pris": pris, "stk": spild_p,
+                                  "bestilt": bestilt_p, "solgt": solgt_p})
+    # Bundle/combo uden eget katalog-SKU (fx "3 x Valgfri Wienerbrød", kaffe+BMO):
+    # de spiser generiske varer fra kategorien.
     for r in alle_solgt:
         if r["vn"] in _sku_set:
             continue
@@ -1941,16 +1938,37 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         if rolle and rolle[0] == "frisk" and rolle[1] in KAT:
             kat = rolle[1]
             n = int((r["ant"] or 0) * rolle[2])
-            avg = kat_cost_sum[kat] / kat_units[kat] if kat_units[kat] > 0 else 0.0
-            foer = kat_spild_kr[kat]
-            kat_spild_kr[kat] = max(0.0, foer - n * avg)
-            if detaljer and (foer - kat_spild_kr[kat]) > 0.01:
-                combo_det.append({"navn": r["varenavn"], "kategori": kat, "antal": n,
-                                  "fratraek": round(foer - kat_spild_kr[kat], 2)})
-    total = round(sum(kat_spild_kr.values()), 2)
+            ex[kat] += n
+            ex_lines[kat].append({"navn": r["varenavn"], "antal": n})
+
+    # Fordel bundle/combo-forbruget ud på kategoriens varer (proportionalt med brutto-
+    # spild, største-rest-metoden) → netto spild pr. vare til den RIGTIGE kostpris.
+    kat_kr = {k: 0.0 for k in KAT}
+    varer_det = []
+    for k in KAT:
+        prods = kat_prod[k]
+        gross = sum(p["stk"] for p in prods)
+        reduce = min(ex[k], gross)
+        alloc = [0] * len(prods)
+        if gross > 0 and reduce > 0:
+            raw = [p["stk"] / gross * reduce for p in prods]
+            alloc = [int(x) for x in raw]
+            rem = reduce - sum(alloc)
+            for i in sorted(range(len(prods)), key=lambda i: -(raw[i] - int(raw[i])))[:rem]:
+                alloc[i] += 1
+        for i, p in enumerate(prods):
+            net = p["stk"] - alloc[i]
+            val = net * p["pris"]
+            kat_kr[k] += val
+            if detaljer and net > 0:
+                varer_det.append({"navn": p["navn"], "kategori": k, "bestilt": p["bestilt"],
+                                  "solgt": p["solgt"], "spild": net, "solgt_i_bundt": alloc[i],
+                                  "kostpris": round(p["pris"], 2), "vaerdi": round(val, 2)})
+    total = round(sum(kat_kr.values()), 2)
     if detaljer:
         varer_det.sort(key=lambda v: -v["vaerdi"])
-        return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_spild_kr.items()},
+        combo_det = [ln for k in KAT for ln in ex_lines[k]]
+        return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_kr.items()},
                 "varer": varer_det, "combo": combo_det}
     return total
 

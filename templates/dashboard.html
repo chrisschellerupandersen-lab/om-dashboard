@@ -4717,10 +4717,16 @@ function _dbsDetLinje(venstre, hoejre, faded){
 function _dbsSpildDet(s){
   if (!s || !s.varer || !s.varer.length) return '<span style="color:var(--ash);font-size:12px;">Intet spild denne dag 🎉</span>';
   const mono = "font-family:'DM Mono',monospace;";
-  const rows  = s.varer.map(v => _dbsDetLinje(`${v.navn} <span style="color:var(--ash);">· ${v.spild} stk × ${v.kostpris} kr</span>`, _dbsKr(v.vaerdi))).join('');
-  const combo = (s.combo||[]).map(c => _dbsDetLinje(`☕ ${c.navn} (${c.antal}) — solgt i combo`, '−' + _dbsKr(c.fratraek), true)).join('');
-  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild — ikke solgt friskt (× kostpris)</div>${rows}${combo}
-    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(s.total)}</span></div>`;
+  const rows = s.varer.map(v => {
+    const bundt = v.solgt_i_bundt > 0 ? ` <span style="color:var(--ash);">(${v.solgt_i_bundt} solgt i bundt/combo)</span>` : '';
+    return _dbsDetLinje(`${v.navn} <span style="color:var(--ash);">· ${v.spild} stk × ${v.kostpris} kr</span>${bundt}`, _dbsKr(v.vaerdi));
+  }).join('');
+  const cTot = (s.combo||[]).reduce((a,c)=>a+(c.antal||0),0);
+  const comboNote = cTot > 0
+    ? `<div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">🧺 ${cTot} stk solgt i bundt/combo (${(s.combo||[]).map(c=>c.navn+' '+c.antal).join(', ')}) — trukket fra ovenstående varer</div>`
+    : '';
+  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild — ikke solgt friskt (netto × kostpris)</div>${rows}
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(s.total)}</span></div>${comboNote}`;
 }
 function _dbsFrostDet(f){
   if (!f || !f.length) return '<span style="color:var(--ash);font-size:12px;">Intet frost-salg denne dag.</span>';

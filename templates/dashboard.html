@@ -986,6 +986,39 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
   #bern-kontekst-tekst { font-size: 11px; line-height: 1.55; }
   #bern-kontekst-kort .card { padding: 12px 10px; }
 }
+
+/* KØRSEL REGNSKAB STYLES */
+.mnd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+.mnd-cell{background:var(--white);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 18px;text-align:center;}
+.mnd-cell-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
+.mnd-cell-value{font-size:24px;font-weight:400;color:var(--forest);line-height:1;}
+.mnd-cell-value.up{color:var(--moss);}
+.mnd-cell-value.dn{color:var(--danger);}
+.mnd-cell-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
+.form-group{margin-bottom:16px;display:flex;flex-direction:column;}
+.form-group label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;font-weight:500;}
+.form-group input,.form-group select{width:100%;border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);background:var(--parchment);}
+.form-group input:focus,.form-group select:focus{outline:none;border-color:var(--forest);}
+.btn{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--forest);color:var(--amber);border:1px solid var(--forest);border-radius:2px;padding:8px 16px;cursor:pointer;font-weight:500;transition:all .15s;}
+.btn:hover{background:var(--moss);}
+.btn-light{background:var(--white);color:var(--forest);border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:8px 12px;cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:400;}
+.btn-light:hover{background:var(--cream);}
+.btn-delete{background:#fff;border:1px solid var(--danger);color:var(--danger);padding:4px 8px;border-radius:2px;cursor:pointer;font-size:11px;font-family:'DM Mono',monospace;}
+.btn-delete:hover{background:rgba(192,57,43,.1);}
+.periode-tabs{display:flex;gap:6px;margin-bottom:16px;}
+.ptab{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:2px;cursor:pointer;background:var(--white);color:var(--ash);}
+.ptab.active{background:var(--forest);color:var(--amber);border-color:var(--forest);}
+.daglist{list-style:none;padding:0;margin:0;}
+.daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
+.daglist li:last-child{border-bottom:none;}
+.daglist .empty{text-align:center;color:var(--ash);}
+.daglist .dl-km{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);white-space:nowrap;margin-left:auto;}
+.daglist .dl-kr{font-family:'DM Mono',monospace;font-size:12px;color:var(--forest);white-space:nowrap;margin-left:16px;}
+
+@media (max-width: 768px) {
+  .mnd-grid{grid-template-columns:repeat(2,1fr);gap:8px;}
+  .two-col{grid-template-columns:1fr;}
+}
 </style>
 </head>
 <body>
@@ -1453,6 +1486,30 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               style="padding:7px 16px;background:var(--forest);color:var(--amber);border:none;border-radius:3px;cursor:pointer;font-size:12px;letter-spacing:.04em;">
               ↻ Opdater analyse
             </button>
+          </div>
+        </div>
+
+        <!-- KØRSEL KPI'ER -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid rgba(30,58,30,.08);">
+          <div class="kpi">
+            <div class="kpi-l">Månedskørsel</div>
+            <div class="kpi-v" id="mgmt-korsel-km">—</div>
+            <div class="kpi-s" id="mgmt-korsel-km-sub">km denne måned</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Kørselsomkostning</div>
+            <div class="kpi-v" id="mgmt-korsel-cost">—</div>
+            <div class="kpi-s" id="mgmt-korsel-cost-sub">budget: 100 kr</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-l">Budget Status</div>
+            <div class="kpi-v" id="mgmt-korsel-pct">—</div>
+            <div class="kpi-s" id="mgmt-korsel-status">af budget</div>
+          </div>
+          <div class="kpi" id="mgmt-korsel-alert" style="display:none;">
+            <div class="kpi-l">⚠ Advarsel</div>
+            <div class="kpi-v" id="mgmt-korsel-alert-msg">—</div>
+            <div class="kpi-s">over budget</div>
           </div>
         </div>
 
@@ -3618,6 +3675,128 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       </div>
 
+      <!-- KØRSEL REGNSKAB -->
+      <div class="panel" id="p-korsel">
+        <div class="page-hdr">
+          <h2>🚗 Kørsel Regnskab</h2>
+          <p>Tracking af kørsler og omkostninger fra 1/9-2026</p>
+        </div>
+
+        <div class="mnd-grid" id="mnd-kpis">
+          <div class="mnd-cell">
+            <div class="mnd-cell-label">Måned</div>
+            <div class="mnd-cell-value" id="mnd-val">2026-09</div>
+          </div>
+          <div class="mnd-cell">
+            <div class="mnd-cell-label">Total KM</div>
+            <div class="mnd-cell-value" id="mnd-km">0</div>
+            <div class="mnd-cell-sub">denne måned</div>
+          </div>
+          <div class="mnd-cell">
+            <div class="mnd-cell-label">Total Omkostning</div>
+            <div class="mnd-cell-value" id="mnd-cost">0 kr</div>
+            <div class="mnd-cell-sub" id="mnd-budget"></div>
+          </div>
+          <div class="mnd-cell">
+            <div class="mnd-cell-label">Budget Status</div>
+            <div class="mnd-cell-value" id="mnd-status">✓</div>
+            <div class="mnd-cell-sub" id="mnd-pct"></div>
+          </div>
+        </div>
+
+        <div class="periode-tabs">
+          <button class="ptab active" onclick="switchTab('dag')">Daglig Oversigt</button>
+          <button class="ptab" onclick="switchTab('maaned')">Månedsopgørelse</button>
+          <button class="ptab" onclick="switchTab('indstillinger')">Tilføj Kørsel</button>
+        </div>
+
+        <!-- DAG-TAB -->
+        <div id="tab-dag" class="tab-content">
+          <div class="card">
+            <div class="card-title">Kørsler denne måned</div>
+            <ul class="daglist" id="dag-list">
+              <li class="empty">Ingen kørsler registreret endnu</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- MÅNED-TAB -->
+        <div id="tab-maaned" class="tab-content" style="display:none;">
+          <div class="card">
+            <div class="card-title">Månedssammenligning</div>
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>Måned</th>
+                  <th class="num">KM</th>
+                  <th class="num">Omkostning</th>
+                  <th class="num">Budget</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="maaned-tbl"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- INDSTILLINGER-TAB -->
+        <div id="tab-indstillinger" class="tab-content" style="display:none;">
+          <div class="two-col">
+            <!-- TILFØJ KØRSEL -->
+            <div class="card">
+              <div class="card-title">Ny Kørsel</div>
+              <div class="form-group">
+                <label>Dato</label>
+                <input type="date" id="dato-input" />
+              </div>
+              <div class="form-group">
+                <label>Rute</label>
+                <select id="rute-select">
+                  <option value="">Vælg rute...</option>
+                  <option value="Karlslunde-tour">Karlslunde-tour (man-tors bagværk)</option>
+                  <option value="Glostrup Inco">Glostrup Inco (ugentlig)</option>
+                  <option value="Mælk-indkøb">Mælk-indkøb og diverse</option>
+                  <option value="Andet">Andet</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>KM</label>
+                <input type="number" id="km-input" placeholder="0" min="0" step="1" />
+              </div>
+              <div class="form-group">
+                <label>Omkostning (kr)</label>
+                <input type="number" id="cost-input" placeholder="0" min="0" step="0.01" />
+              </div>
+              <button class="btn" onclick="addKorsel()">Tilføj Kørsel</button>
+            </div>
+
+            <!-- FASTE RUTER -->
+            <div class="card">
+              <div class="card-title">Faste Ruter</div>
+              <p style="font-size:12px;margin-bottom:12px;color:var(--ash);">Omkostning pr. km estimat: <strong>7-8 kr/km</strong></p>
+
+              <div style="margin-bottom:16px;">
+                <strong style="font-size:13px;color:var(--forest);">Karlslunde-tour</strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Mandag-torsdag: Hentning af bagværk til butik (2x daglig ca. 60 km/dag)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Karlslunde-tour', new Date(), 60)">+ Tilføj i dag</button>
+              </div>
+
+              <div style="margin-bottom:16px;">
+                <strong style="font-size:13px;color:var(--forest);">Glostrup Inco</strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Ugentlig: Besøg hos Inco (ca. 40 km/tur)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Glostrup Inco', new Date(), 40)">+ Tilføj i dag</button>
+              </div>
+
+              <div>
+                <strong style="font-size:13px;color:var(--forest);">Mælk-indkøb</strong>
+                <p style="font-size:12px;color:var(--ash);margin-top:4px;">Diverse ca. 100 kr/mdr (estimat)</p>
+                <button class="btn-light" style="width:100%;margin-top:8px;" onclick="addFastRute('Mælk-indkøb', new Date(), 15)">+ Tilføj i dag</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- HJÆLP & DOKUMENTATION -->
       <div class="panel" id="p-hjaelp">
         <div class="page-hdr">
@@ -5307,6 +5486,7 @@ const NAV_DEFAULT = [
   {id:'prisvagt',    label:'Prisvagt (leverandør)', group:'Administration',       hidden:false},
   {id:'kp-historik', label:'Kostpris historik',     group:'Administration',       hidden:false},
   {id:'kostpris',    label:'Mangler kostpris',      group:'Administration',       hidden:false},
+  {id:'korsel',      label:'🚗 Kørsel Regnskab',   group:'Administration',       hidden:false},
   {id:'hjaelp',      label:'Hjælp & dokumentation', group:'Administration',       hidden:false},
 ];
 
@@ -14218,6 +14398,177 @@ async function dagDbDetaljeLoad() {
       <td></td>
     </tr>`;
   } catch(e) { console.error('dagDbDetaljeLoad:', e); }
+}
+
+// ── KØRSEL REGNSKAB ──────────────────────────────────────────────────────────
+const BUDGET_MONTHLY = 100; // kr/mdr
+function getStorageKey(date) { return date.toISOString().split('T')[0]; }
+function getCurrentMonth() { return new Date().toISOString().slice(0, 7); }
+function loadKorsler() {
+  const stored = localStorage.getItem('korsler') || '[]';
+  return JSON.parse(stored);
+}
+function saveKorsler(korsler) {
+  localStorage.setItem('korsler', JSON.stringify(korsler));
+}
+function addKorsel() {
+  const dato = document.getElementById('dato-input').value;
+  const rute = document.getElementById('rute-select').value;
+  const km = parseFloat(document.getElementById('km-input').value) || 0;
+  const cost = parseFloat(document.getElementById('cost-input').value) || 0;
+  if (!dato || !rute || km === 0) { alert('Udfyld venligst dato, rute og KM'); return; }
+  const korsler = loadKorsler();
+  korsler.push({ dato, rute, km, cost, id: Date.now() });
+  saveKorsler(korsler);
+  document.getElementById('dato-input').value = '';
+  document.getElementById('rute-select').value = '';
+  document.getElementById('km-input').value = '';
+  document.getElementById('cost-input').value = '';
+  renderKorselUI();
+}
+function addFastRute(rute, date, km) {
+  const dato = date.toISOString().split('T')[0];
+  const cost = km * 7.5;
+  const korsler = loadKorsler();
+  korsler.push({ dato, rute, km, cost, id: Date.now() });
+  saveKorsler(korsler);
+  renderKorselUI();
+}
+function deleteKorsel(id) {
+  if (!confirm('Slet denne kørsel?')) return;
+  let korsler = loadKorsler();
+  korsler = korsler.filter(k => k.id !== id);
+  saveKorsler(korsler);
+  renderKorselUI();
+}
+function getMonthlyStats(year, month) {
+  const korsler = loadKorsler();
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const filtered = korsler.filter(k => k.dato.startsWith(monthStr));
+  const totalKm = filtered.reduce((sum, k) => sum + k.km, 0);
+  const totalCost = filtered.reduce((sum, k) => sum + k.cost, 0);
+  return { totalKm, totalCost, count: filtered.length };
+}
+function renderDagTab() {
+  const korsler = loadKorsler();
+  const monthStr = getCurrentMonth();
+  const filtered = korsler.filter(k => k.dato.startsWith(monthStr)).sort((a, b) => new Date(b.dato) - new Date(a.dato));
+  const list = document.getElementById('dag-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<li class="empty">Ingen kørsler registreret endnu</li>';
+    return;
+  }
+  list.innerHTML = filtered.map(k => `
+    <li>
+      <div>
+        <strong>${k.rute}</strong><br/>
+        <span style="font-size:11px;color:var(--ash);">${new Date(k.dato).toLocaleDateString('da-DK')}</span>
+      </div>
+      <span class="dl-km">${k.km} km</span>
+      <span class="dl-kr">${k.cost.toFixed(2)} kr</span>
+      <button class="btn-delete" onclick="deleteKorsel(${k.id})">Slet</button>
+    </li>
+  `).join('');
+}
+function renderMaanedTab() {
+  const months = [];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(2026, 8 + i);
+    if (d.getFullYear() > 2027) break;
+    const year = d.getFullYear();
+    const month = d.getMonth();
+    const stats = getMonthlyStats(year, month);
+    const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+    const monthName = d.toLocaleDateString('da-DK', { month: 'long', year: 'numeric' });
+    months.push({
+      monthStr,
+      monthName,
+      ...stats,
+      pct: stats.totalCost / BUDGET_MONTHLY * 100,
+      status: stats.totalCost <= BUDGET_MONTHLY ? 'OK' : 'Over'
+    });
+  }
+  const tbl = document.getElementById('maaned-tbl');
+  tbl.innerHTML = months.map(m => `
+    <tr>
+      <td>${m.monthName}</td>
+      <td class="num">${m.totalKm}</td>
+      <td class="num">${m.totalCost.toFixed(2)} kr</td>
+      <td class="num"><span class="pill pill-a">${BUDGET_MONTHLY} kr</span></td>
+      <td><span class="pill ${m.status === 'OK' ? 'pill-g' : 'pill-r'}">${m.status}</span></td>
+    </tr>
+  `).join('');
+}
+function renderMaanedKPI() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const monthStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const stats = getMonthlyStats(year, month);
+  const pct = Math.round(stats.totalCost / BUDGET_MONTHLY * 100);
+  const status = stats.totalCost <= BUDGET_MONTHLY ? '✓' : '⚠';
+  const statusClass = stats.totalCost <= BUDGET_MONTHLY ? 'up' : 'dn';
+  document.getElementById('mnd-val').textContent = monthStr;
+  document.getElementById('mnd-km').textContent = stats.totalKm;
+  document.getElementById('mnd-cost').textContent = `${stats.totalCost.toFixed(2)} kr`;
+  document.getElementById('mnd-budget').textContent = `Budget: ${BUDGET_MONTHLY} kr`;
+  document.getElementById('mnd-pct').textContent = `${pct}% af budget`;
+  document.getElementById('mnd-status').textContent = status;
+  document.getElementById('mnd-status').className = `mnd-cell-value ${statusClass}`;
+}
+function switchTab(tab) {
+  document.querySelectorAll('#p-korsel .tab-content').forEach(t => t.style.display = 'none');
+  document.querySelectorAll('#p-korsel .ptab').forEach(t => t.classList.remove('active'));
+  document.getElementById('tab-' + tab).style.display = 'block';
+  event.target.classList.add('active');
+}
+function initKorselDateInput() {
+  const today = new Date();
+  const dateStr = today.toISOString().split('T')[0];
+  const inp = document.getElementById('dato-input');
+  if (inp) inp.value = dateStr;
+}
+function renderKorselUI() {
+  renderDagTab();
+  renderMaanedKPI();
+  renderMaanedTab();
+}
+// Init kørsel regnskab ved load
+document.addEventListener('DOMContentLoaded', function() {
+  if (document.getElementById('p-korsel')) {
+    initKorselDateInput();
+    renderKorselUI();
+  }
+  updateMgmtKorselKPI();
+});
+
+// Opdater Management Review KPI'er med kørsel-data
+function updateMgmtKorselKPI() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const stats = getMonthlyStats(year, month);
+  const pct = Math.round(stats.totalCost / BUDGET_MONTHLY * 100);
+  const isOver = stats.totalCost > BUDGET_MONTHLY;
+
+  document.getElementById('mgmt-korsel-km').textContent = stats.totalKm;
+  document.getElementById('mgmt-korsel-km-sub').textContent = `km denne måned`;
+
+  document.getElementById('mgmt-korsel-cost').textContent = `${stats.totalCost.toFixed(0)} kr`;
+  document.getElementById('mgmt-korsel-cost-sub').textContent = `budget: ${BUDGET_MONTHLY} kr`;
+
+  const pctEl = document.getElementById('mgmt-korsel-pct');
+  pctEl.textContent = `${pct}%`;
+  pctEl.className = `kpi-v ${isOver ? 'dn' : 'up'}`;
+
+  document.getElementById('mgmt-korsel-status').textContent = isOver ? '⚠ Over budget' : '✓ OK';
+
+  if (isOver) {
+    const alert = document.getElementById('mgmt-korsel-alert');
+    alert.style.display = 'flex';
+    alert.className = 'kpi dn';
+    document.getElementById('mgmt-korsel-alert-msg').textContent = `${pct}%`;
+  }
 }
 </script>
 

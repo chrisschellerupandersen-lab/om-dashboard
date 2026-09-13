@@ -9973,7 +9973,7 @@ async function _loadDagUge(uge, aar) {
 
   // Gruppér produkter efter kategori (som Organic-siden) i fast rækkefølge
   const buckets = {};
-  d.produkter.forEach(p => { const k = _dagKat(p.varenavn); (buckets[k] = buckets[k] || []).push(p); });
+  d.produkter.forEach(p => { const k = p.kat || _dagKat(p.varenavn); (buckets[k] = buckets[k] || []).push(p); });
   const katOrder = KATO.filter(k => buckets[k] && buckets[k].length);
 
   const rows = [];
@@ -9987,8 +9987,11 @@ async function _loadDagUge(uge, aar) {
       sekTotS += p.tot_solgt;
       const dagCeller = p.dage.map(_dagCelle).join('');
       const tdc = _diffFarve(p.tot_diff);
-      rows.push(`<tr>
-        <td style="font-size:15px;padding:8px;">${p.varenavn}</td>
+      const komboBadge = p.kombo
+        ? ` <span style="font-size:8px;font-weight:700;letter-spacing:.06em;color:var(--moss);border:1px solid var(--moss);border-radius:4px;padding:0 4px;vertical-align:middle;" title="Kombo/bundle-salg (fx 3x valgfri wienerbrød, kaffe+bolle) — tælles med i kategoriens salg">KOMBO</span>`
+        : '';
+      rows.push(`<tr${p.kombo ? ' style="background:rgba(46,90,90,.04);"' : ''}>
+        <td style="font-size:15px;padding:8px;${p.kombo ? 'color:var(--ash);font-style:italic;' : ''}">${p.varenavn}${komboBadge}</td>
         ${dagCeller}
         <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:16px;">${p.tot_bestilt || '—'}</td>
         <td class="num" style="${mono}font-size:16px;">${p.tot_solgt}</td>

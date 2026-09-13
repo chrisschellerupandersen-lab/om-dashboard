@@ -3218,6 +3218,18 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
             """, dage_datoer + [int(x) for x in alle_sku]).fetchall():
                 salg_map.setdefault(str(s["vn"]), {})[s["dato"]] = int(s["antal"] or 0)
 
+        # Kombo/bundle-salg (3x valgfri wienerbrød, kaffe+BMO m.fl.) ligger på egne
+        # varenumre uden for produkternes SKU'er → hentes separat og tælles med i
+        # kategoriens salg (som på Seneste dag / spild-beregningen).
+        _sku_int = {int(x) for x in alle_sku}
+        _ph_d = ','.join('?' * len(dage_datoer))
+        combo_raw = conn.execute(f"""
+            SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
+                   SUM(antal) AS antal
+            FROM transaktioner WHERE dato IN ({_ph_d})
+            GROUP BY varenavn, vn, dato
+        """, dage_datoer).fetchall()
+
     produkter = []
     for b in bestil:
         skus_b = navn_skus.get((b["varenavn"] or "").strip().lower(), [])
@@ -3233,11 +3245,38 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         produkter.append({
             "varenummer":  str(b["varenummer"]) if b["varenummer"] else "",
             "varenavn":    b["varenavn"],
+            "kat":         _bakery_kat(b["varenavn"]) or "Andet",
             "sektion":     int(b["sektion"] or 1),
             "dage":        dage_data,
             "tot_bestilt": tot_bestilt,
             "tot_solgt":   tot_solgt,
             "tot_diff":    tot_solgt - tot_bestilt,   # negativt = under-solgt
+        })
+
+    # Kombo-salg som egne linjer pr. kategori (bestilt=0) → kategoriens salg-total
+    # inkluderer dem, mens produkternes egne tal forbliver SKU-præcise.
+    combo_agg: Dict = {}
+    for r in combo_raw:
+        if r["vn"] in _sku_int:
+            continue
+        rolle = _bageri_rolle(r["varenavn"])
+        if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
+            continue
+        key = (rolle[1], r["varenavn"])
+        combo_agg.setdefault(key, {})
+        combo_agg[key][r["dato"]] = combo_agg[key].get(r["dato"], 0) + int(r["antal"] or 0) * rolle[2]
+    _SEK_KAT = {"Brød": 1, "Boller": 2, "Wiener": 3, "Kage": 4}
+    for (kat, navn), per_dag in combo_agg.items():
+        dage_data = []
+        tot = 0
+        for i in range(7):
+            s = int(per_dag.get(dage_datoer[i], 0))
+            tot += s
+            dage_data.append({"bestilt": 0, "solgt": s, "diff": s})
+        produkter.append({
+            "varenummer": "", "varenavn": navn, "kat": kat, "kombo": True,
+            "sektion": _SEK_KAT.get(kat, 1),
+            "dage": dage_data, "tot_bestilt": 0, "tot_solgt": tot, "tot_diff": tot,
         })
 
     return {

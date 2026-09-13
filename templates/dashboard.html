@@ -2995,6 +2995,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <button class="bageri-prof-btn" data-dv="forslag" onclick="bageriDagVis('forslag')">Forslag</button>
                 <button class="bageri-prof-btn" data-dv="bestilt" onclick="bageriDagVis('bestilt')">Bestilt</button>
                 <button class="bageri-prof-btn" data-dv="delta" onclick="bageriDagVis('delta')" title="Ændring i bestilt antal vs. forrige uge, pr. produkt">Δ vs. forrige uge</button>
+                <button class="bageri-prof-btn" data-dv="salg" onclick="bageriDagVis('salg')" title="Denne uges bestilling vs. sidste uges faktiske salg — ramte vi rigtigt?">Δ vs. salg</button>
               </div>
               <div style="display:flex;gap:4px;" id="bageri-profil">
                 <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
@@ -4406,14 +4407,19 @@ async function _bageriRender(){
   // Δ-farve/tekst (ændring vs. forrige uge — neutral: op=grøn, ned=orange)
   const dFarve = v => v==null?'var(--ash)':(v>0?'var(--forest)':(v<0?'#b3541e':'var(--ash)'));
   const dTxt   = v => v==null?'–':(v>0?'+'+v:''+v);
+  // Match-farve: bestilt vs. faktisk salg forrige uge (±10% = ramt=grøn; over=rød; under=guld)
+  const mFarve = (best, solgt) => (solgt==null||best==null) ? 'var(--ash)'
+      : (Math.abs(best-solgt) <= Math.max(2, solgt*0.10) ? 'var(--moss)' : (best-solgt>0 ? '#b0413a' : '#c8a84b'));
   const isDelta = _bageriDagVis==='delta';
+  const isSalg  = _bageriDagVis==='salg';
   const prevMap = isDelta ? await _bageriPrevBestMap() : null;
   const visBestilt = _bageriDagVis==='bestilt';
   const kanRedigere = visBestilt && _bageriUgeRedigerbar();
-  const modeBg  = isDelta ? '#6a4a1e' : (visBestilt ? '#8a3a3a' : 'var(--forest)');
+  const modeBg  = isDelta ? '#6a4a1e' : isSalg ? '#2e5a5a' : (visBestilt ? '#8a3a3a' : 'var(--forest)');
   const modeLbl = isDelta ? `▼ ÆNDRING pr. dag vs. forrige uge (bestilt) — forrige = uge ${prevMap.__uge}`
+                : isSalg  ? '▼ DENNE UGES BESTILLING pr. dag — sammenlignet med sidste uges salg'
                           : (visBestilt ? '▼ DIN BESTILLING pr. dag (portal-ordre)' : '▼ MOTORENS FORSLAG pr. dag');
-  const dayTint = isDelta ? 'rgba(106,74,30,.07)' : (visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)');
+  const dayTint = isDelta ? 'rgba(106,74,30,.07)' : isSalg ? 'rgba(46,90,90,.07)' : (visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)');
   let head = `<thead>`
     + `<tr><th></th><th colspan="7" style="text-align:center;background:${modeBg};color:#fff;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;padding:3px 0;border-radius:4px 4px 0 0;">${modeLbl}</th><th colspan="5"></th></tr>`
     + `<tr><th style="text-align:left;min-width:170px;">Vare</th>`
@@ -4423,6 +4429,9 @@ async function _bageriRender(){
     + (isDelta
         ? `<th class="num" title="Ændring i bestilt antal for ugen: denne uge − forrige uge. + (grøn) = bestilt mere, − (orange) = bestilt mindre.">Δ uge</th>`
           + `<th class="num" style="color:var(--ash);" title="Forrige uges bestilte antal (portal-ordre)">Forrige best.</th>`
+        : isSalg
+        ? `<th class="num" title="Bestilt − faktisk solgt forrige hele uge. + (rød) = bestilt mere end solgt (spild-risiko); − (guld) = bestilt mindre (kan sælge ud); inden for ±10% (grøn) = ramt.">Δ vs. salg</th>`
+          + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge">Solgt forr.</th>`
         : `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
           + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge før den viste uge. Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Forrige uge</th>`)
     + `<th class="num">Kr</th></tr></thead>`;
@@ -4449,7 +4458,7 @@ async function _bageriRender(){
         dagSrc = {}; DAGE.forEach(dg=> dagSrc[dg] = (tb[dg]||0) - (prevBest?(prevBest[dg]||0):0));
         DAGE.forEach(dg=> katDag[dg]+=dagSrc[dg]);
       } else {
-        dagSrc = (_bageriDagVis==='bestilt') ? p.bestilt : p.anbefalet;   // kan være null i bestilt-visning
+        dagSrc = (visBestilt || isSalg) ? p.bestilt : p.anbefalet;   // salg viser denne uges bestilling som kontekst
         if (dagSrc) DAGE.forEach(dg=>katDag[dg]+=(dagSrc[dg]||0));
       }
       katUge += (p.total_anbefalet||0); katKr += (p.total_pris||0);
@@ -4482,12 +4491,16 @@ async function _bageriRender(){
         + (isDelta
             ? `<td class="num" style="color:${dFarve(dTot)};font-weight:700;">${dTxt(dTot)}</td>
                <td class="num" style="color:var(--ash);">${prevTot==null?'–':prevTot}</td>`
+            : isSalg
+            ? `<td class="num" style="color:${mFarve(best, sidste)};font-weight:700;">${(best==null&&sidste==null)?'–':dTxt((best||0)-(sidste||0))}</td>
+               <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>`
             : `<td class="num" style="color:${afFarve(afv)};font-weight:600;">${afTxt(afv)}</td>
                <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>`)
         + `<td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
     });
     const katAfv = katBestHar ? (katBest - katUge) : null;
     const katDelta = (katBestHar || katPrevHar) ? (katBest - katPrev) : null;
+    const katMDelta = (katBestHar || katSidsteHar) ? (katBest - katSidste) : null;
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
       + DAGE.map(dg=> isDelta
@@ -4498,12 +4511,16 @@ async function _bageriRender(){
       + (isDelta
           ? `<td class="num" style="color:${dFarve(katDelta)};">${dTxt(katDelta)}</td>`
             + `<td class="num" style="color:var(--ash);">${katPrevHar?katPrev:'–'}</td>`
+          : isSalg
+          ? `<td class="num" style="color:${mFarve(katBestHar?katBest:null, katSidsteHar?katSidste:null)};">${katMDelta==null?'–':dTxt(katMDelta)}</td>`
+            + `<td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td>`
           : `<td class="num" style="color:${afFarve(katAfv)};">${afTxt(katAfv)}</td>`
             + `<td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td>`)
       + `<td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
   });
   const totAfv = harBest ? (totBest - d.total_stk) : null;
   const totDelta = isDelta ? (totBest - totPrev) : null;
+  const totMDelta = (harBest || totSidste) ? ((harBest?totBest:0) - (totSidste||0)) : null;
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
       <td class="num">${d.total_stk}</td>
@@ -4511,6 +4528,9 @@ async function _bageriRender(){
     + (isDelta
         ? `<td class="num" style="color:${dFarve(totDelta)};">${dTxt(totDelta)}</td>
            <td class="num" style="color:var(--ash);">${totPrev||'–'}</td>`
+        : isSalg
+        ? `<td class="num" style="color:${mFarve(harBest?totBest:null, totSidste||null)};">${totMDelta==null?'–':dTxt(totMDelta)}</td>
+           <td class="num" style="color:var(--ash);">${totSidste||'–'}</td>`
         : `<td class="num" style="color:${afFarve(totAfv)};">${afTxt(totAfv)}</td>
            <td class="num" style="color:var(--ash);">${totSidste||'–'}</td>`)
     + `<td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
@@ -4524,6 +4544,10 @@ async function _bageriRender(){
     ? `Δ-visning: ændring i BESTILT antal vs. forrige uge (uge ${prevMap.__uge}), pr. dag og pr. vare. `
       + `+ (grøn) = bestilt mere end sidste uge · − (orange) = bestilt mindre · "–" = ingen bestilling i nogen af ugerne. `
       + `"Bestilt" = denne uges total · "Δ uge" = denne − forrige · "Forrige best." = forrige uges total.`
+    : isSalg
+    ? `Δ vs. salg: denne uges BESTILLING sammenlignet med sidste HELE uges faktiske salg — ramte vi rigtigt? `
+      + `"Δ vs. salg" = bestilt − solgt: + (rød) = bestilt mere end der blev solgt (spild-risiko) · − (guld) = bestilt mindre (kan sælge ud) · inden for ±10% (grøn) = ramt. `
+      + `Dags-kolonnerne viser denne uges bestilling som kontekst.`
     : `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
       + `“Bestilt” = din faktiske portal-ordre for ugen · “Afvig” = bestilt − anbefalet (+ rød = bestilt mere). `
       + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`

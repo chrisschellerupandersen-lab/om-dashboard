@@ -9927,17 +9927,20 @@ async function _loadDagUge(uge, aar) {
     </td>`;
   }
 
-  // Sektionsnavne — matcher Excel-templatens 4 sektioner
-  const SEKTION_NAVNE = {
-    1: 'Brød, flute & focaccia',
-    2: 'Boller',
-    3: 'Wienerbrød',
-    4: 'Kager',
+  // Kategorisering + rækkefølge som Bageri Organic-siden (Brød/Boller/Wiener/Kage)
+  const KATO = ['Brød', 'Boller', 'Wiener', 'Kage', 'Andet'];
+  const _dagKat = (navn) => {
+    const n = (navn || '').toLowerCase();
+    if (n.includes('gulerodskage') || n.includes('cookie') || n.includes('kage')) return 'Kage';
+    if (n.includes('bolle')) return 'Boller';
+    if (['tebirkes','croissant','snurre','snurrer','pain','wiener','spandauer','snegl','frøsnapper','frosnapper','marcipan'].some(k=>n.includes(k))) return 'Wiener';
+    if (n.includes('brød') || n.includes('brod') || n.includes('focaccia') || n.includes('foccacia') || n.includes('flute')) return 'Brød';
+    return 'Andet';
   };
 
-  function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff, sektion) {
+  function _ialtRow(dagTotaler, totBestilt, totSolgt, totDiff, katNavn) {
     const dc    = _diffFarve(totDiff);
-    const label = 'I alt — ' + (SEKTION_NAVNE[sektion] || '');
+    const label = katNavn + ' i alt';
     const dagCeller = dagTotaler.map(([b, s]) => {
       const diff = s - b;
       const c = _diffFarve(diff);
@@ -9959,56 +9962,38 @@ async function _loadDagUge(uge, aar) {
 
   const colSpanTot = 1 + nDage + 3;
 
-  function _sektionHeader(sektion) {
-    const navn = SEKTION_NAVNE[sektion] || ('Gruppe ' + sektion);
-    return `<tr style="background:var(--forest);">
-      <td colspan="${colSpanTot}" style="padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--amber);">${navn}</td>
+  function _sektionHeader(katNavn) {
+    return `<tr style="background:rgba(45,74,45,.07);border-top:1px solid var(--border);">
+      <td colspan="${colSpanTot}" style="padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--forest);">${katNavn.toUpperCase()}</td>
     </tr>`;
   }
 
+  // Gruppér produkter efter kategori (som Organic-siden) i fast rækkefølge
+  const buckets = {};
+  d.produkter.forEach(p => { const k = _dagKat(p.varenavn); (buckets[k] = buckets[k] || []).push(p); });
+  const katOrder = KATO.filter(k => buckets[k] && buckets[k].length);
+
   const rows = [];
-  let curSek = null;
-  let sekDagTot = Array.from({length: nDage}, () => [0, 0]);
-  let sekTotB = 0, sekTotS = 0;
-
-  d.produkter.forEach((p, idx) => {
-    const sek = p.sektion ?? 1;
-    // Sektion-skift: indsæt I alt for forrige sektion + header for ny
-    if (curSek !== null && sek !== curSek) {
-      rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, curSek));
-      sekDagTot = Array.from({length: nDage}, () => [0, 0]);
-      sekTotB = 0; sekTotS = 0;
-    }
-    // Indsæt gruppe-header når ny sektion starter
-    if (sek !== curSek) {
-      rows.push(_sektionHeader(sek));
-    }
-    curSek = sek;
-
-    // Akkumulér sektionssummer
-    p.dage.forEach((dag, i) => {
-      sekDagTot[i][0] += dag.bestilt;
-      sekDagTot[i][1] += dag.solgt;
+  katOrder.forEach(kat => {
+    rows.push(_sektionHeader(kat));
+    let sekDagTot = Array.from({length: nDage}, () => [0, 0]);
+    let sekTotB = 0, sekTotS = 0;
+    buckets[kat].forEach(p => {
+      p.dage.forEach((dag, i) => { sekDagTot[i][0] += dag.bestilt; sekDagTot[i][1] += dag.solgt; });
+      sekTotB += p.tot_bestilt;
+      sekTotS += p.tot_solgt;
+      const dagCeller = p.dage.map(_dagCelle).join('');
+      const tdc = _diffFarve(p.tot_diff);
+      rows.push(`<tr>
+        <td style="font-size:15px;padding:8px;">${p.varenavn}</td>
+        ${dagCeller}
+        <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:16px;">${p.tot_bestilt || '—'}</td>
+        <td class="num" style="${mono}font-size:16px;">${p.tot_solgt}</td>
+        <td class="num" style="${mono}color:${tdc};font-weight:600;font-size:16px;">${p.tot_diff !== 0 ? (p.tot_diff>0?'+':'')+p.tot_diff : '·'}</td>
+      </tr>`);
     });
-    sekTotB += p.tot_bestilt;
-    sekTotS += p.tot_solgt;
-
-    // Produktrække
-    const dagCeller = p.dage.map(_dagCelle).join('');
-    const tdc = _diffFarve(p.tot_diff);
-    rows.push(`<tr>
-      <td style="font-size:15px;padding:8px;">${p.varenavn}</td>
-      ${dagCeller}
-      <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:600;font-size:16px;">${p.tot_bestilt || '—'}</td>
-      <td class="num" style="${mono}font-size:16px;">${p.tot_solgt}</td>
-      <td class="num" style="${mono}color:${tdc};font-weight:600;font-size:16px;">${p.tot_diff !== 0 ? (p.tot_diff>0?'+':'')+p.tot_diff : '·'}</td>
-    </tr>`);
+    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, kat));
   });
-
-  // Afsluttende I alt for sidste sektion
-  if (curSek !== null) {
-    rows.push(_ialtRow(sekDagTot, sekTotB, sekTotS, sekTotS - sekTotB, curSek));
-  }
 
   document.getElementById('dag-tbl-body').innerHTML = rows.join('');
 }

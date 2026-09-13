@@ -2115,8 +2115,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               <tr id="dag-tbl-header">
                 <th style="min-width:160px;text-align:left;font-size:12px;">Produkt</th>
                 <!-- Dag-kolonner indsættes af JS -->
-                <th class="num" style="border-left:2px solid rgba(30,58,30,.1);font-size:11px;color:var(--forest);">Tot. indkøbt</th>
-                <th class="num" style="font-size:11px;">Tot. solgt</th>
+                <th class="num" id="dag-th-indkobt" style="border-left:2px solid rgba(30,58,30,.1);font-size:11px;color:var(--forest);">Tot. indkøbt</th>
+                <th class="num" id="dag-th-solgt" style="font-size:11px;">Tot. solgt</th>
                 <th class="num" style="font-size:11px;">Diff</th>
               </tr>
             </thead>
@@ -9892,7 +9892,11 @@ async function _loadDagUge(uge, aar) {
   const navne = d.dage_navne || ['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
   const datoer = d.dage_datoer || [];
   document.getElementById('dag-dato-range').textContent =
-    datoer.length ? datoer[0].slice(5).replace('-','/') + ' – ' + datoer[6].slice(5).replace('-','/') + ' · ' + aar : '';
+    datoer.length ? 'Uge ' + uge + ' · ' + datoer[0].slice(5).replace('-','/') + ' – ' + datoer[6].slice(5).replace('-','/') + ' · ' + aar : '';
+  // Ugenummer i total-kolonneoverskrifter så det er tydeligt hvilken uge der vises
+  const _uTag = ` <span style="font-weight:400;opacity:.6;">u.${uge}</span>`;
+  const _thI = document.getElementById('dag-th-indkobt'); if (_thI) _thI.innerHTML = 'Tot. indkøbt' + _uTag;
+  const _thS = document.getElementById('dag-th-solgt');   if (_thS) _thS.innerHTML = 'Tot. solgt' + _uTag;
 
   // Byg tabel-header dag-kolonner
   const hdr = document.getElementById('dag-tbl-header');

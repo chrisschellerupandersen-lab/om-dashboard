@@ -6526,6 +6526,9 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         "total_kr":     round(total_indkoeb, 2),
         "har_bestilling": har_bestilling,
         "total_bestilt": total_bestilt,
+        # Hvilken uge "Forrige uge"/"sidste_uge" (faktisk salg) refererer til —
+        # seneste HELE uge før målugen (kan være måluge−1 eller −2). Til kolonne-labels.
+        "forrige_uge":  {"uge": forrige_mon.isocalendar()[1], "aar": forrige_mon.isocalendar()[0]},
         "faktisk":      False,
     }
 

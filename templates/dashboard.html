@@ -2994,6 +2994,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Pr. dag:</span>
                 <button class="bageri-prof-btn" data-dv="forslag" onclick="bageriDagVis('forslag')">Forslag</button>
                 <button class="bageri-prof-btn" data-dv="bestilt" onclick="bageriDagVis('bestilt')">Bestilt</button>
+                <button class="bageri-prof-btn" data-dv="delta" onclick="bageriDagVis('delta')" title="Ændring i bestilt antal vs. forrige uge, pr. produkt">Δ vs. forrige uge</button>
               </div>
               <div style="display:flex;gap:4px;" id="bageri-profil">
                 <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
@@ -4213,6 +4214,34 @@ function bageriUge(delta){
 function bageriProfil(p){ _bageriProfil = p; _bageriRender(); }
 function bageriDagVis(v){ _bageriDagVis = v; _bageriRender(); }
 
+// ISO-uge/år af en dato (til "forrige uge"-opslag på tværs af årsskifte)
+function _isoUgeAf(dt){
+  const d = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+  const day = (d.getUTCDay() + 6) % 7;                 // man=0
+  d.setUTCDate(d.getUTCDate() - day + 3);              // torsdag i ugen
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const fd = (firstThu.getUTCDay() + 6) % 7;
+  firstThu.setUTCDate(firstThu.getUTCDate() - fd + 3);
+  const uge = 1 + Math.round((d - firstThu) / (7 * 24 * 3600 * 1000));
+  return { uge, aar: d.getUTCFullYear() };
+}
+// Forrige uges bestilte antal pr. vare (til Δ-visning). Cachet pr. uge+profil.
+let _bageriPrevCache = {};
+async function _bageriPrevBestMap(){
+  const mon = _bageriMandag(_bageriAar, _bageriUge);
+  const pm = new Date(mon); pm.setDate(pm.getDate() - 7);
+  const pw = _isoUgeAf(pm);
+  const key = `${pw.aar}-${pw.uge}-${_bageriProfil}`;
+  if (_bageriPrevCache[key]) return _bageriPrevCache[key];
+  const pd = await api(`/api/bestilling/anbefaling?uge=${pw.uge}&aar=${pw.aar}&metode=organic&profil=${_bageriProfil}`);
+  const map = { __uge: pw.uge, __aar: pw.aar };
+  if (pd && pd.produkter) pd.produkter.forEach(p=>{
+    map[p.varenavn] = { bestilt: p.bestilt || null, total: (p.total_bestilt==null ? null : p.total_bestilt) };
+  });
+  _bageriPrevCache[key] = map;
+  return map;
+}
+
 // Regulering af bestilling er kun tilladt i indeværende + næste uge
 function _bageriUgeRedigerbar(){
   const iso = _isoUgeIdag();
@@ -4374,25 +4403,36 @@ async function _bageriRender(){
   // Afvig-farve: + (bestilt mere end anbefalet) = spild-risiko = rød; − (leaner) = grøn
   const afFarve = v => v==null?'var(--ash)':(v>0?'#b0413a':(v<0?'var(--moss)':'var(--ash)'));
   const afTxt   = v => v==null?'–':(v>0?'+'+v:''+v);
+  // Δ-farve/tekst (ændring vs. forrige uge — neutral: op=grøn, ned=orange)
+  const dFarve = v => v==null?'var(--ash)':(v>0?'var(--forest)':(v<0?'#b3541e':'var(--ash)'));
+  const dTxt   = v => v==null?'–':(v>0?'+'+v:''+v);
+  const isDelta = _bageriDagVis==='delta';
+  const prevMap = isDelta ? await _bageriPrevBestMap() : null;
   const visBestilt = _bageriDagVis==='bestilt';
   const kanRedigere = visBestilt && _bageriUgeRedigerbar();
-  const modeBg  = visBestilt ? '#8a3a3a' : 'var(--forest)';
-  const modeLbl = visBestilt ? '▼ DIN BESTILLING pr. dag (portal-ordre)' : '▼ MOTORENS FORSLAG pr. dag';
-  const dayTint = visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)';
+  const modeBg  = isDelta ? '#6a4a1e' : (visBestilt ? '#8a3a3a' : 'var(--forest)');
+  const modeLbl = isDelta ? `▼ ÆNDRING pr. dag vs. forrige uge (bestilt) — forrige = uge ${prevMap.__uge}`
+                          : (visBestilt ? '▼ DIN BESTILLING pr. dag (portal-ordre)' : '▼ MOTORENS FORSLAG pr. dag');
+  const dayTint = isDelta ? 'rgba(106,74,30,.07)' : (visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)');
   let head = `<thead>`
     + `<tr><th></th><th colspan="7" style="text-align:center;background:${modeBg};color:#fff;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;padding:3px 0;border-radius:4px 4px 0 0;">${modeLbl}</th><th colspan="5"></th></tr>`
     + `<tr><th style="text-align:left;min-width:170px;">Vare</th>`
     + DAGE.map(dg=>`<th class="num" style="background:${dayTint};">${LBL[dg]}</th>`).join('')
     + `<th class="num" title="Anbefalet af motoren">Uge</th>`
     + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for denne uge)">Bestilt</th>`
-    + `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
-    + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge før den viste uge. Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Forrige uge</th><th class="num">Kr</th></tr></thead>`;
+    + (isDelta
+        ? `<th class="num" title="Ændring i bestilt antal for ugen: denne uge − forrige uge. + (grøn) = bestilt mere, − (orange) = bestilt mindre.">Δ uge</th>`
+          + `<th class="num" style="color:var(--ash);" title="Forrige uges bestilte antal (portal-ordre)">Forrige best.</th>`
+        : `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
+          + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge før den viste uge. Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Forrige uge</th>`)
+    + `<th class="num">Kr</th></tr></thead>`;
   let body = '';
-  let totSidste = 0, totBest = 0;
+  let totSidste = 0, totBest = 0, totPrev = 0;
   order.forEach(kat=>{
     const prods = groups[kat]; if(!prods||!prods.length) return;
     const katDag = {}; DAGE.forEach(dg=>katDag[dg]=0);
     let katUge = 0, katKr = 0, katSidste = 0, katSidsteHar = false, katBest = 0, katBestHar = false;
+    let katPrev = 0, katPrevHar = false;
     body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="13" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
     prods.forEach(p=>{
       const risk = p.risikogruppe==='risiko';
@@ -4400,17 +4440,34 @@ async function _bageriRender(){
         ? `<span class="bageri-badge" style="background:#8a3a3a;color:#fff;" title="Ikke-fryse-egnet — bestilt stramt">stram</span>` : '';
       const seed = !p.har_historik
         ? `<span class="bageri-badge" style="background:var(--amber);color:#4a3800;" title="Ny vare — startbud uden historik">nyt</span>` : '';
-      const dagSrc = (_bageriDagVis==='bestilt') ? p.bestilt : p.anbefalet;   // kan være null i bestilt-visning
-      if (dagSrc) DAGE.forEach(dg=>katDag[dg]+=(dagSrc[dg]||0));
+      const prevP    = isDelta ? (prevMap[p.varenavn] || null) : null;
+      const prevBest = prevP ? prevP.bestilt : null;
+      const prevTot  = prevP ? prevP.total   : null;
+      let dagSrc;
+      if (isDelta){
+        const tb = p.bestilt || {};
+        dagSrc = {}; DAGE.forEach(dg=> dagSrc[dg] = (tb[dg]||0) - (prevBest?(prevBest[dg]||0):0));
+        DAGE.forEach(dg=> katDag[dg]+=dagSrc[dg]);
+      } else {
+        dagSrc = (_bageriDagVis==='bestilt') ? p.bestilt : p.anbefalet;   // kan være null i bestilt-visning
+        if (dagSrc) DAGE.forEach(dg=>katDag[dg]+=(dagSrc[dg]||0));
+      }
       katUge += (p.total_anbefalet||0); katKr += (p.total_pris||0);
       const sidste = (p.sidste_uge==null) ? null : p.sidste_uge;
       if (sidste!=null){ katSidste += sidste; totSidste += sidste; katSidsteHar = true; }
       const best = (p.total_bestilt==null) ? null : p.total_bestilt;
       const afv  = (p.afvig_bestilt==null) ? null : p.afvig_bestilt;
       if (best!=null){ katBest += best; totBest += best; katBestHar = true; }
+      if (prevTot!=null){ katPrev += prevTot; totPrev += prevTot; katPrevHar = true; }
+      const dTot = (isDelta && (best!=null || prevTot!=null)) ? ((best||0) - (prevTot||0)) : null;
       body += `<tr>
         <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
         + DAGE.map(dg=>{
+            if (isDelta){
+              const tv=(p.bestilt&&p.bestilt[dg])||0, pv=(prevBest&&prevBest[dg])||0, dv=tv-pv;
+              const disp=(tv===0&&pv===0)?'–':dTxt(dv);
+              return `<td class="num" style="background:${dayTint};color:${(tv===0&&pv===0)?'var(--ash)':dFarve(dv)};font-weight:${dv!==0?'700':'400'};" title="Denne uge ${tv} · forrige ${pv}">${disp}</td>`;
+            }
             const v = dagSrc ? (dagSrc[dg]||0) : null;
             const disp = v==null?'–':(v||'–');
             if (kanRedigere){
@@ -4421,38 +4478,56 @@ async function _bageriRender(){
             return `<td class="num" style="background:${dayTint};">${disp}</td>`;
           }).join('')
         + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
-           <td class="num" style="font-weight:600;">${best==null?'–':best}</td>
-           <td class="num" style="color:${afFarve(afv)};font-weight:600;">${afTxt(afv)}</td>
-           <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>
-           <td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
+           <td class="num" style="font-weight:600;">${best==null?'–':best}</td>`
+        + (isDelta
+            ? `<td class="num" style="color:${dFarve(dTot)};font-weight:700;">${dTxt(dTot)}</td>
+               <td class="num" style="color:var(--ash);">${prevTot==null?'–':prevTot}</td>`
+            : `<td class="num" style="color:${afFarve(afv)};font-weight:600;">${afTxt(afv)}</td>
+               <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>`)
+        + `<td class="num" style="color:var(--ash);">${kr(p.total_pris)}</td></tr>`;
     });
     const katAfv = katBestHar ? (katBest - katUge) : null;
+    const katDelta = (katBestHar || katPrevHar) ? (katBest - katPrev) : null;
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
-      + DAGE.map(dg=>`<td class="num" style="background:${dayTint};">${katDag[dg]||'–'}</td>`).join('')
+      + DAGE.map(dg=> isDelta
+          ? `<td class="num" style="background:${dayTint};color:${dFarve(katDag[dg])};">${katDag[dg]===0?'0':dTxt(katDag[dg])}</td>`
+          : `<td class="num" style="background:${dayTint};">${katDag[dg]||'–'}</td>`).join('')
       + `<td class="num">${katUge}</td>`
       + `<td class="num">${katBestHar?katBest:'–'}</td>`
-      + `<td class="num" style="color:${afFarve(katAfv)};">${afTxt(katAfv)}</td>`
-      + `<td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td><td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
+      + (isDelta
+          ? `<td class="num" style="color:${dFarve(katDelta)};">${dTxt(katDelta)}</td>`
+            + `<td class="num" style="color:var(--ash);">${katPrevHar?katPrev:'–'}</td>`
+          : `<td class="num" style="color:${afFarve(katAfv)};">${afTxt(katAfv)}</td>`
+            + `<td class="num" style="color:var(--ash);">${katSidsteHar?katSidste:'–'}</td>`)
+      + `<td class="num" style="color:var(--ash);">${kr(katKr)}</td></tr>`;
   });
   const totAfv = harBest ? (totBest - d.total_stk) : null;
+  const totDelta = isDelta ? (totBest - totPrev) : null;
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
       <td class="num">${d.total_stk}</td>
-      <td class="num">${harBest?totBest:'–'}</td>
-      <td class="num" style="color:${afFarve(totAfv)};">${afTxt(totAfv)}</td>
-      <td class="num" style="color:var(--ash);">${totSidste||'–'}</td><td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
+      <td class="num">${harBest?totBest:'–'}</td>`
+    + (isDelta
+        ? `<td class="num" style="color:${dFarve(totDelta)};">${dTxt(totDelta)}</td>
+           <td class="num" style="color:var(--ash);">${totPrev||'–'}</td>`
+        : `<td class="num" style="color:${afFarve(totAfv)};">${afTxt(totAfv)}</td>
+           <td class="num" style="color:var(--ash);">${totSidste||'–'}</td>`)
+    + `<td class="num">${kr(d.total_indkoeb)}</td></tr></tfoot>`;
   tbl.innerHTML = head + '<tbody>'+body+'</tbody>' + foot;
 
   const regTxt = !visBestilt ? ''
     : (kanRedigere
         ? ` ✎ Regulér: klik en dag i tabellen for at rette det faktiske antal (fx hvis leveringen afveg). Reguleringen står, indtil ugens faktura godkendes.`
         : ` 🔒 Regulering kan kun ske i indeværende + næste uge.`);
-  document.getElementById('bageri-note').textContent =
-    `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
-    + `“Bestilt” = din faktiske portal-ordre for ugen · “Afvig” = bestilt − anbefalet (+ rød = bestilt mere). `
-    + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`
-    + regTxt;
+  document.getElementById('bageri-note').textContent = isDelta
+    ? `Δ-visning: ændring i BESTILT antal vs. forrige uge (uge ${prevMap.__uge}), pr. dag og pr. vare. `
+      + `+ (grøn) = bestilt mere end sidste uge · − (orange) = bestilt mindre · "–" = ingen bestilling i nogen af ugerne. `
+      + `"Bestilt" = denne uges total · "Δ uge" = denne − forrige · "Forrige best." = forrige uges total.`
+    : `Basis: median af faktisk salg pr. ugedag (seneste ~8 uger), justeret med sæson og profil. `
+      + `“Bestilt” = din faktiske portal-ordre for ugen · “Afvig” = bestilt − anbefalet (+ rød = bestilt mere). `
+      + `“stram” = ikke-fryse-egnet (tebirkes/croissant/pain au chocolate). “nyt” = startbud uden historik. Ingen retur.`
+      + regTxt;
 
   _bageriSpildRender();
 }

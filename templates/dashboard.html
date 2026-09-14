@@ -4417,7 +4417,7 @@ async function _bageriRender(){
   const kanRedigere = visBestilt && _bageriUgeRedigerbar();
   const mUge = d.maal_uge;                                   // den viste uge
   const fUge = d.forrige_uge ? d.forrige_uge.uge : null;     // seneste hele uge (faktisk salg)
-  const uTag = u => u ? ` <span style="font-weight:400;opacity:.7;">u.${u}</span>` : '';
+  const uTag = u => u ? ` <span style="font-weight:400;color:#e6c96b;">u.${u}</span>` : '';
   const modeBg  = isDelta ? '#6a4a1e' : isSalg ? '#2e5a5a' : (visBestilt ? '#8a3a3a' : 'var(--forest)');
   const modeLbl = isDelta ? `▼ ÆNDRING pr. dag: uge ${mUge} − uge ${prevMap.__uge} (bestilt)`
                 : isSalg  ? `▼ BESTILLING uge ${mUge} pr. dag — sammenlignet med faktisk salg uge ${fUge||'?'}`
@@ -4431,12 +4431,12 @@ async function _bageriRender(){
     + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for uge ${mUge})">Bestilt${uTag(mUge)}</th>`
     + (isDelta
         ? `<th class="num" title="Ændring i bestilt antal: uge ${mUge} − uge ${prevMap.__uge}. + (grøn) = bestilt mere, − (orange) = bestilt mindre.">Δ (u.${mUge}−u.${prevMap.__uge})</th>`
-          + `<th class="num" style="color:var(--ash);" title="Forrige uges bestilte antal (portal-ordre), uge ${prevMap.__uge}">Forrige best.${uTag(prevMap.__uge)}</th>`
+          + `<th class="num" title="Forrige uges bestilte antal (portal-ordre), uge ${prevMap.__uge}">Forrige best.${uTag(prevMap.__uge)}</th>`
         : isSalg
         ? `<th class="num" title="Bestilt (uge ${mUge}) − faktisk solgt (uge ${fUge||'?'}). + (rød) = bestilt mere end solgt (spild-risiko); − (guld) = bestilt mindre (kan sælge ud); inden for ±10% (grøn) = ramt.">Δ vs. salg${fUge?` (u.${mUge}−u.${fUge})`:''}</th>`
-          + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge (uge ${fUge||'?'})">Solgt${uTag(fUge)}</th>`
+          + `<th class="num" title="Faktisk solgt i seneste HELE uge (uge ${fUge||'?'})">Solgt${uTag(fUge)}</th>`
         : `<th class="num" title="Bestilt − Anbefalet. + (rød) = du bestilte mere end anbefalet (spild-risiko); − (grøn) = strammere.">Afvig</th>`
-          + `<th class="num" style="color:var(--ash);" title="Faktisk solgt i seneste HELE uge før den viste uge (uge ${fUge||'?'}). Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Solgt${uTag(fUge)}</th>`)
+          + `<th class="num" title="Faktisk solgt i seneste HELE uge før den viste uge (uge ${fUge||'?'}). Ser du på den aktuelle uge, er det sidste uge; bestiller du til en fremtidig uge (hvor sidste uge ikke er slut endnu), vises ugen før den. Kun de ugedage anbefalingen dækker tælles med.">Solgt${uTag(fUge)}</th>`)
     + `<th class="num">Kr</th></tr></thead>`;
   let body = '';
   let totSidste = 0, totBest = 0, totPrev = 0;

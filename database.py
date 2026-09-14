@@ -91,7 +91,7 @@ _ORGANIC_BAKERY = [
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},
-    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436]},
+    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant)
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
     {"navn": "Karamelliseret croissant","indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [], "salg_kilde": [10418],
      "seed": {"man": 0, "tir": 4, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 8}},  # startbud til forslag; nyt SKU 10418 til solgt/spild

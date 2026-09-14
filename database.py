@@ -177,6 +177,16 @@ def _bageri_rolle(navn: str):
     return ("frisk", kat, 1) if kat else None
 
 
+def _kombo_navn(navn: str) -> str:
+    """Kanonisk navn til kombo-linjer, så reelt ens comboer vises som én linje.
+    Kaffe + valgfri wienerbrød sælges under flere kassenavne ('Stor kop kaffe og
+    valgfri wienerbrød', 'Wienerbrød & varm valgfri kaffe') → slås sammen."""
+    n = (navn or "").lower()
+    if "kaffe" in n and "wien" in n:
+        return "Kaffe + valgfri wienerbrød"
+    return navn
+
+
 def _organic_kat(navn: str) -> str:
     """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
     n = (navn or "").lower()
@@ -1847,8 +1857,13 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             continue                       # allerede talt via katalog-SKU
         rolle = _bageri_rolle(r["varenavn"])
         if rolle and rolle[0] == "frisk" and rolle[1] in extra:
-            extra[rolle[1]].append({"varenavn": r["varenavn"],
-                                    "antal": int((r["ant"] or 0) * rolle[2])})
+            nm = _kombo_navn(r["varenavn"])
+            n = int((r["ant"] or 0) * rolle[2])
+            _ln = next((x for x in extra[rolle[1]] if x["varenavn"] == nm), None)
+            if _ln:
+                _ln["antal"] += n
+            else:
+                extra[rolle[1]].append({"varenavn": nm, "antal": n})
 
     # Pr. vare: rest = bestilt − solgt (MÅ gå i minus, så totalen bliver korrekt når
     # der sælges mere end indkøbt). Solgt tælles ukappet.
@@ -1982,7 +1997,12 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
             kat = rolle[1]
             n = int((r["ant"] or 0) * rolle[2])
             ex[kat] += n
-            ex_lines[kat].append({"navn": r["varenavn"], "antal": n})
+            nm = _kombo_navn(r["varenavn"])
+            _ln = next((x for x in ex_lines[kat] if x["navn"] == nm), None)
+            if _ln:
+                _ln["antal"] += n
+            else:
+                ex_lines[kat].append({"navn": nm, "antal": n})
 
     # Fordel bundle/combo-forbruget ud på kategoriens varer (proportionalt med brutto-
     # spild, største-rest-metoden) → netto spild pr. vare til den RIGTIGE kostpris.
@@ -3262,7 +3282,7 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         rolle = _bageri_rolle(r["varenavn"])
         if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
             continue
-        key = (rolle[1], r["varenavn"])
+        key = (rolle[1], _kombo_navn(r["varenavn"]))
         combo_agg.setdefault(key, {})
         combo_agg[key][r["dato"]] = combo_agg[key].get(r["dato"], 0) + int(r["antal"] or 0) * rolle[2]
     _SEK_KAT = {"Brød": 1, "Boller": 2, "Wiener": 3, "Kage": 4}
@@ -6560,7 +6580,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             rolle = _bageri_rolle(r["varenavn"])
             if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
                 continue
-            key = (rolle[1], r["varenavn"])
+            key = (rolle[1], _kombo_navn(r["varenavn"]))
             combo_agg[key] = combo_agg.get(key, 0) + int(r["antal"] or 0) * rolle[2]
         for (kat, navn), tot in combo_agg.items():
             produkter.append({

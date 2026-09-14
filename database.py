@@ -6539,6 +6539,41 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             x["total_bestilt"] = None
             x["afvig_bestilt"] = None
 
+    # Kombo-salg i forrige hele uge (3x valgfri wienerbrød, kaffe+bolle m.fl.) ligger
+    # på egne varenumre uden for katalogets SKU'er → tilføjes som egne KOMBO-linjer pr.
+    # kategori, så "Solgt (forrige uge)"-totalen matcher det faktiske salg (som på
+    # Seneste dag / dagsoverblik / spild). Ingen bestilling/anbefaling (kun salg).
+    if sidste_dage:
+        _kat_sku = {int(v) for v in alle_kilde}
+        with _conn() as conn:
+            ph_sd = ",".join("?" * len(sidste_dage))
+            combo_rows_ = conn.execute(f"""
+                SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       SUM(antal) AS antal
+                FROM transaktioner WHERE dato IN ({ph_sd})
+                GROUP BY varenavn, vn
+            """, sidste_dage).fetchall()
+        combo_agg: Dict = {}
+        for r in combo_rows_:
+            if r["vn"] in _kat_sku:
+                continue
+            rolle = _bageri_rolle(r["varenavn"])
+            if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
+                continue
+            key = (rolle[1], r["varenavn"])
+            combo_agg[key] = combo_agg.get(key, 0) + int(r["antal"] or 0) * rolle[2]
+        for (kat, navn), tot in combo_agg.items():
+            produkter.append({
+                "varenavn": navn, "kategori": kat, "kombo": True,
+                "risikogruppe": "standard", "service_faktor": 1.0,
+                "indkoeb_ex_moms": 0, "udsalg_ex_moms": 0, "pris_ex_moms": 0,
+                "kilde_varenumre": [], "har_historik": True,
+                "sidste_uge": int(tot),
+                "basis": {d: 0 for d in DAGE}, "anbefalet": {d: 0 for d in DAGE},
+                "total_basis": 0, "total_anbefalet": 0, "total_pris": 0, "db_ved_salg": 0,
+                "bestilt": None, "total_bestilt": None, "afvig_bestilt": None,
+            })
+
     total_stk     = sum(x["total_anbefalet"] for x in produkter)
     total_indkoeb = sum(x["total_pris"] for x in produkter)
     total_bestilt = sum(x["total_bestilt"] or 0 for x in produkter) if har_bestilling else None

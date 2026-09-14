@@ -4447,11 +4447,14 @@ async function _bageriRender(){
     let katPrev = 0, katPrevHar = false;
     body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="13" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
     prods.forEach(p=>{
+      if (isDelta && p.kombo) return;   // combo har ingen bestilling → ikke relevant i Δ-visning
       const risk = p.risikogruppe==='risiko';
       const badge = risk
         ? `<span class="bageri-badge" style="background:#8a3a3a;color:#fff;" title="Ikke-fryse-egnet — bestilt stramt">stram</span>` : '';
-      const seed = !p.har_historik
+      const seed = (!p.har_historik && !p.kombo)
         ? `<span class="bageri-badge" style="background:var(--amber);color:#4a3800;" title="Ny vare — startbud uden historik">nyt</span>` : '';
+      const komboB = p.kombo
+        ? ` <span class="bageri-badge" style="background:var(--moss);color:#fff;" title="Kombo/bundle-salg (3x valgfri wienerbrød, kaffe+bolle) — tælles med i kategoriens salg">kombo</span>` : '';
       const prevP    = isDelta ? (prevMap[p.varenavn] || null) : null;
       const prevBest = prevP ? prevP.bestilt : null;
       const prevTot  = prevP ? prevP.total   : null;
@@ -4472,8 +4475,8 @@ async function _bageriRender(){
       if (best!=null){ katBest += best; totBest += best; katBestHar = true; }
       if (prevTot!=null){ katPrev += prevTot; totPrev += prevTot; katPrevHar = true; }
       const dTot = (isDelta && (best!=null || prevTot!=null)) ? ((best||0) - (prevTot||0)) : null;
-      body += `<tr>
-        <td style="text-align:left;">${p.varenavn}${badge}${seed}</td>`
+      body += `<tr${p.kombo?' style="background:rgba(45,74,45,.03);"':''}>
+        <td style="text-align:left;${p.kombo?'color:var(--ash);font-style:italic;':''}">${p.varenavn}${badge}${seed}${komboB}</td>`
         + DAGE.map(dg=>{
             if (isDelta){
               const tv=(p.bestilt&&p.bestilt[dg])||0, pv=(prevBest&&prevBest[dg])||0, dv=tv-pv;
@@ -4489,13 +4492,13 @@ async function _bageriRender(){
             }
             return `<td class="num" style="background:${dayTint};">${disp}</td>`;
           }).join('')
-        + `<td class="num" style="font-weight:700;">${p.total_anbefalet}</td>
+        + `<td class="num" style="font-weight:700;">${p.kombo?'–':p.total_anbefalet}</td>
            <td class="num" style="font-weight:600;">${best==null?'–':best}</td>`
         + (isDelta
             ? `<td class="num" style="color:${dFarve(dTot)};font-weight:700;">${dTxt(dTot)}</td>
                <td class="num" style="color:var(--ash);">${prevTot==null?'–':prevTot}</td>`
             : isSalg
-            ? `<td class="num" style="color:${mFarve(best, sidste)};font-weight:700;">${(best==null&&sidste==null)?'–':dTxt((best||0)-(sidste||0))}</td>
+            ? `<td class="num" style="color:${p.kombo?'var(--ash)':mFarve(best, sidste)};font-weight:700;">${p.kombo?'–':((best==null&&sidste==null)?'–':dTxt((best||0)-(sidste||0)))}</td>
                <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>`
             : `<td class="num" style="color:${afFarve(afv)};font-weight:600;">${afTxt(afv)}</td>
                <td class="num" style="color:var(--ash);">${sidste==null?'–':sidste}</td>`)

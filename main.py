@@ -1200,8 +1200,10 @@ async def api_bestillings_anbefaling(
     aar: Optional[int] = None,
     metode: Optional[str] = None,
     profil: Optional[str] = None,
+    secret: Optional[str] = None,
 ):
-    _kræv_login(request)
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
     from datetime import date
     if uge is None:
         iso = date.today().isocalendar()

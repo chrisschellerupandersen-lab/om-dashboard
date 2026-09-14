@@ -6479,6 +6479,9 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     sidste_slut  = (forrige_mon + timedelta(days=7)).isoformat()
     sidste_dage  = [d for d in aabne if sidste_start <= d < sidste_slut
                     and date.fromisoformat(d).weekday() not in nul_wd]
+    # Til "Forslag gns. sidste 2 uger": de 2 seneste hele ugers mandage + sæt af åbne dage
+    _2uger_mon = [forrige_mon, forrige_mon - timedelta(days=7)]
+    aabne_set  = set(aabne)
 
     produkter = []
     for p in _ORGANIC_BAKERY:
@@ -6525,6 +6528,14 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         _salg_kilde = [vn for vn in (p["kilde"] + p.get("salg_kilde", [])) if vn not in _BAGERI_BUNDLE]
         sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in _salg_kilde for d in sidste_dage)
                       if _salg_kilde else None)
+        # Forslag = gns. af de 2 seneste HELE ugers faktiske salg pr. ugedag (inkl. 4-pak
+        # via p["kilde"], så efterspørgslen er komplet). Kun dage butikken var åben tælles.
+        _sk_full = p["kilde"] + p.get("salg_kilde", [])
+        gns2 = {}
+        for i, dn in enumerate(DAGE):
+            vals = [sum(salg.get((vn, (wkmon + timedelta(days=i)).isoformat()), 0.0) for vn in _sk_full)
+                    for wkmon in _2uger_mon if (wkmon + timedelta(days=i)).isoformat() in aabne_set]
+            gns2[dn] = int(round(sum(vals) / len(vals))) if vals else 0
         produkter.append({
             "varenavn":        p["navn"],
             "kategori":        _organic_kat(p["navn"]),
@@ -6538,6 +6549,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "sidste_uge":      (round(sidste_uge) if sidste_uge is not None else None),
             "basis":           {d: round(basis_dag[d], 1) for d in DAGE},
             "anbefalet":       anb_dag,
+            "gns2":            gns2,
+            "total_gns2":      sum(gns2.values()),
             "total_basis":     round(sum(basis_dag.values())),
             "total_anbefalet": total_anb,
             "total_pris":      round(total_anb * p["indkoeb"], 2),
@@ -6595,6 +6608,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 "kilde_varenumre": [], "har_historik": True,
                 "sidste_uge": int(tot),
                 "basis": {d: 0 for d in DAGE}, "anbefalet": {d: 0 for d in DAGE},
+                "gns2": {d: 0 for d in DAGE}, "total_gns2": 0,
                 "total_basis": 0, "total_anbefalet": 0, "total_pris": 0, "db_ved_salg": 0,
                 "bestilt": None, "total_bestilt": None, "afvig_bestilt": None,
             })
@@ -6628,6 +6642,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         # Hvilken uge "Forrige uge"/"sidste_uge" (faktisk salg) refererer til —
         # seneste HELE uge før målugen (kan være måluge−1 eller −2). Til kolonne-labels.
         "forrige_uge":  {"uge": forrige_mon.isocalendar()[1], "aar": forrige_mon.isocalendar()[0]},
+        "gns2_uger":    [forrige_mon.isocalendar()[1],
+                         (forrige_mon - timedelta(days=7)).isocalendar()[1]],
         "faktisk":      False,
     }
 

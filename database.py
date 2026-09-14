@@ -3219,8 +3219,10 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
 
         # Portal-ordren har INGEN varenumre (kun navne) → match solgt via katalogets
         # navn→SKU-mapping (kilde + salg_kilde), inkl. bundle-opgang (_antal_sql).
+        # Bundle-SKU'er (fx 4-pak surdejsboller, 10445) tælles IKKE som produkt-salg her
+        # → de vises i stedet som egne KOMBO-linjer (ligesom valgfri wienerbrød).
         navn_skus = {p["navn"].strip().lower():
-                     [str(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
+                     [str(v) for v in (p["kilde"] + p.get("salg_kilde", [])) if v not in _BAGERI_BUNDLE]
                      for p in _ORGANIC_BAKERY}
         alle_sku = sorted({sku for b in bestil
                            for sku in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
@@ -6517,7 +6519,10 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 basis_dag[dn] = 0.0
                 anb_dag[dn] = 0
         total_anb = sum(anb_dag.values())
-        _salg_kilde = p["kilde"] + p.get("salg_kilde", [])   # solgt-side: inkl. nye SKU'er for startbud-varer
+        # Til "Solgt (forrige uge)"-visningen udelades bundle-SKU'er (4-pak surdejsboller
+        # 10445) → de vises som egen KOMBO-linje. Anbefalings-medianen (ovenfor) bruger
+        # stadig p["kilde"] inkl. 4-pakken, så efterspørgsel ikke tabes.
+        _salg_kilde = [vn for vn in (p["kilde"] + p.get("salg_kilde", [])) if vn not in _BAGERI_BUNDLE]
         sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in _salg_kilde for d in sidste_dage)
                       if _salg_kilde else None)
         produkter.append({
@@ -6564,7 +6569,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # kategori, så "Solgt (forrige uge)"-totalen matcher det faktiske salg (som på
     # Seneste dag / dagsoverblik / spild). Ingen bestilling/anbefaling (kun salg).
     if sidste_dage:
-        _kat_sku = {int(v) for v in alle_kilde}
+        _kat_sku = {int(v) for v in alle_kilde if int(v) not in _BAGERI_BUNDLE}  # 4-pak → combo-linje
         with _conn() as conn:
             ph_sd = ",".join("?" * len(sidste_dage))
             combo_rows_ = conn.execute(f"""

@@ -2159,11 +2159,11 @@ def hent_kage_organic_analyse(fra_dato: str = "2026-09-01") -> Dict:
     return {"fra": fra_dato, "til": til, "varer": varer, "uger": uger, "total": total}
 
 
-def hent_kage_foer_efter(skift: str = "2026-09-01", gl_dage: int = 56) -> Dict:
+def hent_kage_foer_efter(skift: str = "2026-09-01", gl_dage: int = 224) -> Dict:
     """Sammenligner kagesalg FØR vs. EFTER leverandørskiftet, splittet på SALGSDATO
     (≥ skift = Organic), så uge 36 (skift midt i ugen) ikke fejlklassificeres.
     Måler pr. dag og pr. uge (dag×7) da Organic-perioden endnu er kort. Gammelt
-    baseline = seneste `gl_dage` dage før skift. Kage-def = _KAGE_WHERE (varenavn).
+    baseline = seneste `gl_dage` dage før skift (default 224 = 32 uger). Kage-def = _KAGE_WHERE (varenavn).
     NB: gammelt sortiment havde flere kage-typer (brownie/muffin/konfekt); Organic
     = cookies + gulerodskage."""
     from datetime import date as _d, timedelta as _td

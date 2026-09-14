@@ -2067,6 +2067,54 @@ def hent_dag_detalje(dato: str) -> Dict:
             "frost": hent_dagens_frost_detalje(dato)}
 
 
+def hent_kage_kurv(fra: str = "2026-09-01", limit: int = 30) -> Dict:
+    """Kurv-analyse: hvad køber kunderne typisk SAMMEN med kage. For hver bon der
+    indeholder en kage (_KAGE_WHERE), tælles de øvrige varer i samme bon.
+    Returnerer pr. vare: antal kage-bons den optræder i, stk, andel af kage-bons,
+    og 'lift' = hvor meget oftere varen er i en kage-kurv vs. i en tilfældig kurv
+    (>1 = købes oftere sammen med kage end normalt). Bon = (dato,bon_nr)."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        tot_bons = conn.execute(
+            "SELECT COUNT(*) FROM (SELECT DISTINCT dato,bon_nr FROM transaktioner "
+            "WHERE dato>=? AND bon_nr!='')", (fra,)).fetchone()[0] or 0
+        kage_bons = conn.execute(
+            f"SELECT COUNT(*) FROM (SELECT DISTINCT dato,bon_nr FROM transaktioner "
+            f"WHERE dato>=? AND bon_nr!='' AND {_KAGE_WHERE})", (fra,)).fetchone()[0] or 0
+        # Antal kage-bons der KUN indeholder kage (ingen andre varer)
+        kun_kage = conn.execute(f"""
+            WITH kb AS (SELECT DISTINCT dato,bon_nr FROM transaktioner
+                        WHERE dato>=? AND bon_nr!='' AND {_KAGE_WHERE})
+            SELECT COUNT(*) FROM kb WHERE NOT EXISTS (
+                SELECT 1 FROM transaktioner t WHERE t.dato=kb.dato AND t.bon_nr=kb.bon_nr
+                AND NOT {_KAGE_WHERE})""", (fra,)).fetchone()[0] or 0
+        co = conn.execute(f"""
+            WITH kb AS (SELECT DISTINCT dato,bon_nr FROM transaktioner
+                        WHERE dato>=? AND bon_nr!='' AND {_KAGE_WHERE})
+            SELECT t.varenavn AS navn,
+                   COUNT(DISTINCT t.dato||'|'||t.bon_nr) AS bons,
+                   ROUND(SUM(t.antal),0) AS stk
+            FROM transaktioner t
+            INNER JOIN kb ON t.dato=kb.dato AND t.bon_nr=kb.bon_nr
+            WHERE NOT {_KAGE_WHERE} AND t.varenavn IS NOT NULL AND t.varenavn!=''
+            GROUP BY t.varenavn ORDER BY bons DESC LIMIT ?""", (fra, limit)).fetchall()
+        overall = {r["navn"]: r["bons"] for r in conn.execute(f"""
+            SELECT varenavn AS navn, COUNT(DISTINCT dato||'|'||bon_nr) AS bons
+            FROM transaktioner WHERE dato>=? AND bon_nr!='' AND NOT {_KAGE_WHERE}
+            GROUP BY varenavn""", (fra,)).fetchall()}
+    varer = []
+    for r in co:
+        navn, bons = r["navn"], int(r["bons"] or 0)
+        support = bons / kage_bons if kage_bons else 0.0
+        base = (overall.get(navn, 0) / tot_bons) if tot_bons else 0.0
+        lift = (support / base) if base > 0 else None
+        varer.append({"navn": navn, "bons": bons, "stk": int(r["stk"] or 0),
+                      "pct_af_kagekurve": round(support * 100, 1),
+                      "lift": round(lift, 2) if lift else None})
+    return {"fra": fra, "total_bons": tot_bons, "kage_bons": kage_bons,
+            "kun_kage_bons": kun_kage, "varer": varer}
+
+
 def hent_kage_organic_analyse(fra_dato: str = "2026-09-01") -> Dict:
     """Analyse af kager (Gulerodskage 1p/5-6p, Cookie) siden Organic-skiftet 1/9.
     Bestilt vs. faktisk solgt (kager sælges over flere dage → periode-tal, ikke dag),

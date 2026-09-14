@@ -792,6 +792,14 @@ async def api_kage_analyse(request: Request, fra: str = "2026-09-01"):
     return res
 
 
+@app.get("/api/bageri/kage-kurv")
+async def api_kage_kurv(request: Request, fra: str = "2026-09-01", limit: int = 30):
+    """Kurv-analyse: hvad køber kunderne sammen med kage. Login ELLER ?secret=."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_kage_kurv(fra, limit)
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

@@ -126,10 +126,12 @@ def _bakery_kat(n: str) -> Optional[str]:
     sortiment). None = ikke bagværk."""
     n = (n or "").lower()
     # Ikke-bagværk der ellers fanges af 'bolle'/'brød' (flødeboller, kødboller,
-    # boller i karry/tomat, frikadeller osv.) — udelukkes eksplicit.
+    # boller i karry/tomat, frikadeller osv.) — udelukkes eksplicit. Inkl. pakkede
+    # hyldevarer: knækbrød og glutenfri brød/rugbrød (ikke Organic Bakery-friskvarer).
     if any(k in n for k in ("flødebolle", "flodebolle", "fløde bolle",
                             "kødbolle", "kodbolle", "kød bolle", "frikadelle",
-                            "boller i karry", "boller i tomat", "fiskefrikadelle")):
+                            "boller i karry", "boller i tomat", "fiskefrikadelle",
+                            "knæk", "knaek", "glutenfri", "glutenfrit")):
         return None
     # Kaffe-combos: bagværks-delen tæller med (tjekkes FØR de generiske regler,
     # da "wienerbrød" ellers fanges af "brød"). Ren kaffe uden bagværk = None.

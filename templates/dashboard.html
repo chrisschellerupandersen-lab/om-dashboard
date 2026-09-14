@@ -4503,7 +4503,7 @@ async function _bageriRender(){
             }
             return `<td class="num" style="background:${dayTint};">${disp}</td>`;
           }).join('')
-        + `<td class="num" style="font-weight:700;">${p.kombo?'–':(isGns2?p.total_gns2:p.total_anbefalet)}</td>
+        + `<td class="num" style="font-weight:700;">${isGns2?p.total_gns2:(p.kombo?'–':p.total_anbefalet)}</td>
            <td class="num" style="font-weight:600;">${best==null?'–':best}</td>`
         + (isDelta
             ? `<td class="num" style="color:${dFarve(dTot)};font-weight:700;">${dTxt(dTot)}</td>

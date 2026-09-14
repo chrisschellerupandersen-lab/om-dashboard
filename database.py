@@ -6528,12 +6528,12 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         _salg_kilde = [vn for vn in (p["kilde"] + p.get("salg_kilde", [])) if vn not in _BAGERI_BUNDLE]
         sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in _salg_kilde for d in sidste_dage)
                       if _salg_kilde else None)
-        # Forslag = gns. af de 2 seneste HELE ugers faktiske salg pr. ugedag (inkl. 4-pak
-        # via p["kilde"], så efterspørgslen er komplet). Kun dage butikken var åben tælles.
-        _sk_full = p["kilde"] + p.get("salg_kilde", [])
+        # Forslag = gns. af de 2 seneste HELE ugers faktiske salg pr. ugedag. Bundle-SKU'er
+        # (4-pak) udelades her og vises som egen KOMBO-linje (som "Solgt"-kolonnen), så
+        # samme vare ikke tælles to steder. Kun dage butikken var åben tælles.
         gns2 = {}
         for i, dn in enumerate(DAGE):
-            vals = [sum(salg.get((vn, (wkmon + timedelta(days=i)).isoformat()), 0.0) for vn in _sk_full)
+            vals = [sum(salg.get((vn, (wkmon + timedelta(days=i)).isoformat()), 0.0) for vn in _salg_kilde)
                     for wkmon in _2uger_mon if (wkmon + timedelta(days=i)).isoformat() in aabne_set]
             gns2[dn] = int(round(sum(vals) / len(vals))) if vals else 0
         produkter.append({
@@ -6583,32 +6583,50 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # Seneste dag / dagsoverblik / spild). Ingen bestilling/anbefaling (kun salg).
     if sidste_dage:
         _kat_sku = {int(v) for v in alle_kilde if int(v) not in _BAGERI_BUNDLE}  # 4-pak → combo-linje
-        with _conn() as conn:
-            ph_sd = ",".join("?" * len(sidste_dage))
-            combo_rows_ = conn.execute(f"""
-                SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
-                       SUM(antal) AS antal
-                FROM transaktioner WHERE dato IN ({ph_sd})
-                GROUP BY varenavn, vn
-            """, sidste_dage).fetchall()
-        combo_agg: Dict = {}
-        for r in combo_rows_:
-            if r["vn"] in _kat_sku:
-                continue
-            rolle = _bageri_rolle(r["varenavn"])
-            if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
-                continue
-            key = (rolle[1], _kombo_navn(r["varenavn"]))
-            combo_agg[key] = combo_agg.get(key, 0) + int(r["antal"] or 0) * rolle[2]
-        for (kat, navn), tot in combo_agg.items():
+        # Hent hele 2-ugers-vinduet (til både 'Solgt forrige uge' og 'Gns 2 uger')
+        _win_dage = sorted({(m + timedelta(days=i)).isoformat()
+                            for m in _2uger_mon for i in range(7)
+                            if (m + timedelta(days=i)).isoformat() in aabne_set})
+        _sidste_set = set(sidste_dage)
+        combo_last: Dict = {}                 # (kat,navn) -> stk i sidste hele uge
+        combo_bydate: Dict = {}               # (kat,navn) -> {dato: stk}
+        if _win_dage:
+            with _conn() as conn:
+                ph_w = ",".join("?" * len(_win_dage))
+                rows_ = conn.execute(f"""
+                    SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                           dato, SUM(antal) AS antal
+                    FROM transaktioner WHERE dato IN ({ph_w})
+                    GROUP BY varenavn, vn, dato
+                """, _win_dage).fetchall()
+            for r in rows_:
+                if r["vn"] in _kat_sku:
+                    continue
+                rolle = _bageri_rolle(r["varenavn"])
+                if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
+                    continue
+                key = (rolle[1], _kombo_navn(r["varenavn"]))
+                n = int(r["antal"] or 0) * rolle[2]
+                combo_bydate.setdefault(key, {})
+                combo_bydate[key][r["dato"]] = combo_bydate[key].get(r["dato"], 0) + n
+                if r["dato"] in _sidste_set:
+                    combo_last[key] = combo_last.get(key, 0) + n
+        for key in set(list(combo_last.keys()) + list(combo_bydate.keys())):
+            kat, navn = key
+            bydate = combo_bydate.get(key, {})
+            g2c = {}
+            for i, dn in enumerate(DAGE):
+                vals = [bydate.get((m + timedelta(days=i)).isoformat(), 0)
+                        for m in _2uger_mon if (m + timedelta(days=i)).isoformat() in aabne_set]
+                g2c[dn] = int(round(sum(vals) / len(vals))) if vals else 0
             produkter.append({
                 "varenavn": navn, "kategori": kat, "kombo": True,
                 "risikogruppe": "standard", "service_faktor": 1.0,
                 "indkoeb_ex_moms": 0, "udsalg_ex_moms": 0, "pris_ex_moms": 0,
                 "kilde_varenumre": [], "har_historik": True,
-                "sidste_uge": int(tot),
+                "sidste_uge": int(combo_last.get(key, 0)),
                 "basis": {d: 0 for d in DAGE}, "anbefalet": {d: 0 for d in DAGE},
-                "gns2": {d: 0 for d in DAGE}, "total_gns2": 0,
+                "gns2": g2c, "total_gns2": sum(g2c.values()),
                 "total_basis": 0, "total_anbefalet": 0, "total_pris": 0, "db_ved_salg": 0,
                 "bestilt": None, "total_bestilt": None, "afvig_bestilt": None,
             })

@@ -9967,7 +9967,7 @@ function renderUgeMatrix(){
   const heat=(v,i)=>{ const s=t(v,i); return s==null?'transparent':`rgba(47,90,48,${(0.06+0.66*s).toFixed(3)})`; };
   const txt =(v,i)=>{ const s=t(v,i); return s==null?'var(--ash)':(s>0.55?'#fff':'var(--ink)'); };
   const totLbl=_umxScope==='bag'?(_umxMeasure==='antal'?'Bagv. stk':'Bagv. i alt'):(_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv'));
-  let head=`<tr><th style="text-align:left;padding:8px 10px;">Uge</th>`
+  let head=`<tr><th style="text-align:left;padding:8px 6px;width:64px;">Uge</th>`
     +DAGE.map(d=>`<th class="num" style="padding:8px 10px;">${d}</th>`).join('')
     +`<th class="num" style="padding:8px 10px;border-left:2px solid rgba(255,255,255,.15);">${totLbl}</th>`
     +`<th class="num" style="padding:8px 10px;">Δ%</th></tr>`;
@@ -9980,9 +9980,9 @@ function renderUgeMatrix(){
     const evDage=(r.event&&r.event.dage)||[];
     const cells=DAGE.map((_,i)=>{ const v=_umxVal(r,i); const ev=evDage.indexOf(i)>=0;
       return `<td class="num" style="${mono}font-size:13px;padding:8px 10px;background:${heat(v,i)};color:${txt(v,i)};${ev?'box-shadow:inset 0 0 0 2px var(--gold);':''}"${ev?` title="${(r.event.navn||'').replace(/"/g,'')}"`:''}>${_umxFmt(v)||'·'}</td>`; }).join('');
-    const evLbl=r.event?` <span title="${((r.event.navn||'')+(r.event.note?' — '+r.event.note:'')).replace(/"/g,'')}" style="font-size:10px;color:var(--gold);white-space:nowrap;">🎉 ${r.event.navn||''}</span>`:'';
+    const evLbl=r.event?`<span title="${((r.event.navn||'')+(r.event.note?' — '+r.event.note:'')).replace(/"/g,'')}" style="display:block;font-size:9px;color:var(--gold);line-height:1.15;margin-top:2px;">🎉 ${r.event.navn||''}</span>`:'';
     body+=`<tr>
-      <td style="text-align:left;padding:8px 10px;${mono}font-size:12px;font-weight:600;">u.${r.uge}${r.indevaerende?' <span style="font-size:9px;color:var(--gold);">i gang</span>':''}${evLbl}</td>
+      <td style="text-align:left;padding:8px 6px;${mono}font-size:12px;font-weight:600;white-space:nowrap;">u.${r.uge}${r.indevaerende?' <span style="font-size:9px;color:var(--gold);">i gang</span>':''}${evLbl}</td>
       ${cells}
       <td class="num" style="${mono}font-size:13px;font-weight:700;padding:8px 10px;border-left:2px solid var(--line-soft,rgba(30,58,30,.12));">${wtot!=null?_umxFmt(wtot):'·'}</td>
       <td class="num" style="${mono}font-size:12px;color:${dc};padding:8px 10px;">${dpct==null?'·':(dpct>0?'+':'')+dpct+'%'}</td></tr>`;

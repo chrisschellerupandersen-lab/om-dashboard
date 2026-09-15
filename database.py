@@ -1371,20 +1371,43 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
             FROM transaktioner
             GROUP BY dato ORDER BY dato DESC LIMIT ?
         """, (int(uger) * 7,)).fetchall()
+        # Bagværks-omsætning pr. dag: klassificér hver vare (katalog-SKU eller
+        # _bakery_kat på varenavn — fanger både gammelt og nyt bagværk).
+        oms_bag: Dict[str, float] = {}
+        stk_bag: Dict[str, int] = {}
+        if rows:
+            cutoff = min(str(r["dato"])[:10] for r in rows)
+            cat_sku = {int(vn) for p in _ORGANIC_BAKERY
+                       for vn in (p["kilde"] + p.get("salg_kilde", []))}
+            for it in conn.execute("""
+                SELECT dato, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       varenavn, SUM(omsætning) AS oms, SUM(antal) AS stk
+                FROM transaktioner WHERE dato>=? GROUP BY dato, vn, varenavn
+            """, (cutoff,)).fetchall():
+                if (it["vn"] in cat_sku) or (_bakery_kat(it["varenavn"]) is not None):
+                    dt = str(it["dato"])[:10]
+                    oms_bag[dt] = oms_bag.get(dt, 0.0) + float(it["oms"] or 0)
+                    stk_bag[dt] = stk_bag.get(dt, 0) + int(it["stk"] or 0)
     wk: Dict = {}
     for r in rows:
-        d = _d.fromisoformat(str(r["dato"])[:10])
+        dt = str(r["dato"])[:10]
+        d = _d.fromisoformat(dt)
         y, w, wd = d.isocalendar()            # wd: 1=man .. 7=søn
-        rec = wk.setdefault((y, w), {"aar": y, "uge": w,
-                                     "oms": [None] * 7, "bons": [None] * 7})
+        rec = wk.setdefault((y, w), {"aar": y, "uge": w, "oms": [None] * 7,
+                                     "bons": [None] * 7, "oms_bag": [None] * 7,
+                                     "stk_bag": [None] * 7})
         rec["oms"][wd - 1] = round(float(r["oms"] or 0))
         rec["bons"][wd - 1] = int(r["bons"] or 0)
+        rec["oms_bag"][wd - 1] = round(oms_bag.get(dt, 0.0))
+        rec["stk_bag"][wd - 1] = int(stk_bag.get(dt, 0))
     iso_i = _d.today().isocalendar()
     ud = []
     for key in sorted(wk.keys(), reverse=True):
         rec = wk[key]
         rec["oms_total"] = round(sum(x for x in rec["oms"] if x))
         rec["bons_total"] = sum(x for x in rec["bons"] if x)
+        rec["oms_bag_total"] = round(sum(x for x in rec["oms_bag"] if x))
+        rec["stk_bag_total"] = sum(x for x in rec["stk_bag"] if x)
         rec["indevaerende"] = (rec["aar"] == iso_i[0] and rec["uge"] == iso_i[1])
         ud.append(rec)
     return {"uger": ud, "antal_uger": len(ud)}

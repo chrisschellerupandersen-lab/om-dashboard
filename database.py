@@ -1357,6 +1357,39 @@ def hent_dage(n: int = 14, aar: int = None) -> List[Dict]:
     return [dict(r) for r in reversed(rows)]
 
 
+def hent_omsaetning_matrix(uger: int = 16) -> Dict:
+    """Matrix: ISO-uger i rækker (nyeste først) × ugedag man→søn i kolonner.
+    Pr. dag: omsætning (som kassen viser, inkl. moms) og antal kunder (distinkte bons).
+    Frontend kan vise omsætning, kunder eller kurvstørrelse (oms/kunder). Total +
+    ugedags-snit beregnes også. Indeværende uge kan være ufærdig (markeres)."""
+    from datetime import date as _d
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT dato, SUM(omsætning) AS oms,
+                   COUNT(DISTINCT CASE WHEN bon_nr!='' THEN bon_nr END) AS bons
+            FROM transaktioner
+            GROUP BY dato ORDER BY dato DESC LIMIT ?
+        """, (int(uger) * 7,)).fetchall()
+    wk: Dict = {}
+    for r in rows:
+        d = _d.fromisoformat(str(r["dato"])[:10])
+        y, w, wd = d.isocalendar()            # wd: 1=man .. 7=søn
+        rec = wk.setdefault((y, w), {"aar": y, "uge": w,
+                                     "oms": [None] * 7, "bons": [None] * 7})
+        rec["oms"][wd - 1] = round(float(r["oms"] or 0))
+        rec["bons"][wd - 1] = int(r["bons"] or 0)
+    iso_i = _d.today().isocalendar()
+    ud = []
+    for key in sorted(wk.keys(), reverse=True):
+        rec = wk[key]
+        rec["oms_total"] = round(sum(x for x in rec["oms"] if x))
+        rec["bons_total"] = sum(x for x in rec["bons"] if x)
+        rec["indevaerende"] = (rec["aar"] == iso_i[0] and rec["uge"] == iso_i[1])
+        ud.append(rec)
+    return {"uger": ud, "antal_uger": len(ud)}
+
+
 def _mp_uge_netto(aar: int, maaned: int) -> float:
     """Pro-ratet MobilePay netto (ex. moms) for én uge i given måned."""
     from calendar import monthrange

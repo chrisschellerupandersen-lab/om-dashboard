@@ -800,6 +800,14 @@ async def api_kage_kurv(request: Request, fra: str = "2026-09-01", limit: int = 
     return database.hent_kage_kurv(fra, limit)
 
 
+@app.get("/api/salg/uge-matrix")
+async def api_uge_matrix(request: Request, uger: int = 16):
+    """Omsætnings-matrix: uger (nyeste først) × ugedag man→søn. Login ELLER ?secret=."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_omsaetning_matrix(uger)
+
+
 @app.get("/api/rapport-status")
 async def rapport_status():
     info = database.hent_seneste_snapshot_info()

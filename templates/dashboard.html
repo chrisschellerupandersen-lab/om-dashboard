@@ -3678,6 +3678,31 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       </div>
 
+      <!-- UGE × UGEDAG MATRIX -->
+      <div class="panel" id="p-ugematrix">
+        <div class="page-hdr">
+          <h2>Omsætning — uge × ugedag</h2>
+          <p>Uger nedad (nyeste først) · mandag→søndag ud til højre · heatmap + ugedags-snit</p>
+        </div>
+        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="display:flex;gap:4px;align-items:center;" id="umx-measure">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Mål:</span>
+            <button class="bageri-prof-btn active" data-m="oms"  onclick="umxMeasure('oms')">Omsætning</button>
+            <button class="bageri-prof-btn"        data-m="kunder" onclick="umxMeasure('kunder')">Kunder</button>
+            <button class="bageri-prof-btn"        data-m="kurv" onclick="umxMeasure('kurv')">Kurvstørrelse</button>
+          </div>
+          <div style="display:flex;gap:4px;align-items:center;" id="umx-uger">
+            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Uger:</span>
+            <button class="bageri-prof-btn"        data-u="8"  onclick="umxUger(8)">8</button>
+            <button class="bageri-prof-btn active" data-u="16" onclick="umxUger(16)">16</button>
+            <button class="bageri-prof-btn"        data-u="26" onclick="umxUger(26)">26</button>
+            <button class="bageri-prof-btn"        data-u="52" onclick="umxUger(52)">52</button>
+          </div>
+        </div>
+        <div id="umx-wrap" style="overflow-x:auto;"><div class="empty" style="padding:40px;color:var(--ash);">Indlæser…</div></div>
+        <p id="umx-note" style="font-size:11px;color:var(--ash);margin:12px 2px 0;"></p>
+      </div>
+
       <!-- KØRSEL REGNSKAB -->
       <div class="panel" id="p-korsel">
         <div class="page-hdr">
@@ -5585,6 +5610,7 @@ const NAV_DEFAULT = [
   {id:'dbshopbox',   label:'DB (Shopbox)',          group:'Dagsoverblik',        hidden:false},
   {id:'dagedetaljer',label:'Dage & produkter',      group:'Dagsoverblik',        hidden:false},
   {id:'time',        label:'Timeprofil',            group:'Dagsoverblik',        hidden:false},
+  {id:'ugematrix',   label:'Uge × ugedag',          group:'Dagsoverblik',        hidden:false},
   {id:'uge',         label:'Ugeoversigt',           group:'Salg & økonomi',      hidden:false},
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
@@ -9873,6 +9899,71 @@ async function basisInitFromHistory() {
   }
 }
 
+// ── UGE × UGEDAG MATRIX ───────────────────────────────────────────────────────
+let _umxData = null, _umxMeasure = 'oms', _umxUger = 16;
+async function loadUgeMatrix(){
+  const wrap = document.getElementById('umx-wrap');
+  wrap.innerHTML = '<div class="empty" style="padding:40px;color:var(--ash);">Indlæser…</div>';
+  try { _umxData = await api('/api/salg/uge-matrix?uger=' + _umxUger); }
+  catch(e){ wrap.innerHTML = '<div class="empty" style="padding:40px;">Kunne ikke hente data</div>'; return; }
+  renderUgeMatrix();
+}
+function umxMeasure(m){ _umxMeasure = m;
+  document.querySelectorAll('#umx-measure .bageri-prof-btn').forEach(b=>b.classList.toggle('active', b.dataset.m===m));
+  renderUgeMatrix(); }
+function umxUger(u){ _umxUger = u;
+  document.querySelectorAll('#umx-uger .bageri-prof-btn').forEach(b=>b.classList.toggle('active', +b.dataset.u===u));
+  loadUgeMatrix(); }
+function _umxVal(rec,i){
+  const oms = rec.oms[i], bons = rec.bons[i];
+  if (_umxMeasure==='oms') return oms;
+  if (_umxMeasure==='kunder') return bons;
+  return (oms&&bons) ? oms/bons : null;      // kurvstørrelse
+}
+function _umxFmt(v){ return v==null ? '' : Math.round(v).toLocaleString('da-DK'); }
+function _umxWeekTotal(r){
+  if (_umxMeasure==='oms') return r.oms_total;
+  if (_umxMeasure==='kunder') return r.bons_total;
+  return r.bons_total ? r.oms_total/r.bons_total : null;
+}
+function renderUgeMatrix(){
+  const wrap = document.getElementById('umx-wrap');
+  if (!_umxData || !_umxData.uger || !_umxData.uger.length){ wrap.innerHTML='<div class="empty" style="padding:40px;">Ingen data</div>'; return; }
+  const DAGE=['Man','Tir','Ons','Tor','Fre','Lør','Søn'];
+  const uger=_umxData.uger, mono="font-family:'DM Mono',monospace;";
+  let vals=[], colSum=Array(7).fill(0), colN=Array(7).fill(0);
+  uger.forEach(r=>{ for(let i=0;i<7;i++){ const v=_umxVal(r,i); if(v!=null){ vals.push(v); colSum[i]+=v; colN[i]++; } } });
+  const mx=Math.max(...vals,1), mn=Math.min(...vals,0);
+  const t=v=>(mx>mn)?(v-mn)/(mx-mn):0.5;
+  const heat=v=> v==null?'transparent':`rgba(47,90,48,${(0.06+0.66*t(v)).toFixed(3)})`;
+  const txt =v=> v==null?'var(--ash)':(t(v)>0.55?'#fff':'var(--ink)');
+  const totLbl=_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv');
+  let head=`<tr><th style="text-align:left;padding:8px 10px;">Uge</th>`
+    +DAGE.map(d=>`<th class="num" style="padding:8px 10px;">${d}</th>`).join('')
+    +`<th class="num" style="padding:8px 10px;border-left:2px solid rgba(255,255,255,.15);">${totLbl}</th>`
+    +`<th class="num" style="padding:8px 10px;">Δ%</th></tr>`;
+  let body='';
+  uger.forEach((r,ri)=>{
+    const wtot=_umxWeekTotal(r), prev=uger[ri+1];
+    const ptot=prev?_umxWeekTotal(prev):null;
+    const dpct=(ptot&&wtot!=null)?Math.round((wtot-ptot)/ptot*100):null;
+    const dc=dpct==null?'var(--ash)':(dpct>0?'var(--moss)':(dpct<0?'#b3541e':'var(--ash)'));
+    const cells=DAGE.map((_,i)=>{ const v=_umxVal(r,i);
+      return `<td class="num" style="${mono}font-size:13px;padding:8px 10px;background:${heat(v)};color:${txt(v)};">${_umxFmt(v)||'·'}</td>`; }).join('');
+    body+=`<tr>
+      <td style="text-align:left;padding:8px 10px;${mono}font-size:12px;font-weight:600;">u.${r.uge}${r.indevaerende?' <span style="font-size:9px;color:var(--gold);">i gang</span>':''}</td>
+      ${cells}
+      <td class="num" style="${mono}font-size:13px;font-weight:700;padding:8px 10px;border-left:2px solid var(--line-soft,rgba(30,58,30,.12));">${wtot!=null?_umxFmt(wtot):'·'}</td>
+      <td class="num" style="${mono}font-size:12px;color:${dc};padding:8px 10px;">${dpct==null?'·':(dpct>0?'+':'')+dpct+'%'}</td></tr>`;
+  });
+  const snit=DAGE.map((_,i)=>{ const a=colN[i]?colSum[i]/colN[i]:null;
+    return `<td class="num" style="${mono}font-size:12px;padding:8px 10px;color:var(--forest);font-weight:700;">${a!=null?_umxFmt(a):'·'}</td>`; }).join('');
+  const foot=`<tr style="border-top:2px solid var(--border);"><td style="text-align:left;padding:8px 10px;${mono}font-size:11px;color:var(--forest);font-weight:700;">Snit/dag</td>${snit}<td></td><td></td></tr>`;
+  wrap.innerHTML=`<table class="aar2-tbl" style="width:100%;min-width:660px;"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
+  const unit=_umxMeasure==='kunder'?'antal kunder (distinkte bons)':(_umxMeasure==='kurv'?'kr pr. kunde (omsætning ÷ kunder)':'kr omsætning (som kassen viser, inkl. moms)');
+  document.getElementById('umx-note').textContent=`Mål: ${unit}. Farve = relativ styrke (mørkere grøn = højere). Δ% = ugens total vs. ugen før. "Snit/dag" = gennemsnit pr. ugedag over de viste uger. Indeværende uge kan være ufærdig.`;
+}
+
 // ── DAGSOVERBLIK: BESTILT VS. SOLGT ───────────────────────────────────────────
 let _dagUge = null, _dagAar = null;
 
@@ -12901,6 +12992,7 @@ window.showPanel = function(id, el) {
   if (id === 'margin')     loadMarginAnalyse();
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
+  if (id === 'ugematrix')    loadUgeMatrix();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
   if (id === 'morgenbriefing') mbLoad();

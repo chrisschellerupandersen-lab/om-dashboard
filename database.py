@@ -1409,6 +1409,16 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         rec["oms_bag_total"] = round(sum(x for x in rec["oms_bag"] if x))
         rec["stk_bag_total"] = sum(x for x in rec["stk_bag"] if x)
         rec["indevaerende"] = (rec["aar"] == iso_i[0] and rec["uge"] == iso_i[1])
+        # Mærkedag/begivenhed for ugen (mors dag, påske, fastelavn m.fl.) — så man
+        # kan se hvorfor en dag stikker af. dage = ugedags-index (0=man) der påvirkes.
+        _DC = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+        evd = _events_for_aar(rec["aar"]).get((rec["uge"], rec["aar"]))
+        if evd:
+            df = evd.get("dag_fak") or {}
+            rec["event"] = {
+                "navn": evd.get("navn"), "note": evd.get("note"),
+                "dage": [i for i, dn in enumerate(_DC) if abs(float(df.get(dn, 1.0)) - 1.0) >= 0.1],
+            }
         ud.append(rec)
     return {"uger": ud, "antal_uger": len(ud)}
 
@@ -5399,10 +5409,11 @@ def _events_for_aar(aar: int) -> Dict:
         iso = d.isocalendar()
         return iso[1], iso[0]   # (uge, aar) — iso[0]=år kan afvige ved uge 52/1
 
-    def _dname(d, fmt="%d. %b"):
-        """Kort datostreng, fjerner evt. ledende nul."""
-        s = d.strftime(fmt)
-        return s.lstrip("0")
+    _MDR_KORT = ["", "jan", "feb", "mar", "apr", "maj", "jun",
+                 "jul", "aug", "sep", "okt", "nov", "dec"]
+    def _dname(d):
+        """Kort dansk datostreng, fx '2. apr' (dag + måned, uden ledende nul)."""
+        return f"{d.day}. {_MDR_KORT[d.month]}"
 
     # ── Fastelavn (søndag, 7 uger før påske) ────────────────────────────
     fastelavn = paaske - timedelta(weeks=7)
@@ -5419,7 +5430,7 @@ def _events_for_aar(aar: int) -> Dict:
     uw, uy = _yw(skaer)
     ev[(uw, uy)] = {
         "factor": 1.20,
-        "navn": f"Påskeuge ({_dname(skaer)}.–{_dname(langfre)}. {langfre.strftime('%b')})",
+        "navn": f"Påskeuge ({_dname(skaer)}–{_dname(langfre)})",
         "note": "Lang weekend — ekstra torsdag og fredag",
         "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.35,"fre":1.40,"loe":1.20,"son":1.0},
     }
@@ -5440,7 +5451,7 @@ def _events_for_aar(aar: int) -> Dict:
     if (hw, hy) not in ev:
         ev[(hw, hy)] = {
             "factor": 1.18,
-            "navn": f"Kristi Himmelfartsdag ({_dname(himmelfart)}. {himmelfart.strftime('%b')})",
+            "navn": f"Kristi Himmelfartsdag ({_dname(himmelfart)})",
             "note": "Tor: folk fri — travl formiddag. Fre er brofridag for mange +40%",
             "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.20,"fre":1.40,"loe":1.20,"son":1.0},
         }
@@ -5476,7 +5487,7 @@ def _events_for_aar(aar: int) -> Dict:
     if (mw, my) not in ev:
         ev[(mw, my)] = {
             "factor": 1.22,
-            "navn": f"Mors dag ({_dname(mors)}. maj)",
+            "navn": f"Mors dag ({_dname(mors)})",
             "note": "Høj søndag — kage og wienerbrød sælger stærkt",
             "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.10,"loe":1.25,"son":1.55},
         }
@@ -5495,7 +5506,7 @@ def _events_for_aar(aar: int) -> Dict:
     pw, py = _yw(pinse)
     ev[(pw, py)] = {
         "factor": 1.15,
-        "navn": f"Pinse ({_dname(pinse)}. {pinse.strftime('%b')})",
+        "navn": f"Pinse ({_dname(pinse)})",
         "note": "Fre/Lør/Søn stiger — Søn er Pinsesøndag. Mandag (2. Pinsedag) håndteres i næste uge",
         "dag_fak": {"man":1.0,"tir":1.0,"ons":1.0,"tor":1.0,"fre":1.10,"loe":1.20,"son":1.40},
     }

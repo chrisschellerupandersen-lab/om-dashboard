@@ -9977,10 +9977,12 @@ function renderUgeMatrix(){
     const ptot=prev?_umxWeekTotal(prev):null;
     const dpct=(ptot&&wtot!=null)?Math.round((wtot-ptot)/ptot*100):null;
     const dc=dpct==null?'var(--ash)':(dpct>0?'var(--moss)':(dpct<0?'#b3541e':'var(--ash)'));
-    const cells=DAGE.map((_,i)=>{ const v=_umxVal(r,i);
-      return `<td class="num" style="${mono}font-size:13px;padding:8px 10px;background:${heat(v,i)};color:${txt(v,i)};">${_umxFmt(v)||'·'}</td>`; }).join('');
+    const evDage=(r.event&&r.event.dage)||[];
+    const cells=DAGE.map((_,i)=>{ const v=_umxVal(r,i); const ev=evDage.indexOf(i)>=0;
+      return `<td class="num" style="${mono}font-size:13px;padding:8px 10px;background:${heat(v,i)};color:${txt(v,i)};${ev?'box-shadow:inset 0 0 0 2px var(--gold);':''}"${ev?` title="${(r.event.navn||'').replace(/"/g,'')}"`:''}>${_umxFmt(v)||'·'}</td>`; }).join('');
+    const evLbl=r.event?` <span title="${((r.event.navn||'')+(r.event.note?' — '+r.event.note:'')).replace(/"/g,'')}" style="font-size:10px;color:var(--gold);white-space:nowrap;">🎉 ${r.event.navn||''}</span>`:'';
     body+=`<tr>
-      <td style="text-align:left;padding:8px 10px;${mono}font-size:12px;font-weight:600;">u.${r.uge}${r.indevaerende?' <span style="font-size:9px;color:var(--gold);">i gang</span>':''}</td>
+      <td style="text-align:left;padding:8px 10px;${mono}font-size:12px;font-weight:600;">u.${r.uge}${r.indevaerende?' <span style="font-size:9px;color:var(--gold);">i gang</span>':''}${evLbl}</td>
       ${cells}
       <td class="num" style="${mono}font-size:13px;font-weight:700;padding:8px 10px;border-left:2px solid var(--line-soft,rgba(30,58,30,.12));">${wtot!=null?_umxFmt(wtot):'·'}</td>
       <td class="num" style="${mono}font-size:12px;color:${dc};padding:8px 10px;">${dpct==null?'·':(dpct>0?'+':'')+dpct+'%'}</td></tr>`;
@@ -9994,7 +9996,9 @@ function renderUgeMatrix(){
     ? (_umxMeasure==='antal'?'antal stk bagværk':'kr bagværks-omsætning (inkl. moms)')
     : (_umxMeasure==='kunder'?'antal kunder (distinkte bons)':(_umxMeasure==='kurv'?'kr pr. kunde (omsætning ÷ kunder)':'kr omsætning (inkl. moms)'));
   const farveTxt=_umxFarve==='col'?'farve pr. ugedag (mandage mod mandage)':'farve på samlet skala';
-  document.getElementById('umx-note').textContent=`Salg: ${scopeTxt} · mål: ${unit} · ${farveTxt}. Δ% = ugens total vs. ugen før. "Snit/dag" = gennemsnit pr. ugedag over de viste uger. Bagværk = Organic-sortiment + bagværk generelt (kassesalg). Indeværende uge kan være ufærdig.`;
+  const evNavne=[...new Set(uger.filter(r=>r.event&&r.event.navn).map(r=>r.event.navn))];
+  const legend=evNavne.length?`<div style="margin-bottom:6px;"><span style="color:var(--gold);">🎉 Begivenheder (guld-ramme = påvirket dag):</span> ${evNavne.join(' · ')}</div>`:'';
+  document.getElementById('umx-note').innerHTML=`${legend}Salg: ${scopeTxt} · mål: ${unit} · ${farveTxt}. Δ% = ugens total vs. ugen før. "Snit/dag" = gennemsnit pr. ugedag over de viste uger. Bagværk = Organic-sortiment + bagværk generelt (kassesalg). Indeværende uge kan være ufærdig.`;
 }
 
 // ── DAGSOVERBLIK: BESTILT VS. SOLGT ───────────────────────────────────────────

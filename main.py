@@ -958,8 +958,9 @@ async def api_bagvaerk_dag(request: Request, uge: int, aar: Optional[int] = None
 
 
 @app.get("/api/bager/svind")
-async def api_bager_svind(request: Request, aar: Optional[int] = None):
-    _kræv_login(request)
+async def api_bager_svind(request: Request, aar: Optional[int] = None, secret: Optional[str] = None):
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
     return database.hent_svind_data(aar)
 
 

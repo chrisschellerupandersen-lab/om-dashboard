@@ -2604,7 +2604,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                   <th style="width:6%;"></th>
                   <th class="num" colspan="3" style="border-bottom:2px solid rgba(30,58,30,.15);font-size:8px;letter-spacing:.07em;color:var(--ash);padding-bottom:2px;">FAKTURA &amp; RETUR</th>
                   <th class="num" colspan="3" style="border-bottom:2px solid rgba(155,52,32,.3);font-size:8px;letter-spacing:.07em;color:#9b3420;padding-bottom:2px;">RETUR STK</th>
-                  <th class="num" colspan="3" style="border-bottom:2px solid rgba(74,124,74,.4);font-size:8px;letter-spacing:.07em;color:var(--moss);padding-bottom:2px;">SVIND</th>
+                  <th class="num" colspan="4" style="border-bottom:2px solid rgba(74,124,74,.4);font-size:8px;letter-spacing:.07em;color:var(--moss);padding-bottom:2px;">SVIND</th>
                 </tr>
                 <tr>
                   <th>Uge</th>
@@ -2615,12 +2615,13 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                   <th class="num">Boller stk</th>
                   <th class="num">TGTG stk</th>
                   <th class="num">Bestilt stk</th>
+                  <th class="num" title="Reddet fra frost (solgt igen) — trækkes fra svindet">Frost stk</th>
                   <th class="num">Svind stk</th>
                   <th class="num">Svind %</th>
                 </tr>
               </thead>
               <tbody id="bager-tbody">
-                <tr><td colspan="10" class="empty">Indl&aelig;ser&hellip;</td></tr>
+                <tr><td colspan="11" class="empty">Indl&aelig;ser&hellip;</td></tr>
               </tbody>
             </table>
           </div>
@@ -10781,7 +10782,7 @@ async function loadBager() {
       const aarData = data.filter(x => x.aar === r.aar && x.faktura > 0);
       const aarFakt = aarData.reduce((s,x)=>s+(x.faktura||0),0);
       html += `<tr style="background:rgba(30,58,30,.06);">
-        <td colspan="10" style="${mono}font-size:10px;letter-spacing:.08em;color:var(--ash);padding:6px 14px;font-weight:600;">
+        <td colspan="11" style="${mono}font-size:10px;letter-spacing:.08em;color:var(--ash);padding:6px 14px;font-weight:600;">
           ${r.aar} &mdash; ${aarData.length} fakturaer &middot; total ${Math.round(aarFakt).toLocaleString('da-DK')} kr
         </td></tr>`;
     }
@@ -10797,6 +10798,7 @@ async function loadBager() {
       <td class="num" style="${mono}color:var(--ash);">${r.retur_boller > 0 ? r.retur_boller : '—'}</td>
       <td class="num" style="${mono}color:var(--ash);">${r.tgtg > 0 ? r.tgtg : '—'}</td>
       <td class="num" style="${mono}">${r.bestilt_stk > 0 ? Math.round(r.bestilt_stk) : '—'}</td>
+      <td class="num" style="${mono}color:var(--moss);">${r.reddet_frost_stk ? Math.round(r.reddet_frost_stk) : (r.reddet_frost_stk===0?'0':'—')}</td>
       <td class="num" style="${mono}">${r.svind_stk != null ? Math.round(r.svind_stk) : '—'}</td>
       <td class="num" ${svindCls}>${r.svind_pct != null ? r.svind_pct.toFixed(1) + '%' : '—'}</td>
     </tr>`;

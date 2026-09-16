@@ -3906,19 +3906,40 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
                 solgt_org = int(round(sum(p.get("tot_solgt", 0) or 0 for p in _cmp.get("produkter", []))))
             except Exception:
                 solgt_org = 0
-            effektivt = solgt_org + tgtg_stk
+            # Reddet fra frost ("Frost …"/"fra i går") — solgt igen, tælles som egen post
+            # og trækker svindet ned. Matches på varenavn via _bageri_rolle (rolle='reddet').
+            reddet_frost = 0
+            try:
+                from datetime import timedelta as _td3
+                _mon = _today_date.fromisocalendar(int(d["aar"]), int(d["uge"]), 1)
+                _wd = [(_mon + _td3(days=i)).isoformat() for i in range(7)]
+                with _conn() as _c2:
+                    _c2.row_factory = sqlite3.Row
+                    _ph = ",".join("?" * 7)
+                    for _rr in _c2.execute(
+                        f"SELECT varenavn, SUM(antal) AS ant FROM transaktioner "
+                        f"WHERE dato IN ({_ph}) GROUP BY varenavn", _wd).fetchall():
+                        _rolle = _bageri_rolle(_rr["varenavn"])
+                        if _rolle and _rolle[0] == "reddet" and _rolle[1] in ("Brød", "Boller", "Wiener"):
+                            reddet_frost += int((_rr["ant"] or 0) * _rolle[2])
+            except Exception:
+                reddet_frost = 0
+            effektivt = solgt_org + reddet_frost + tgtg_stk
             d["kassesalg_stk"] = solgt_org
+            d["reddet_frost_stk"] = reddet_frost
             d["effektivt_solgt"] = effektivt
             d["svind_stk"] = max(0, d["bestilt_stk"] - effektivt)
-            d["svind_pct"] = round((d["bestilt_stk"] - effektivt) / d["bestilt_stk"] * 100, 1)
+            d["svind_pct"] = round(max(0, d["bestilt_stk"] - effektivt) / d["bestilt_stk"] * 100, 1)
         elif kassesalg is not None and d["bestilt_stk"]:
             effektivt = kassesalg + kw_stk + tgtg_stk
             svind     = d["bestilt_stk"] - effektivt
             d["effektivt_solgt"] = effektivt
+            d["reddet_frost_stk"] = None
             d["svind_stk"]  = svind
             d["svind_pct"]  = round(svind / d["bestilt_stk"] * 100, 1)
         else:
             d["effektivt_solgt"] = None
+            d["reddet_frost_stk"] = None
             d["svind_stk"]  = None
             d["svind_pct"]  = None
         result.append(d)

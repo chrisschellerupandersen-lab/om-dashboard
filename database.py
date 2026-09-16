@@ -3892,7 +3892,26 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
         else:
             d["netto_kr_adj"] = None
 
-        if kassesalg is not None and d["bestilt_stk"]:
+        # Organic-æra (fra 1/9): ugebestillingerne har INGEN Shopbox-varenumre (kun
+        # navne), så kassesalg-joinet rammer ~0 → svind blev fejlagtigt ~100%. Brug i
+        # stedet katalog-SKU-matchet salg (inkl. combos + kager) fra dag-sammenligningen.
+        _organic = False
+        try:
+            _organic = _today_date.fromisocalendar(int(d["aar"]), int(d["uge"]), 1).isoformat() >= _RETUR_SLUT
+        except Exception:
+            pass
+        if _organic and d["bestilt_stk"]:
+            try:
+                _cmp = hent_bagvaerk_dag_sammenligning(int(d["uge"]), int(d["aar"]))
+                solgt_org = int(round(sum(p.get("tot_solgt", 0) or 0 for p in _cmp.get("produkter", []))))
+            except Exception:
+                solgt_org = 0
+            effektivt = solgt_org + tgtg_stk
+            d["kassesalg_stk"] = solgt_org
+            d["effektivt_solgt"] = effektivt
+            d["svind_stk"] = max(0, d["bestilt_stk"] - effektivt)
+            d["svind_pct"] = round((d["bestilt_stk"] - effektivt) / d["bestilt_stk"] * 100, 1)
+        elif kassesalg is not None and d["bestilt_stk"]:
             effektivt = kassesalg + kw_stk + tgtg_stk
             svind     = d["bestilt_stk"] - effektivt
             d["effektivt_solgt"] = effektivt

@@ -3426,6 +3426,37 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
     }
 
 
+def resync_organic_faktura_regnskab() -> Dict:
+    """Ensret bager_regnskab.faktura med bageri_fakturaer (den korrekte leverings-uge).
+    Retter Organic-æra-rækker der blev lagt en uge for højt (fakturadatoens ISO-uge i
+    stedet for leverings-ugen), og fjerner faktura-only fantom-rækker uden anden data.
+    Rører IKKE gamle bager-uger (retur/tgtg bevares)."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        faks = conn.execute(
+            "SELECT uge, aar, subtotal_ex_moms FROM bageri_fakturaer").fetchall()
+        have = {(r["uge"], r["aar"]) for r in faks}
+        for r in faks:
+            ex = conn.execute("SELECT retur_wiener,retur_boller,tgtg,b_kvali,retur_ialt "
+                              "FROM bager_regnskab WHERE uge=? AND aar=?",
+                              (r["uge"], r["aar"])).fetchone()
+            conn.execute("""INSERT OR REPLACE INTO bager_regnskab
+                (uge,aar,retur_wiener,retur_boller,tgtg,b_kvali,retur_ialt,faktura)
+                VALUES (?,?,?,?,?,?,?,?)""",
+                (r["uge"], r["aar"], ex["retur_wiener"] if ex else 0,
+                 ex["retur_boller"] if ex else 0, ex["tgtg"] if ex else 0,
+                 ex["b_kvali"] if ex else 0, ex["retur_ialt"] if ex else 0,
+                 round(float(r["subtotal_ex_moms"] or 0))))
+        # Fjern Organic-æra fantom-rækker (uge>=36/2026) uden faktura og uden anden data
+        slettet = []
+        for r in conn.execute("SELECT uge,aar,retur_ialt,tgtg FROM bager_regnskab "
+                              "WHERE aar>2026 OR (aar=2026 AND uge>=36)").fetchall():
+            if (r["uge"], r["aar"]) not in have and not (r["retur_ialt"] or 0) and not (r["tgtg"] or 0):
+                conn.execute("DELETE FROM bager_regnskab WHERE uge=? AND aar=?", (r["uge"], r["aar"]))
+                slettet.append(f"{r['uge']}/{r['aar']}")
+    return {"synkroniseret": [f"{r['uge']}/{r['aar']}" for r in faks], "slettet": slettet}
+
+
 def gem_bager_regnskab(linjer: List[Dict]) -> int:
     with _conn() as conn:
         # Fjern duplikate rækker (gamle imports uden UNIQUE constraint)

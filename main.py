@@ -308,6 +308,19 @@ def gmail_sync_run() -> dict:
                 sprunget.append(f"'{subject[:50]}' (intet ugenummer fundet)")
                 continue
             parsed = _afstem_faktura_mod_subtotal(parsed, pdf_b)  # afstem mod subtotal
+            # Ensret til LEVERINGS-ugen (ugen FØR fakturadatoen) ud fra datoen i emnet
+            # ("Fakturanr. 14 - 14.09.26"). Ellers lander bager_regnskab en uge for højt,
+            # fordi fakturadatoens egen ISO-uge er ugen EFTER leveringen.
+            _md = re.search(r"(\d{2})\.(\d{2})\.(\d{2})", subject)
+            if _md:
+                try:
+                    from datetime import timedelta as _tdlt
+                    _dd = datetime(2000 + int(_md.group(3)), int(_md.group(2)), int(_md.group(1)))
+                    _son = _dd - _tdlt(days=_dd.weekday() + 1)   # søndag før fakturadatoen
+                    _iso = _son.isocalendar()
+                    parsed["uge"], parsed["aar"] = _iso[1], _iso[0]
+                except Exception:
+                    pass
             nye.append({"msg_id": msg_id, "data": parsed})
 
         if not nye:
@@ -798,6 +811,16 @@ async def api_kage_kurv(request: Request, fra: str = "2026-09-01", limit: int = 
     if request.query_params.get("secret") != WEBHOOK_SECRET:
         _kræv_login(request)
     return database.hent_kage_kurv(fra, limit)
+
+
+@app.post("/api/bager/regnskab-resync")
+async def api_bager_regnskab_resync(request: Request):
+    """Ensret bager_regnskab.faktura med fakturaer-tabellens leverings-uge. Secret-sikret."""
+    try: body = await request.json()
+    except Exception: body = {}
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    return database.resync_organic_faktura_regnskab()
 
 
 @app.get("/api/salg/uge-matrix")

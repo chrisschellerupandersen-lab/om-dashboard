@@ -813,6 +813,25 @@ async def api_kage_kurv(request: Request, fra: str = "2026-09-01", limit: int = 
     return database.hent_kage_kurv(fra, limit)
 
 
+@app.get("/api/_diag/raw-salg")
+async def api_diag_raw_salg3(request: Request, q: str = "", fra: str = "", secret: Optional[str] = None):
+    """MIDLERTIDIG diagnose: rå salg pr. varenavn+varenummer fra en dato."""
+    if secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    import sqlite3 as _sq
+    con = _sq.connect(database.DB_PATH); con.row_factory = _sq.Row
+    mx = con.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()["d"]
+    _fra = fra or "2026-01-01"
+    rows = con.execute(
+        "SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, "
+        "SUM(antal) AS ant FROM transaktioner WHERE dato>=? GROUP BY varenavn, vn ORDER BY varenavn",
+        (_fra,)).fetchall()
+    con.close()
+    ql = q.lower()
+    return {"max_dato": mx, "salg": [{"navn": r["varenavn"], "vn": r["vn"], "ant": int(r["ant"] or 0)}
+                                     for r in rows if not ql or ql in (r["varenavn"] or "").lower()]}
+
+
 @app.post("/api/bager/regnskab-resync")
 async def api_bager_regnskab_resync(request: Request):
     """Ensret bager_regnskab.faktura med fakturaer-tabellens leverings-uge. Secret-sikret."""

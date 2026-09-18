@@ -813,6 +813,27 @@ async def api_kage_kurv(request: Request, fra: str = "2026-09-01", limit: int = 
     return database.hent_kage_kurv(fra, limit)
 
 
+@app.get("/api/_diag/pris")
+async def api_diag_pris(request: Request, q: str = "", fra: str = "", til: str = "", secret: Optional[str] = None):
+    """MIDLERTIDIG: antal + omsætning (→ pris/stk) pr. varenavn+SKU i periode."""
+    if secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    import sqlite3 as _sq
+    con = _sq.connect(database.DB_PATH); con.row_factory = _sq.Row
+    rows = con.execute(
+        "SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, "
+        "SUM(antal) AS ant, SUM(omsætning) AS oms FROM transaktioner "
+        "WHERE dato>=? AND dato<=? GROUP BY varenavn, vn ORDER BY varenavn",
+        (fra or "2026-01-01", til or "2026-12-31")).fetchall()
+    con.close()
+    ql = q.lower()
+    return {"fra": fra, "til": til, "salg": [
+        {"navn": r["varenavn"], "vn": r["vn"], "ant": int(r["ant"] or 0),
+         "oms": round(float(r["oms"] or 0)),
+         "pris_stk": round(float(r["oms"] or 0) / r["ant"], 2) if r["ant"] else None}
+        for r in rows if not ql or ql in (r["varenavn"] or "").lower()]}
+
+
 @app.post("/api/bager/regnskab-resync")
 async def api_bager_regnskab_resync(request: Request):
     """Ensret bager_regnskab.faktura med fakturaer-tabellens leverings-uge. Secret-sikret."""

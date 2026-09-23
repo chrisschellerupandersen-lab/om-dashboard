@@ -3679,6 +3679,17 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       </div>
 
+      <!-- BAGVÆRKS-REGNSKAB -->
+      <div class="panel" id="p-bagregnskab">
+        <div class="page-hdr">
+          <h2>Bagværks-regnskab</h2>
+          <p>Faktisk bagværkssalg (friskt + frost, ex moms) − fakturaens varer − fragt = dækningsbidrag pr. uge · kun uger med indlæst faktura</p>
+        </div>
+        <div id="bregn-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:740px;" id="bregn-tabel"></table></div>
+        <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">DB = salg − vareforbrug. Resultat = DB − fragt (ekskl. delt butikspersonale/omk). Vareforbrug = fakturaens varer ex fragt (ex moms). Salg = faktisk kassesalg ex moms af bagværk (katalog + combos + kager) samt frost-salg. Frost er indtægt af tidligere nedfrosset bagværk, så DG pr. uge kan svinge lidt pga. tidsforskydning — totalen er retvisende.</p>
+      </div>
+
       <!-- UGE × UGEDAG MATRIX -->
       <div class="panel" id="p-ugematrix">
         <div class="page-hdr">
@@ -5652,6 +5663,7 @@ const NAV_DEFAULT = [
   {id:'basis',       label:'Basis Bestilling',      group:'Bageri & indkøb',     hidden:false},
   {id:'dagsoverblik',label:'Bestilt vs. solgt',     group:'Bageri & indkøb',     hidden:false},
   {id:'bager',       label:'Bager regnskab',        group:'Bageri & indkøb',     hidden:false},
+  {id:'bagregnskab', label:'Bagværks-regnskab',     group:'Bageri & indkøb',     hidden:false},
   {id:'spild',       label:'Spild-rapport',         group:'Bageri & indkøb',     hidden:false},
   {id:'fakturaafstemning', label:'Faktura & afstemning', group:'Bageri & indkøb', hidden:false},
   {id:'svind',       label:'Svind & økonomi',       group:'Bageri & indkøb',     hidden:false},
@@ -9923,6 +9935,66 @@ async function basisInitFromHistory() {
   }
 }
 
+// ── BAGVÆRKS-REGNSKAB ─────────────────────────────────────────────────────────
+let _bregnLoaded = false;
+async function loadBagRegnskab(){
+  const tbl = document.getElementById('bregn-tabel');
+  tbl.innerHTML = '<tr><td style="padding:16px;color:var(--ash);">Henter…</td></tr>';
+  let d; try { d = await api('/api/bageri/regnskab'); } catch(e){ tbl.innerHTML='<tr><td style="padding:16px;color:var(--danger);">Kunne ikke hente</td></tr>'; return; }
+  const kr = v => Math.round(v||0).toLocaleString('da-DK');
+  const t = d.total || {};
+  const tile = (l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+      <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
+  const resClr = (t.resultat||0)>=0?'var(--moss)':'var(--danger)';
+  document.getElementById('bregn-tot').innerHTML =
+      tile('Bagværkssalg', kr(t.oms_ialt)+' kr')
+    + tile('— heraf frost', kr(t.oms_frost)+' kr', 'var(--moss)')
+    + tile('Vareforbrug', kr(t.vareforbrug)+' kr', '#8a3a3a')
+    + tile('DB', kr(t.db)+' kr', 'var(--moss)')
+    + tile('DG %', (t.dg_pct!=null?t.dg_pct:'—')+' %', 'var(--forest)')
+    + tile('Fragt', kr(t.fragt)+' kr', '#8a3a3a')
+    + tile('Resultat (før løn)', kr(t.resultat)+' kr', resClr)
+    + tile('Værdi spild', kr(t.spild_vaerdi)+' kr', '#8a6d3a');
+  let html = `<thead><tr>
+    <th style="text-align:left;">Uge</th>
+    <th class="num" title="Faktisk kassesalg ex moms af bagværk (katalog + combos + kager)">Salg friskt</th>
+    <th class="num" title="Omsætning ex moms af nedfrosset bagværk solgt igen">Frost</th>
+    <th class="num">Salg i alt</th>
+    <th class="num" title="Fakturaens varer ex fragt (ex moms) — hvad I betalte bageriet">Vareforbrug</th>
+    <th class="num">DB</th><th class="num">DG %</th>
+    <th class="num">Fragt</th><th class="num">Resultat</th>
+    <th class="num" title="Bagværk ikke solgt friskt × kostpris">Værdi spild</th></tr></thead><tbody>`;
+  (d.uger||[]).forEach(u=>{
+    const rc = u.resultat>=0?'var(--moss)':'var(--danger)';
+    const dgc = u.dg_pct==null?'var(--ash)':(u.dg_pct>=45?'var(--moss)':u.dg_pct>=35?'var(--gold)':'var(--danger)');
+    html += `<tr>
+      <td style="text-align:left;font-weight:600;">u.${u.uge}</td>
+      <td class="num">${kr(u.oms_friskt)}</td>
+      <td class="num" style="color:var(--moss);">${u.oms_frost?kr(u.oms_frost):'—'}</td>
+      <td class="num" style="font-weight:600;">${kr(u.oms_ialt)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(u.vareforbrug)}</td>
+      <td class="num" style="font-weight:600;color:var(--moss);">${kr(u.db)}</td>
+      <td class="num" style="color:${dgc};font-weight:600;">${u.dg_pct!=null?u.dg_pct+' %':'—'}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(u.fragt)}</td>
+      <td class="num" style="font-weight:700;color:${rc};">${kr(u.resultat)}</td>
+      <td class="num" style="color:var(--ash);">${u.spild_vaerdi?kr(u.spild_vaerdi):'—'}</td></tr>`;
+  });
+  html += `</tbody><tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+      <td style="text-align:left;">I alt</td>
+      <td class="num">${kr(t.oms_friskt)}</td>
+      <td class="num" style="color:var(--moss);">${kr(t.oms_frost)}</td>
+      <td class="num">${kr(t.oms_ialt)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(t.vareforbrug)}</td>
+      <td class="num" style="color:var(--moss);">${kr(t.db)}</td>
+      <td class="num">${t.dg_pct!=null?t.dg_pct+' %':'—'}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(t.fragt)}</td>
+      <td class="num" style="color:${resClr};">${kr(t.resultat)}</td>
+      <td class="num" style="color:var(--ash);">${kr(t.spild_vaerdi)}</td></tr></tfoot>`;
+  tbl.innerHTML = html;
+  _bregnLoaded = true;
+}
+
 // ── UGE × UGEDAG MATRIX ───────────────────────────────────────────────────────
 let _umxData = null, _umxScope = 'butik', _umxMeasure = 'oms', _umxFarve = 'col', _umxUger = 16;
 const _UMX_MEASURES = {
@@ -13048,6 +13120,7 @@ window.showPanel = function(id, el) {
   if (id === 'bestilling')   loadBestilling();
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'ugematrix')    loadUgeMatrix();
+  if (id === 'bagregnskab')  loadBagRegnskab();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
   if (id === 'morgenbriefing') mbLoad();

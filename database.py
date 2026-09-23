@@ -87,6 +87,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
      "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # startbud til forslag; nyt SKU 10426 til solgt/spild
+    {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 12, "son": 10}},  # NY vare — startbud (under kurvens 65 for at undgå spild); mangler Shopbox-SKU til solgt/spild
     {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158, 10434]},
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
@@ -101,8 +103,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    {"navn": "Gulerodskage 1 pers",     "indkoeb": 16.0, "udsalg": 32.0,  "gruppe": "kage",     "kilde": [], "salg_kilde": [10412],
-     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 3, "loe": 5, "son": 4}},  # offensivt startbud; nyt SKU 10412 til solgt/spild
+    {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},  # NY vare (erstatter Gulerodskage 1 pers) — startbud; mangler Shopbox-SKU til solgt/spild
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},
@@ -198,7 +200,7 @@ def _organic_kat(navn: str) -> str:
         return "Boller"
     if any(k in n for k in ("brød", "focaccia", "rugbrød")):
         return "Brød"
-    if any(k in n for k in ("tebirkes", "croissant", "snurre", "pain")):
+    if any(k in n for k in ("tebirkes", "croissant", "snurre", "snegl", "brunsviger", "pain")):
         return "Wiener"
     return ""
 

@@ -3688,6 +3688,14 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div id="bregn-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
         <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:740px;" id="bregn-tabel"></table></div>
         <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">DB = salg − vareforbrug. Resultat = DB − fragt (ekskl. delt butikspersonale/omk). Vareforbrug = fakturaens varer ex fragt (ex moms). Salg = faktisk kassesalg ex moms af bagværk (katalog + combos + kager) samt frost-salg. Frost er indtægt af tidligere nedfrosset bagværk, så DG pr. uge kan svinge lidt pga. tidsforskydning — totalen er retvisende.</p>
+
+        <div style="display:flex;align-items:baseline;gap:12px;margin:32px 0 14px;">
+          <h3 style="font-family:'Fraunces',Georgia,serif;font-size:19px;margin:0;">Kun kager</h3>
+          <span style="flex:1;height:1px;background:var(--border);"></span>
+        </div>
+        <div id="kregn-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:680px;" id="kregn-tabel"></table></div>
+        <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Kun Gulerodskage + Cookie. Salg = faktisk kagesalg ex moms · Vareforbrug = kagernes andel af fakturaen (ex moms) · DB = salg − vareforbrug. Fragt fordeles ikke på kager (fælles levering). Sell-through = solgt ÷ bestilt · Spild-værdi = usolgte kager × kostpris.</p>
       </div>
 
       <!-- UGE × UGEDAG MATRIX -->
@@ -9993,6 +10001,50 @@ async function loadBagRegnskab(){
       <td class="num" style="color:var(--ash);">${kr(t.spild_vaerdi)}</td></tr></tfoot>`;
   tbl.innerHTML = html;
   _bregnLoaded = true;
+
+  // ── Kun kager ──
+  let k; try { k = await api('/api/bageri/kage-regnskab'); } catch(e){ return; }
+  const kt = k.total || {};
+  const kResClr = (kt.db||0)>=0?'var(--moss)':'var(--danger)';
+  document.getElementById('kregn-tot').innerHTML =
+      tile('Kagesalg', kr(kt.salg)+' kr')
+    + tile('Vareforbrug', kr(kt.vareforbrug)+' kr', '#8a3a3a')
+    + tile('DB', kr(kt.db)+' kr', kResClr)
+    + tile('DG %', (kt.dg_pct!=null?kt.dg_pct:'—')+' %', (kt.dg_pct!=null&&kt.dg_pct>=25)?'var(--forest)':'var(--danger)')
+    + tile('Sell-through', (kt.sell_through!=null?kt.sell_through:'—')+' %', (kt.sell_through>=60?'var(--moss)':'var(--gold)'))
+    + tile('Værdi spild', kr(kt.spild_vaerdi)+' kr', '#8a6d3a');
+  let kh = `<thead><tr>
+    <th style="text-align:left;">Uge</th>
+    <th class="num">Kagesalg</th><th class="num">Vareforbrug</th>
+    <th class="num">DB</th><th class="num">DG %</th>
+    <th class="num">Bestilt</th><th class="num">Solgt</th>
+    <th class="num" title="Solgt ÷ bestilt">Sell-through</th>
+    <th class="num">Værdi spild</th></tr></thead><tbody>`;
+  (k.uger||[]).forEach(u=>{
+    const dbc = u.db>=0?'var(--moss)':'var(--danger)';
+    const stc = u.sell_through==null?'var(--ash)':(u.sell_through>=60?'var(--moss)':u.sell_through>=45?'var(--gold)':'var(--danger)');
+    kh += `<tr>
+      <td style="text-align:left;font-weight:600;">u.${u.uge}</td>
+      <td class="num">${kr(u.salg)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(u.vareforbrug)}</td>
+      <td class="num" style="font-weight:700;color:${dbc};">${kr(u.db)}</td>
+      <td class="num" style="color:${dbc};">${u.dg_pct!=null?u.dg_pct+' %':'—'}</td>
+      <td class="num" style="color:var(--ash);">${u.bestilt}</td>
+      <td class="num">${u.solgt}</td>
+      <td class="num" style="color:${stc};font-weight:600;">${u.sell_through!=null?u.sell_through+' %':'—'}</td>
+      <td class="num" style="color:var(--ash);">${u.spild_vaerdi?kr(u.spild_vaerdi):'—'}</td></tr>`;
+  });
+  kh += `</tbody><tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+      <td style="text-align:left;">I alt</td>
+      <td class="num">${kr(kt.salg)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(kt.vareforbrug)}</td>
+      <td class="num" style="color:${kResClr};">${kr(kt.db)}</td>
+      <td class="num" style="color:${kResClr};">${kt.dg_pct!=null?kt.dg_pct+' %':'—'}</td>
+      <td class="num" style="color:var(--ash);">${kt.bestilt}</td>
+      <td class="num">${kt.solgt}</td>
+      <td class="num">${kt.sell_through!=null?kt.sell_through+' %':'—'}</td>
+      <td class="num" style="color:var(--ash);">${kr(kt.spild_vaerdi)}</td></tr></tfoot>`;
+  document.getElementById('kregn-tabel').innerHTML = kh;
 }
 
 // ── UGE × UGEDAG MATRIX ───────────────────────────────────────────────────────

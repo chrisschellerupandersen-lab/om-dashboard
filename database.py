@@ -94,7 +94,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},
     {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant)
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
-    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420]},        # + Høj Romsnegle
+    {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420],
+     "weekend_kun": True, "hverdag_til": "Kanelsnurre"},  # bevidst sortiment: kun fre-søn; hverdags-snurre = kanel
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
@@ -7229,6 +7230,34 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         for m in _mem:
             if m.get("gns2") is not None:
                 m["total_gns2"] = sum(m["gns2"].values())
+
+    # ── Weekend-kun-varer (bevidst sortiment) ──────────────────────────────────
+    # Fx Kardemommesnurre kun fre-søn: nulstil hverdage (man-tor) i forslaget, og
+    # flyt hverdags-efterspørgslen til substituttet (Kanelsnurre bærer hverdags-
+    # snurre-slotten alene), så den samlede hverdags-efterspørgsel ikke tabes.
+    _HVERDAG = ("man", "tir", "ons", "tor")
+    for _wp in _ORGANIC_BAKERY:
+        if not _wp.get("weekend_kun"):
+            continue
+        m = _prod_map.get(_wp["navn"].strip().lower())
+        if not m:
+            continue
+        _sub = _prod_map.get((_wp.get("hverdag_til") or "").strip().lower())
+        for _dn in _HVERDAG:
+            _v = m["anbefalet"].get(_dn, 0)
+            if _v and _sub is not None:
+                _sub["anbefalet"][_dn] = _sub["anbefalet"].get(_dn, 0) + _v
+            m["anbefalet"][_dn] = 0
+        m["weekend_kun"] = True
+        for _x in (m, _sub):
+            if _x is None:
+                continue
+            _x["total_anbefalet"] = sum(_x["anbefalet"].values())
+            _x["total_pris"] = round(_x["total_anbefalet"] * _x["pris_ex_moms"], 2)
+            _x["db_ved_salg"] = round(_x["total_anbefalet"]
+                                      * (_x["udsalg_ex_moms"] - _x["indkoeb_ex_moms"]), 2)
+            if _x.get("total_bestilt") is not None:
+                _x["afvig_bestilt"] = _x["total_bestilt"] - _x["total_anbefalet"]
 
     # Kombo-salg i forrige hele uge (3x valgfri wienerbrød, kaffe+bolle m.fl.) ligger
     # på egne varenumre uden for katalogets SKU'er → tilføjes som egne KOMBO-linjer pr.

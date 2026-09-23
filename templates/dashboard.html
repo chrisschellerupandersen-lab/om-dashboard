@@ -3689,7 +3689,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:820px;" id="uoek-tabel"></table></div>
         <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">
           <b>Bagværk:</b> salg (friskt+frost, ex moms) − fakturaens varer (rigtige indkøbskroner) = DB.
-          <b>Andet:</b> alt øvrigt Shopbox-salg (ex moms) − vareforbrug efter Shopbox' egen avance = DB.
+          <b>Andet:</b> alt øvrigt Shopbox-salg (ex moms) − vareforbrug efter Shopbox' egen avance = DB, plus <b>MobilePay + B2B-faktura</b> (ex moms) som regnes uden ekstra vareforbrug (varen er allerede på bager-fakturaen — samme princip som Årsplanen), så det slår igennem som ren margin.
           <b>Løn:</b> weekend-standard (lør+søn à 300 kr; 'fuld'-uger = alle dage). <b>Drift:</b> 500 kr/dag.
           <b>Fragt:</b> fakturaens faktiske fragt. <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
           MobilePay/B2B-faktura er ikke med (kun kassesalg).</p>
@@ -9976,6 +9976,7 @@ async function loadUgeOekonomi(){
     + tile('DB Bagværk', kr(tb.db)+' kr', (tb.db||0)>=0?'var(--moss)':'var(--danger)')
     + tile('DB Andet', kr(ta.db)+' kr', 'var(--moss)')
     + tile('DB i alt', kr(t.db_total)+' kr', 'var(--forest)')
+    + tile('Øvrig oms (MP+B2B)', kr(ta.ekstra)+' kr', 'var(--moss)')
     + tile('Løn', kr(t.loen)+' kr', '#8a3a3a')
     + tile('Drift', kr(t.omk)+' kr', '#8a3a3a')
     + tile('Fragt', kr(t.fragt)+' kr', '#8a3a3a')
@@ -10006,7 +10007,7 @@ async function loadUgeOekonomi(){
       <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(u.fragt)}</td>
       <td rowspan="2" class="num" style="vertical-align:middle;font-weight:800;font-size:15px;color:${rc};">${kr(u.resultat)}</td></tr>
      <tr>
-      <td style="text-align:left;">Andet</td>
+      <td style="text-align:left;">Andet${a.ekstra?`<span style="display:block;font-size:10px;color:var(--ash);">inkl. ${kr(a.ekstra)} MP+B2B</span>`:''}</td>
       <td class="num">${kr(a.salg)}</td>
       <td class="num" style="color:#8a3a3a;">${kr(a.vf)}</td>
       <td class="num" style="font-weight:600;color:var(--moss);">${kr(a.db)}</td>

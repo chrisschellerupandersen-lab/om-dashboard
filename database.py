@@ -4141,10 +4141,15 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
             vf_bag = float(f["varer_ex_fragt"] or 0)
             fragt  = float(f["fragt_kr"] or 0)
             db_bag = salg_bag - vf_bag
-            # Andet: Shopbox' egen avance
-            salg_andet = salg_total - salg_bag
-            db_andet   = db_pt_total - db_pt_bag
+            # Andet: Shopbox' egen avance + øvrig omsætning (MobilePay + B2B faktura).
+            # Øvrig omsætning regnes uden ekstra vareforbrug (som i Årsplanen/månedsregnskabet):
+            # varen er typisk allerede udgiftsført på bager-fakturaen, så ekstra kanal = ren margin.
+            ek = _ekstra_omsaetning(conn, dates[0], dates[6])
+            ekstra_ex = float(ek["ialt"] or 0)          # ex moms: MobilePay (÷1,25) + B2B
+            salg_andet = (salg_total - salg_bag) + ekstra_ex
+            db_andet   = (db_pt_total - db_pt_bag) + ekstra_ex
             vf_andet   = salg_andet - db_andet
+            salg_total = salg_total + ekstra_ex          # samlet omsætning inkl. øvrige kanaler
             # Fælles omkostninger pr. dag
             ov = {r["dato"]: r["loennet"] for r in conn.execute(
                 f"SELECT dato, loennet FROM db_loen_override WHERE dato IN ({ph})", dates).fetchall()}
@@ -4164,7 +4169,10 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
                 "bagvaerk": {"salg": round(salg_bag), "vf": round(vf_bag), "db": round(db_bag),
                              "dg_pct": round(db_bag / salg_bag * 100, 1) if salg_bag > 0 else None},
                 "andet":    {"salg": round(salg_andet), "vf": round(vf_andet), "db": round(db_andet),
-                             "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None},
+                             "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None,
+                             "ekstra": round(ekstra_ex),
+                             "ekstra_mp": round(float(ek["mp_netto"] or 0)),
+                             "ekstra_b2b": round(float(ek["faktura"] or 0))},
                 "salg_total": round(salg_total), "db_total": round(db_ialt),
                 "loen": round(loen), "omk": round(omk), "fragt": round(fragt),
                 "resultat": round(resultat),
@@ -4187,7 +4195,10 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
         "andet":    {"salg": _s("andet", "salg"), "vf": _s("andet", "vf"),
                      "db": _s("andet", "db"),
                      "dg_pct": round(_s("andet", "db") / _s("andet", "salg") * 100, 1)
-                               if _s("andet", "salg") > 0 else None},
+                               if _s("andet", "salg") > 0 else None,
+                     "ekstra": round(_s("andet", "ekstra")),
+                     "ekstra_mp": round(_s("andet", "ekstra_mp")),
+                     "ekstra_b2b": round(_s("andet", "ekstra_b2b"))},
         "salg_total": round(st), "db_total": round(_s("db_total")),
         "loen": round(_s("loen")), "omk": round(_s("omk")), "fragt": round(_s("fragt")),
         "resultat": round(_s("resultat")),

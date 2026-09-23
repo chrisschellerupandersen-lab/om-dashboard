@@ -3946,6 +3946,75 @@ def hent_svind_data(aar: int = None) -> List[Dict]:
     return result
 
 
+def hent_bagvaerk_regnskab() -> Dict:
+    """Rigtigt bagværks-regnskab pr. uge (Organic-æra): faktisk kassesalg af bagværk
+    (friskt + frost, ex moms) MINUS fakturaens varer (vareforbrug, ex moms) og fragt.
+    Kun uger hvor fakturaen er indlæst. Resultat = DB − fragt (ingen delt løn).
+        Bagværks-omsætning = friskt (katalog-SKU + combos, inkl. kager) + frost salg
+        − Vareforbrug (fakturaens varer ex fragt)  = DB
+        − Fragt                                     = Resultat (før delt løn)."""
+    from datetime import date as _d, timedelta as _td
+    cat_sku = {int(v) for p in _ORGANIC_BAKERY for v in (p["kilde"] + p.get("salg_kilde", []))}
+    KAT = ("Brød", "Boller", "Wiener", "Kage")
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        faks = conn.execute("""SELECT uge, aar, varer_ex_fragt, fragt_kr, total_kr
+                               FROM bageri_fakturaer ORDER BY aar DESC, uge DESC""").fetchall()
+        uger = []
+        for f in faks:
+            uge, aar = int(f["uge"]), int(f["aar"])
+            mon = _d.fromisocalendar(aar, uge, 1)
+            dates = [(mon + _td(days=i)).isoformat() for i in range(7)]
+            ph = ",".join("?" * 7)
+            rows = conn.execute(f"""
+                SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       COALESCE(SUM(omsaetning_ex_moms),0) AS oms
+                FROM v_transaktioner WHERE dato IN ({ph}) GROUP BY varenavn, vn
+            """, dates).fetchall()
+            friskt = frost = 0.0
+            for r in rows:
+                oms = float(r["oms"] or 0)
+                if r["vn"] in cat_sku:
+                    friskt += oms                      # katalog-bagværk (inkl. kager)
+                    continue
+                rolle = _bageri_rolle(r["varenavn"])
+                if not rolle:
+                    continue
+                if rolle[0] == "frisk" and rolle[1] in KAT:
+                    friskt += oms                      # combos (3x valgfri, kaffe+bolle)
+                elif rolle[0] == "reddet" and "frost" in (r["varenavn"] or "").lower():
+                    frost += oms                       # frost/reddet solgt igen
+            vareforbrug = float(f["varer_ex_fragt"] or 0)
+            fragt = float(f["fragt_kr"] or 0)
+            oms_ialt = friskt + frost
+            db = oms_ialt - vareforbrug
+            resultat = db - fragt
+            try:
+                spildv = (hent_bageri_spild(uge, aar).get("total") or {}).get("spild_kost", 0)
+            except Exception:
+                spildv = 0
+            uger.append({
+                "uge": uge, "aar": aar,
+                "oms_friskt": round(friskt), "oms_frost": round(frost),
+                "oms_ialt": round(oms_ialt),
+                "vareforbrug": round(vareforbrug), "fragt": round(fragt),
+                "db": round(db), "dg_pct": round(db / oms_ialt * 100, 1) if oms_ialt > 0 else None,
+                "resultat": round(resultat), "spild_vaerdi": round(spildv),
+                "frost_andel_pct": round(frost / oms_ialt * 100, 1) if oms_ialt > 0 else 0.0,
+            })
+    def _s(k):
+        return sum(u[k] for u in uger)
+    to = _s("oms_ialt")
+    total = {
+        "oms_friskt": _s("oms_friskt"), "oms_frost": _s("oms_frost"), "oms_ialt": to,
+        "vareforbrug": _s("vareforbrug"), "fragt": _s("fragt"),
+        "db": _s("db"), "resultat": _s("resultat"), "spild_vaerdi": _s("spild_vaerdi"),
+        "dg_pct": round(_s("db") / to * 100, 1) if to > 0 else None,
+        "frost_andel_pct": round(_s("oms_frost") / to * 100, 1) if to > 0 else 0.0,
+    }
+    return {"uger": uger, "total": total, "antal_uger": len(uger)}
+
+
 def hent_dag_db_detalje() -> Dict:
     """DB-detaljer per produkt for seneste dato med data — bruges til fejlfinding."""
     with _conn() as conn:

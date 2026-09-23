@@ -860,6 +860,14 @@ async def api_kage_regnskab(request: Request):
     return database.hent_kage_regnskab()
 
 
+@app.get("/api/bageri/uge-oekonomi")
+async def api_uge_oekonomi(request: Request):
+    """Samlet uge-økonomi: 2 linjer (Bagværk/Andet) med salg/VF/DB + løn/drift/fragt = ugeresultat."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_uge_samlet_oekonomi()
+
+
 @app.get("/api/salg/uge-matrix")
 async def api_uge_matrix(request: Request, uger: int = 16):
     """Omsætnings-matrix: uger (nyeste først) × ugedag man→søn. Login ELLER ?secret=."""

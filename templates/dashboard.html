@@ -3680,6 +3680,21 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       </div>
 
       <!-- BAGVÆRKS-REGNSKAB -->
+      <div class="panel" id="p-ugeoekonomi">
+        <div class="page-hdr">
+          <h2>Samlet uge-økonomi</h2>
+          <p>Ét reelt resultat pr. uge: to salgslinjer (Bagværk / Andet) med salg − vareforbrug = DB, minus løn, drift og fragt · kun uger med indlæst bager-faktura</p>
+        </div>
+        <div id="uoek-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
+        <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:820px;" id="uoek-tabel"></table></div>
+        <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">
+          <b>Bagværk:</b> salg (friskt+frost, ex moms) − fakturaens varer (rigtige indkøbskroner) = DB.
+          <b>Andet:</b> alt øvrigt Shopbox-salg (ex moms) − vareforbrug efter Shopbox' egen avance = DB.
+          <b>Løn:</b> weekend-standard (lør+søn à 300 kr; 'fuld'-uger = alle dage). <b>Drift:</b> 500 kr/dag.
+          <b>Fragt:</b> fakturaens faktiske fragt. <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
+          MobilePay/B2B-faktura er ikke med (kun kassesalg).</p>
+      </div>
+
       <div class="panel" id="p-bagregnskab">
         <div class="page-hdr">
           <h2>Bagværks-regnskab</h2>
@@ -5654,6 +5669,7 @@ const NAV_DEFAULT = [
   {id:'dagedetaljer',label:'Dage & produkter',      group:'Dagsoverblik',        hidden:false},
   {id:'time',        label:'Timeprofil',            group:'Dagsoverblik',        hidden:false},
   {id:'ugematrix',   label:'Uge × ugedag',          group:'Dagsoverblik',        hidden:false},
+  {id:'ugeoekonomi', label:'Samlet uge-økonomi',     group:'Salg & økonomi',      hidden:false},
   {id:'uge',         label:'Ugeoversigt',           group:'Salg & økonomi',      hidden:false},
   {id:'kategori',    label:'Kategorier',            group:'Salg & økonomi',      hidden:false},
   {id:'top',         label:'Top produkter',         group:'Salg & økonomi',      hidden:false},
@@ -9943,6 +9959,79 @@ async function basisInitFromHistory() {
   }
 }
 
+// ── SAMLET UGE-ØKONOMI ────────────────────────────────────────────────────────
+async function loadUgeOekonomi(){
+  const tbl = document.getElementById('uoek-tabel');
+  tbl.innerHTML = '<tr><td style="padding:16px;color:var(--ash);">Henter…</td></tr>';
+  let d; try { d = await api('/api/bageri/uge-oekonomi'); } catch(e){ tbl.innerHTML='<tr><td style="padding:16px;color:var(--danger);">Kunne ikke hente</td></tr>'; return; }
+  const kr = v => Math.round(v||0).toLocaleString('da-DK');
+  const t = d.total || {};
+  const tile = (l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+      <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
+  const resClr = (t.resultat||0)>=0?'var(--moss)':'var(--danger)';
+  const tb=t.bagvaerk||{}, ta=t.andet||{};
+  document.getElementById('uoek-tot').innerHTML =
+      tile('Omsætning', kr(t.salg_total)+' kr')
+    + tile('DB Bagværk', kr(tb.db)+' kr', (tb.db||0)>=0?'var(--moss)':'var(--danger)')
+    + tile('DB Andet', kr(ta.db)+' kr', 'var(--moss)')
+    + tile('DB i alt', kr(t.db_total)+' kr', 'var(--forest)')
+    + tile('Løn', kr(t.loen)+' kr', '#8a3a3a')
+    + tile('Drift', kr(t.omk)+' kr', '#8a3a3a')
+    + tile('Fragt', kr(t.fragt)+' kr', '#8a3a3a')
+    + tile('Resultat', kr(t.resultat)+' kr', resClr);
+  const dgTxt = v => v!=null? v+' %' : '—';
+  let html = `<thead><tr>
+    <th style="text-align:left;">Uge</th>
+    <th style="text-align:left;">Linje</th>
+    <th class="num">Salg</th>
+    <th class="num" title="Bagværk: fakturaens varer. Andet: Shopbox-avance">Vareforbrug</th>
+    <th class="num">DB</th><th class="num">DG %</th>
+    <th class="num" title="Weekend-standard: lør+søn à 300 kr">Løn</th>
+    <th class="num" title="500 kr/dag">Drift</th>
+    <th class="num" title="Fakturaens fragt">Fragt</th>
+    <th class="num">Ugeresultat</th></tr></thead><tbody>`;
+  (d.uger||[]).forEach(u=>{
+    const b=u.bagvaerk||{}, a=u.andet||{};
+    const rc = u.resultat>=0?'var(--moss)':'var(--danger)';
+    html += `<tr style="border-top:2px solid var(--border);">
+      <td rowspan="2" style="text-align:left;font-weight:700;vertical-align:middle;">u.${u.uge}</td>
+      <td style="text-align:left;">Bagværk</td>
+      <td class="num">${kr(b.salg)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(b.vf)}</td>
+      <td class="num" style="font-weight:600;color:${(b.db||0)>=0?'var(--moss)':'var(--danger)'};">${kr(b.db)}</td>
+      <td class="num" style="color:var(--ash);">${dgTxt(b.dg_pct)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(u.loen)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(u.omk)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(u.fragt)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;font-weight:800;font-size:15px;color:${rc};">${kr(u.resultat)}</td></tr>
+     <tr>
+      <td style="text-align:left;">Andet</td>
+      <td class="num">${kr(a.salg)}</td>
+      <td class="num" style="color:#8a3a3a;">${kr(a.vf)}</td>
+      <td class="num" style="font-weight:600;color:var(--moss);">${kr(a.db)}</td>
+      <td class="num" style="color:var(--ash);">${dgTxt(a.dg_pct)}</td></tr>`;
+  });
+  html += `</tbody><tfoot>
+    <tr style="border-top:3px solid var(--border);font-weight:700;">
+      <td rowspan="2" style="text-align:left;vertical-align:middle;">I alt</td>
+      <td style="text-align:left;">Bagværk</td>
+      <td class="num">${kr(tb.salg)}</td><td class="num" style="color:#8a3a3a;">${kr(tb.vf)}</td>
+      <td class="num" style="color:${(tb.db||0)>=0?'var(--moss)':'var(--danger)'};">${kr(tb.db)}</td>
+      <td class="num">${dgTxt(tb.dg_pct)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(t.loen)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(t.omk)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;color:#8a3a3a;">${kr(t.fragt)}</td>
+      <td rowspan="2" class="num" style="vertical-align:middle;font-weight:800;font-size:15px;color:${resClr};">${kr(t.resultat)}</td></tr>
+    <tr style="font-weight:700;">
+      <td style="text-align:left;">Andet</td>
+      <td class="num">${kr(ta.salg)}</td><td class="num" style="color:#8a3a3a;">${kr(ta.vf)}</td>
+      <td class="num" style="color:var(--moss);">${kr(ta.db)}</td>
+      <td class="num">${dgTxt(ta.dg_pct)}</td></tr>
+    </tfoot>`;
+  tbl.innerHTML = html;
+}
+
 // ── BAGVÆRKS-REGNSKAB ─────────────────────────────────────────────────────────
 let _bregnLoaded = false;
 async function loadBagRegnskab(){
@@ -13173,6 +13262,7 @@ window.showPanel = function(id, el) {
   if (id === 'dagsoverblik') loadDagsoverblik();
   if (id === 'ugematrix')    loadUgeMatrix();
   if (id === 'bagregnskab')  loadBagRegnskab();
+  if (id === 'ugeoekonomi')  loadUgeOekonomi();
   if (id === 'tgtg')         loadTgtg();
   if (id === 'bager')        { loadBager(); gmailStatusLoad(); }
   if (id === 'morgenbriefing') mbLoad();

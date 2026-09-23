@@ -4085,6 +4085,117 @@ def hent_kage_regnskab() -> Dict:
     return {"uger": uger, "total": total, "antal_uger": len(uger)}
 
 
+def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
+                             omk_pr_dag: float = 500.0) -> Dict:
+    """Samlet uge-økonomi (Organic-æra) med ÉT reelt resultat pr. uge.
+
+    Pr. uge (kun uger hvor bager-fakturaen er indlæst) vises TO salgslinjer:
+      • Bagværk : salg (friskt+frost, ex moms) − vareforbrug (fakturaens varer) = DB
+      • Andet   : alt øvrigt Shopbox-salg (ex moms) − vareforbrug (Shopbox-avance) = DB
+    og derefter de fælles omkostninger:
+      − Løn (weekend-standard: lør+søn, 300 kr/løndag; 'fuld'-uger = alle dage; overrides)
+      − Drift/omk (500 kr/dag)
+      − Fragt (fakturaens faktiske fragt)
+      = Ugeresultat.
+
+    Bagværk bruger fakturaens rigtige vareforbrug; Andet bruger Shopbox' egen avance
+    (db_korrekt). Fragt tages fra fakturaen (ikke dobbelt med et levering-estimat)."""
+    from datetime import date as _d, timedelta as _td
+    cat_sku = {int(v) for p in _ORGANIC_BAKERY for v in (p["kilde"] + p.get("salg_kilde", []))}
+    KAT = ("Brød", "Boller", "Wiener", "Kage")
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        faks = conn.execute("""SELECT uge, aar, varer_ex_fragt, fragt_kr
+                               FROM bageri_fakturaer ORDER BY aar DESC, uge DESC""").fetchall()
+        bemanding = {(r["aar"], r["uge"]): (r["type"] or "fuld") for r in
+                     conn.execute("SELECT aar, uge, COALESCE(type,'fuld') AS type "
+                                  "FROM fuld_bemanding_uger").fetchall()}
+        uger = []
+        for f in faks:
+            uge, aar = int(f["uge"]), int(f["aar"])
+            mon = _d.fromisocalendar(aar, uge, 1)
+            dates = [(mon + _td(days=i)).isoformat() for i in range(7)]
+            ph = ",".join("?" * 7)
+            rows = conn.execute(f"""
+                SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                       COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
+                       COALESCE(SUM(db_korrekt),0)         AS db
+                FROM v_transaktioner WHERE dato IN ({ph}) GROUP BY varenavn, vn
+            """, dates).fetchall()
+            salg_total = db_pt_total = 0.0
+            salg_bag = db_pt_bag = 0.0
+            for r in rows:
+                oms = float(r["oms"] or 0); dbk = float(r["db"] or 0)
+                salg_total += oms; db_pt_total += dbk
+                er_bag = False
+                if r["vn"] in cat_sku:
+                    er_bag = True                              # katalog-bagværk (inkl. kager)
+                else:
+                    rolle = _bageri_rolle(r["varenavn"])
+                    if rolle and ((rolle[0] == "frisk" and rolle[1] in KAT)
+                                  or (rolle[0] == "reddet" and "frost" in (r["varenavn"] or "").lower())):
+                        er_bag = True                          # combos + frost/reddet
+                if er_bag:
+                    salg_bag += oms; db_pt_bag += dbk
+            # Bagværk: fakturaens vareforbrug (rigtige kroner)
+            vf_bag = float(f["varer_ex_fragt"] or 0)
+            fragt  = float(f["fragt_kr"] or 0)
+            db_bag = salg_bag - vf_bag
+            # Andet: Shopbox' egen avance
+            salg_andet = salg_total - salg_bag
+            db_andet   = db_pt_total - db_pt_bag
+            vf_andet   = salg_andet - db_andet
+            # Fælles omkostninger pr. dag
+            ov = {r["dato"]: r["loennet"] for r in conn.execute(
+                f"SELECT dato, loennet FROM db_loen_override WHERE dato IN ({ph})", dates).fetchall()}
+            fuld = bemanding.get((aar, uge)) == "fuld"
+            loen = omk = 0.0
+            for i in range(7):
+                iso = dates[i]
+                o = ov.get(iso)
+                loennet = (o == 1) if o is not None else _db_loennet_dag(iso, i, fuld)
+                if loennet:
+                    loen += loen_pr_loendag
+                omk += omk_pr_dag
+            db_ialt  = db_bag + db_andet
+            resultat = db_ialt - loen - omk - fragt
+            uger.append({
+                "uge": uge, "aar": aar,
+                "bagvaerk": {"salg": round(salg_bag), "vf": round(vf_bag), "db": round(db_bag),
+                             "dg_pct": round(db_bag / salg_bag * 100, 1) if salg_bag > 0 else None},
+                "andet":    {"salg": round(salg_andet), "vf": round(vf_andet), "db": round(db_andet),
+                             "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None},
+                "salg_total": round(salg_total), "db_total": round(db_ialt),
+                "loen": round(loen), "omk": round(omk), "fragt": round(fragt),
+                "resultat": round(resultat),
+                "resultat_pct": round(resultat / salg_total * 100, 1) if salg_total > 0 else None,
+            })
+    def _s(*keys):
+        t = 0.0
+        for u in uger:
+            node = u
+            for k in keys:
+                node = node[k]
+            t += node
+        return t
+    st = _s("salg_total")
+    total = {
+        "bagvaerk": {"salg": _s("bagvaerk", "salg"), "vf": _s("bagvaerk", "vf"),
+                     "db": _s("bagvaerk", "db"),
+                     "dg_pct": round(_s("bagvaerk", "db") / _s("bagvaerk", "salg") * 100, 1)
+                               if _s("bagvaerk", "salg") > 0 else None},
+        "andet":    {"salg": _s("andet", "salg"), "vf": _s("andet", "vf"),
+                     "db": _s("andet", "db"),
+                     "dg_pct": round(_s("andet", "db") / _s("andet", "salg") * 100, 1)
+                               if _s("andet", "salg") > 0 else None},
+        "salg_total": round(st), "db_total": round(_s("db_total")),
+        "loen": round(_s("loen")), "omk": round(_s("omk")), "fragt": round(_s("fragt")),
+        "resultat": round(_s("resultat")),
+        "resultat_pct": round(_s("resultat") / st * 100, 1) if st > 0 else None,
+    }
+    return {"uger": uger, "total": total, "antal_uger": len(uger)}
+
+
 def hent_dag_db_detalje() -> Dict:
     """DB-detaljer per produkt for seneste dato med data — bruges til fejlfinding."""
     with _conn() as conn:

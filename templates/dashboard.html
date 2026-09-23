@@ -2999,6 +2999,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
                 <button class="bageri-prof-btn" data-dv="delta" onclick="bageriDagVis('delta')" title="Ændring i bestilt antal vs. forrige uge, pr. produkt">Δ vs. forrige uge</button>
                 <button class="bageri-prof-btn" data-dv="salg" onclick="bageriDagVis('salg')" title="Denne uges bestilling vs. sidste uges faktiske salg — ramte vi rigtigt?">Δ vs. salg</button>
               </div>
+              <button class="bageri-prof-btn" id="bageri-blok-btn" onclick="bageriBlokToggle()" title="Slå de 7 dage sammen til Hverdag (man-tor) + Weekend (fre-søn) med snit pr. dag — weekenden er hvor pengene tjenes">Hverdag/Weekend</button>
               <div style="display:flex;gap:4px;" id="bageri-profil">
                 <button class="bageri-prof-btn" data-p="minimal"    onclick="bageriProfil('minimal')">Minimal spild</button>
                 <button class="bageri-prof-btn" data-p="balanceret" onclick="bageriProfil('balanceret')">Balanceret</button>
@@ -4253,7 +4254,7 @@ function _spFmt(v){
                                   : Number(v).toLocaleString('da-DK');
 }
 // ── BAGERI (Organic Bakery) — sell-through-bestilling, ingen retur ───────────
-let _bageriUge = null, _bageriAar = null, _bageriProfil = 'minimal', _bageriDagVis = 'forslag';
+let _bageriUge = null, _bageriAar = null, _bageriProfil = 'minimal', _bageriDagVis = 'forslag', _bageriBlok = false;
 
 function _bageriMandag(aar, uge){
   const s = new Date(aar, 0, 4);
@@ -4282,6 +4283,7 @@ function bageriUge(delta){
 }
 function bageriProfil(p){ _bageriProfil = p; _bageriRender(); }
 function bageriDagVis(v){ _bageriDagVis = v; _bageriRender(); }
+function bageriBlokToggle(){ _bageriBlok = !_bageriBlok; _bageriRender(); }
 
 // ISO-uge/år af en dato (til "forrige uge"-opslag på tværs af årsskifte)
 function _isoUgeAf(dt){
@@ -4437,6 +4439,7 @@ async function _bageriRender(){
     .forEach(b => b.classList.toggle('active', b.dataset.p === _bageriProfil));
   document.querySelectorAll('#bageri-dagvis .bageri-prof-btn')
     .forEach(b => b.classList.toggle('active', b.dataset.dv === _bageriDagVis));
+  { const bb = document.getElementById('bageri-blok-btn'); if (bb) bb.classList.toggle('active', _bageriBlok); }
   const tbl = document.getElementById('bageri-tabel');
   tbl.innerHTML = '<tr><td style="padding:16px;color:var(--ash);">Henter…</td></tr>';
   const d = await api(`/api/bestilling/anbefaling?uge=${_bageriUge}&aar=${_bageriAar}&metode=organic&profil=${_bageriProfil}`);
@@ -4448,6 +4451,12 @@ async function _bageriRender(){
 
   const DAGE = ['man','tir','ons','tor','fre','loe','son'];
   const LBL  = {man:'Man',tir:'Tir',ons:'Ons',tor:'Tor',fre:'Fre',loe:'Lør',son:'Søn'};
+  // Blok-visning: slå de 7 dage sammen til Hverdag (man-tor) + Weekend (fre-søn).
+  const COLS = _bageriBlok
+    ? [{lbl:'Man-Tor', dg:['man','tir','ons','tor'], n:4}, {lbl:'Fre-Søn', dg:['fre','loe','son'], n:3}]
+    : DAGE.map(dg=>({lbl:LBL[dg], dg:[dg], n:1}));
+  const colSum = (src, c) => c.dg.reduce((a,dg)=> a + ((src&&src[dg])||0), 0);
+  const nDayCols = COLS.length;
   const KATO = ['Brød','Boller','Wiener','Kage'];
   const WKND = new Set(['fre','loe','son']);
   const kr = v => Math.round(v||0).toLocaleString('da-DK');
@@ -4495,12 +4504,12 @@ async function _bageriRender(){
                           : (visBestilt ? `▼ DIN BESTILLING pr. dag (portal-ordre) — uge ${mUge}` : `▼ MOTORENS FORSLAG pr. dag — uge ${mUge}`);
   const dayTint = isDelta ? 'rgba(106,74,30,.07)' : isSalg ? 'rgba(46,90,90,.07)' : isGns2 ? 'rgba(58,90,58,.08)' : (visBestilt ? 'rgba(138,58,58,.07)' : 'rgba(45,74,45,.05)');
   const nSum = (isSalg || isDelta) ? 6 : 5; // antal opsummerings-kolonner (salg + delta har ekstra Δ%)
-  const nCols = 1 + 7 + nSum;              // total kolonner (vare + 7 dage + opsummering)
+  const nCols = 1 + nDayCols + nSum;        // total kolonner (vare + dage/blokke + opsummering)
   const pctTxt = v => v==null ? '–' : (v>0?'+':'') + Math.round(v) + '%';
   let head = `<thead>`
-    + `<tr><th></th><th colspan="7" style="text-align:center;background:${modeBg};color:#fff;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;padding:3px 0;border-radius:4px 4px 0 0;">${modeLbl}</th><th colspan="${nSum}"></th></tr>`
+    + `<tr><th></th><th colspan="${nDayCols}" style="text-align:center;background:${modeBg};color:#fff;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;padding:3px 0;border-radius:4px 4px 0 0;">${modeLbl}${_bageriBlok?' · blokke (snit/dag)':''}</th><th colspan="${nSum}"></th></tr>`
     + `<tr><th style="text-align:left;min-width:170px;">Vare</th>`
-    + DAGE.map(dg=>`<th class="num" style="background:${dayTint};">${LBL[dg]}</th>`).join('')
+    + COLS.map(c=>`<th class="num" style="background:${dayTint};" ${_bageriBlok?`title="${c.n} dage — tallet er summen, (snit) er pr. dag"`:''}>${c.lbl}${_bageriBlok?` <span style="font-weight:400;color:var(--ash);">/${c.n}d</span>`:''}</th>`).join('')
     + `<th class="num" title="${isGns2?`Forslag = gns. af faktisk salg uge ${g2[1]||'?'} + ${g2[0]||'?'}`:`Motorens anbefaling for den viste uge (uge ${mUge})`}">${isGns2?'Gns 2u':'Anbef.'}${isGns2?'':uTag(mUge)}</th>`
     + `<th class="num" title="Hvad du faktisk bestilte via portalen (ordre for uge ${mUge})">Bestilt${uTag(mUge)}</th>`
     + (isDelta
@@ -4555,7 +4564,16 @@ async function _bageriRender(){
       const dTot = (isDelta && (best!=null || prevTot!=null)) ? ((best||0) - (prevTot||0)) : null;
       body += `<tr${p.kombo?' style="background:rgba(45,74,45,.03);"':''}>
         <td style="text-align:left;${p.kombo?'color:var(--ash);font-style:italic;':''}">${p.varenavn}${badge}${seed}${komboB}</td>`
-        + DAGE.map(dg=>{
+        + COLS.map(c=>{
+            if (_bageriBlok){                          // blok-visning: sum + snit, read-only
+              if (isDelta){
+                const dv = colSum(dagSrc, c);
+                return `<td class="num" style="background:${dayTint};color:${dv===0?'var(--ash)':dFarve(dv)};font-weight:${dv!==0?'700':'400'};" title="${c.lbl}: sum af daglige ændringer">${dv===0?'–':dTxt(dv)}</td>`;
+              }
+              const s = colSum(dagSrc, c), snit = s/c.n;
+              return `<td class="num" style="background:${dayTint};" title="${c.lbl}: ${s} stk = snit ${snit.toFixed(1)}/dag">${s||'–'}${s?`<span style="color:var(--ash);font-weight:400;font-size:10px;"> (${snit.toFixed(1)})</span>`:''}</td>`;
+            }
+            const dg = c.dg[0];
             if (isDelta){
               const tv=(p.bestilt&&p.bestilt[dg])||0, pv=(prevBest&&prevBest[dg])||0, dv=tv-pv;
               const disp=(tv===0&&pv===0)?'–':dTxt(dv);
@@ -4590,9 +4608,12 @@ async function _bageriRender(){
     const katMDelta = (katBestHar || katSidsteHar) ? (katBest - katSidste) : null;
     body += `<tr style="border-top:1px solid var(--border);font-weight:600;color:var(--forest);background:rgba(45,74,45,.02);">
         <td style="text-align:left;font-size:11px;">${kat} i alt</td>`
-      + DAGE.map(dg=> isDelta
-          ? `<td class="num" style="background:${dayTint};color:${dFarve(katDag[dg])};">${katDag[dg]===0?'0':dTxt(katDag[dg])}</td>`
-          : `<td class="num" style="background:${dayTint};">${katDag[dg]||'–'}</td>`).join('')
+      + COLS.map(c=>{
+          const cs = colSum(katDag, c);
+          if (isDelta) return `<td class="num" style="background:${dayTint};color:${dFarve(cs)};">${cs===0?'0':dTxt(cs)}</td>`;
+          if (_bageriBlok){ const snit=cs/c.n; return `<td class="num" style="background:${dayTint};" title="${c.lbl}: snit ${snit.toFixed(1)}/dag">${cs||'–'}${cs?`<span style="color:var(--ash);font-weight:400;font-size:10px;"> (${snit.toFixed(1)})</span>`:''}</td>`; }
+          return `<td class="num" style="background:${dayTint};">${cs||'–'}</td>`;
+        }).join('')
       + `<td class="num">${isGns2?katGns2:katUge}</td>`
       + `<td class="num">${katBestHar?katBest:'–'}</td>`
       + (isDelta
@@ -4612,7 +4633,7 @@ async function _bageriRender(){
   const totDelta = isDelta ? (totBest - totPrev) : null;
   const totMDelta = (harBest || totSidste) ? ((harBest?totBest:0) - (totSidste||0)) : null;
   let foot = `<tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
-      <td style="text-align:left;">I alt</td><td class="num" colspan="7"></td>
+      <td style="text-align:left;">I alt</td><td class="num" colspan="${nDayCols}"></td>
       <td class="num">${isGns2?totGns2:d.total_stk}</td>
       <td class="num">${harBest?totBest:'–'}</td>`
     + (isDelta

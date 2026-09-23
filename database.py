@@ -7053,11 +7053,20 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             if _s:
                 kat_wsold_d[(_k, _d)] = kat_wsold_d.get((_k, _d), 0.0) + _w * _s
 
+    # Åbne dage pr. ISO-uge i vinduet → til trend-dæmpning (kun (næsten) hele uger,
+    # så en igangværende delvis uge ikke forvrider trenden).
+    wk_days: Dict = {}
+    for _d in aabne:
+        _wk = date.fromisoformat(_d).isocalendar()[:2]
+        wk_days[_wk] = wk_days.get(_wk, 0) + 1
+    _hele_uger = [w for w in sorted(wk_days) if wk_days[w] >= 6]
+
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
         seed = p.get("seed")
         _combo_kredit = 0.0
+        trend = 1.0
         if not p["kilde"] and seed:
             # Ny vare uden historik → startbud, justeret for vejr
             basis_dag = {d: float(seed.get(d, 0)) for d in DAGE}
@@ -7081,15 +7090,23 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 pr_wd[wd_af_dato[d]].append(s)
                 wk = date.fromisoformat(d).isocalendar()[:2]
                 wk_tot[wk] = wk_tot.get(wk, 0.0) + s
-            # Trend: seneste 2 uger vs uge 3-5 (cap ±15%) — fanger faldende/stigende salg,
-            # så anbefalingen følger det AKTUELLE niveau, ikke sommerens højere.
-            wv = [wk_tot[w] for w in sorted(wk_tot)]
+            # Trend-dæmpning: følg det AKTUELLE niveau, så faldende varer (fx kardemomme)
+            # ikke overbestilles pga. tidligere stærke uger. Kun (næsten) HELE uger tælles
+            # (delvis igangværende uge udelades), da en uge uden weekend ellers falsk
+            # ligner et fald. Virker allerede fra 3 hele uger. Cap ±20%.
+            wv = [wk_tot.get(w, 0.0) for w in _hele_uger]
             trend = 1.0
             if len(wv) >= 5:
                 nyere = sum(wv[-2:]) / 2.0
                 aeldre = sum(wv[-5:-2]) / 3.0
                 if aeldre > 0:
-                    trend = max(0.85, min(1.15, nyere / aeldre))
+                    trend = nyere / aeldre
+            elif len(wv) >= 3:                     # kun Organic-æra: seneste hele uge vs de ældre
+                nyere = wv[-1]
+                aeldre = sum(wv[:-1]) / (len(wv) - 1)
+                if aeldre > 0:
+                    trend = nyere / aeldre
+            trend = max(0.80, min(1.20, trend))
             basis_dag, anb_dag = {}, {}
             wb = p["navn"] in spildfri
             for i, dn in enumerate(DAGE):
@@ -7127,6 +7144,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "service_faktor":  sf,
             "weekend_buffer":  p["navn"] in spildfri,
             "combo_kredit":    round(_combo_kredit),
+            "trend":           round(trend, 2),
             "indkoeb_ex_moms": p["indkoeb"],
             "udsalg_ex_moms":  p["udsalg"],
             "pris_ex_moms":    p["indkoeb"],

@@ -4015,6 +4015,76 @@ def hent_bagvaerk_regnskab() -> Dict:
     return {"uger": uger, "total": total, "antal_uger": len(uger)}
 
 
+def hent_kage_regnskab() -> Dict:
+    """Kage-only regnskab pr. uge: faktisk kagesalg (ex moms) − kagernes andel af
+    fakturaen (vareforbrug ex moms) = DB. Plus bestilt/solgt stk, sell-through og
+    spild-værdi. Fragt fordeles IKKE på kager (fælles levering)."""
+    from datetime import date as _d, timedelta as _td
+    kage_prods = [p for p in _ORGANIC_BAKERY if _organic_kat(p["navn"]) == "Kage"]
+    sku2navn = {int(v): p["navn"] for p in kage_prods
+                for v in (p["kilde"] + p.get("salg_kilde", []))}
+    kage_sku = set(sku2navn.keys())
+    kost = {p["navn"]: float(p["indkoeb"]) for p in kage_prods}
+    kage_navne = {p["navn"].strip().lower() for p in kage_prods}
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        faks = conn.execute("""SELECT fakturanr, uge, aar FROM bageri_fakturaer
+                               ORDER BY aar DESC, uge DESC""").fetchall()
+        uger = []
+        for f in faks:
+            uge, aar = int(f["uge"]), int(f["aar"])
+            mon = _d.fromisocalendar(aar, uge, 1)
+            dates = [(mon + _td(days=i)).isoformat() for i in range(7)]
+            per = {p["navn"]: {"best": 0, "solgt": 0, "salg": 0.0, "vareforbrug": 0.0,
+                               "kost": kost[p["navn"]]} for p in kage_prods}
+            # Bestilt + vareforbrug fra fakturaens kage-linjer
+            for l in conn.execute("SELECT varenavn, total_antal, total_pris FROM "
+                                  "bageri_faktura_linjer WHERE fakturanr=?", (f["fakturanr"],)).fetchall():
+                nv = (l["varenavn"] or "").strip()
+                if nv in per:
+                    per[nv]["best"] += int(l["total_antal"] or 0)
+                    per[nv]["vareforbrug"] += float(l["total_pris"] or 0)
+            # Faktisk salg (stk + omsætning ex moms) fra kassen
+            if kage_sku:
+                ph = ",".join("?" * 7)
+                psk = ",".join("?" * len(kage_sku))
+                for r in conn.execute(f"""
+                    SELECT CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn,
+                           ROUND(SUM(antal),0) AS stk, COALESCE(SUM(omsaetning_ex_moms),0) AS oms
+                    FROM v_transaktioner WHERE dato IN ({ph})
+                      AND CAST(CAST(varenummer AS REAL) AS INTEGER) IN ({psk})
+                    GROUP BY vn""", dates + [int(x) for x in kage_sku]).fetchall():
+                    nv = sku2navn.get(int(r["vn"]))
+                    if nv:
+                        per[nv]["solgt"] += int(r["stk"] or 0)
+                        per[nv]["salg"] += float(r["oms"] or 0)
+            salg = sum(v["salg"] for v in per.values())
+            vareforbrug = sum(v["vareforbrug"] for v in per.values())
+            bestilt = sum(v["best"] for v in per.values())
+            solgt = sum(v["solgt"] for v in per.values())
+            spild_v = sum(max(0, v["best"] - v["solgt"]) * v["kost"] for v in per.values())
+            db = salg - vareforbrug
+            uger.append({
+                "uge": uge, "aar": aar,
+                "salg": round(salg), "vareforbrug": round(vareforbrug), "db": round(db),
+                "dg_pct": round(db / salg * 100, 1) if salg > 0 else None,
+                "bestilt": bestilt, "solgt": solgt,
+                "sell_through": round(solgt / bestilt * 100) if bestilt > 0 else None,
+                "spild_vaerdi": round(spild_v),
+            })
+    def _s(k):
+        return sum(u[k] for u in uger)
+    ts = _s("salg"); tb = _s("bestilt")
+    total = {
+        "salg": ts, "vareforbrug": _s("vareforbrug"), "db": _s("db"),
+        "dg_pct": round(_s("db") / ts * 100, 1) if ts > 0 else None,
+        "bestilt": tb, "solgt": _s("solgt"),
+        "sell_through": round(_s("solgt") / tb * 100) if tb > 0 else None,
+        "spild_vaerdi": _s("spild_vaerdi"),
+    }
+    return {"uger": uger, "total": total, "antal_uger": len(uger)}
+
+
 def hent_dag_db_detalje() -> Dict:
     """DB-detaljer per produkt for seneste dato med data — bruges til fejlfinding."""
     with _conn() as conn:

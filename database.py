@@ -6907,7 +6907,10 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         svc.update({k: float(v) for k, v in service.items() if k in svc})
 
     mon_dato     = date.fromisocalendar(maal_aar, maal_uge, 1)
-    vindue_start = (mon_dato - timedelta(weeks=13)).isoformat()
+    # Lær KUN af Organic-æraen (fra 1/9). Det gamle bageris højere salg må ikke
+    # trække samme-ugedag-medianen op — det gav ~25% for høje bestillinger og spild.
+    # Med 3+ ugers faktisk Organic-salg er medianen nu retvisende for niveauet nu.
+    vindue_start = max((mon_dato - timedelta(weeks=13)).isoformat(), _ORGANIC_START)
     maal_mon     = mon_dato.isoformat()
     alle_kilde   = sorted({vn for p in _ORGANIC_BAKERY
                            for vn in (p["kilde"] + p.get("salg_kilde", []))})

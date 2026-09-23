@@ -7032,17 +7032,25 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # Vi fordeler combo-enhederne pr. dag proportionalt med varens eget salg samme
     # dag, så fx Croissant/Pain (populære combo-valg) ikke fejlagtigt ser ud som spild.
     _COMBO_KAT = ("Wiener", "Boller")
-    kat_sold_d: Dict = {}
+    # Præference-vægt: de "altid udsolgte" premium-wienerbrød vælges oftere i comboen
+    # end løssalget alene viser, så de får dobbelt vægt i fordelingen (snurrer trækkes
+    # tilsvarende ned). Vægten ganges på varens salg, når combo-andelen beregnes.
+    _COMBO_PREF = {"Croissant", "Pain au Chocolate", "Tebirkes"}
+    _COMBO_PREF_VAEGT = 2.0
+    def _cvaegt(_navn):
+        return _COMBO_PREF_VAEGT if _navn in _COMBO_PREF else 1.0
+    kat_wsold_d: Dict = {}          # (kat, dato) -> Σ vægt × standalone-salg
     kat_n: Dict = {}
     for _p in _ORGANIC_BAKERY:
         _k = _organic_kat(_p["navn"])
         if _k not in _COMBO_KAT:
             continue
         kat_n[_k] = kat_n.get(_k, 0) + 1
+        _w = _cvaegt(_p["navn"])
         for _d in aabne:
             _s = sum(salg.get((vn, _d), 0.0) for vn in _p["kilde"])
             if _s:
-                kat_sold_d[(_k, _d)] = kat_sold_d.get((_k, _d), 0.0) + _s
+                kat_wsold_d[(_k, _d)] = kat_wsold_d.get((_k, _d), 0.0) + _w * _s
 
     produkter = []
     for p in _ORGANIC_BAKERY:
@@ -7064,8 +7072,9 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 if _pk in _COMBO_KAT:                       # læg combo-andel oveni
                     cu = combo_units.get((_pk, d), 0.0)
                     if cu:
-                        tot = kat_sold_d.get((_pk, d), 0.0)
-                        andel = (cu * (s / tot)) if tot > 0 else (cu / max(1, kat_n.get(_pk, 1)))
+                        totw = kat_wsold_d.get((_pk, d), 0.0)
+                        w = _cvaegt(p["navn"])
+                        andel = (cu * (w * s / totw)) if totw > 0 else (cu / max(1, kat_n.get(_pk, 1)))
                         s += andel
                         _combo_kredit += andel
                 pr_wd[wd_af_dato[d]].append(s)

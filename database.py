@@ -6933,6 +6933,26 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             """, (vindue_start, maal_mon, *alle_kilde)).fetchall():
                 if r["vn"] is not None:
                     salg[(int(r["vn"]), r["dato"])] = float(r["stk"] or 0)
+        # Combo-enheder pr. (kategori, dato): wienerbrød/boller solgt via comboer
+        # (3x valgfri wienerbrød, kaffe+wienerbrød, BMO, 'N x'-pakker m.fl.) der ligger
+        # på egne SKU'er og IKKE krediteres den enkelte vare. Katalog-SKU'er (inkl.
+        # 4-pak-bundlen 10445, der allerede er i Surdejsbolle) springes over → ingen
+        # dobbelttælling. Faktor fra _bageri_rolle ('3 x ...' = 3 stk pr. salg).
+        _kilde_set = set(alle_kilde)
+        combo_units: Dict = {}
+        for r in conn.execute("""
+            SELECT varenavn, CAST(CAST(varenummer AS REAL) AS INTEGER) AS vn, dato,
+                   SUM(antal) AS antal
+            FROM transaktioner WHERE dato >= ? AND dato < ? AND varenavn != ''
+            GROUP BY varenavn, vn, dato
+        """, (vindue_start, maal_mon)).fetchall():
+            if r["vn"] in _kilde_set:
+                continue
+            rolle = _bageri_rolle(r["varenavn"])
+            if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Boller", "Wiener"):
+                continue
+            combo_units[(rolle[1], r["dato"])] = (combo_units.get((rolle[1], r["dato"]), 0.0)
+                                                  + float(r["antal"] or 0) * rolle[2])
         tg = conn.execute("SELECT tgtg FROM bager_regnskab ORDER BY aar DESC, uge DESC LIMIT 1").fetchone()
         tgtg_kr = float(tg[0]) if (tg and tg[0]) else 0.0
     tgtg_korr = 1.0   # TGTG udgår 1/9 → ingen TGTG-korrektion i Organic-anbefalingen
@@ -7006,10 +7026,29 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         if _best > 0 and _solgt / _best >= SPILDFRI_TAERSKEL:
             spildfri.add(_p["navn"])
 
+    # ── Combo-kreditering: fordel combo-enheder ud på enkeltvarerne ────────────
+    # Wienerbrød solgt via 3x/kaffe-combo og boller via BMO/combo krediteres ikke
+    # den enkelte vare i kassen → deres efterspørgsel (og dermed forslag) er for lav.
+    # Vi fordeler combo-enhederne pr. dag proportionalt med varens eget salg samme
+    # dag, så fx Croissant/Pain (populære combo-valg) ikke fejlagtigt ser ud som spild.
+    _COMBO_KAT = ("Wiener", "Boller")
+    kat_sold_d: Dict = {}
+    kat_n: Dict = {}
+    for _p in _ORGANIC_BAKERY:
+        _k = _organic_kat(_p["navn"])
+        if _k not in _COMBO_KAT:
+            continue
+        kat_n[_k] = kat_n.get(_k, 0) + 1
+        for _d in aabne:
+            _s = sum(salg.get((vn, _d), 0.0) for vn in _p["kilde"])
+            if _s:
+                kat_sold_d[(_k, _d)] = kat_sold_d.get((_k, _d), 0.0) + _s
+
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
         seed = p.get("seed")
+        _combo_kredit = 0.0
         if not p["kilde"] and seed:
             # Ny vare uden historik → startbud, justeret for vejr
             basis_dag = {d: float(seed.get(d, 0)) for d in DAGE}
@@ -7019,8 +7058,16 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         else:
             pr_wd: Dict[int, list] = {i: [] for i in range(7)}
             wk_tot: Dict = {}
+            _pk = _organic_kat(p["navn"])
             for d in aabne:
                 s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
+                if _pk in _COMBO_KAT:                       # læg combo-andel oveni
+                    cu = combo_units.get((_pk, d), 0.0)
+                    if cu:
+                        tot = kat_sold_d.get((_pk, d), 0.0)
+                        andel = (cu * (s / tot)) if tot > 0 else (cu / max(1, kat_n.get(_pk, 1)))
+                        s += andel
+                        _combo_kredit += andel
                 pr_wd[wd_af_dato[d]].append(s)
                 wk = date.fromisoformat(d).isocalendar()[:2]
                 wk_tot[wk] = wk_tot.get(wk, 0.0) + s
@@ -7069,6 +7116,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "risikogruppe":    p["gruppe"],
             "service_faktor":  sf,
             "weekend_buffer":  p["navn"] in spildfri,
+            "combo_kredit":    round(_combo_kredit),
             "indkoeb_ex_moms": p["indkoeb"],
             "udsalg_ex_moms":  p["udsalg"],
             "pris_ex_moms":    p["indkoeb"],

@@ -94,8 +94,6 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},
     {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant)
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
-    {"navn": "Karamelliseret croissant","indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [], "salg_kilde": [10418],
-     "seed": {"man": 0, "tir": 4, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 8}},  # startbud til forslag; nyt SKU 10418 til solgt/spild
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420]},        # + Høj Romsnegle
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},

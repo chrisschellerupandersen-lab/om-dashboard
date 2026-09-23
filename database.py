@@ -7181,6 +7181,52 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             x["total_bestilt"] = None
             x["afvig_bestilt"] = None
 
+    # ── Familie-pooling (mis-indtastning) ──────────────────────────────────────
+    # Sesam/plain ringes ofte ind på hinandens/generiske SKU'er ved kassen, så
+    # SPLIT'et i salget er upålideligt (familie-totalen er korrekt). Bruger-valg:
+    # ram familie-totalen og fordel efter ORDRE-forholdet (seneste hele ugers
+    # bestilling), så sesam ikke fejlagtigt ser ud som spild.
+    _prod_map = {p["varenavn"].strip().lower(): p for p in produkter}
+    for _fam, _navne in _SPILD_FAMILIE_GRUPPER.items():
+        _mem = [_prod_map[n] for n in _navne if n in _prod_map]
+        if len(_mem) < 2:
+            continue
+        _tb = {m["varenavn"]: _best_tot.get(m["varenavn"].strip().lower(), 0.0) for m in _mem}
+        _sumtb = sum(_tb.values())
+        if _sumtb <= 0:
+            continue
+        _sh = {n: _tb[n] / _sumtb for n in _tb}
+        for m in _mem:
+            m["familie"] = _fam
+        # (a) Anbefaling: kun historik-baserede medlemmer (seed-varer beholder deres bud)
+        _hist = [m for m in _mem if m.get("har_historik")]
+        if len(_hist) >= 2:
+            _shh = sum(_sh[m["varenavn"]] for m in _hist) or 1.0
+            for _dn in DAGE:
+                _fd = sum(m["anbefalet"].get(_dn, 0) for m in _hist)
+                for m in _hist:
+                    m["anbefalet"][_dn] = int(round(_fd * _sh[m["varenavn"]] / _shh))
+            for m in _hist:
+                m["total_anbefalet"] = sum(m["anbefalet"].values())
+                m["total_pris"] = round(m["total_anbefalet"] * m["pris_ex_moms"], 2)
+                m["db_ved_salg"] = round(m["total_anbefalet"]
+                                         * (m["udsalg_ex_moms"] - m["indkoeb_ex_moms"]), 2)
+                if m.get("total_bestilt") is not None:
+                    m["afvig_bestilt"] = m["total_bestilt"] - m["total_anbefalet"]
+        # (b) Solgt-visning: fordel familiens puljede salg efter ordre-forhold
+        if any(m.get("sidste_uge") is not None for m in _mem):
+            _fs = sum((m.get("sidste_uge") or 0) for m in _mem)
+            for m in _mem:
+                m["sidste_uge"] = int(round(_fs * _sh[m["varenavn"]]))
+        for _dn in DAGE:
+            _fg = sum((m.get("gns2") or {}).get(_dn, 0) for m in _mem)
+            for m in _mem:
+                if m.get("gns2") is not None:
+                    m["gns2"][_dn] = int(round(_fg * _sh[m["varenavn"]]))
+        for m in _mem:
+            if m.get("gns2") is not None:
+                m["total_gns2"] = sum(m["gns2"].values())
+
     # Kombo-salg i forrige hele uge (3x valgfri wienerbrød, kaffe+bolle m.fl.) ligger
     # på egne varenumre uden for katalogets SKU'er → tilføjes som egne KOMBO-linjer pr.
     # kategori, så "Solgt (forrige uge)"-totalen matcher det faktiske salg (som på

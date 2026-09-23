@@ -84,7 +84,6 @@ _SERVICE_FAKTOR = {"risiko": 0.95, "standard": 1.05, "kage": 0.90}
 # Snegle + konfekt udgår (ingen kilde-mapping). Grovbirkes foldes ind i Tebirkes.
 _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051, 10424, 10445]},  # +10424 nyt SKU, +10445 bundle "4 x surdejsboller" (×4)
-    {"navn": "Surdejsbolle m. birkes",  "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10048]},  # ægte birkes-bolle-historik (10048)
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
      "seed": {"man": 0, "tir": 8, "ons": 8, "tor": 8, "fre": 10, "loe": 15, "son": 15}},  # startbud til forslag; nyt SKU 10426 til solgt/spild
     {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
@@ -210,7 +209,7 @@ def _organic_kat(navn: str) -> str:
 # og 4-pakken). De skal POOLES ved spild-beregning — ellers ser en variant som
 # usolgt (spild) mens salget lander på den generiske linje. Nøgle = fælles familie.
 _SPILD_FAMILIE_GRUPPER = {
-    "surdejsbolle": ("surdejsbolle", "surdejsbolle m. birkes", "surdejsbolle m. sesam"),
+    "surdejsbolle": ("surdejsbolle", "surdejsbolle m. sesam", "müsli surdejsbolle"),
     "surdejsbrød":  ("surdejsbrød", "surdejsbrød m. sesam"),
 }
 _SPILD_FAMILIE = {v: fam for fam, navne in _SPILD_FAMILIE_GRUPPER.items() for v in navne}

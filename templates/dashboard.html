@@ -3683,7 +3683,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-ugeoekonomi">
         <div class="page-hdr">
           <h2>Samlet uge-økonomi</h2>
-          <p>Ét reelt resultat pr. uge: to salgslinjer (Bagværk / Andet) med salg − vareforbrug = DB, minus løn, drift og fragt · kun uger med indlæst bager-faktura</p>
+          <p>Ét reelt resultat pr. uge: to salgslinjer (Bagværk / Andet) med salg − vareforbrug = DB, minus løn, drift og fragt · alle Organic-uger fra 1/9</p>
         </div>
         <div id="uoek-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
         <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:820px;" id="uoek-tabel"></table></div>
@@ -3691,8 +3691,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <b>Bagværk:</b> salg (friskt+frost, ex moms) − fakturaens varer (rigtige indkøbskroner) = DB.
           <b>Andet:</b> alt øvrigt Shopbox-salg (ex moms) − vareforbrug efter Shopbox' egen avance = DB, plus <b>MobilePay + B2B-faktura</b> (ex moms) som regnes uden ekstra vareforbrug (varen er allerede på bager-fakturaen — samme princip som Årsplanen), så det slår igennem som ren margin.
           <b>Løn:</b> weekend-standard (lør+søn à 300 kr; 'fuld'-uger = alle dage). <b>Drift:</b> 500 kr/dag.
-          <b>Fragt:</b> fakturaens faktiske fragt. <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
-          MobilePay/B2B-faktura er ikke med (kun kassesalg).</p>
+          <b>Fragt:</b> fakturaens faktiske fragt (uden faktura: levering-estimat 175 kr/drop fre-søn). <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
+          <b>est</b> = bagværks-vareforbrug estimeret ud fra faktura-ugernes gennemsnits-DG (indtil ugens faktura er indlæst). <b>delvis</b> = uge endnu ikke afsluttet, så løn/drift kun talt til seneste datadag.</p>
       </div>
 
       <div class="panel" id="p-bagregnskab">
@@ -9995,8 +9995,10 @@ async function loadUgeOekonomi(){
   (d.uger||[]).forEach(u=>{
     const b=u.bagvaerk||{}, a=u.andet||{};
     const rc = u.resultat>=0?'var(--moss)':'var(--danger)';
+    const badge = (u.est?`<span title="Bagværks-vareforbrug estimeret (faktura ikke indlæst endnu)" style="display:inline-block;font-size:9px;color:var(--gold);border:1px solid var(--gold);border-radius:4px;padding:0 3px;margin-left:4px;">est</span>`:'')
+                + (u.komplet===false?`<span title="Delvis uge — ikke afsluttet endnu" style="display:inline-block;font-size:9px;color:var(--ash);border:1px solid var(--border);border-radius:4px;padding:0 3px;margin-left:4px;">delvis</span>`:'');
     html += `<tr style="border-top:2px solid var(--border);">
-      <td rowspan="2" style="text-align:left;font-weight:700;vertical-align:middle;">u.${u.uge}</td>
+      <td rowspan="2" style="text-align:left;font-weight:700;vertical-align:middle;">u.${u.uge}${badge}</td>
       <td style="text-align:left;">Bagværk</td>
       <td class="num">${kr(b.salg)}</td>
       <td class="num" style="color:#8a3a3a;">${kr(b.vf)}</td>

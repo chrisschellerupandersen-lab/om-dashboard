@@ -4086,34 +4086,43 @@ def hent_kage_regnskab() -> Dict:
 
 
 def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
-                             omk_pr_dag: float = 500.0) -> Dict:
-    """Samlet uge-økonomi (Organic-æra) med ÉT reelt resultat pr. uge.
+                             omk_pr_dag: float = 500.0,
+                             levering_pr_dag: float = 175.0) -> Dict:
+    """Samlet uge-økonomi (Organic-æra, fra 1/9-2026) med ÉT reelt resultat pr. uge.
 
-    Pr. uge (kun uger hvor bager-fakturaen er indlæst) vises TO salgslinjer:
-      • Bagværk : salg (friskt+frost, ex moms) − vareforbrug (fakturaens varer) = DB
-      • Andet   : alt øvrigt Shopbox-salg (ex moms) − vareforbrug (Shopbox-avance) = DB
-    og derefter de fælles omkostninger:
-      − Løn (weekend-standard: lør+søn, 300 kr/løndag; 'fuld'-uger = alle dage; overrides)
-      − Drift/omk (500 kr/dag)
-      − Fragt (fakturaens faktiske fragt)
-      = Ugeresultat.
+    ALLE uger med kassesalg vises — ikke kun uger med indlæst faktura. Pr. uge to
+    salgslinjer og de fælles omkostninger:
+      • Bagværk : salg (friskt+frost, ex moms) − vareforbrug = DB
+      • Andet   : øvrigt Shopbox-salg + MobilePay + B2B (ex moms) − vareforbrug = DB
+      − Løn (weekend-standard: lør+søn à 300 kr; 'fuld'-uger = alle dage; per-dag-overrides)
+      − Drift/omk (500 kr/dag) · − Fragt = Ugeresultat.
 
-    Bagværk bruger fakturaens rigtige vareforbrug; Andet bruger Shopbox' egen avance
-    (db_korrekt). Fragt tages fra fakturaen (ikke dobbelt med et levering-estimat)."""
+    Vareforbrug bagværk: fakturaens rigtige varer hvor den er indlæst; ellers estimeret
+    ud fra faktura-ugernes gennemsnitlige bagværks-DG (est=true). Fragt: fakturaens
+    faktiske fragt, ellers levering-estimat (175 kr/drop fre-søn). Andet bruger Shopbox'
+    egen avance; MobilePay+B2B regnes uden ekstra vareforbrug (som i Årsplanen).
+    Løn/drift/fragt tælles kun for dage til og med seneste datadag (delvis uge = komplet:false)."""
     from datetime import date as _d, timedelta as _td
     cat_sku = {int(v) for p in _ORGANIC_BAKERY for v in (p["kilde"] + p.get("salg_kilde", []))}
     KAT = ("Brød", "Boller", "Wiener", "Kage")
+    ORG_START = "2026-09-01"
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
-        faks = conn.execute("""SELECT uge, aar, varer_ex_fragt, fragt_kr
-                               FROM bageri_fakturaer ORDER BY aar DESC, uge DESC""").fetchall()
+        inv = {(int(r["aar"]), int(r["uge"])): r for r in conn.execute(
+            "SELECT uge, aar, varer_ex_fragt, fragt_kr FROM bageri_fakturaer").fetchall()}
         bemanding = {(r["aar"], r["uge"]): (r["type"] or "fuld") for r in
                      conn.execute("SELECT aar, uge, COALESCE(type,'fuld') AS type "
                                   "FROM fuld_bemanding_uger").fetchall()}
-        uger = []
-        for f in faks:
-            uge, aar = int(f["uge"]), int(f["aar"])
-            mon = _d.fromisocalendar(aar, uge, 1)
+        maxrow = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
+        if not maxrow or not maxrow["d"]:
+            return {"uger": [], "total": {}, "antal_uger": 0}
+        maxd = _d.fromisoformat(str(maxrow["d"])[:10])
+        startd = _d.fromisoformat(ORG_START)
+        cur = startd - _td(days=startd.weekday())            # mandag i første Organic-uge
+        raws = []
+        while cur <= maxd:
+            aar, uge, _ = cur.isocalendar()
+            mon = cur
             dates = [(mon + _td(days=i)).isoformat() for i in range(7)]
             ph = ",".join("?" * 7)
             rows = conn.execute(f"""
@@ -4122,62 +4131,96 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
                        COALESCE(SUM(db_korrekt),0)         AS db
                 FROM v_transaktioner WHERE dato IN ({ph}) GROUP BY varenavn, vn
             """, dates).fetchall()
-            salg_total = db_pt_total = 0.0
-            salg_bag = db_pt_bag = 0.0
+            salg_total = db_pt_total = salg_bag = db_pt_bag = 0.0
             for r in rows:
                 oms = float(r["oms"] or 0); dbk = float(r["db"] or 0)
                 salg_total += oms; db_pt_total += dbk
                 er_bag = False
                 if r["vn"] in cat_sku:
-                    er_bag = True                              # katalog-bagværk (inkl. kager)
+                    er_bag = True
                 else:
                     rolle = _bageri_rolle(r["varenavn"])
                     if rolle and ((rolle[0] == "frisk" and rolle[1] in KAT)
                                   or (rolle[0] == "reddet" and "frost" in (r["varenavn"] or "").lower())):
-                        er_bag = True                          # combos + frost/reddet
+                        er_bag = True
                 if er_bag:
                     salg_bag += oms; db_pt_bag += dbk
-            # Bagværk: fakturaens vareforbrug (rigtige kroner)
-            vf_bag = float(f["varer_ex_fragt"] or 0)
-            fragt  = float(f["fragt_kr"] or 0)
-            db_bag = salg_bag - vf_bag
-            # Andet: Shopbox' egen avance + øvrig omsætning (MobilePay + B2B faktura).
-            # Øvrig omsætning regnes uden ekstra vareforbrug (som i Årsplanen/månedsregnskabet):
-            # varen er typisk allerede udgiftsført på bager-fakturaen, så ekstra kanal = ren margin.
+            if salg_total <= 0:
+                cur += _td(days=7); continue                 # spring tomme uger over
             ek = _ekstra_omsaetning(conn, dates[0], dates[6])
-            ekstra_ex = float(ek["ialt"] or 0)          # ex moms: MobilePay (÷1,25) + B2B
-            salg_andet = (salg_total - salg_bag) + ekstra_ex
-            db_andet   = (db_pt_total - db_pt_bag) + ekstra_ex
-            vf_andet   = salg_andet - db_andet
-            salg_total = salg_total + ekstra_ex          # samlet omsætning inkl. øvrige kanaler
-            # Fælles omkostninger pr. dag
+            # Fælles omkostninger pr. dag (kun dage ≤ seneste datadag)
             ov = {r["dato"]: r["loennet"] for r in conn.execute(
                 f"SELECT dato, loennet FROM db_loen_override WHERE dato IN ({ph})", dates).fetchall()}
+            lov = {r["dato"]: r["leveret"] for r in conn.execute(
+                f"SELECT dato, leveret FROM db_levering_override WHERE dato IN ({ph})", dates).fetchall()}
             fuld = bemanding.get((aar, uge)) == "fuld"
-            loen = omk = 0.0
+            loen = omk = est_fragt = 0.0
             for i in range(7):
                 iso = dates[i]
+                if _d.fromisoformat(iso) > maxd:
+                    continue
                 o = ov.get(iso)
-                loennet = (o == 1) if o is not None else _db_loennet_dag(iso, i, fuld)
-                if loennet:
+                if ((o == 1) if o is not None else _db_loennet_dag(iso, i, fuld)):
                     loen += loen_pr_loendag
                 omk += omk_pr_dag
-            db_ialt  = db_bag + db_andet
-            resultat = db_ialt - loen - omk - fragt
-            uger.append({
-                "uge": uge, "aar": aar,
-                "bagvaerk": {"salg": round(salg_bag), "vf": round(vf_bag), "db": round(db_bag),
-                             "dg_pct": round(db_bag / salg_bag * 100, 1) if salg_bag > 0 else None},
-                "andet":    {"salg": round(salg_andet), "vf": round(vf_andet), "db": round(db_andet),
-                             "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None,
-                             "ekstra": round(ekstra_ex),
-                             "ekstra_mp": round(float(ek["mp_netto"] or 0)),
-                             "ekstra_b2b": round(float(ek["faktura"] or 0))},
-                "salg_total": round(salg_total), "db_total": round(db_ialt),
-                "loen": round(loen), "omk": round(omk), "fragt": round(fragt),
-                "resultat": round(resultat),
-                "resultat_pct": round(resultat / salg_total * 100, 1) if salg_total > 0 else None,
+                lv = lov.get(iso)
+                if ((lv == 1) if lv is not None else _db_leveret_dag(iso, i)):
+                    est_fragt += levering_pr_dag
+            sidste_iso = _d.fromisocalendar(aar, uge, 7)
+            raws.append({
+                "aar": aar, "uge": uge,
+                "salg_total": salg_total, "db_pt_total": db_pt_total,
+                "salg_bag": salg_bag, "db_pt_bag": db_pt_bag, "ek": ek,
+                "loen": loen, "omk": omk, "est_fragt": est_fragt,
+                "komplet": sidste_iso <= maxd,
             })
+            cur += _td(days=7)
+
+    # Gennemsnitlig bagværks-DG fra faktura-uger → bruges til at estimere uger uden faktura
+    inv_salg = inv_db = 0.0
+    for w in raws:
+        f = inv.get((w["aar"], w["uge"]))
+        if f:
+            inv_salg += w["salg_bag"]; inv_db += (w["salg_bag"] - float(f["varer_ex_fragt"] or 0))
+    avg_bag_frac = (inv_db / inv_salg) if inv_salg > 0 else None
+
+    uger = []
+    for w in sorted(raws, key=lambda x: (x["aar"], x["uge"]), reverse=True):
+        salg_bag, db_pt_bag = w["salg_bag"], w["db_pt_bag"]
+        f = inv.get((w["aar"], w["uge"]))
+        if f:
+            vf_bag = float(f["varer_ex_fragt"] or 0)
+            db_bag = salg_bag - vf_bag
+            fragt  = float(f["fragt_kr"] or 0)
+            est = False
+        else:
+            frac = avg_bag_frac if avg_bag_frac is not None else (
+                db_pt_bag / salg_bag if salg_bag > 0 else 0.0)
+            db_bag = salg_bag * frac
+            vf_bag = salg_bag - db_bag
+            fragt  = w["est_fragt"]
+            est = True
+        ek = w["ek"]; ekstra_ex = float(ek["ialt"] or 0)
+        salg_andet = (w["salg_total"] - salg_bag) + ekstra_ex
+        db_andet   = (w["db_pt_total"] - db_pt_bag) + ekstra_ex
+        vf_andet   = salg_andet - db_andet
+        salg_total = w["salg_total"] + ekstra_ex
+        db_ialt  = db_bag + db_andet
+        resultat = db_ialt - w["loen"] - w["omk"] - fragt
+        uger.append({
+            "uge": w["uge"], "aar": w["aar"], "est": est, "komplet": w["komplet"],
+            "bagvaerk": {"salg": round(salg_bag), "vf": round(vf_bag), "db": round(db_bag),
+                         "dg_pct": round(db_bag / salg_bag * 100, 1) if salg_bag > 0 else None},
+            "andet":    {"salg": round(salg_andet), "vf": round(vf_andet), "db": round(db_andet),
+                         "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None,
+                         "ekstra": round(ekstra_ex),
+                         "ekstra_mp": round(float(ek["mp_netto"] or 0)),
+                         "ekstra_b2b": round(float(ek["faktura"] or 0))},
+            "salg_total": round(salg_total), "db_total": round(db_ialt),
+            "loen": round(w["loen"]), "omk": round(w["omk"]), "fragt": round(fragt),
+            "resultat": round(resultat),
+            "resultat_pct": round(resultat / salg_total * 100, 1) if salg_total > 0 else None,
+        })
     def _s(*keys):
         t = 0.0
         for u in uger:

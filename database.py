@@ -6978,6 +6978,34 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     _2uger_mon = [forrige_mon, forrige_mon - timedelta(days=7)]
     aabne_set  = set(aabne)
 
+    # ── Weekend-buffer på spildfri varer ──────────────────────────────────────
+    # Varer der reelt sælger ud (høj sell-through de seneste Organic-uger = ingen/
+    # lidt spild) får ekstra på fre/lør/søn, så butikken ikke løber tør på travle
+    # dage. Spild-tunge varer (og risiko/kage) rører vi IKKE — de holdes stramme.
+    WEEKEND_BUFFER = {"fre": 1.08, "loe": 1.18, "son": 1.18}
+    SPILDFRI_TAERSKEL = 0.85          # solgt ÷ bestilt ≥ 85 % ⇒ spildfri
+    _recent_mons = [m for m in (forrige_mon, forrige_mon - timedelta(days=7),
+                                forrige_mon - timedelta(days=14))
+                    if m.isoformat() >= _ORGANIC_START]
+    _best_tot: Dict[str, float] = {}
+    with _conn() as conn:
+        for wkmon in _recent_mons:
+            wk_y, wk_w = wkmon.isocalendar()[0], wkmon.isocalendar()[1]
+            for br in conn.execute("SELECT varenavn, total_antal FROM ugebestillinger "
+                                   "WHERE uge=? AND aar=?", (wk_w, wk_y)).fetchall():
+                k = (br["varenavn"] or "").strip().lower()
+                _best_tot[k] = _best_tot.get(k, 0.0) + float(br["total_antal"] or 0)
+    spildfri = set()
+    for _p in _ORGANIC_BAKERY:
+        if _p["gruppe"] in ("risiko", "kage"):
+            continue
+        _solgt = sum(salg.get((vn, (wkmon + timedelta(days=i)).isoformat()), 0.0)
+                     for wkmon in _recent_mons for i in range(7) for vn in _p["kilde"]
+                     if (wkmon + timedelta(days=i)).isoformat() in aabne_set)
+        _best = _best_tot.get(_p["navn"].strip().lower(), 0.0)
+        if _best > 0 and _solgt / _best >= SPILDFRI_TAERSKEL:
+            spildfri.add(_p["navn"])
+
     produkter = []
     for p in _ORGANIC_BAKERY:
         sf = svc.get(p["gruppe"], 1.0)
@@ -7006,11 +7034,15 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 if aeldre > 0:
                     trend = max(0.85, min(1.15, nyere / aeldre))
             basis_dag, anb_dag = {}, {}
+            wb = p["navn"] in spildfri
             for i, dn in enumerate(DAGE):
                 med = _median(pr_wd[i][-6:])           # seneste 6 uger = tættere på nu
                 basis_dag[dn] = med
                 vf = _vejr_faktor(p["gruppe"], vf_dato[i])
-                anb_dag[dn] = int(round(med * si * dag_fak.get(dn, 1.0) * sf * vf * trend))
+                raw = med * si * dag_fak.get(dn, 1.0) * sf * vf * trend
+                if wb:                                  # spildfri vare → weekend-buffer
+                    raw *= WEEKEND_BUFFER.get(dn, 1.0)
+                anb_dag[dn] = int(round(raw))
         # Dage før Organic Bakery-start (fx mandag 31/8 i uge 36 = gammel bager) → 0
         for i, dn in enumerate(DAGE):
             if (mon_dato + timedelta(days=i)).isoformat() < _ORGANIC_START:
@@ -7036,6 +7068,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             "kategori":        _organic_kat(p["navn"]),
             "risikogruppe":    p["gruppe"],
             "service_faktor":  sf,
+            "weekend_buffer":  p["navn"] in spildfri,
             "indkoeb_ex_moms": p["indkoeb"],
             "udsalg_ex_moms":  p["udsalg"],
             "pris_ex_moms":    p["indkoeb"],

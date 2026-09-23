@@ -7121,10 +7121,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 basis_dag[dn] = 0.0
                 anb_dag[dn] = 0
         total_anb = sum(anb_dag.values())
-        # Til "Solgt (forrige uge)"-visningen udelades bundle-SKU'er (4-pak surdejsboller
-        # 10445) → de vises som egen KOMBO-linje. Anbefalings-medianen (ovenfor) bruger
-        # stadig p["kilde"] inkl. 4-pakken, så efterspørgsel ikke tabes.
-        _salg_kilde = [vn for vn in (p["kilde"] + p.get("salg_kilde", [])) if vn not in _BAGERI_BUNDLE]
+        # "Solgt (forrige uge)"-visningen INKLUDERER nu 4-pakken (bundle, ×4 via _antal_sql),
+        # så bollens salgstal er retvisende (før blev 4-pakken vist som egen KOMBO-linje og
+        # fik bollerne til at ligne under-solgte). Den fjernes derfor fra combo-linjerne
+        # nedenfor, så intet tælles to steder.
+        _salg_kilde = list(p["kilde"] + p.get("salg_kilde", []))
         sidste_uge = (sum(salg.get((vn, d), 0.0) for vn in _salg_kilde for d in sidste_dage)
                       if _salg_kilde else None)
         # Forslag = gns. af de 2 seneste HELE ugers faktiske salg pr. ugedag. Bundle-SKU'er
@@ -7230,7 +7231,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # kategori, så "Solgt (forrige uge)"-totalen matcher det faktiske salg (som på
     # Seneste dag / dagsoverblik / spild). Ingen bestilling/anbefaling (kun salg).
     if sidste_dage:
-        _kat_sku = {int(v) for v in alle_kilde if int(v) not in _BAGERI_BUNDLE}  # 4-pak → combo-linje
+        _kat_sku = {int(v) for v in alle_kilde}  # inkl. 4-pak → krediteres Surdejsbolle, ikke egen combo-linje
         # Hent hele 2-ugers-vinduet (til både 'Solgt forrige uge' og 'Gns 2 uger')
         _win_dage = sorted({(m + timedelta(days=i)).isoformat()
                             for m in _2uger_mon for i in range(7)

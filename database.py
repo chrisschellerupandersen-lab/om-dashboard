@@ -3408,7 +3408,21 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         combo_agg.setdefault(key, {})
         combo_agg[key][r["dato"]] = combo_agg[key].get(r["dato"], 0) + int(r["antal"] or 0) * rolle[2]
     _SEK_KAT = {"Brød": 1, "Boller": 2, "Wiener": 3, "Kage": 4}
+    # Salg der matcher en eksisterende ordre-linje (case-insensitivt) foldes IND i den,
+    # så fx en udgået birkes-bolle (stadig bestilt/solgt) står som ÉN ren linje med
+    # bestilt + faktisk salg — ikke en 0-solgt ordre-linje + en separat combo-linje.
+    _ord_by_navn = {p["varenavn"].strip().lower(): p for p in produkter if not p.get("kombo")}
     for (kat, navn), per_dag in combo_agg.items():
+        _match = _ord_by_navn.get((navn or "").strip().lower())
+        if _match is not None:
+            for i in range(7):
+                s = int(per_dag.get(dage_datoer[i], 0))
+                if s:
+                    _match["dage"][i]["solgt"] += s
+                    _match["dage"][i]["diff"] = _match["dage"][i]["solgt"] - _match["dage"][i]["bestilt"]
+            _match["tot_solgt"] = sum(d["solgt"] for d in _match["dage"])
+            _match["tot_diff"] = _match["tot_solgt"] - _match["tot_bestilt"]
+            continue
         dage_data = []
         tot = 0
         for i in range(7):

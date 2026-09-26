@@ -113,9 +113,9 @@ _ORGANIC_BAKERY = [
 # og SKU'et lægges i basisvarens kilde (fx 10445 i Surdejsbolle).
 _BAGERI_BUNDLE = {10445: 4}   # "4 x surdejsboller" = 4 Surdejsboller pr. salg
 
-# Udgåede varer (fjernet fra kataloget): rest-salg på deres gamle SKU'er skjules fra
-# combo/øvrig-visningen, så tabellen er ren. Tilføj SKU her når en vare udgår.
-_UDGAAEDE_SKUER = {10048, 10418, 10412}  # Surdejsbolle m. birkes, Karam. croissant, Gulerodskage 1 pers
+# Udgåede varer (fjernet fra kataloget) forsvinder IKKE helt: deres rest-salg vises
+# som en øvrig/combo-linje NÅR der faktisk er salg (kunder/personale kan taste forkert),
+# og skjules automatisk når der ikke er salg — combo-aggregeringen er salgs-drevet.
 
 def _antal_sql(vn_expr: str = "CAST(CAST(varenummer AS REAL) AS INTEGER)") -> str:
     """SQL-udtryk for antal, hvor bundle-varer ganges op til reelt stk-antal."""
@@ -7282,8 +7282,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                     GROUP BY varenavn, vn, dato
                 """, _win_dage).fetchall()
             for r in rows_:
-                if r["vn"] in _kat_sku or r["vn"] in _UDGAAEDE_SKUER:
-                    continue                              # katalog-SKU'er + udgåede varers rest-salg
+                if r["vn"] in _kat_sku:
+                    continue                              # katalog-SKU'er (øvrige/udgåede SKU'er vises som combo-linje NÅR der er salg)
                 rolle = _bageri_rolle(r["varenavn"])
                 if not rolle or rolle[0] != "frisk" or rolle[1] not in ("Brød", "Boller", "Wiener"):
                     continue

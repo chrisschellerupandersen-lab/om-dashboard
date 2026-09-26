@@ -10341,14 +10341,15 @@ async function _loadDagUge(uge, aar) {
     </td>`;
   }
 
-  // Kategorisering + rækkefølge som Bageri Organic-siden (Brød/Boller/Wiener/Kage)
-  const KATO = ['Brød', 'Boller', 'Wiener', 'Kage', 'Andet'];
+  // Kategorisering + rækkefølge (Focaccia som EGEN gruppe — tæller ikke med i Brød)
+  const KATO = ['Brød', 'Focaccia', 'Boller', 'Wiener', 'Kage', 'Andet'];
   const _dagKat = (navn) => {
     const n = (navn || '').toLowerCase();
     if (n.includes('gulerodskage') || n.includes('cookie') || n.includes('kage')) return 'Kage';
+    if (n.includes('focaccia') || n.includes('foccacia')) return 'Focaccia';   // egen gruppe, før brød
     if (n.includes('bolle')) return 'Boller';
     if (['tebirkes','croissant','snurre','snurrer','pain','wiener','spandauer','snegl','frøsnapper','frosnapper','marcipan'].some(k=>n.includes(k))) return 'Wiener';
-    if (n.includes('brød') || n.includes('brod') || n.includes('focaccia') || n.includes('foccacia') || n.includes('flute')) return 'Brød';
+    if (n.includes('brød') || n.includes('brod') || n.includes('flute')) return 'Brød';
     return 'Andet';
   };
 

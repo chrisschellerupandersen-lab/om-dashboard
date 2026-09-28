@@ -3693,7 +3693,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <b>Frost:</b> genvundet salg af tidligere nedfrosset bagværk = ren margin (vareforbruget blev bogført da varen oprindeligt blev købt frisk, så DG = 100 %).
           <b>Andet:</b> alt øvrigt Shopbox-salg (ex moms) − vareforbrug efter Shopbox' egen avance = DB, plus <b>MobilePay + B2B-faktura</b> (ex moms) som regnes uden ekstra vareforbrug (varen er allerede på bager-fakturaen — samme princip som Årsplanen), så det slår igennem som ren margin.
           <b>Løn:</b> weekend-standard (lør+søn à 300 kr; 'fuld'-uger = alle dage). <b>Drift:</b> 500 kr/dag.
-          <b>Fragt:</b> fakturaens faktiske fragt (uden faktura: levering-estimat 175 kr/drop fre-søn). <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
+          <b>Fragt:</b> fakturaens faktiske fragt (uden faktura: levering-estimat — fra 1/10 <b>250 kr/drop kun lør+søn</b>; før 175 kr fre-søn). <b>Ugeresultat</b> = samlet DB − løn − drift − fragt.
           <b>est</b> = bagværks-vareforbrug estimeret ud fra faktura-ugernes gennemsnits-DG (indtil ugens faktura er indlæst). <b>delvis</b> = uge endnu ikke afsluttet, så løn/drift kun talt til seneste datadag.</p>
       </div>
 
@@ -5096,7 +5096,7 @@ function _dbsLevCell(x){
     : ov===1
       ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:#8a6d3a;color:#fff;border-radius:4px;padding:1px 4px;">lev</span>`
       : '';
-  const tip = (on ? 'Klik: I hentede selv (fjern levering)' : 'Klik: leveret (tilføj 175 kr)')
+  const tip = (on ? 'Klik: I hentede selv (fjern levering)' : 'Klik: leveret (tilføj fragt)')
             + (ov!=null ? ' · klik igen = auto' : '');
   return `<td onclick="dbsLevToggle('${x.dato}')" title="${tip}" style="text-align:right;cursor:pointer;color:${on?'#8a3a3a':'var(--ash)'};white-space:nowrap;">${on?_dbsKr(x.levering):'—'}${badge}</td>`;
 }
@@ -5181,7 +5181,7 @@ async function loadDbsMaaned(val){
   document.getElementById('dbs-maaned-titel').textContent = d.maaned_navn ? (d.maaned_navn + ' ' + d.aar) : 'Månedsresultat';
   const hint = document.getElementById('dbs-maaned-hint');
   if (hint) hint.textContent = d.loen_aktiv
-    ? 'Løn 300 kr/dag lør+søn · omk 500 kr/dag · levering 175 kr/dag fre–søn (selv man–tor) · resultat = DB − løn − omk − levering'
+    ? 'Løn 300 kr/dag lør+søn · omk 500 kr/dag · levering (fra 1/10: 250 kr/drop lør+søn; før 175 kr fre–søn) · resultat = DB − løn − omk − levering'
     : 'Ingen løn (før juni 2026) · omk 500 kr/dag · resultat = DB − omk';
   // Totaler i toppen
   const tile=(lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
@@ -5219,7 +5219,7 @@ async function loadDbsMaaned(val){
     <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
     <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
     <th style="text-align:right;">Omk</th>
-    <th style="text-align:right;" title="Levering 175 kr/dag. Standard fre–søn (I henter selv man–tor). Klik en dag for at rette.">Levering</th>
+    <th style="text-align:right;" title="Levering pr. drop (fra 1/10: 250 kr, kun lør+søn; før 175 kr fre–søn). I henter selv de øvrige dage. Klik en dag for at rette.">Levering</th>
     <th style="text-align:right;">Resultat</th>
     <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th>
     <th style="text-align:right;" title="Omsætning ex moms af nedfrosset bagværk solgt igen som frost.">Frost salg</th>

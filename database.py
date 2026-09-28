@@ -4184,7 +4184,7 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
                 omk += omk_pr_dag
                 lv = lov.get(iso)
                 if ((lv == 1) if lv is not None else _db_leveret_dag(iso, i)):
-                    est_fragt += levering_pr_dag
+                    est_fragt += _levering_pris(iso)
             sidste_iso = _d.fromisocalendar(aar, uge, 7)
             raws.append({
                 "aar": aar, "uge": uge,
@@ -10765,12 +10765,20 @@ def toggle_db_loen_override(dato: str) -> dict:
 
 
 def _db_leveret_dag(iso: str, wd: int) -> bool:
-    """Standard: Organic Bakery leverer fre(4)+lør(5)+søn(6); butikken henter selv
-    man-tor. Levering koster 175 kr/dag. Gælder fra 1/9-2026 (Organic-æraen).
+    """Standard leveringsdage (Organic-æra). Butikken henter selv de øvrige dage.
+      • 1/9-30/9-2026: fre(4)+lør(5)+søn(6).
+      • fra 1/10-2026: KUN lør(5)+søn(6) (fredag udgår).
     wd: 0=man … 4=fre, 5=lør, 6=søn."""
     if iso < "2026-09-01":
         return False
-    return wd in (4, 5, 6)
+    if iso < "2026-10-01":
+        return wd in (4, 5, 6)
+    return wd in (5, 6)
+
+
+def _levering_pris(iso: str) -> float:
+    """Fragt pr. drop: 175 kr til og med 30/9-2026, 250 kr fra 1/10-2026."""
+    return 250.0 if iso >= "2026-10-01" else 175.0
 
 
 def toggle_db_levering_override(dato: str) -> dict:
@@ -10882,7 +10890,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         omk = omk_pr_dag
         lov = lev_ov.get(iso)                      # None / 0 / 1 (levering-undtagelse)
         leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
-        levering = levering_pr_dag if leveret else 0.0
+        levering = _levering_pris(iso) if leveret else 0.0
         res = db - loen - omk - levering
         vspild_d = hent_dagens_spild_vaerdi(iso, detaljer=True) if x else {"total": 0.0, "kategorier": {}}
         vspild = vspild_d["total"]
@@ -10952,7 +10960,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             loen = loen_tir_ons if (loen_aktiv and loennet) else 0.0
             lov = lev_ov.get(iso)
             leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
-            levering = levering_pr_dag if leveret else 0.0
+            levering = _levering_pris(iso) if leveret else 0.0
             lst = wd_oms.get(wd)
             oms = (sum(lst) / len(lst)) if lst else snit_alle
             db = oms * dg_frac

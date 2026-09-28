@@ -4149,20 +4149,21 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
                        COALESCE(SUM(db_korrekt),0)         AS db
                 FROM v_transaktioner WHERE dato IN ({ph}) GROUP BY varenavn, vn
             """, dates).fetchall()
-            salg_total = db_pt_total = salg_bag = db_pt_bag = 0.0
+            salg_total = db_pt_total = 0.0
+            salg_frisk = db_pt_frisk = salg_frost = db_pt_frost = 0.0
             for r in rows:
                 oms = float(r["oms"] or 0); dbk = float(r["db"] or 0)
                 salg_total += oms; db_pt_total += dbk
-                er_bag = False
                 if r["vn"] in cat_sku:
-                    er_bag = True
-                else:
-                    rolle = _bageri_rolle(r["varenavn"])
-                    if rolle and ((rolle[0] == "frisk" and rolle[1] in KAT)
-                                  or (rolle[0] == "reddet" and "frost" in (r["varenavn"] or "").lower())):
-                        er_bag = True
-                if er_bag:
-                    salg_bag += oms; db_pt_bag += dbk
+                    salg_frisk += oms; db_pt_frisk += dbk        # katalog-bagværk (friskt, inkl. kager)
+                    continue
+                rolle = _bageri_rolle(r["varenavn"])
+                if not rolle:
+                    continue
+                if rolle[0] == "frisk" and rolle[1] in KAT:
+                    salg_frisk += oms; db_pt_frisk += dbk        # combos (friskt)
+                elif rolle[0] == "reddet" and "frost" in (r["varenavn"] or "").lower():
+                    salg_frost += oms; db_pt_frost += dbk        # frost/reddet (genvundet spild)
             if salg_total <= 0:
                 cur += _td(days=7); continue                 # spring tomme uger over
             ek = _ekstra_omsaetning(conn, dates[0], dates[6])
@@ -4188,7 +4189,8 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
             raws.append({
                 "aar": aar, "uge": uge,
                 "salg_total": salg_total, "db_pt_total": db_pt_total,
-                "salg_bag": salg_bag, "db_pt_bag": db_pt_bag, "ek": ek,
+                "salg_frisk": salg_frisk, "db_pt_frisk": db_pt_frisk,
+                "salg_frost": salg_frost, "db_pt_frost": db_pt_frost, "ek": ek,
                 "loen": loen, "omk": omk, "est_fragt": est_fragt,
                 "komplet": sidste_iso <= maxd,
             })
@@ -4199,36 +4201,42 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
     for w in raws:
         f = inv.get((w["aar"], w["uge"]))
         if f:
-            inv_salg += w["salg_bag"]; inv_db += (w["salg_bag"] - float(f["varer_ex_fragt"] or 0))
+            inv_salg += w["salg_frisk"]; inv_db += (w["salg_frisk"] - float(f["varer_ex_fragt"] or 0))
     avg_bag_frac = (inv_db / inv_salg) if inv_salg > 0 else None
 
     uger = []
     for w in sorted(raws, key=lambda x: (x["aar"], x["uge"]), reverse=True):
-        salg_bag, db_pt_bag = w["salg_bag"], w["db_pt_bag"]
+        salg_frisk, db_pt_frisk = w["salg_frisk"], w["db_pt_frisk"]
+        salg_frost = w["salg_frost"]
+        salg_bag  = salg_frisk + salg_frost                       # samlet bagværkssalg (til Andet-beregning)
+        db_pt_bag = db_pt_frisk + w["db_pt_frost"]
         f = inv.get((w["aar"], w["uge"]))
         if f:
             vf_bag = float(f["varer_ex_fragt"] or 0)
-            db_bag = salg_bag - vf_bag
+            db_bag = salg_frisk - vf_bag
             fragt  = float(f["fragt_kr"] or 0)
             est = False
         else:
             frac = avg_bag_frac if avg_bag_frac is not None else (
-                db_pt_bag / salg_bag if salg_bag > 0 else 0.0)
-            db_bag = salg_bag * frac
-            vf_bag = salg_bag - db_bag
+                db_pt_frisk / salg_frisk if salg_frisk > 0 else 0.0)
+            db_bag = salg_frisk * frac
+            vf_bag = salg_frisk - db_bag
             fragt  = w["est_fragt"]
             est = True
+        db_frost = salg_frost                                     # Frost = ren margin (vareforbrug allerede bogført)
         ek = w["ek"]; ekstra_ex = float(ek["ialt"] or 0)
         salg_andet = (w["salg_total"] - salg_bag) + ekstra_ex
         db_andet   = (w["db_pt_total"] - db_pt_bag) + ekstra_ex
         vf_andet   = salg_andet - db_andet
         salg_total = w["salg_total"] + ekstra_ex
-        db_ialt  = db_bag + db_andet
+        db_ialt  = db_bag + db_frost + db_andet
         resultat = db_ialt - w["loen"] - w["omk"] - fragt
         uger.append({
             "uge": w["uge"], "aar": w["aar"], "est": est, "komplet": w["komplet"],
-            "bagvaerk": {"salg": round(salg_bag), "vf": round(vf_bag), "db": round(db_bag),
-                         "dg_pct": round(db_bag / salg_bag * 100, 1) if salg_bag > 0 else None},
+            "bagvaerk": {"salg": round(salg_frisk), "vf": round(vf_bag), "db": round(db_bag),
+                         "dg_pct": round(db_bag / salg_frisk * 100, 1) if salg_frisk > 0 else None},
+            "frost":    {"salg": round(salg_frost), "vf": 0, "db": round(db_frost),
+                         "dg_pct": 100.0 if salg_frost > 0 else None},
             "andet":    {"salg": round(salg_andet), "vf": round(vf_andet), "db": round(db_andet),
                          "dg_pct": round(db_andet / salg_andet * 100, 1) if salg_andet > 0 else None,
                          "ekstra": round(ekstra_ex),
@@ -4253,6 +4261,8 @@ def hent_uge_samlet_oekonomi(loen_pr_loendag: float = 300.0,
                      "db": _s("bagvaerk", "db"),
                      "dg_pct": round(_s("bagvaerk", "db") / _s("bagvaerk", "salg") * 100, 1)
                                if _s("bagvaerk", "salg") > 0 else None},
+        "frost":    {"salg": _s("frost", "salg"), "vf": 0, "db": _s("frost", "db"),
+                     "dg_pct": 100.0 if _s("frost", "salg") > 0 else None},
         "andet":    {"salg": _s("andet", "salg"), "vf": _s("andet", "vf"),
                      "db": _s("andet", "db"),
                      "dg_pct": round(_s("andet", "db") / _s("andet", "salg") * 100, 1)

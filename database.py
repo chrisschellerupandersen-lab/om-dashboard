@@ -101,8 +101,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
-     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},  # NY vare (erstatter Gulerodskage 1 pers) — startbud; mangler Shopbox-SKU til solgt/spild
+    {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10479],
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},  # NY vare (erstatter Gulerodskage 1 pers) — SKU 10479 til solgt/spild; startbud indtil historik
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},

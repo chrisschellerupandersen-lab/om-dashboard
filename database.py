@@ -86,8 +86,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle",            "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [10049, 10050, 10051, 10424, 10445]},  # +10424 nyt SKU, +10445 bundle "4 x surdejsboller" (×4)
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
      "seed": {"man": 6, "tir": 8, "ons": 8, "tor": 10, "fre": 16, "loe": 26, "son": 26}},  # startbud ~100/uge = faktisk niveau (sælger ud ~86% ST; mis-indtastning gør SKU-salg upålideligt)
-    {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
-     "seed": {"man": 4, "tir": 5, "ons": 5, "tor": 5, "fre": 9, "loe": 14, "son": 12}},  # NY vare — startbud ~54/uge (midt ml. tidligere 46 og kurvens 65); mangler Shopbox-SKU til solgt/spild
+    {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10482],
+     "seed": {"man": 4, "tir": 5, "ons": 5, "tor": 5, "fre": 9, "loe": 14, "son": 12}},  # NY vare — SKU 10482 til solgt/spild; startbud ~54/uge indtil historik
     {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158, 10434]},
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},

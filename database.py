@@ -4017,9 +4017,12 @@ def hent_bagvaerk_regnskab() -> Dict:
             db = oms_ialt - vareforbrug
             resultat = db - fragt
             try:
-                spildv = (hent_bageri_spild(uge, aar).get("total") or {}).get("spild_kost", 0)
+                _sp = hent_bageri_spild(uge, aar).get("total") or {}
             except Exception:
-                spildv = 0
+                _sp = {}
+            spildv = _sp.get("spild_kost", 0) or 0
+            spild_stk = int(_sp.get("spild", 0) or 0)
+            bestilt_stk = int(_sp.get("bestilt", 0) or 0)
             uger.append({
                 "uge": uge, "aar": aar,
                 "oms_friskt": round(friskt), "oms_frost": round(frost),
@@ -4027,6 +4030,8 @@ def hent_bagvaerk_regnskab() -> Dict:
                 "vareforbrug": round(vareforbrug), "fragt": round(fragt),
                 "db": round(db), "dg_pct": round(db / oms_ialt * 100, 1) if oms_ialt > 0 else None,
                 "resultat": round(resultat), "spild_vaerdi": round(spildv),
+                "spild_stk": spild_stk, "bestilt_stk": bestilt_stk,
+                "spild_pct": round(spild_stk / bestilt_stk * 100, 1) if bestilt_stk > 0 else None,
                 "frost_andel_pct": round(frost / oms_ialt * 100, 1) if oms_ialt > 0 else 0.0,
             })
     def _s(k):
@@ -4036,6 +4041,8 @@ def hent_bagvaerk_regnskab() -> Dict:
         "oms_friskt": _s("oms_friskt"), "oms_frost": _s("oms_frost"), "oms_ialt": to,
         "vareforbrug": _s("vareforbrug"), "fragt": _s("fragt"),
         "db": _s("db"), "resultat": _s("resultat"), "spild_vaerdi": _s("spild_vaerdi"),
+        "spild_stk": _s("spild_stk"), "bestilt_stk": _s("bestilt_stk"),
+        "spild_pct": round(_s("spild_stk") / _s("bestilt_stk") * 100, 1) if _s("bestilt_stk") > 0 else None,
         "dg_pct": round(_s("db") / to * 100, 1) if to > 0 else None,
         "frost_andel_pct": round(_s("oms_frost") / to * 100, 1) if to > 0 else 0.0,
     }

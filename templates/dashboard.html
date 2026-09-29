@@ -10112,6 +10112,8 @@ async function loadBagRegnskab(){
       <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
       <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
   const resClr = (t.resultat||0)>=0?'var(--moss)':'var(--danger)';
+  // Spild % (af bestilt, stk) mod branche-norm: <15% godt, 15-25% normalt, >25% højt
+  const spPctClr = p => p==null?'var(--ash)':p<15?'var(--moss)':p<=25?'var(--gold)':'var(--danger)';
   document.getElementById('bregn-tot').innerHTML =
       tile('Bagværkssalg', kr(t.oms_ialt)+' kr')
     + tile('— heraf frost', kr(t.oms_frost)+' kr', 'var(--moss)')
@@ -10120,7 +10122,8 @@ async function loadBagRegnskab(){
     + tile('DG %', (t.dg_pct!=null?t.dg_pct:'—')+' %', 'var(--forest)')
     + tile('Fragt', kr(t.fragt)+' kr', '#8a3a3a')
     + tile('Resultat (før løn)', kr(t.resultat)+' kr', resClr)
-    + tile('Værdi spild', kr(t.spild_vaerdi)+' kr', '#8a6d3a');
+    + tile('Værdi spild', kr(t.spild_vaerdi)+' kr', '#8a6d3a')
+    + tile('Spild %', (t.spild_pct!=null?t.spild_pct:'—')+' %', spPctClr(t.spild_pct));
   let html = `<thead><tr>
     <th style="text-align:left;">Uge</th>
     <th class="num" title="Faktisk kassesalg ex moms af bagværk (katalog + combos + kager)">Salg friskt</th>
@@ -10129,7 +10132,8 @@ async function loadBagRegnskab(){
     <th class="num" title="Fakturaens varer ex fragt (ex moms) — hvad I betalte bageriet">Vareforbrug</th>
     <th class="num">DB</th><th class="num">DG %</th>
     <th class="num">Fragt</th><th class="num">Resultat</th>
-    <th class="num" title="Bagværk ikke solgt friskt × kostpris">Værdi spild</th></tr></thead><tbody>`;
+    <th class="num" title="Bagværk ikke solgt friskt × kostpris">Værdi spild</th>
+    <th class="num" title="Spild ÷ bestilt i stk — mod branche-norm: <15% godt, 15-25% normalt for ferskbageri, >25% højt">Spild %</th></tr></thead><tbody>`;
   (d.uger||[]).forEach(u=>{
     const rc = u.resultat>=0?'var(--moss)':'var(--danger)';
     const dgc = u.dg_pct==null?'var(--ash)':(u.dg_pct>=45?'var(--moss)':u.dg_pct>=35?'var(--gold)':'var(--danger)');
@@ -10143,7 +10147,8 @@ async function loadBagRegnskab(){
       <td class="num" style="color:${dgc};font-weight:600;">${u.dg_pct!=null?u.dg_pct+' %':'—'}</td>
       <td class="num" style="color:#8a3a3a;">${kr(u.fragt)}</td>
       <td class="num" style="font-weight:700;color:${rc};">${kr(u.resultat)}</td>
-      <td class="num" style="color:var(--ash);">${u.spild_vaerdi?kr(u.spild_vaerdi):'—'}</td></tr>`;
+      <td class="num" style="color:var(--ash);">${u.spild_vaerdi?kr(u.spild_vaerdi):'—'}</td>
+      <td class="num" style="font-weight:600;color:${spPctClr(u.spild_pct)};">${u.spild_pct!=null?u.spild_pct+' %':'—'}</td></tr>`;
   });
   html += `</tbody><tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td>
@@ -10155,7 +10160,8 @@ async function loadBagRegnskab(){
       <td class="num">${t.dg_pct!=null?t.dg_pct+' %':'—'}</td>
       <td class="num" style="color:#8a3a3a;">${kr(t.fragt)}</td>
       <td class="num" style="color:${resClr};">${kr(t.resultat)}</td>
-      <td class="num" style="color:var(--ash);">${kr(t.spild_vaerdi)}</td></tr></tfoot>`;
+      <td class="num" style="color:var(--ash);">${kr(t.spild_vaerdi)}</td>
+      <td class="num" style="color:${spPctClr(t.spild_pct)};">${t.spild_pct!=null?t.spild_pct+' %':'—'}</td></tr></tfoot>`;
   tbl.innerHTML = html;
   _bregnLoaded = true;
 

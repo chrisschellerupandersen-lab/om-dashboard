@@ -4021,8 +4021,10 @@ def hent_bagvaerk_regnskab() -> Dict:
             except Exception:
                 _sp = {}
             spildv = _sp.get("spild_kost", 0) or 0
-            spild_stk = int(_sp.get("spild", 0) or 0)
+            spild_netto_stk = int(_sp.get("spild", 0) or 0)              # efter reddet/frost
             bestilt_stk = int(_sp.get("bestilt", 0) or 0)
+            frisk_solgt = int(_sp.get("frisk_solgt", 0) or 0)
+            spild_brutto_stk = max(0, bestilt_stk - frisk_solgt)          # før frost (rå)
             uger.append({
                 "uge": uge, "aar": aar,
                 "oms_friskt": round(friskt), "oms_frost": round(frost),
@@ -4030,8 +4032,12 @@ def hent_bagvaerk_regnskab() -> Dict:
                 "vareforbrug": round(vareforbrug), "fragt": round(fragt),
                 "db": round(db), "dg_pct": round(db / oms_ialt * 100, 1) if oms_ialt > 0 else None,
                 "resultat": round(resultat), "spild_vaerdi": round(spildv),
-                "spild_stk": spild_stk, "bestilt_stk": bestilt_stk,
-                "spild_pct": round(spild_stk / bestilt_stk * 100, 1) if bestilt_stk > 0 else None,
+                "bestilt_stk": bestilt_stk, "frisk_solgt_stk": frisk_solgt,
+                "spild_brutto_stk": spild_brutto_stk, "spild_netto_stk": spild_netto_stk,
+                "spild_stk": spild_netto_stk,
+                "spild_pct_brutto": round(spild_brutto_stk / bestilt_stk * 100, 1) if bestilt_stk > 0 else None,
+                "spild_pct_netto":  round(spild_netto_stk / bestilt_stk * 100, 1) if bestilt_stk > 0 else None,
+                "spild_pct": round(spild_netto_stk / bestilt_stk * 100, 1) if bestilt_stk > 0 else None,
                 "frost_andel_pct": round(frost / oms_ialt * 100, 1) if oms_ialt > 0 else 0.0,
             })
     def _s(k):
@@ -4041,8 +4047,11 @@ def hent_bagvaerk_regnskab() -> Dict:
         "oms_friskt": _s("oms_friskt"), "oms_frost": _s("oms_frost"), "oms_ialt": to,
         "vareforbrug": _s("vareforbrug"), "fragt": _s("fragt"),
         "db": _s("db"), "resultat": _s("resultat"), "spild_vaerdi": _s("spild_vaerdi"),
-        "spild_stk": _s("spild_stk"), "bestilt_stk": _s("bestilt_stk"),
-        "spild_pct": round(_s("spild_stk") / _s("bestilt_stk") * 100, 1) if _s("bestilt_stk") > 0 else None,
+        "bestilt_stk": _s("bestilt_stk"), "spild_stk": _s("spild_netto_stk"),
+        "spild_brutto_stk": _s("spild_brutto_stk"), "spild_netto_stk": _s("spild_netto_stk"),
+        "spild_pct_brutto": round(_s("spild_brutto_stk") / _s("bestilt_stk") * 100, 1) if _s("bestilt_stk") > 0 else None,
+        "spild_pct_netto":  round(_s("spild_netto_stk") / _s("bestilt_stk") * 100, 1) if _s("bestilt_stk") > 0 else None,
+        "spild_pct": round(_s("spild_netto_stk") / _s("bestilt_stk") * 100, 1) if _s("bestilt_stk") > 0 else None,
         "dg_pct": round(_s("db") / to * 100, 1) if to > 0 else None,
         "frost_andel_pct": round(_s("oms_frost") / to * 100, 1) if to > 0 else 0.0,
     }
@@ -10872,8 +10881,10 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         # Frost-salg pr. dag (omsætning ex moms af nedfrosset bagværk solgt igen).
         # Bredt LIKE '%rost%' + Python-filter via _bageri_rolle (frost, ekskl. pølse/ost).
         frost_per: Dict[str, float] = {}
+        frost_stk_per: Dict[str, int] = {}
         for fr in conn.execute("""
-            SELECT dato, varenavn, COALESCE(SUM(omsaetning_ex_moms),0) AS kr
+            SELECT dato, varenavn, COALESCE(SUM(omsaetning_ex_moms),0) AS kr,
+                   COALESCE(SUM(antal),0) AS stk
             FROM v_transaktioner
             WHERE dato>=? AND dato<=? AND LOWER(varenavn) LIKE '%rost%'
             GROUP BY dato, varenavn
@@ -10882,6 +10893,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             rolle = _bageri_rolle(navn)
             if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
                 frost_per[fr["dato"]] = frost_per.get(fr["dato"], 0.0) + float(fr["kr"] or 0)
+                frost_stk_per[fr["dato"]] = frost_stk_per.get(fr["dato"], 0) + int((fr["stk"] or 0) * rolle[2])
     per = {str(x["dato"])[:10]: x for x in rows}
 
     loen_aktiv = (y, m) >= _LOEN_START
@@ -10889,7 +10901,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     dage = []
     tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0,
            "resultat": 0.0, "vaerdi_spild": 0.0, "frost_salg": 0.0,
-           "bestilt_stk": 0, "solgt_stk": 0, "spild_stk": 0}
+           "bestilt_stk": 0, "solgt_stk": 0, "spild_stk": 0, "frost_stk": 0}
     spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
     d = foerste
     while d <= sidste:
@@ -10929,6 +10941,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "solgt_stk":   int(vspild_d.get("solgt_stk", 0)),
             "spild_stk":   int(vspild_d.get("spild_stk", 0)),
             "frost_salg": round(frost_per.get(iso, 0.0)),
+            "frost_stk":  int(frost_stk_per.get(iso, 0)),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
             "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
@@ -10941,6 +10954,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         tot["bestilt_stk"] += int(vspild_d.get("bestilt_stk", 0))
         tot["solgt_stk"]   += int(vspild_d.get("solgt_stk", 0))
         tot["spild_stk"]   += int(vspild_d.get("spild_stk", 0))
+        tot["frost_stk"]   += int(frost_stk_per.get(iso, 0))
         d += _td(days=1)
 
     total = {
@@ -10955,6 +10969,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "bestilt_stk": int(tot["bestilt_stk"]),
         "solgt_stk":   int(tot["solgt_stk"]),
         "spild_stk":   int(tot["spild_stk"]),
+        "frost_stk":   int(tot["frost_stk"]),
         "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
         "antal_dage": len(dage),
     }

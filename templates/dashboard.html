@@ -5212,11 +5212,15 @@ async function loadDbsMaaned(val){
   const _nettoSpild = (t.vaerdi_spild||0)-(t.frost_salg||0);
   // Spild % af bestilt (stk) — mod branche-norm: <15% godt, 15-25% normalt, >25% højt
   const _spPctClr = p => p<15?'var(--moss)':p<=25?'var(--gold)':'var(--danger)';
-  const _spildPct = t.bestilt_stk>0 ? (t.spild_stk/t.bestilt_stk*100) : 0;
-  const _pctTile = `<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">Spild % (af bestilt)</div>
-      <div style="font-size:20px;font-weight:700;line-height:1;color:${_spPctClr(_spildPct)};">${_spildPct.toFixed(1)} %</div>
-      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${t.spild_stk||0}/${t.bestilt_stk||0} stk · norm 15-25%</div></div>`;
+  const _spildPctB = t.bestilt_stk>0 ? (t.spild_stk/t.bestilt_stk*100) : 0;                 // brutto (før frost)
+  const _spildNettoStk = Math.max(0,(t.spild_stk||0)-(t.frost_stk||0));
+  const _spildPctN = t.bestilt_stk>0 ? (_spildNettoStk/t.bestilt_stk*100) : 0;               // netto (efter frost)
+  const _pctBox = (lbl,pct,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${lbl}</div>
+      <div style="font-size:20px;font-weight:700;line-height:1;color:${_spPctClr(pct)};">${pct.toFixed(1)} %</div>
+      <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div></div>`;
+  const _pctTile = _pctBox('Spild % brutto', _spildPctB, `${t.spild_stk||0}/${t.bestilt_stk||0} stk · norm 15-25%`)
+                 + _pctBox('Spild % netto',  _spildPctN, `efter frost (${t.frost_stk||0} stk reddet)`);
   document.getElementById('dbs-maaned-tot').innerHTML =
       tile('DB i alt', t.db_kr)
     + tile('Løn i alt', t.loen, '#8a3a3a')
@@ -5243,7 +5247,7 @@ async function loadDbsMaaned(val){
     <th style="text-align:right;">Resultat</th>
     <th style="text-align:right;" title="Bagværk bestilt (indkøbt) i stk denne dag — Brød/Boller/Wiener, ekskl. kager">Indkøb stk</th>
     <th style="text-align:right;" title="Bagværk solgt friskt i stk (inkl. combo-forbrug og 4-pak à 4 stk)">Solgt stk</th>
-    <th style="text-align:right;" title="Spild i stk (pr. vare, netto — det der ikke blev solgt friskt og typisk fryses ned). Kan afvige fra Indkøb − Solgt, fordi nogle varer sælger ud (og 4-pak/combo tæller i Solgt) mens andre har spild.">Spild stk</th>
+    <th style="text-align:right;" title="Spild i stk + spild%: brutto (bestilt − friskt solgt) og netto efter frost i parentes. Klik for spild pr. vare. Kan afvige fra Indkøb − Solgt, fordi nogle varer sælger ud (og 4-pak/combo tæller i Solgt) mens andre har spild.">Spild stk (brutto% / netto%)</th>
     <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th>
     <th style="text-align:right;" title="Omsætning ex moms af nedfrosset bagværk solgt igen som frost.">Frost salg</th>
     <th style="text-align:right;" title="Netto spild = værdi spild − frost salg. Det reelle tab efter at noget er reddet via frost.">Netto spild</th>
@@ -5267,7 +5271,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${x.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${x.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${x.dato}','spildstk',this)"`:''}>${x.spild_stk?`${x.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(x.bestilt_stk>0?x.spild_stk/x.bestilt_stk*100:0)};">${x.bestilt_stk>0?Math.round(x.spild_stk/x.bestilt_stk*100):0}%</span>`:'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${x.dato}','spildstk',this)"`:''}>${x.spild_stk?(()=>{const bp=x.bestilt_stk>0?x.spild_stk/x.bestilt_stk*100:0; const nS=Math.max(0,(x.spild_stk||0)-(x.frost_stk||0)); const np=x.bestilt_stk>0?nS/x.bestilt_stk*100:0; return `${x.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(bp)};">${Math.round(bp)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${Math.round(np)}%)</span>`;})():'—'}</td>
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td>
       ${(()=>{const ns=(x.vaerdi_spild||0)-(x.frost_salg||0); const re=(x.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
@@ -5308,7 +5312,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${t.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${t.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;">${t.spild_stk?`${t.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(_spildPct)};">${_spildPct.toFixed(0)}%</span>`:'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;">${t.spild_stk?`${t.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(_spildPctB)};">${_spildPctB.toFixed(0)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${_spildPctN.toFixed(0)}%)</span>`:'—'}</td>
       <td style="text-align:right;color:var(--ash);">${_dbsKr(t.vaerdi_spild)}</td>
       <td style="text-align:right;color:var(--moss);">${_dbsKr(t.frost_salg)}</td>
       ${(()=>{const ns=(t.vaerdi_spild||0)-(t.frost_salg||0); const re=(t.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
@@ -10123,7 +10127,8 @@ async function loadBagRegnskab(){
     + tile('Fragt', kr(t.fragt)+' kr', '#8a3a3a')
     + tile('Resultat (før løn)', kr(t.resultat)+' kr', resClr)
     + tile('Værdi spild', kr(t.spild_vaerdi)+' kr', '#8a6d3a')
-    + tile('Spild %', (t.spild_pct!=null?t.spild_pct:'—')+' %', spPctClr(t.spild_pct));
+    + tile('Spild % brutto', (t.spild_pct_brutto!=null?t.spild_pct_brutto:'—')+' %', spPctClr(t.spild_pct_brutto))
+    + tile('Spild % netto', (t.spild_pct_netto!=null?t.spild_pct_netto:'—')+' %', spPctClr(t.spild_pct_netto));
   let html = `<thead><tr>
     <th style="text-align:left;">Uge</th>
     <th class="num" title="Faktisk kassesalg ex moms af bagværk (katalog + combos + kager)">Salg friskt</th>
@@ -10133,7 +10138,7 @@ async function loadBagRegnskab(){
     <th class="num">DB</th><th class="num">DG %</th>
     <th class="num">Fragt</th><th class="num">Resultat</th>
     <th class="num" title="Bagværk ikke solgt friskt × kostpris">Værdi spild</th>
-    <th class="num" title="Spild ÷ bestilt i stk — mod branche-norm: <15% godt, 15-25% normalt for ferskbageri, >25% højt">Spild %</th></tr></thead><tbody>`;
+    <th class="num" title="Spild % af bestilt (stk). Brutto = bestilt − friskt solgt. Netto = efter frost/reddet (i parentes). Mod branche-norm: <15% godt, 15-25% normalt, >25% højt.">Spild % brutto (netto)</th></tr></thead><tbody>`;
   (d.uger||[]).forEach(u=>{
     const rc = u.resultat>=0?'var(--moss)':'var(--danger)';
     const dgc = u.dg_pct==null?'var(--ash)':(u.dg_pct>=45?'var(--moss)':u.dg_pct>=35?'var(--gold)':'var(--danger)');
@@ -10148,7 +10153,7 @@ async function loadBagRegnskab(){
       <td class="num" style="color:#8a3a3a;">${kr(u.fragt)}</td>
       <td class="num" style="font-weight:700;color:${rc};">${kr(u.resultat)}</td>
       <td class="num" style="color:var(--ash);">${u.spild_vaerdi?kr(u.spild_vaerdi):'—'}</td>
-      <td class="num" style="font-weight:600;color:${spPctClr(u.spild_pct)};">${u.spild_pct!=null?u.spild_pct+' %':'—'}</td></tr>`;
+      <td class="num" style="font-weight:600;color:${spPctClr(u.spild_pct_brutto)};">${u.spild_pct_brutto!=null?u.spild_pct_brutto+' %':'—'}<span style="font-weight:400;color:var(--ash);font-size:11px;">${u.spild_pct_netto!=null?' ('+u.spild_pct_netto+'%)':''}</span></td></tr>`;
   });
   html += `</tbody><tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">I alt</td>
@@ -10161,7 +10166,7 @@ async function loadBagRegnskab(){
       <td class="num" style="color:#8a3a3a;">${kr(t.fragt)}</td>
       <td class="num" style="color:${resClr};">${kr(t.resultat)}</td>
       <td class="num" style="color:var(--ash);">${kr(t.spild_vaerdi)}</td>
-      <td class="num" style="color:${spPctClr(t.spild_pct)};">${t.spild_pct!=null?t.spild_pct+' %':'—'}</td></tr></tfoot>`;
+      <td class="num" style="color:${spPctClr(t.spild_pct_brutto)};">${t.spild_pct_brutto!=null?t.spild_pct_brutto+' %':'—'}<span style="font-weight:400;color:var(--ash);font-size:11px;">${t.spild_pct_netto!=null?' ('+t.spild_pct_netto+'%)':''}</span></td></tr></tfoot>`;
   tbl.innerHTML = html;
   _bregnLoaded = true;
 

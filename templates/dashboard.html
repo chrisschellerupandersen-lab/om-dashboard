@@ -5127,7 +5127,19 @@ async function dbsDagDetalje(dato, type, cell){
   const d = await api('/api/db-shopbox/dag-detalje?dato=' + dato);
   const box = det.querySelector('div');
   if (!d){ box.textContent = 'Kunne ikke hente detaljer.'; return; }
-  box.innerHTML = (type === 'spild') ? _dbsSpildDet(d.spild) : _dbsFrostDet(d.frost);
+  box.innerHTML = (type === 'spildstk') ? _dbsSpildStkDet(d.spild)
+                : (type === 'spild')    ? _dbsSpildDet(d.spild)
+                : _dbsFrostDet(d.frost);
+}
+function _dbsSpildStkDet(s){
+  if (!s || !s.varer || !s.varer.length) return '<span style="color:var(--ash);font-size:12px;">Intet spild denne dag 🎉</span>';
+  const mono = "font-family:'DM Mono',monospace;";
+  const rows = s.varer.map(v => {
+    const bundt = v.solgt_i_bundt > 0 ? ` <span style="color:var(--ash);">(${v.solgt_i_bundt} i bundt/combo)</span>` : '';
+    return _dbsDetLinje(`${v.navn} <span style="color:var(--ash);">· indkøbt ${v.bestilt} / solgt ${v.solgt}</span>${bundt}`, `${v.spild} stk`);
+  }).join('');
+  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Spild i stk — ikke solgt friskt</div>${rows}
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${s.spild_stk} stk</span></div>`;
 }
 function _dbsDetLinje(venstre, hoejre, faded){
   const mono = "font-family:'DM Mono',monospace;";
@@ -5143,7 +5155,7 @@ function _dbsSpildDet(s){
     const est = v.solgt_i_bundt > 0
       ? (harEst = true, ` <span style="font-size:9px;font-weight:700;color:var(--ash);border:1px solid var(--border);border-radius:4px;padding:0 3px;" title="Estimat: en del af salget kom via 3x-valgfri/combo uden varenummer og er fordelt forholdsmæssigt">est.</span>`)
       : '';
-    return _dbsDetLinje(`${v.navn}${est} <span style="color:var(--ash);">· indkøbt ${v.bestilt} / solgt ${v.solgt} → spild ${v.spild} stk × ${v.kostpris} kr</span>${bundt}`, _dbsKr(v.vaerdi));
+    return _dbsDetLinje(`${v.navn}${est} <span style="color:var(--ash);">· ${v.spild} stk × ${v.kostpris} kr</span>${bundt}`, _dbsKr(v.vaerdi));
   }).join('');
   const cTot = (s.combo||[]).reduce((a,c)=>a+(c.antal||0),0);
   const comboNote = cTot > 0
@@ -5247,7 +5259,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${x.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${x.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spildet pr. vare" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.spild_stk?x.spild_stk:'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${x.dato}','spildstk',this)"`:''}>${x.spild_stk?x.spild_stk:'—'}</td>
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td>
       ${(()=>{const ns=(x.vaerdi_spild||0)-(x.frost_salg||0); const re=(x.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';

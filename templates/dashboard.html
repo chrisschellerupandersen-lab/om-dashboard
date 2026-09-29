@@ -5143,7 +5143,7 @@ function _dbsSpildDet(s){
     const est = v.solgt_i_bundt > 0
       ? (harEst = true, ` <span style="font-size:9px;font-weight:700;color:var(--ash);border:1px solid var(--border);border-radius:4px;padding:0 3px;" title="Estimat: en del af salget kom via 3x-valgfri/combo uden varenummer og er fordelt forholdsmæssigt">est.</span>`)
       : '';
-    return _dbsDetLinje(`${v.navn}${est} <span style="color:var(--ash);">· ${v.spild} stk × ${v.kostpris} kr</span>${bundt}`, _dbsKr(v.vaerdi));
+    return _dbsDetLinje(`${v.navn}${est} <span style="color:var(--ash);">· indkøbt ${v.bestilt} / solgt ${v.solgt} → spild ${v.spild} stk × ${v.kostpris} kr</span>${bundt}`, _dbsKr(v.vaerdi));
   }).join('');
   const cTot = (s.combo||[]).reduce((a,c)=>a+(c.antal||0),0);
   const comboNote = cTot > 0
@@ -5222,8 +5222,8 @@ async function loadDbsMaaned(val){
     <th style="text-align:right;" title="Levering pr. drop (fra 1/10: 250 kr, kun lør+søn; før 175 kr fre–søn). I henter selv de øvrige dage. Klik en dag for at rette.">Levering</th>
     <th style="text-align:right;">Resultat</th>
     <th style="text-align:right;" title="Bagværk bestilt (indkøbt) i stk denne dag — Brød/Boller/Wiener, ekskl. kager">Indkøb stk</th>
-    <th style="text-align:right;" title="Bagværk solgt friskt i stk (inkl. combo-forbrug)">Solgt stk</th>
-    <th style="text-align:right;" title="Diff = indkøbt − solgt = spild i stk">Diff stk</th>
+    <th style="text-align:right;" title="Bagværk solgt friskt i stk (inkl. combo-forbrug og 4-pak à 4 stk)">Solgt stk</th>
+    <th style="text-align:right;" title="Spild i stk (pr. vare, netto — det der ikke blev solgt friskt og typisk fryses ned). Kan afvige fra Indkøb − Solgt, fordi nogle varer sælger ud (og 4-pak/combo tæller i Solgt) mens andre har spild.">Spild stk</th>
     <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th>
     <th style="text-align:right;" title="Omsætning ex moms af nedfrosset bagværk solgt igen som frost.">Frost salg</th>
     <th style="text-align:right;" title="Netto spild = værdi spild − frost salg. Det reelle tab efter at noget er reddet via frost.">Netto spild</th>
@@ -5247,7 +5247,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${x.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${x.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;font-weight:600;">${x.spild_stk?x.spild_stk:'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spildet pr. vare" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.spild_stk?x.spild_stk:'—'}</td>
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td>
       ${(()=>{const ns=(x.vaerdi_spild||0)-(x.frost_salg||0); const re=(x.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';

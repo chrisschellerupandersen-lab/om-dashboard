@@ -5221,6 +5221,9 @@ async function loadDbsMaaned(val){
     <th style="text-align:right;">Omk</th>
     <th style="text-align:right;" title="Levering pr. drop (fra 1/10: 250 kr, kun lør+søn; før 175 kr fre–søn). I henter selv de øvrige dage. Klik en dag for at rette.">Levering</th>
     <th style="text-align:right;">Resultat</th>
+    <th style="text-align:right;" title="Bagværk bestilt (indkøbt) i stk denne dag — Brød/Boller/Wiener, ekskl. kager">Indkøb stk</th>
+    <th style="text-align:right;" title="Bagværk solgt friskt i stk (inkl. combo-forbrug)">Solgt stk</th>
+    <th style="text-align:right;" title="Diff = indkøbt − solgt = spild i stk">Diff stk</th>
     <th style="text-align:right;" title="Bagværk der ikke blev solgt friskt × kostpris (ex moms). Fryses typisk ned og sælges som frost. Trækkes ikke fra resultatet.">Værdi spild</th>
     <th style="text-align:right;" title="Omsætning ex moms af nedfrosset bagværk solgt igen som frost.">Frost salg</th>
     <th style="text-align:right;" title="Netto spild = værdi spild − frost salg. Det reelle tab efter at noget er reddet via frost.">Netto spild</th>
@@ -5242,6 +5245,9 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;color:#8a3a3a;">${_dbsKr(x.omk)}</td>
       ${_dbsLevCell(x)}
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
+      <td style="text-align:right;color:var(--ash);">${x.bestilt_stk||'—'}</td>
+      <td style="text-align:right;color:var(--ash);">${x.solgt_stk||'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;font-weight:600;">${x.spild_stk?x.spild_stk:'—'}</td>
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td>
       ${(()=>{const ns=(x.vaerdi_spild||0)-(x.frost_salg||0); const re=(x.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
@@ -5251,7 +5257,7 @@ async function loadDbsMaaned(val){
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];
   if (d.har_forecast && fc.length){
-    html += `<tr><td colspan="13" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
+    html += `<tr><td colspan="16" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
     fc.forEach(x=>{
       const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
       const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -5265,6 +5271,7 @@ async function loadDbsMaaned(val){
         <td style="text-align:right;">${_dbsKr(x.omk)}</td>
         ${_dbsLevCell(x)}
         <td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td>
+        <td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>
         <td style="text-align:right;">—</td><td style="text-align:right;">—</td>
         <td style="text-align:right;">—</td><td style="text-align:right;font-weight:600;color:${rClr};">${_dbsKr(x.resultat)}</td></tr>`;
     });
@@ -5279,6 +5286,9 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${_dbsKr(t.omk)}</td>
       <td style="text-align:right;">${_dbsKr(t.levering)}</td>
       <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td>
+      <td style="text-align:right;color:var(--ash);">${t.bestilt_stk||'—'}</td>
+      <td style="text-align:right;color:var(--ash);">${t.solgt_stk||'—'}</td>
+      <td style="text-align:right;color:#8a6d3a;">${t.spild_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${_dbsKr(t.vaerdi_spild)}</td>
       <td style="text-align:right;color:var(--moss);">${_dbsKr(t.frost_salg)}</td>
       ${(()=>{const ns=(t.vaerdi_spild||0)-(t.frost_salg||0); const re=(t.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
@@ -5295,6 +5305,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;">${_dbsKr(p.omk)}</td>
       <td style="text-align:right;">${_dbsKr(p.levering)}</td>
       <td style="text-align:right;color:${pClr};">${_dbsKr(p.resultat)}</td>
+      <td style="text-align:right;">—</td><td style="text-align:right;">—</td><td style="text-align:right;">—</td>
       <td style="text-align:right;">—</td><td style="text-align:right;">—</td>
       <td style="text-align:right;">—</td><td style="text-align:right;color:${pClr};">${_dbsKr(p.resultat)}</td></tr>`;
   }

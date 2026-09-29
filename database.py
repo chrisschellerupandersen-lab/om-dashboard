@@ -1997,7 +1997,8 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     d = _d.fromisoformat(dato)
     iso_y, iso_w, _ = d.isocalendar()
     col = DAGCOL[d.weekday()]
-    _tom = {"total": 0.0, "kategorier": {k: 0.0 for k in KAT}}
+    _tom = {"total": 0.0, "kategorier": {k: 0.0 for k in KAT},
+            "bestilt_stk": 0, "solgt_stk": 0, "spild_stk": 0}
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         best = conn.execute(
@@ -2052,8 +2053,10 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         a["bestilt"] += int(b["ant"] or 0)
         a["pris"] = max(a["pris"], float(b["pris_ex_moms"] or 0))
         a["navne"].append(navn)
+    solgt_fam_total = 0
     for fam, a in fam_agg.items():
         solgt_f = sum(solgt_pr_sku.get(s, 0) for s in fam_skus.get(fam, []))
+        solgt_fam_total += solgt_f
         spild_f = max(0, a["bestilt"] - solgt_f)
         if spild_f > 0:
             label = _SPILD_FAMILIE_LABEL.get(fam) or a["navne"][0]
@@ -2080,6 +2083,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     # spild, største-rest-metoden) → netto spild pr. vare til den RIGTIGE kostpris.
     kat_kr = {k: 0.0 for k in KAT}
     varer_det = []
+    spild_stk_total = 0
     for k in KAT:
         prods = kat_prod[k]
         gross = sum(p["stk"] for p in prods)
@@ -2095,6 +2099,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
             net = p["stk"] - alloc[i]
             val = net * p["pris"]
             kat_kr[k] += val
+            spild_stk_total += net
             if detaljer and net > 0:
                 varer_det.append({"navn": p["navn"], "kategori": k, "bestilt": p["bestilt"],
                                   "solgt": p["solgt"], "spild": net, "solgt_i_bundt": alloc[i],
@@ -2103,8 +2108,12 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     if detaljer:
         varer_det.sort(key=lambda v: -v["vaerdi"])
         combo_det = [ln for k in KAT for ln in ex_lines[k]]
+        bestilt_stk = sum(a["bestilt"] for a in fam_agg.values())     # indkøbt/bestilt (KAT)
+        solgt_stk   = solgt_fam_total + sum(ex.values())              # solgt friskt (SKU + combo)
         return {"total": total, "kategorier": {k: round(v, 2) for k, v in kat_kr.items()},
-                "varer": varer_det, "combo": combo_det}
+                "varer": varer_det, "combo": combo_det,
+                "bestilt_stk": int(bestilt_stk), "solgt_stk": int(solgt_stk),
+                "spild_stk": int(spild_stk_total)}
     return total
 
 
@@ -10872,7 +10881,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
 
     dage = []
     tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0,
-           "resultat": 0.0, "vaerdi_spild": 0.0, "frost_salg": 0.0}
+           "resultat": 0.0, "vaerdi_spild": 0.0, "frost_salg": 0.0,
+           "bestilt_stk": 0, "solgt_stk": 0, "spild_stk": 0}
     spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
     d = foerste
     while d <= sidste:
@@ -10908,6 +10918,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "levering": round(levering),
             "resultat": round(res),
             "vaerdi_spild": round(vspild),
+            "bestilt_stk": int(vspild_d.get("bestilt_stk", 0)),
+            "solgt_stk":   int(vspild_d.get("solgt_stk", 0)),
+            "spild_stk":   int(vspild_d.get("spild_stk", 0)),
             "frost_salg": round(frost_per.get(iso, 0.0)),
             "fuld_bemanding": fuld,
             "bemanding": bem,          # None / 'fuld' / 'weekend'
@@ -10918,6 +10931,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         tot["loen"] += loen; tot["omk"] += omk; tot["levering"] += levering; tot["resultat"] += res
         tot["vaerdi_spild"] += vspild
         tot["frost_salg"] += frost_per.get(iso, 0.0)
+        tot["bestilt_stk"] += int(vspild_d.get("bestilt_stk", 0))
+        tot["solgt_stk"]   += int(vspild_d.get("solgt_stk", 0))
+        tot["spild_stk"]   += int(vspild_d.get("spild_stk", 0))
         d += _td(days=1)
 
     total = {
@@ -10929,6 +10945,9 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "resultat": round(tot["resultat"]),
         "vaerdi_spild": round(tot["vaerdi_spild"]),
         "frost_salg": round(tot["frost_salg"]),
+        "bestilt_stk": int(tot["bestilt_stk"]),
+        "solgt_stk":   int(tot["solgt_stk"]),
+        "spild_stk":   int(tot["spild_stk"]),
         "dg_pct":   round(tot["db_kr"] / tot["oms_ex"] * 100, 1) if tot["oms_ex"] > 0 else 0.0,
         "antal_dage": len(dage),
     }

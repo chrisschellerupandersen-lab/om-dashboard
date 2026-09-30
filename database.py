@@ -3463,17 +3463,17 @@ def hent_bageri_uge_sammenlign(uge: int, aar: int) -> Dict:
     KATO = ['Brød', 'Boller', 'Wiener', 'Kage', 'Andet']
 
     def _uge_ordre(u: int, a: int):
-        """{navn_lower: {'navn','dage':[7]}} fra indlæst ordre — None hvis ingen."""
+        """{navn_lower: {'navn','dage':[7]}} fra den placerede ugebestilling
+        (samme kilde som 'bestilt vs. solgt') — None hvis ugen ikke er indlæst."""
         with _conn() as conn:
             conn.row_factory = sqlite3.Row
             rows = conn.execute("""
-                SELECT l.varenavn AS navn,
-                       COALESCE(l.man,0) man, COALESCE(l.tir,0) tir, COALESCE(l.ons,0) ons,
-                       COALESCE(l.tor,0) tor, COALESCE(l.fre,0) fre, COALESCE(l.loe,0) loe,
-                       COALESCE(l.son,0) son
-                FROM bageri_faktura_linjer l
-                JOIN bageri_fakturaer f ON l.fakturanr = f.fakturanr
-                WHERE f.uge = ? AND f.aar = ?
+                SELECT varenavn AS navn,
+                       COALESCE(man,0) man, COALESCE(tir,0) tir, COALESCE(ons,0) ons,
+                       COALESCE(tor,0) tor, COALESCE(fre,0) fre, COALESCE(loe,0) loe,
+                       COALESCE(son,0) son
+                FROM ugebestillinger
+                WHERE uge = ? AND aar = ?
             """, (int(u), int(a))).fetchall()
         if not rows:
             return None

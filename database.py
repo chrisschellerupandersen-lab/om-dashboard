@@ -3453,6 +3453,118 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
     }
 
 
+def hent_bageri_uge_sammenlign(uge: int, aar: int) -> Dict:
+    """To ugers bestillinger side-om-side, pr. produkt pr. dag, grupperet som
+    bestillingssiden (Brød/Boller/Wiener/Kage). Kilde pr. uge: den faktisk
+    indlæste ordre (bageri_faktura_linjer) hvis den findes — ellers anbefalingen."""
+    from datetime import date as _date, timedelta as _td
+    DAGE = ['man', 'tir', 'ons', 'tor', 'fre', 'loe', 'son']
+    DAGE_NAVNE = ['Man', 'Tir', 'Ons', 'Tor', 'Fre', 'Lør', 'Søn']
+    KATO = ['Brød', 'Boller', 'Wiener', 'Kage', 'Andet']
+
+    def _uge_ordre(u: int, a: int):
+        """{navn_lower: {'navn','dage':[7]}} fra indlæst ordre — None hvis ingen."""
+        with _conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("""
+                SELECT l.varenavn AS navn,
+                       COALESCE(l.man,0) man, COALESCE(l.tir,0) tir, COALESCE(l.ons,0) ons,
+                       COALESCE(l.tor,0) tor, COALESCE(l.fre,0) fre, COALESCE(l.loe,0) loe,
+                       COALESCE(l.son,0) son
+                FROM bageri_faktura_linjer l
+                JOIN bageri_fakturaer f ON l.fakturanr = f.fakturanr
+                WHERE f.uge = ? AND f.aar = ?
+            """, (int(u), int(a))).fetchall()
+        if not rows:
+            return None
+        out: Dict = {}
+        for r in rows:
+            key = (r["navn"] or "").strip().lower()
+            if not key:
+                continue
+            e = out.setdefault(key, {"navn": r["navn"], "dage": [0] * 7})
+            for i, dg in enumerate(DAGE):
+                e["dage"][i] += int(r[dg] or 0)
+        return out
+
+    def _uge_anbefaling(u: int, a: int):
+        try:
+            rec = hent_bestillings_uge_organic(int(u), int(a))
+        except Exception:
+            return {}
+        out: Dict = {}
+        for p in rec.get("produkter", []):
+            navn = p.get("varenavn")
+            anb = p.get("anbefalet", {}) or {}
+            out[(navn or "").strip().lower()] = {
+                "navn": navn,
+                "dage": [int(round(anb.get(dg, 0) or 0)) for dg in DAGE],
+            }
+        return out
+
+    def _uge_data(u: int, a: int):
+        o = _uge_ordre(u, a)
+        if o is not None:
+            return o, "ordre"
+        return _uge_anbefaling(u, a), "anbefaling"
+
+    # Forrige ISO-uge
+    p_mon = _date.fromisocalendar(int(aar), int(uge), 1) - _td(days=7)
+    p_aar, p_uge, _ = p_mon.isocalendar()
+
+    denne, denne_kilde = _uge_data(uge, aar)
+    forrige, forrige_kilde = _uge_data(p_uge, p_aar)
+
+    # Union af varenavne, bevar en pæn visnings-stavning
+    navne: Dict[str, str] = {}
+    for src in (forrige, denne):
+        for k, v in src.items():
+            navne.setdefault(k, v["navn"])
+
+    grupper_map: Dict[str, list] = {k: [] for k in KATO}
+    for key, visnavn in navne.items():
+        kat = _bakery_kat(visnavn) or "Andet"
+        if kat not in grupper_map:
+            kat = "Andet"
+        f_dage = forrige.get(key, {}).get("dage", [0] * 7)
+        d_dage = denne.get(key, {}).get("dage", [0] * 7)
+        f_tot, d_tot = sum(f_dage), sum(d_dage)
+        if f_tot == 0 and d_tot == 0:
+            continue
+        grupper_map[kat].append({
+            "varenavn": visnavn,
+            "forrige": f_dage,
+            "denne": d_dage,
+            "f_tot": f_tot,
+            "d_tot": d_tot,
+            "diff": d_tot - f_tot,
+        })
+
+    grupper = []
+    tot_f = tot_d = 0
+    for kat in KATO:
+        prods = grupper_map[kat]
+        if not prods:
+            continue
+        prods.sort(key=lambda p: p["d_tot"] or p["f_tot"], reverse=True)
+        gf = sum(p["f_tot"] for p in prods)
+        gd = sum(p["d_tot"] for p in prods)
+        tot_f += gf
+        tot_d += gd
+        grupper.append({
+            "kategori": kat, "produkter": prods,
+            "f_tot": gf, "d_tot": gd, "diff": gd - gf,
+        })
+
+    return {
+        "dage_navne": DAGE_NAVNE,
+        "denne":   {"uge": int(uge),   "aar": int(aar),   "kilde": denne_kilde},
+        "forrige": {"uge": int(p_uge), "aar": int(p_aar), "kilde": forrige_kilde},
+        "grupper": grupper,
+        "tot": {"forrige": tot_f, "denne": tot_d, "diff": tot_d - tot_f},
+    }
+
+
 def resync_organic_faktura_regnskab() -> Dict:
     """Ensret bager_regnskab.faktura med bageri_fakturaer (den korrekte leverings-uge).
     Retter Organic-æra-rækker der blev lagt en uge for højt (fakturadatoens ISO-uge i

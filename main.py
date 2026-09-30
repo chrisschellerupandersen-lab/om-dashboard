@@ -1002,6 +1002,17 @@ async def api_bagvaerk_dag(request: Request, uge: int, aar: Optional[int] = None
     return database.hent_bagvaerk_dag_sammenligning(uge, aar)
 
 
+@app.get("/api/bageri/uge-sammenlign")
+async def api_bageri_uge_sammenlign(request: Request, uge: int, aar: Optional[int] = None,
+                                    secret: Optional[str] = None):
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    if aar is None:
+        from datetime import date
+        aar = date.today().year
+    return database.hent_bageri_uge_sammenlign(uge, aar)
+
+
 @app.get("/api/bager/svind")
 async def api_bager_svind(request: Request, aar: Optional[int] = None, secret: Optional[str] = None):
     if request.query_params.get("secret") != WEBHOOK_SECRET:

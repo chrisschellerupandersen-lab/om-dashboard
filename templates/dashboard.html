@@ -1855,6 +1855,18 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div id="bu-wrap"><div class="empty" style="padding:40px;">Indlæser…</div></div>
       </div>
 
+      <!-- UGE VS. UGE: BESTILLING SIDE-OM-SIDE -->
+      <div class="panel" id="p-ugesammenlign">
+        <div class="page-hdr" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+          <div>
+            <h2>Uge vs. uge — bestilling</h2>
+            <p>Sidste uges bestilling og den valgte uge side om side, pr. produkt pr. dag. Grupperet som bestillingen. Er en uge ikke indlæst endnu, vises anbefalingen i stedet.</p>
+          </div>
+          <select id="us-uge" onchange="loadUgeSammenlign(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;"></select>
+        </div>
+        <div id="us-wrap"><div class="empty" style="padding:40px;">Indlæser…</div></div>
+      </div>
+
       <!-- ÅRSPLAN -->
       <div class="panel" id="p-aar">
         <div class="page-hdr">
@@ -5737,6 +5749,7 @@ const NAV_DEFAULT = [
   {id:'fakturasalg', label:'Fakturasalg (B2B)',     group:'Salg & økonomi',      hidden:false},
   {id:'bageri',      label:'Bageri (Organic)',      group:'Bageri & indkøb',     hidden:false},
   {id:'bageriuge',   label:'Uge: bestilt vs. solgt',group:'Bageri & indkøb',     hidden:false},
+  {id:'ugesammenlign',label:'Uge vs. uge (bestilling)',group:'Bageri & indkøb',  hidden:false},
   {id:'priser',      label:'Priser & avance',       group:'Bageri & indkøb',     hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'prisaendring',label:'Prisændringer',         group:'Bageri & indkøb',     hidden:false},
@@ -8282,6 +8295,108 @@ function renderBageriUge(d){
       </tr></tfoot>
     </table></div>
     <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Solgt = friskt salg (kaffe-comboer tæller med). Frost/"fra i går" indgår ikke. Afvig = solgt − bestilt (minus = rest der fryses ned).</p>`;
+}
+
+// ── UGE VS. UGE: bestilling side om side ───────────────────────────────────
+let _usSel = null, _usBuilt = false;
+function _isoWeekNow(){
+  const d = new Date(); d.setHours(0,0,0,0);
+  const th = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  th.setUTCDate(th.getUTCDate() + 3 - ((th.getUTCDay()+6)%7));   // torsdag i ugen
+  const jan1 = new Date(Date.UTC(th.getUTCFullYear(),0,1));
+  const wk = Math.ceil((((th - jan1)/86400000)+1)/7);
+  return {aar: th.getUTCFullYear(), uge: wk};
+}
+async function loadUgeSammenlign(val){
+  const now = _isoWeekNow();
+  if (!_usBuilt){
+    // default = næste uge (den vi er ved at bestille til)
+    const nm = _isoMonday(now.aar, now.uge); nm.setUTCDate(nm.getUTCDate()+7);
+    const nxt = {aar:nm.getUTCFullYear(), uge:(()=>{const t=new Date(nm);t.setUTCDate(t.getUTCDate()+3-((t.getUTCDay()+6)%7));const j=new Date(Date.UTC(t.getUTCFullYear(),0,1));return Math.ceil((((t-j)/86400000)+1)/7);})()};
+    _usSel = nxt;
+    // liste: 2 uger frem → 12 uger tilbage
+    const opts = [];
+    let cur = _isoMonday(now.aar, now.uge); cur.setUTCDate(cur.getUTCDate()+14);
+    for (let i=0;i<16;i++){
+      const t=new Date(cur); t.setUTCDate(t.getUTCDate()+3-((t.getUTCDay()+6)%7));
+      const j=new Date(Date.UTC(t.getUTCFullYear(),0,1));
+      const w=Math.ceil((((t-j)/86400000)+1)/7);
+      opts.push({aar:t.getUTCFullYear(), uge:w});
+      cur.setUTCDate(cur.getUTCDate()-7);
+    }
+    const sel = document.getElementById('us-uge');
+    if (sel) sel.innerHTML = opts.map(x=>{
+      const on = x.aar===_usSel.aar && x.uge===_usSel.uge;
+      const kommende = _isoMonday(x.aar,x.uge) > _isoMonday(now.aar,now.uge);
+      return `<option value="${x.aar}-${x.uge}"${on?' selected':''}>Uge ${x.uge} · ${x.aar}${kommende?' (kommende)':''}</option>`;
+    }).join('');
+    _usBuilt = true;
+  }
+  if (val){ const [a,u]=val.split('-').map(Number); _usSel={aar:a,uge:u}; }
+  document.getElementById('us-wrap').innerHTML='<div class="empty" style="padding:24px;">Indlæser…</div>';
+  const d = await api(`/api/bageri/uge-sammenlign?uge=${_usSel.uge}&aar=${_usSel.aar}`);
+  renderUgeSammenlign(d);
+}
+function renderUgeSammenlign(d){
+  const wrap = document.getElementById('us-wrap');
+  if (!d || !d.grupper || !d.grupper.length){ wrap.innerHTML='<div class="empty" style="padding:40px;">Ingen data for ugerne</div>'; return; }
+  const mono = "font-family:'DM Mono',monospace;";
+  const dg = d.dage_navne;
+  const kildeTxt = k => k==='ordre' ? 'indlæst ordre' : 'anbefaling';
+  const badge = (u,kilde,farve)=>`<span style="${mono}font-size:11px;padding:2px 8px;border-radius:10px;background:${farve};color:#fff;">Uge ${u.uge}: ${kildeTxt(kilde)}</span>`;
+
+  // celle: denne stor, forrige lille + Δ-farve (mere bestilt = rød, mindre = grøn)
+  const cel = (f,dd)=>{
+    const diff = dd - f;
+    const c = diff>0 ? '#b3541e' : (diff<0 ? 'var(--moss)' : 'var(--ash)');
+    const fx = f? `<span style="font-size:10px;color:var(--ash);">${f}</span>` : `<span style="font-size:10px;color:var(--ash);opacity:.4;">–</span>`;
+    return `<td class="num" style="padding:4px 6px;line-height:1.25;">
+      <div style="${mono}font-weight:600;color:${diff!==0?c:'var(--charcoal)'};">${dd||'–'}</div>${fx}</td>`;
+  };
+  const totCel = (f,dd,big)=>{
+    const diff=dd-f; const c=diff>0?'#b3541e':(diff<0?'var(--moss)':'var(--ash)');
+    const w=big?'700':'600';
+    return `<td class="num" style="padding:4px 8px;line-height:1.2;">
+      <div style="${mono}font-weight:${w};">${dd} <span style="font-size:10px;color:var(--ash);font-weight:400;">(${f})</span></div>
+      <div style="${mono}font-size:10px;color:${c};">${diff>0?'+':''}${diff}</div></td>`;
+  };
+
+  let body='';
+  d.grupper.forEach(g=>{
+    body += `<tr style="background:rgba(30,58,30,.05);font-weight:700;">
+      <td style="padding:7px 8px;">${g.kategori}</td>
+      ${dg.map(()=>'<td></td>').join('')}
+      ${totCel(g.f_tot,g.d_tot,true)}</tr>`;
+    g.produkter.forEach(p=>{
+      body += `<tr style="border-top:1px solid rgba(30,58,30,.06);">
+        <td style="padding:5px 8px;">${p.varenavn}</td>
+        ${p.forrige.map((f,i)=>cel(f, p.denne[i])).join('')}
+        ${totCel(p.f_tot,p.d_tot)}</tr>`;
+    });
+  });
+
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+      ${badge(d.denne, d.denne.kilde, 'var(--forest)')}
+      <span style="color:var(--ash);">vs.</span>
+      ${badge(d.forrige, d.forrige.kilde, 'var(--ash)')}
+      <span style="${mono}font-size:11px;color:var(--ash);margin-left:auto;">Stort tal = valgt uge · lille tal = forrige uge · farve = ændring (<span style="color:#b3541e;">+mere</span> / <span style="color:var(--moss);">−mindre</span>)</span>
+    </div>
+    <div style="overflow-x:auto;">
+    <table class="aar2-tbl" style="width:100%;min-width:640px;border-collapse:collapse;">
+      <thead><tr style="text-align:left;">
+        <th style="padding:6px 8px;">Vare</th>
+        ${dg.map(n=>`<th class="num" style="padding:6px 6px;">${n}</th>`).join('')}
+        <th class="num" style="padding:6px 8px;">Uge (Δ)</th>
+      </tr></thead>
+      <tbody>${body}</tbody>
+      <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
+        <td style="padding:8px;">I alt</td>
+        ${dg.map(()=>'<td></td>').join('')}
+        ${totCel(d.tot.forrige, d.tot.denne, true)}
+      </tr></tfoot>
+    </table></div>
+    <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Er en uge ikke indlæst som ordre endnu, bruges bestillingsanbefalingen for den uge (se badge). Grupperet som bestillingen: Brød · Boller · Wiener · Kage.</p>`;
 }
 
 async function fakGodkend(nr, afvig){
@@ -13353,6 +13468,7 @@ window.showPanel = function(id, el) {
   if (id === 'spild')        loadSpild();
   if (id === 'fakturaafstemning') loadFakturaAfstemning();
   if (id === 'bageriuge')    loadBageriUge();
+  if (id === 'ugesammenlign') loadUgeSammenlign();
   if (id === 'returtgtg')    loadReturTgtg();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();

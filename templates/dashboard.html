@@ -8345,58 +8345,71 @@ function renderUgeSammenlign(d){
   const kildeTxt = k => k==='ordre' ? 'indlæst ordre' : 'anbefaling';
   const badge = (u,kilde,farve)=>`<span style="${mono}font-size:11px;padding:2px 8px;border-radius:10px;background:${farve};color:#fff;">Uge ${u.uge}: ${kildeTxt(kilde)}</span>`;
 
-  // celle: denne stor, forrige lille + Δ-farve (mere bestilt = rød, mindre = grøn)
-  const cel = (f,dd)=>{
-    const diff = dd - f;
-    const c = diff>0 ? '#b3541e' : (diff<0 ? 'var(--moss)' : 'var(--ash)');
-    const fx = f? `<span style="font-size:10px;color:var(--ash);">${f}</span>` : `<span style="font-size:10px;color:var(--ash);opacity:.4;">–</span>`;
-    return `<td class="num" style="padding:4px 6px;line-height:1.25;">
-      <div style="${mono}font-weight:600;color:${diff!==0?c:'var(--charcoal)'};">${dd||'–'}</div>${fx}</td>`;
+  // 2 kolonner pr. dag: forrige (F) og denne (D). D farves ift. F.
+  const fCel = (f)=>`<td class="num" style="padding:4px 5px;${mono}color:var(--ash);border-left:1px solid rgba(30,58,30,.06);">${f||'–'}</td>`;
+  const dCel = (f,dd)=>{
+    const diff=dd-f; const c=diff>0?'#b3541e':(diff<0?'var(--moss)':'var(--charcoal)');
+    return `<td class="num" style="padding:4px 5px;${mono}font-weight:600;color:${c};">${dd||'–'}</td>`;
   };
-  const totCel = (f,dd,big)=>{
+  const diffCel = (f,dd,big)=>{
     const diff=dd-f; const c=diff>0?'#b3541e':(diff<0?'var(--moss)':'var(--ash)');
-    const w=big?'700':'600';
-    return `<td class="num" style="padding:4px 8px;line-height:1.2;">
-      <div style="${mono}font-weight:${w};">${dd} <span style="font-size:10px;color:var(--ash);font-weight:400;">(${f})</span></div>
-      <div style="${mono}font-size:10px;color:${c};">${diff>0?'+':''}${diff}</div></td>`;
+    return `<td class="num" style="padding:4px 8px;${mono}font-weight:${big?'700':'600'};color:${c};border-left:2px solid var(--border);">${diff>0?'+':''}${diff}</td>`;
   };
+  const emptyDays = dg.map(()=>'<td style="border-left:1px solid rgba(30,58,30,.06);"></td><td></td>').join('');
 
   let body='';
   d.grupper.forEach(g=>{
-    body += `<tr style="background:rgba(30,58,30,.05);font-weight:700;">
+    body += `<tr style="background:rgba(30,58,30,.06);font-weight:700;">
       <td style="padding:7px 8px;">${g.kategori}</td>
-      ${dg.map(()=>'<td></td>').join('')}
-      ${totCel(g.f_tot,g.d_tot,true)}</tr>`;
+      ${emptyDays}
+      <td class="num" style="padding:7px 6px;${mono}border-left:1px solid rgba(30,58,30,.12);">${g.f_tot}</td>
+      <td class="num" style="padding:7px 6px;${mono}">${g.d_tot}</td>
+      ${diffCel(g.f_tot,g.d_tot,true)}</tr>`;
     g.produkter.forEach(p=>{
-      body += `<tr style="border-top:1px solid rgba(30,58,30,.06);">
-        <td style="padding:5px 8px;">${p.varenavn}</td>
-        ${p.forrige.map((f,i)=>cel(f, p.denne[i])).join('')}
-        ${totCel(p.f_tot,p.d_tot)}</tr>`;
+      body += `<tr style="border-top:1px solid rgba(30,58,30,.05);">
+        <td style="padding:5px 8px;white-space:nowrap;">${p.varenavn}</td>
+        ${p.forrige.map((f,i)=>fCel(f)+dCel(f,p.denne[i])).join('')}
+        <td class="num" style="padding:5px 6px;${mono}color:var(--ash);border-left:1px solid rgba(30,58,30,.12);">${p.f_tot}</td>
+        <td class="num" style="padding:5px 6px;${mono}font-weight:600;">${p.d_tot}</td>
+        ${diffCel(p.f_tot,p.d_tot)}</tr>`;
     });
   });
 
+  const dayHdr = dg.map(n=>`<th class="num" colspan="2" style="padding:5px 6px;border-left:1px solid rgba(30,58,30,.12);">${n}</th>`).join('');
+  const subHdr = dg.map(()=>`<th class="num" style="padding:2px 5px;font-weight:400;font-size:10px;color:var(--ash);border-left:1px solid rgba(30,58,30,.06);">F</th><th class="num" style="padding:2px 5px;font-weight:400;font-size:10px;color:var(--ash);">D</th>`).join('');
+
   wrap.innerHTML = `
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
-      ${badge(d.denne, d.denne.kilde, 'var(--forest)')}
-      <span style="color:var(--ash);">vs.</span>
       ${badge(d.forrige, d.forrige.kilde, 'var(--ash)')}
-      <span style="${mono}font-size:11px;color:var(--ash);margin-left:auto;">Stort tal = valgt uge · lille tal = forrige uge · farve = ændring (<span style="color:#b3541e;">+mere</span> / <span style="color:var(--moss);">−mindre</span>)</span>
+      <span style="color:var(--ash);">→</span>
+      ${badge(d.denne, d.denne.kilde, 'var(--forest)')}
+      <span style="${mono}font-size:11px;color:var(--ash);margin-left:auto;">F = forrige uge · D = denne uge · Δ = forskel (<span style="color:#b3541e;">+mere</span> / <span style="color:var(--moss);">−mindre</span>)</span>
     </div>
     <div style="overflow-x:auto;">
-    <table class="aar2-tbl" style="width:100%;min-width:640px;border-collapse:collapse;">
-      <thead><tr style="text-align:left;">
-        <th style="padding:6px 8px;">Vare</th>
-        ${dg.map(n=>`<th class="num" style="padding:6px 6px;">${n}</th>`).join('')}
-        <th class="num" style="padding:6px 8px;">Uge (Δ)</th>
-      </tr></thead>
+    <table class="aar2-tbl" style="width:100%;min-width:900px;border-collapse:collapse;text-align:right;">
+      <thead>
+      <tr>
+        <th rowspan="2" style="padding:6px 8px;text-align:left;vertical-align:bottom;">Vare</th>
+        ${dayHdr}
+        <th colspan="3" style="padding:5px 6px;border-left:2px solid var(--border);">Uge</th>
+      </tr>
+      <tr>
+        ${subHdr}
+        <th class="num" style="padding:2px 6px;font-weight:400;font-size:10px;color:var(--ash);border-left:2px solid var(--border);">F</th>
+        <th class="num" style="padding:2px 6px;font-weight:400;font-size:10px;color:var(--ash);">D</th>
+        <th class="num" style="padding:2px 8px;font-weight:400;font-size:10px;color:var(--ash);">Δ</th>
+      </tr>
+      </thead>
       <tbody>${body}</tbody>
       <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
-        <td style="padding:8px;">I alt</td>
-        ${dg.map(()=>'<td></td>').join('')}
-        ${totCel(d.tot.forrige, d.tot.denne, true)}
+        <td style="padding:8px;text-align:left;">I alt</td>
+        ${emptyDays}
+        <td class="num" style="padding:8px 6px;${mono}border-left:1px solid rgba(30,58,30,.12);">${d.tot.forrige}</td>
+        <td class="num" style="padding:8px 6px;${mono}">${d.tot.denne}</td>
+        ${diffCel(d.tot.forrige, d.tot.denne, true)}
       </tr></tfoot>
     </table></div>
-    <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Er en uge ikke indlæst som ordre endnu, bruges bestillingsanbefalingen for den uge (se badge). Grupperet som bestillingen: Brød · Boller · Wiener · Kage.</p>`;
+    <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Hver dag har to kolonner: <b>F</b> = forrige uge, <b>D</b> = denne uge. Yderst til højre uge-total (F/D) og forskel (Δ). Er en uge ikke indlæst som ordre, bruges anbefalingen (se badge). Grupperet som bestillingen: Brød · Boller · Wiener · Kage.</p>`;
 }
 
 async function fakGodkend(nr, afvig){

@@ -3198,6 +3198,48 @@ async def bageri_ordre_mail(request: Request):
                       for l in r["linjer"]]}
 
 
+@app.post("/api/bageri/ordre-gem")
+async def bageri_ordre_gem(request: Request):
+    """Gemmer en manuelt parset uge-bestilling (fx website-kurv, som ikke er
+    Shopify-mailformatet portal-parseren læser) direkte i ugebestillinger.
+    Body (JSON): {secret, uge, aar, linjer:[{varenavn, man..son, pris_ex_moms?,
+    varenummer?, sektion?}], dry_run?}."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    uge, aar = body.get("uge"), body.get("aar")
+    linjer = body.get("linjer") or []
+    if not uge or not aar:
+        raise HTTPException(status_code=400, detail="Mangler uge eller aar")
+    if not linjer:
+        raise HTTPException(status_code=422, detail="Ingen bestillingslinjer")
+    DAGE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    norm = []
+    for l in linjer:
+        navn = (l.get("varenavn") or "").strip()
+        if not navn:
+            continue
+        dage = {d: int(l.get(d, 0) or 0) for d in DAGE}
+        tot = sum(dage.values())
+        pris = float(l.get("pris_ex_moms", 0) or 0)
+        norm.append({"varenavn": navn, "varenummer": l.get("varenummer", ""),
+                     "pris_ex_moms": pris, **dage, "total_antal": tot,
+                     "total_pris": round(tot * pris, 2),
+                     "sektion": int(l.get("sektion", 1) or 1)})
+    total_stk = sum(l["total_antal"] for l in norm)
+    if body.get("dry_run"):
+        return {"ok": True, "gemt": False, "uge": int(uge), "aar": int(aar),
+                "antal_varer": len(norm), "total_stk": total_stk,
+                "varer": [{"varenavn": l["varenavn"], "total_antal": l["total_antal"]} for l in norm]}
+    antal = database.gem_ugebestilling(int(uge), int(aar), norm)
+    return {"ok": True, "gemt": True, "uge": int(uge), "aar": int(aar),
+            "linjer": antal, "total_stk": total_stk}
+
+
 @app.post("/api/bageri/faktura-mail")
 async def bageri_faktura_mail(request: Request):
     """Modtager en Organic Bakery-faktura (e-conomic PDF) fra Gmail-scriptet,

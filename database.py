@@ -1881,7 +1881,7 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
     navn→SKU + bundle-opgang; kaffe-combos/frost indgår ikke (kun friske SKU'er)."""
     from datetime import date as _d
     DAGCOL = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
-    KAT_ORDEN = ["Brød", "Boller", "Wiener", "Kage"]
+    KAT_ORDEN = ["Brød", "Focaccia", "Boller", "Wiener", "Kage"]
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         if not dato:
@@ -1943,6 +1943,8 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
     for b in best:
         navn = (b["varenavn"] or "")
         kat = _organic_kat(navn) or _bakery_kat(navn)
+        if "focaccia" in navn.lower():          # Focaccia = egen gruppe (tæller ikke i Brød)
+            kat = "Focaccia"
         if kat not in agg:
             continue
         bestilt_p = int(b["ant"] or 0)

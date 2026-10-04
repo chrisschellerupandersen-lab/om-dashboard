@@ -7318,6 +7318,10 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
   if (kpi && kpi.dag) {
     const dag     = kpi.dag;
     const prevDag = kpi.prev_dag || {};
+    // Omsætning ekskl. B2B (fakturasalg, inkl. moms) → stemmer til Shopbox, som top-tile'en
+    const _exB2B = r => (r && r.omsaetning!=null) ? (r.omsaetning - (r.ekstra_faktura||0)*1.25) : null;
+    const dagOms  = _exB2B(dag);
+    const prevDagOms = _exB2B(prevDag);
 
     // Sæt dato i header
     const dagDato = dag.dato || kpi.dag_dato;
@@ -7336,14 +7340,14 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
         DAGE[d.getUTCDay()] + ' ' + d.getUTCDate() + '. ' + MND[d.getUTCMonth()] + klTxt;
     }
 
-    // Omsætning
-    document.getElementById('dag-omsat').textContent = dag.omsaetning != null ? kr(dag.omsaetning) : '—';
+    // Omsætning (ekskl. B2B — stemmer til Shopbox)
+    document.getElementById('dag-omsat').textContent = dagOms != null ? kr(dagOms) : '—';
     const momsEl = document.getElementById('dag-omsat-moms');
-    if (momsEl) momsEl.textContent = MOMS_EX ? 'ekskl. moms' : 'inkl. moms';
-    if (prevDag.omsaetning > 0) {
-      const pct = ((dag.omsaetning / prevDag.omsaetning) - 1) * 100;
+    if (momsEl) momsEl.textContent = (MOMS_EX ? 'ekskl. moms' : 'inkl. moms') + ' · ekskl. B2B';
+    if (prevDagOms > 0) {
+      const pct = ((dagOms / prevDagOms) - 1) * 100;
       document.getElementById('dag-omsat-ref').textContent =
-        'forrige uge: ' + Math.round(prevDag.omsaetning).toLocaleString('da-DK') + ' kr · ' +
+        'forrige uge: ' + Math.round(prevDagOms).toLocaleString('da-DK') + ' kr · ' +
         (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
     }
 
@@ -7370,10 +7374,10 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       maalEl.style.color = dag.db_pct >= 35 ? 'var(--moss)' : dag.db_pct >= 28 ? 'var(--gold)' : 'var(--danger)';
     }
 
-    // vs. forrige uge
-    const prevDagOmsat = prevDag.omsaetning;
-    if (prevDagOmsat > 0 && dag.omsaetning) {
-      const pct = ((dag.omsaetning / prevDagOmsat) - 1) * 100;
+    // vs. forrige uge (ekskl. B2B)
+    const prevDagOmsat = prevDagOms;
+    if (prevDagOmsat > 0 && dagOms) {
+      const pct = ((dagOms / prevDagOmsat) - 1) * 100;
       const el  = document.getElementById('dag-vs-snit');
       el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
       el.className = 'dag-ring-val ' + (pct >= 0 ? 'up' : 'dn');
@@ -7385,8 +7389,8 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       // Fast 75% + grøn/rød farve
       setRing('ring-dag-vssnit', 75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
       setRing('ring-dag-omsat',  75, pct >= 0 ? 'var(--moss)' : 'var(--danger)');
-    } else if (dag.omsaetning > 0 && kpi.snit_dag) {
-      const pct = ((dag.omsaetning / kpi.snit_dag) - 1) * 100;
+    } else if (dagOms > 0 && kpi.snit_dag) {
+      const pct = ((dagOms / kpi.snit_dag) - 1) * 100;
       const el  = document.getElementById('dag-vs-snit');
       el.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
       el.className = 'dag-ring-val ' + (pct >= 0 ? 'up' : 'dn');

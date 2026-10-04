@@ -5447,10 +5447,17 @@ function dbsRenderChart(rows){
   const r = rows.slice().reverse();  // ældst → nyest
   const lab = r.map(x => _dbsMode==='dage' ? fmtDato(x.periode) : x.label.replace('Uge ','U'));
   const dbClr = r.map(x => x.dg_pct>=35?'rgba(45,90,45,.75)':x.dg_pct>=25?'rgba(200,168,75,.8)':'rgba(192,57,43,.7)');
-  mk('c-dbs','bar', lab, [
-    { label:'DB kr', data:r.map(x=>x.db_kr), backgroundColor:dbClr, borderRadius:3, yAxisID:'y', order:2 },
+  const ds = [
+    { label:'DB kr', data:r.map(x=>x.db_kr), backgroundColor:dbClr, borderRadius:3, yAxisID:'y', order:3 },
     { label:'DG %', data:r.map(x=>x.dg_pct), type:'line', borderColor:'rgba(139,69,19,.9)', backgroundColor:'transparent', borderWidth:2, pointRadius:2, tension:.25, yAxisID:'y1', order:1 }
-  ], {
+  ];
+  // Resultat efter spild = linje på kr-aksen (kun uge-visning hvor det beregnes)
+  if (_dbsMode==='uger' && r.some(x=>x.resultat_e_spild!=null)){
+    ds.push({ label:'Resultat e. spild', data:r.map(x=>x.resultat_e_spild),
+      type:'line', borderColor:'rgba(45,90,45,.95)', backgroundColor:'transparent',
+      borderWidth:2, borderDash:[5,4], pointRadius:2, tension:.25, yAxisID:'y', order:0 });
+  }
+  mk('c-dbs','bar', lab, ds, {
     plugins:{ legend:{ display:true, labels:{ font:{size:10}, padding:10, usePointStyle:true }}},
     scales:{
       y:{  position:'left',  ticks:{ callback:v=>Math.round(v/1000)+'k', font:{size:10} }, grid:{ color:'rgba(30,58,30,.05)' } },

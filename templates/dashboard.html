@@ -1867,6 +1867,15 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
         <div id="us-wrap"><div class="empty" style="padding:40px;">Indlæser…</div></div>
       </div>
 
+      <!-- SPILD-HÅNDTERING (score) -->
+      <div class="panel" id="p-spildscore">
+        <div class="page-hdr">
+          <h2>Spild-håndtering</h2>
+          <p>Hvor gode er vi til at håndtere spild? Kvalitet (spild% mod 15 %-norm) og konsekvens (hvor meget af resultatet spildet æder) — Organic-æraen.</p>
+        </div>
+        <div id="spildscore-wrap"><div class="empty" style="padding:40px;">Indlæser…</div></div>
+      </div>
+
       <!-- ÅRSPLAN -->
       <div class="panel" id="p-aar">
         <div class="page-hdr">
@@ -5763,6 +5772,7 @@ const NAV_DEFAULT = [
   {id:'bageri',      label:'Bageri (Organic)',      group:'Bageri & indkøb',     hidden:false},
   {id:'bageriuge',   label:'Uge: bestilt vs. solgt',group:'Bageri & indkøb',     hidden:false},
   {id:'ugesammenlign',label:'Uge vs. uge (bestilling)',group:'Bageri & indkøb',  hidden:false},
+  {id:'spildscore', label:'Spild-håndtering',       group:'Bageri & indkøb',     hidden:false},
   {id:'priser',      label:'Priser & avance',       group:'Bageri & indkøb',     hidden:false},
   {id:'beregner',    label:'Bestillingsberegner',   group:'Bageri & indkøb',     hidden:false},
   {id:'prisaendring',label:'Prisændringer',         group:'Bageri & indkøb',     hidden:false},
@@ -7538,10 +7548,14 @@ function buildDagTop(kpi, dage){
   const arr = (dage||[]).filter(x=>x && x.dato).slice().sort((a,b)=> a.dato < b.dato ? -1 : 1).slice(-14);
   const kNu   = (D.transak > 0)  ? D.omsaetning / D.transak   : null;
   const kFoer = (PD.transak > 0) ? PD.omsaetning / PD.transak : null;
+  // Omsætning i dag = total − B2B (fakturasalg, inkl. moms) → stemmer til Shopbox. B2B vises ved siden af.
+  const exB2B = r => (r && r.omsaetning!=null) ? (r.omsaetning - (r.ekstra_faktura||0)*1.25) : null;
+  const dSB=exB2B(D), pdSB=exB2B(PD), uSB=exB2B(U), puSB=exB2B(PU), mSB=exB2B(M), pmSB=exB2B(PM);
+  const b2bDag = (D.ekstra_faktura||0)*1.25;
   const cards =
-      _metricCard('Omsætning i dag', D.omsaetning!=null ? kr(D.omsaetning) : '—', D.omsaetning, PD.omsaetning,
+      _metricCard('Omsætning i dag', dSB!=null ? kr(dSB) : '—', dSB, pdSB,
         arr, x=> oms(x.omsaetning)||0,
-        `vs. samme dag sidste uge · uge ${_pctTxt(U.omsaetning,PU.omsaetning)} · md ${_pctTxt(M.omsaetning,PM.omsaetning)}`)
+        `ekskl. B2B (stemmer til Shopbox) · uge ${_pctTxt(uSB,puSB)} · md ${_pctTxt(mSB,pmSB)}${b2bDag>0?` · + B2B ${kr(b2bDag)}`:''}`)
     + _metricCard('Kunder i dag', D.transak!=null ? D.transak : '—', D.transak, PD.transak,
         arr, x=> x.transak||0,
         `antal kunder · vs. samme dag sidste uge${PD.transak>0 ? ': '+PD.transak : ''}`)
@@ -8425,6 +8439,87 @@ function renderUgeSammenlign(d){
       </tr></tfoot>
     </table></div>
     <p style="font-size:11px;color:var(--ash);margin:10px 2px 0;">Hver dag har to kolonner: <b>F</b> = forrige uge, <b>D</b> = denne uge. Yderst til højre uge-total (F/D) og forskel (Δ). Er en uge ikke indlæst som ordre, bruges anbefalingen (se badge). Grupperet som bestillingen: Brød · Boller · Wiener · Kage.</p>`;
+}
+
+// ── SPILD-HÅNDTERING (score) ───────────────────────────────────────────────
+function _spildFarve(p){ return p<15?'var(--moss)':(p<25?'#8a6800':'var(--danger)'); }
+function _spildStatusTxt(s){ return s==='god'?'Fremragende':(s==='ok'?'Ok — kan strammes':'For højt'); }
+async function loadSpildScore(){
+  const wrap = document.getElementById('spildscore-wrap');
+  wrap.innerHTML = '<div class="empty" style="padding:24px;">Indlæser…</div>';
+  const d = await api('/api/spild/score?antal_uger=10');
+  renderSpildScore(d);
+}
+function renderSpildScore(d){
+  const wrap = document.getElementById('spildscore-wrap');
+  if (!d || !d.uger || !d.uger.length){ wrap.innerHTML='<div class="empty" style="padding:40px;">Ingen spild-data endnu (Organic-æraen fra 1/9)</div>'; return; }
+  const mono = "font-family:'DM Mono',monospace;";
+  const kr = v => Math.round(v).toLocaleString('da-DK')+' kr';
+  const sen = d.seneste||{};
+  const pctFarve = _spildFarve(d.snit_spild_pct);
+  const resFarve = _spildFarve(d.snit_pct_resultat);   // samme skala-idé (lavt=godt)
+
+  // To score-kort side om side
+  const kort = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
+    <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
+      <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Spild-grad (kvalitet)</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
+        <span style="font-size:40px;font-weight:700;line-height:1;color:${pctFarve};">${d.snit_spild_pct}%</span>
+        <span style="font-size:13px;font-weight:600;color:${pctFarve};">${_spildStatusTxt(d.status)}</span>
+      </div>
+      <div style="font-size:12px;color:var(--ash);margin-top:6px;">netto spild af bestilte stk · snit 4 uger · <b>mål 15 %</b></div>
+      <div style="position:relative;height:12px;border-radius:7px;background:rgba(30,58,30,.08);margin-top:12px;overflow:hidden;">
+        <div style="position:absolute;inset:0 auto 0 0;width:${Math.min(100,d.snit_spild_pct/35*100)}%;background:${pctFarve};border-radius:7px;"></div>
+        <div style="position:absolute;top:-3px;bottom:-3px;left:${15/35*100}%;width:2px;background:var(--forest);" title="Mål 15 %"></div>
+      </div>
+      <div style="${mono}font-size:10px;color:var(--ash);margin-top:5px;">seneste uge: <b style="color:${_spildFarve(sen.spild_pct_netto||0)}">${sen.spild_pct_netto||0}%</b> (brutto ${sen.spild_pct_brutto||0}%)</div>
+    </div>
+    <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
+      <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Andel af resultat tabt (konsekvens)</div>
+      <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
+        <span style="font-size:40px;font-weight:700;line-height:1;color:${resFarve};">${d.snit_pct_resultat}%</span>
+        <span style="font-size:13px;color:var(--ash);">af ugens resultat</span>
+      </div>
+      <div style="font-size:12px;color:var(--ash);margin-top:6px;">spildet spiser denne andel af overskuddet · snit 4 uger</div>
+      <div style="font-size:14px;margin-top:14px;">Spild koster <b style="${mono}">~${kr(d.snit_spild_kr)}</b>/uge</div>
+      ${d.potentiale_kr_md>0?`<div style="font-size:14px;margin-top:6px;color:var(--moss);font-weight:600;">💰 Potentiale: +${kr(d.potentiale_kr_md)}/md hvis I rammer 15 %</div>`:''}
+    </div>
+  </div>`;
+
+  // Trend-graf
+  const chart = `<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px;">
+    <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Spild% netto pr. uge · målstreg 15 %</div>
+    <div style="height:220px;"><canvas id="c-spildscore"></canvas></div></div>`;
+
+  // Tabel
+  const rows = d.uger.slice().reverse().map(w=>`<tr>
+    <td style="text-align:left;">Uge ${w.uge}</td>
+    <td style="text-align:right;color:${_spildFarve(w.spild_pct_netto)};font-weight:600;">${w.spild_pct_netto}%</td>
+    <td style="text-align:right;color:var(--ash);">${w.spild_pct_brutto}%</td>
+    <td style="text-align:right;">${kr(w.spild_kr)}</td>
+    <td style="text-align:right;">${w.pct_resultat_tabt==null?'—':w.pct_resultat_tabt+'%'}</td>
+    <td style="text-align:right;color:${w.resultat_e_spild>=0?'var(--moss)':'var(--danger)'};font-weight:600;">${kr(w.resultat_e_spild)}</td></tr>`).join('');
+  const tabel = `<div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:560px;${mono}font-size:13px;">
+    <thead><tr style="text-align:right;">
+      <th style="text-align:left;">Uge</th><th>Spild% netto</th><th>brutto</th><th>Spild kr</th><th>% af resultat</th><th>Resultat e. spild</th>
+    </tr></thead><tbody>${rows}</tbody></table></div>`;
+
+  wrap.innerHTML = kort + chart + tabel;
+
+  // Tegn graf
+  const ug = d.uger.slice();
+  const lab = ug.map(w=>'U'+w.uge);
+  const vals = ug.map(w=>w.spild_pct_netto);
+  const clr = ug.map(w=>w.spild_pct_netto<15?'rgba(45,90,45,.8)':w.spild_pct_netto<25?'rgba(200,168,75,.85)':'rgba(192,57,43,.75)');
+  mk('c-spildscore','bar', lab, [
+    { label:'Spild% netto', data:vals, backgroundColor:clr, borderRadius:3, order:2 },
+    { label:'Mål 15 %', data:ug.map(()=>15), type:'line', borderColor:'rgba(47,90,48,.9)', borderDash:[6,4], borderWidth:2, pointRadius:0, order:1 }
+  ], {
+    plugins:{ legend:{ display:true, labels:{ font:{size:10}, usePointStyle:true }}},
+    scales:{ y:{ beginAtZero:true, ticks:{ callback:v=>v+'%', font:{size:10} }, grid:{ color:'rgba(30,58,30,.05)' } },
+             x:{ ticks:{ font:{size:10} } } }
+  });
 }
 
 async function fakGodkend(nr, afvig){
@@ -13497,6 +13592,7 @@ window.showPanel = function(id, el) {
   if (id === 'fakturaafstemning') loadFakturaAfstemning();
   if (id === 'bageriuge')    loadBageriUge();
   if (id === 'ugesammenlign') loadUgeSammenlign();
+  if (id === 'spildscore')   loadSpildScore();
   if (id === 'returtgtg')    loadReturTgtg();
   if (id === 'beregner')   loadBeregner();
   if (id === 'mobilepay')  loadMobilepay();

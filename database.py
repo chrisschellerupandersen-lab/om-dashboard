@@ -1610,6 +1610,9 @@ def hent_uger(aar: int = None) -> List[Dict]:
             GROUP BY strftime('%Y-%W', dato)
             ORDER BY dato ASC
         """, params).fetchall()
+        # Kontekst til resultat efter spild (samme DB-Shopbox-model som DB-siden)
+        conn.row_factory = sqlite3.Row
+        bemanding, loen_ov, lev_ov, frost_per, seneste_iso = _db_shopbox_kontekst(conn)
 
     resultat = []
     for r in rows:
@@ -1623,6 +1626,16 @@ def hent_uger(aar: int = None) -> List[Dict]:
         row["uge"] = iso[1]  # Brug ISO week i stedet for %W
         row["aar"] = iso[0]  # Brug ISO år
         row["mp_netto"] = mp_netto
+        # Resultat efter spild = DB − løn − omk − levering − netto spild
+        komp = _uge_efter_spild(iso[0], iso[1], seneste_iso,
+                                bemanding, loen_ov, lev_ov, frost_per)
+        res = float(row.get("db_kr") or 0) - komp["kostnader"]
+        row["loen"] = komp["loen"]
+        row["omk"] = komp["omk"]
+        row["levering"] = komp["levering"]
+        row["netto_spild"] = komp["netto_spild"]
+        row["resultat"] = round(res)
+        row["resultat_e_spild"] = round(res - komp["netto_spild"])
         resultat.append(row)
     return resultat
 
@@ -10822,11 +10835,41 @@ def hent_db_shopbox(aar: int = None, antal_dage: int = 30,
             })
         return ud
 
+    from datetime import date as _d2
     with _conn() as conn:
         conn.row_factory = sqlite3.Row
         dage     = _rens(_agg(conn, "dato", antal_dage), "dag")
-        uger     = _rens(_agg(conn, "strftime('%Y-%W', dato)", antal_uger), "uge")
         maaneder = _rens(_agg(conn, "strftime('%Y-%m', dato)", antal_maaneder), "måned")
+
+        # Uger: ISO-uger med resultat og resultat efter spild (DB-Shopbox-modellen)
+        bemanding, loen_ov, lev_ov, frost_per, seneste_iso = _db_shopbox_kontekst(conn)
+        uge_rows = conn.execute(f"""
+            SELECT MIN(dato)                            AS min_dato,
+                   COALESCE(SUM(omsaetning_ex_moms),0)  AS oms_ex,
+                   COALESCE(SUM(db_korrekt),0)          AS db_kr
+            FROM v_transaktioner
+            {aar_where}
+            GROUP BY strftime('%Y-%W', dato)
+            ORDER BY min_dato DESC
+            LIMIT {int(antal_uger)}
+        """, params).fetchall()
+
+    uger = []
+    for r in uge_rows:
+        d0 = _d2.fromisoformat(str(r["min_dato"])[:10])
+        iy, iw, _ = d0.isocalendar()
+        oms = float(r["oms_ex"] or 0)
+        db = float(r["db_kr"] or 0)
+        komp = _uge_efter_spild(iy, iw, seneste_iso, bemanding, loen_ov, lev_ov, frost_per)
+        res = db - komp["kostnader"]
+        uger.append({
+            "periode": f"{iy}-{iw:02d}", "label": f"Uge {iw:02d}", "under": str(iy),
+            "oms_ex": round(oms), "db_kr": round(db),
+            "dg_pct": round(db / oms * 100, 1) if oms > 0 else 0.0,
+            "loen": komp["loen"], "omk": komp["omk"], "levering": komp["levering"],
+            "frost_salg": komp["frost_salg"], "netto_spild": komp["netto_spild"],
+            "resultat": round(res), "resultat_e_spild": round(res - komp["netto_spild"]),
+        })
 
     return {"dage": dage, "uger": uger, "maaneder": maaneder}
 
@@ -10918,6 +10961,68 @@ def _db_leveret_dag(iso: str, wd: int) -> bool:
 def _levering_pris(iso: str) -> float:
     """Fragt pr. drop: 175 kr til og med 30/9-2026, 250 kr fra 1/10-2026."""
     return 250.0 if iso >= "2026-10-01" else 175.0
+
+
+def _db_shopbox_kontekst(conn):
+    """Prefetch til _uge_efter_spild: bemanding, løn/levering-overrides, frost-salg
+    pr. dag (Organic-æra) og seneste data-dato. Kaldes med en åben Row-conn."""
+    bemanding = {(r["aar"], r["uge"]): (r["type"] or "fuld") for r in
+                 conn.execute("SELECT aar, uge, COALESCE(type,'fuld') AS type "
+                              "FROM fuld_bemanding_uger").fetchall()}
+    loen_ov = {r["dato"]: r["loennet"] for r in
+               conn.execute("SELECT dato, loennet FROM db_loen_override").fetchall()}
+    lev_ov = {r["dato"]: r["leveret"] for r in
+              conn.execute("SELECT dato, leveret FROM db_levering_override").fetchall()}
+    frost_per: Dict[str, float] = {}
+    for fr in conn.execute(
+            "SELECT dato, varenavn, COALESCE(SUM(omsaetning_ex_moms),0) AS kr "
+            "FROM v_transaktioner WHERE dato >= ? AND LOWER(varenavn) LIKE '%rost%' "
+            "GROUP BY dato, varenavn", (_ORGANIC_START,)).fetchall():
+        navn = fr["varenavn"] or ""
+        rolle = _bageri_rolle(navn)
+        if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
+            frost_per[fr["dato"]] = frost_per.get(fr["dato"], 0.0) + float(fr["kr"] or 0)
+    sen = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
+    seneste_iso = str(sen["d"])[:10] if sen and sen["d"] else "9999-12-31"
+    return bemanding, loen_ov, lev_ov, frost_per, seneste_iso
+
+
+def _uge_efter_spild(iso_y, iso_w, seneste_iso, bemanding, loen_ov, lev_ov, frost_per,
+                     loen_beloeb: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
+    """Komponenter til 'resultat efter spild' for én ISO-uge (DB-Shopbox-modellen):
+    løn (weekend-standard), omk pr. dag, levering på leveringsdage, og netto spild
+    (brutto spild-kost − frost-salg) for Organic-æra-dage. Kun dage <= seneste_iso."""
+    from datetime import date as _d, timedelta as _td
+    try:
+        mon = _d.fromisocalendar(int(iso_y), int(iso_w), 1)
+    except Exception:
+        return {"loen": 0, "omk": 0, "levering": 0, "brutto_spild": 0,
+                "frost_salg": 0, "netto_spild": 0, "kostnader": 0}
+    bem = bemanding.get((int(iso_y), int(iso_w)))
+    fuld = bem == "fuld"
+    loen = omk = levering = brutto = frost = 0.0
+    for i in range(7):
+        dd = mon + _td(days=i)
+        iso = dd.isoformat()
+        if iso > seneste_iso:
+            break
+        wd = dd.weekday()
+        ov = loen_ov.get(iso)
+        loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
+        if (dd.year, dd.month) >= _LOEN_START and loennet:
+            loen += loen_beloeb
+        omk += omk_pr_dag
+        lov = lev_ov.get(iso)
+        leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
+        if leveret:
+            levering += _levering_pris(iso)
+        if iso >= _ORGANIC_START:
+            brutto += float(hent_dagens_spild_vaerdi(iso, detaljer=False) or 0)
+            frost += float(frost_per.get(iso, 0.0))
+    netto = brutto - frost
+    return {"loen": round(loen), "omk": round(omk), "levering": round(levering),
+            "brutto_spild": round(brutto), "frost_salg": round(frost),
+            "netto_spild": round(netto), "kostnader": round(loen + omk + levering)}
 
 
 def toggle_db_levering_override(dato: str) -> dict:

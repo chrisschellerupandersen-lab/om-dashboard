@@ -1669,7 +1669,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">MobilePay</th><th class="num">DB kr</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">MobilePay</th><th class="num">DB kr</th><th class="num" title="DB − løn − omk − levering − netto spild">Resultat e. spild</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
             <tbody id="uge-tbody"><tr><td colspan="9" class="empty">Indlæser…</td></tr></tbody>
           </table>
@@ -5483,24 +5483,30 @@ function dbsRenderTable(rows, mode){
   const t = document.getElementById('dbs-tabel');
   const perLbl = mode==='dage'?'Dato':mode==='uger'?'Uge':'Måned';
   const th = (col,lbl,align)=>`<th style="text-align:${align};cursor:pointer;user-select:none;" onclick="dbsSortBy('${col}')">${lbl}${_dbsArrow(col)}</th>`;
+  const visSpild = mode==='uger';   // resultat efter spild beregnes pr. uge
   let html = `<thead><tr>
     ${th('periode',perLbl,'left')}
     ${th('oms_ex','Omsætning','right')}
     ${th('db_kr','DB kr','right')}
-    ${th('dg_pct','DG %','right')}</tr></thead><tbody>`;
+    ${th('dg_pct','DG %','right')}
+    ${visSpild?th('resultat_e_spild','Resultat e. spild','right'):''}</tr></thead><tbody>`;
   rows = _dbsSortRows(rows, _dbsSort);
-  if(!rows.length) html += `<tr><td colspan="4" style="text-align:center;color:var(--ash);padding:12px;">Ingen data endnu</td></tr>`;
+  const ncol = visSpild?5:4;
+  if(!rows.length) html += `<tr><td colspan="${ncol}" style="text-align:center;color:var(--ash);padding:12px;">Ingen data endnu</td></tr>`;
   rows.forEach(x=>{
     const dgClr = x.dg_pct>=35?'var(--moss)':x.dg_pct>=25?'#8a6800':'var(--danger)';
     const per = (mode==='dage' || x.under)
       ? `${x.label} <span style="color:var(--ash);font-size:11px;">${x.under}</span>`
       : x.label;
     const lblEsc = (x.label + (x.under?(' '+x.under):'')).replace(/'/g,"\\'");
+    const res = x.resultat_e_spild;
+    const resClr = (res==null)?'var(--ash)':(res>=0?'var(--moss)':'var(--danger)');
     html += `<tr style="cursor:pointer;" onclick="dbsDrill('${mode}','${x.periode}','${lblEsc}')" title="Se posterne bag">
       <td style="text-align:left;">${per}</td>
       <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
       <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
-      <td style="text-align:right;color:${dgClr};font-weight:600;">${_dbsPct(x.dg_pct)}</td></tr>`;
+      <td style="text-align:right;color:${dgClr};font-weight:600;">${_dbsPct(x.dg_pct)}</td>
+      ${visSpild?`<td style="text-align:right;color:${resClr};font-weight:600;" title="DB − løn − omk − levering − netto spild">${res==null?'—':_dbsKr(res)}</td>`:''}</tr>`;
   });
   html += `</tbody>`;
   t.innerHTML = html;
@@ -7645,6 +7651,7 @@ function buildUge(uger) {
       <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
+      <td class="num" style="${mono}font-size:13px;font-weight:600;color:${r.resultat_e_spild==null?'var(--ash)':(r.resultat_e_spild>=0?'var(--moss)':'var(--danger)')};" title="DB − løn − omk − levering − netto spild">${r.resultat_e_spild==null?'—':Math.round(r.resultat_e_spild).toLocaleString('da-DK')+' kr'}</td>
       <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
       <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>
       <td class="num" style="font-size:14px;">${r.antal_dage}</td>

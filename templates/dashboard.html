@@ -1669,7 +1669,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">MobilePay</th><th class="num">DB kr</th><th class="num" title="DB − løn − omk − levering − netto spild">Resultat e. spild</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+              <tr><th>Uge</th><th class="num">Omsætning</th><th class="num">Vareforbrug</th><th class="num">MobilePay</th><th class="num">DB kr</th><th class="num" title="DB − løn − omk − levering">Resultat</th><th class="num" title="DB − løn − omk − levering − netto spild">Resultat e. spild</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
             <tbody id="uge-tbody"><tr><td colspan="9" class="empty">Indlæser…</td></tr></tbody>
           </table>
@@ -7658,6 +7658,7 @@ function buildUge(uger) {
       <td class="num" style="${mono}font-size:13px;color:var(--ash);">${r.vareforbrug > 0 ? Math.round(r.vareforbrug).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;color:var(--moss);">${r.mp_netto > 0 ? Math.round(r.mp_netto).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
+      <td class="num" style="${mono}font-size:13px;color:${r.resultat==null?'var(--ash)':(r.resultat>=0?'var(--moss)':'var(--danger)')};" title="DB − løn − omk − levering">${r.resultat==null?'—':Math.round(r.resultat).toLocaleString('da-DK')+' kr'}</td>
       <td class="num" style="${mono}font-size:13px;font-weight:600;color:${r.resultat_e_spild==null?'var(--ash)':(r.resultat_e_spild>=0?'var(--moss)':'var(--danger)')};" title="DB − løn − omk − levering − netto spild">${r.resultat_e_spild==null?'—':Math.round(r.resultat_e_spild).toLocaleString('da-DK')+' kr'}</td>
       <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
       <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>

@@ -5242,6 +5242,22 @@ async function loadDbsMaaned(val){
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div></div>`;
   const _pctTile = _pctBox('Spild % brutto', _spildPctB, `${t.spild_stk||0}/${t.bestilt_stk||0} stk · norm 15-25%`)
                  + _pctBox('Spild % netto',  _spildPctN, `efter frost (${t.frost_stk||0} stk reddet)`);
+  // Spild-stk-celle: når solgt ≥ indkøb (udsolgt pga. combo/dagsgammelt/frost) vises "udsolgt 🎉" + note
+  const _spildStkCell = (bestilt, solgt, spild, frost, dato)=>{
+    const ns = Math.max(0,(spild||0)-(frost||0));
+    const over = (bestilt>0)?(solgt-bestilt):0;
+    if (bestilt>0 && solgt>=bestilt){
+      const tip = `Udsolgt 🎉 — solgt ${over} stk ud over dagens levering (combo, dagsgammelt og frost${frost>0?`; heraf ${frost} frost`:''}).${spild>0?` Reelt spild: ${spild} stk (udsolgte varer undtaget).`:''}`;
+      const clk = (spild>0 && dato)?`cursor:pointer;`:'';
+      const oc  = (spild>0 && dato)?`onclick="dbsDagDetalje('${dato}','spildstk',this)"`:'';
+      return `<td style="text-align:right;color:var(--moss);font-weight:600;${clk}" title="${tip}" ${oc}>udsolgt 🎉${over>0?`<span style="font-size:9px;font-weight:400;color:var(--ash);"> +${over}</span>`:''}</td>`;
+    }
+    if (!spild) return `<td style="text-align:right;color:var(--ash);">—</td>`;
+    const bp=bestilt>0?spild/bestilt*100:0, np=bestilt>0?ns/bestilt*100:0;
+    const clk = dato?`cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;`:'';
+    const oc  = dato?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${dato}','spildstk',this)"`:'';
+    return `<td style="text-align:right;color:#8a6d3a;font-weight:600;${clk}" ${oc}>${spild} <span style="font-size:10px;font-weight:400;color:${_spPctClr(bp)};">${Math.round(bp)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${Math.round(np)}%)</span></td>`;
+  };
   document.getElementById('dbs-maaned-tot').innerHTML =
       tile('DB i alt', t.db_kr)
     + tile('Løn i alt', t.loen, '#8a3a3a')
@@ -5292,7 +5308,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;font-weight:700;color:${rClr};">${_dbsKr(x.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${x.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${x.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;font-weight:600;${x.spild_stk>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.spild_stk>0?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${x.dato}','spildstk',this)"`:''}>${x.spild_stk?(()=>{const bp=x.bestilt_stk>0?x.spild_stk/x.bestilt_stk*100:0; const nS=Math.max(0,(x.spild_stk||0)-(x.frost_stk||0)); const np=x.bestilt_stk>0?nS/x.bestilt_stk*100:0; return `${x.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(bp)};">${Math.round(bp)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${Math.round(np)}%)</span>`;})():'—'}</td>
+      ${_spildStkCell(x.bestilt_stk, x.solgt_stk, x.spild_stk, x.frost_stk, x.dato)}
       <td style="text-align:right;color:var(--ash);${x.vaerdi_spild>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.vaerdi_spild>0?`title="Klik for at se hvad spildet består af" onclick="dbsDagDetalje('${x.dato}','spild',this)"`:''}>${x.vaerdi_spild>0?_dbsKr(x.vaerdi_spild):'—'}</td>
       <td style="text-align:right;color:var(--moss);${x.frost_salg>0?'cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;':''}" ${x.frost_salg>0?`title="Klik for at se frost-salget" onclick="dbsDagDetalje('${x.dato}','frost',this)"`:''}>${x.frost_salg>0?_dbsKr(x.frost_salg):'—'}</td>
       ${(()=>{const ns=(x.vaerdi_spild||0)-(x.frost_salg||0); const re=(x.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
@@ -5333,7 +5349,7 @@ async function loadDbsMaaned(val){
       <td style="text-align:right;color:${resClr};">${_dbsKr(t.resultat)}</td>
       <td style="text-align:right;color:var(--ash);">${t.bestilt_stk||'—'}</td>
       <td style="text-align:right;color:var(--ash);">${t.solgt_stk||'—'}</td>
-      <td style="text-align:right;color:#8a6d3a;">${t.spild_stk?`${t.spild_stk} <span style="font-size:10px;font-weight:400;color:${_spPctClr(_spildPctB)};">${_spildPctB.toFixed(0)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${_spildPctN.toFixed(0)}%)</span>`:'—'}</td>
+      ${_spildStkCell(t.bestilt_stk, t.solgt_stk, t.spild_stk, t.frost_stk, null)}
       <td style="text-align:right;color:var(--ash);">${_dbsKr(t.vaerdi_spild)}</td>
       <td style="text-align:right;color:var(--moss);">${_dbsKr(t.frost_salg)}</td>
       ${(()=>{const ns=(t.vaerdi_spild||0)-(t.frost_salg||0); const re=(t.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';

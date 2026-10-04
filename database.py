@@ -11025,6 +11025,107 @@ def _uge_efter_spild(iso_y, iso_w, seneste_iso, bemanding, loen_ov, lev_ov, fros
             "netto_spild": round(netto), "kostnader": round(loen + omk + levering)}
 
 
+def hent_spild_score(antal_uger: int = 10) -> dict:
+    """Spild-håndterings-score pr. ISO-uge (Organic-æra). To mål side om side:
+      • spild% netto (stk) mod 15%-branche-norm — kvalitet/håndværk
+      • andel af ugens resultat som spildet æder — konsekvens
+    Samme spild-model som DB-Shopbox/Ugeoversigt (netto = efter frost-redning)."""
+    from datetime import date as _d, timedelta as _td
+    NORM = 15.0
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        bemanding, loen_ov, lev_ov, frost_kr_per, seneste_iso = _db_shopbox_kontekst(conn)
+        frost_stk_per: Dict[str, int] = {}
+        for fr in conn.execute(
+                "SELECT dato, varenavn, COALESCE(SUM(antal),0) AS stk FROM v_transaktioner "
+                "WHERE dato>=? AND LOWER(varenavn) LIKE '%rost%' GROUP BY dato, varenavn",
+                (_ORGANIC_START,)).fetchall():
+            navn = fr["varenavn"] or ""
+            rolle = _bageri_rolle(navn)
+            if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
+                frost_stk_per[fr["dato"]] = frost_stk_per.get(fr["dato"], 0) + int((fr["stk"] or 0) * rolle[2])
+        day_fin = {r["dato"]: (float(r["oms_ex"] or 0), float(r["db_kr"] or 0)) for r in conn.execute(
+            "SELECT dato, COALESCE(SUM(omsaetning_ex_moms),0) AS oms_ex, "
+            "COALESCE(SUM(db_korrekt),0) AS db_kr FROM v_transaktioner WHERE dato>=? GROUP BY dato",
+            (_ORGANIC_START,)).fetchall()}
+
+    if seneste_iso == "9999-12-31":
+        return {"norm": NORM, "uger": [], "seneste": {}, "snit_spild_pct": 0.0,
+                "snit_pct_resultat": 0.0, "snit_spild_kr": 0, "status": "god", "potentiale_kr_md": 0}
+
+    sen = _d.fromisoformat(seneste_iso)
+    org0 = _d.fromisoformat(_ORGANIC_START)
+    weeks = []
+    iy, iw, _ = sen.isocalendar()
+    wk_mon = _d.fromisocalendar(iy, iw, 1)
+    while len(weeks) < antal_uger and (wk_mon + _td(days=6)) >= org0:
+        wy, ww, _ = wk_mon.isocalendar()
+        weeks.append((wy, ww, wk_mon))
+        wk_mon -= _td(days=7)
+    weeks.reverse()
+
+    out = []
+    for (wy, ww, mon) in weeks:
+        bestilt = spild_b = frost_s = 0
+        spild_kr = frost_kr = loen = omk = levering = oms = db = 0.0
+        bem = bemanding.get((wy, ww)); fuld = bem == "fuld"
+        for i in range(7):
+            dd = mon + _td(days=i); iso = dd.isoformat()
+            if iso > seneste_iso:
+                break
+            wd = dd.weekday()
+            ov = loen_ov.get(iso)
+            loennet = (ov == 1) if ov is not None else _db_loennet_dag(iso, wd, fuld)
+            if (dd.year, dd.month) >= _LOEN_START and loennet:
+                loen += 300.0
+            omk += 500.0
+            lov = lev_ov.get(iso)
+            leveret = (lov == 1) if lov is not None else _db_leveret_dag(iso, wd)
+            if leveret:
+                levering += _levering_pris(iso)
+            of = day_fin.get(iso)
+            if of:
+                oms += of[0]; db += of[1]
+            if iso >= _ORGANIC_START:
+                sp = hent_dagens_spild_vaerdi(iso, detaljer=True)
+                bestilt += int(sp.get("bestilt_stk", 0))
+                spild_b += int(sp.get("spild_stk", 0))
+                spild_kr += float(sp.get("total", 0) or 0)
+                frost_s += int(frost_stk_per.get(iso, 0))
+                frost_kr += float(frost_kr_per.get(iso, 0.0))
+        spild_n = max(0, spild_b - frost_s)
+        spild_kr_netto = max(0.0, spild_kr - frost_kr)
+        pct_n = round(spild_n / bestilt * 100, 1) if bestilt > 0 else 0.0
+        pct_b = round(spild_b / bestilt * 100, 1) if bestilt > 0 else 0.0
+        resultat = db - (loen + omk + levering)
+        res_e = resultat - spild_kr_netto
+        pct_res = round(spild_kr_netto / resultat * 100, 1) if resultat > 0 else None
+        out.append({
+            "aar": wy, "uge": ww, "bestilt_stk": bestilt,
+            "spild_netto_stk": spild_n, "frost_stk": frost_s,
+            "spild_pct_netto": pct_n, "spild_pct_brutto": pct_b,
+            "spild_kr": round(spild_kr_netto), "resultat": round(resultat),
+            "resultat_e_spild": round(res_e), "pct_resultat_tabt": pct_res,
+        })
+
+    sidste4 = out[-4:]
+    def _snit(key):
+        vals = [w[key] for w in sidste4 if w.get(key) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else 0.0
+    snit_pct = _snit("spild_pct_netto")
+    snit_res = _snit("pct_resultat_tabt")
+    snit_kr = round(sum(w["spild_kr"] for w in sidste4) / len(sidste4)) if sidste4 else 0
+    pot_kr_md = 0
+    if snit_pct > NORM and snit_kr > 0:
+        pot_kr_md = round(snit_kr * (1 - NORM / snit_pct) * 4.33)
+    status = "god" if snit_pct < 15 else ("ok" if snit_pct < 25 else "høj")
+    return {
+        "norm": NORM, "uger": out, "seneste": out[-1] if out else {},
+        "snit_spild_pct": snit_pct, "snit_pct_resultat": snit_res,
+        "snit_spild_kr": snit_kr, "status": status, "potentiale_kr_md": pot_kr_md,
+    }
+
+
 def toggle_db_levering_override(dato: str) -> dict:
     """Skift levering for én dag. Uden override → sæt modsat af standarden (fx marker
     at I selv hentede en fredag, eller fik leveret en hverdag). Med override → ryd."""

@@ -1002,6 +1002,14 @@ async def api_bagvaerk_dag(request: Request, uge: int, aar: Optional[int] = None
     return database.hent_bagvaerk_dag_sammenligning(uge, aar)
 
 
+@app.get("/api/spild/score")
+async def api_spild_score(request: Request, antal_uger: int = 10,
+                          secret: Optional[str] = None):
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_spild_score(antal_uger)
+
+
 @app.get("/api/bageri/uge-sammenlign")
 async def api_bageri_uge_sammenlign(request: Request, uge: int, aar: Optional[int] = None,
                                     secret: Optional[str] = None):

@@ -2910,6 +2910,26 @@ def hent_kaffe_analyse(aar: int = None) -> Dict:
     }
 
 
+def hent_produkt_salg_periode(fra: str, til: str) -> List[Dict]:
+    """Shopbox-salg pr. varenavn i perioden [fra, til] (inkl.). Til lager/indkøbs-
+    afstemning: antal solgt, omsætning (inkl moms), vareforbrug, db. Kun kassesalg."""
+    with _conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT varenavn,
+                   MAX(kategori)                      AS kategori,
+                   ROUND(SUM(antal), 0)               AS antal,
+                   ROUND(SUM(omsætning), 2)           AS omsaetning,
+                   ROUND(SUM(vf_korrekt), 2)          AS vareforbrug,
+                   ROUND(SUM(db_korrekt), 2)          AS db_kr
+            FROM v_transaktioner
+            WHERE varenavn != '' AND dato >= ? AND dato <= ?
+            GROUP BY varenavn
+            ORDER BY antal DESC
+        """, (fra, til)).fetchall()
+    return [dict(r) for r in rows]
+
+
 def hent_top_produkter(n: int = 20, aar: int = None) -> List[Dict]:
     with _conn() as conn:
         extra = "AND strftime('%Y', dato) = ?" if aar else ""

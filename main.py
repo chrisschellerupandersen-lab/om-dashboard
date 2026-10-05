@@ -755,6 +755,17 @@ async def api_dagens_bonner(request: Request, dato: Optional[str] = None):
     return database.hent_dagens_bonner(dato)
 
 
+@app.get("/api/salg/produkt-periode")
+async def api_produkt_salg_periode(request: Request, fra: str, til: str,
+                                   secret: Optional[str] = None):
+    """Shopbox-salg pr. vare i en periode (til lager/indkøbs-afstemning).
+    Returnerer varenavn, antal, omsætning (inkl moms), vareforbrug, db — alt fra
+    v_transaktioner (kun kassesalg)."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_produkt_salg_periode(fra, til)
+
+
 @app.get("/api/salg/rest-kategori")
 async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None):
     """Dagens restlager pr. kategori (bestilt − solgt) med sell-through til

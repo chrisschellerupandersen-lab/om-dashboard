@@ -3327,6 +3327,31 @@ async def bageri_faktura_mail(request: Request):
             "moms_kr": r["moms_kr"], "total_kr": r["total_kr"]}
 
 
+@app.post("/api/bageri/faktura-gem")
+async def bageri_faktura_gem(request: Request):
+    """Gemmer en manuelt justeret bagværks-faktura (JSON) direkte — fx når ekstra
+    boller leveret/faktureret som B2B skal holdes ude af afstemning/spild (varelinjer
+    sat til bestilt antal). Body: {secret, faktura:{...gem_faktura-format...}}."""
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Ugyldig JSON")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    fak = body.get("faktura") or {}
+    if not fak.get("fakturanr") or not fak.get("linjer"):
+        raise HTTPException(status_code=422, detail="Mangler fakturanr eller linjer")
+    if body.get("dry_run"):
+        return {"ok": True, "gemt": False, "fakturanr": fak["fakturanr"],
+                "uge": fak.get("uge"), "antal_varer": len(fak["linjer"]),
+                "total_stk": fak.get("total_stk")}
+    database.gem_faktura(fak)
+    return {"ok": True, "gemt": True, "fakturanr": fak["fakturanr"], "uge": fak.get("uge"),
+            "aar": fak.get("aar"), "antal_varer": len(fak["linjer"]),
+            "total_stk": fak.get("total_stk"), "subtotal_ex_moms": fak.get("subtotal_ex_moms")}
+
+
 def _faktura_auth(request: Request):
     """Tillad enten login (browser) eller ?secret= (så importen kan verificeres eksternt)."""
     if request.query_params.get("secret") == WEBHOOK_SECRET:

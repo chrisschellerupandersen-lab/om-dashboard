@@ -10477,7 +10477,7 @@ async function loadBagRegnskab(){
 let _umxData = null, _umxScope = 'butik', _umxMeasure = 'db', _umxFarve = 'col', _umxUger = 16;
 const _UMX_MEASURES = {
   butik: [['db','DB'],['oms','Omsætning'],['kunder','Kunder'],['kurv','Kurvstørrelse']],
-  bag:   [['oms','Omsætning'],['antal','Antal stk']],
+  bag:   [['db','DB'],['oms','Omsætning'],['antal','Antal stk']],
 };
 async function loadUgeMatrix(){
   _umxSyncMeasureBtns();
@@ -10505,7 +10505,7 @@ function umxUger(u){ _umxUger = u;
   document.querySelectorAll('#umx-uger .bageri-prof-btn').forEach(b=>b.classList.toggle('active', +b.dataset.u===u));
   loadUgeMatrix(); }
 function _umxVal(rec,i){
-  if (_umxScope==='bag') return _umxMeasure==='antal' ? rec.stk_bag[i] : rec.oms_bag[i];
+  if (_umxScope==='bag') return _umxMeasure==='antal' ? rec.stk_bag[i] : (_umxMeasure==='db' ? (rec.db_bag?rec.db_bag[i]:null) : rec.oms_bag[i]);
   const oms = rec.oms[i], bons = rec.bons[i];
   if (_umxMeasure==='db') return rec.db ? rec.db[i] : null;
   if (_umxMeasure==='kunder') return bons;
@@ -10514,7 +10514,7 @@ function _umxVal(rec,i){
 }
 function _umxFmt(v){ return v==null ? '' : Math.round(v).toLocaleString('da-DK'); }
 function _umxWeekTotal(r){
-  if (_umxScope==='bag') return _umxMeasure==='antal' ? r.stk_bag_total : r.oms_bag_total;
+  if (_umxScope==='bag') return _umxMeasure==='antal' ? r.stk_bag_total : (_umxMeasure==='db' ? r.db_bag_total : r.oms_bag_total);
   if (_umxMeasure==='db') return r.db_total;
   if (_umxMeasure==='kunder') return r.bons_total;
   if (_umxMeasure==='kurv') return r.bons_total ? r.oms_total/r.bons_total : null;
@@ -10535,7 +10535,7 @@ function renderUgeMatrix(){
     return (mx>mn)?(v-mn)/(mx-mn):0.5; };
   const heat=(v,i)=>{ const s=t(v,i); return s==null?'transparent':`rgba(47,90,48,${(0.06+0.66*s).toFixed(3)})`; };
   const txt =(v,i)=>{ const s=t(v,i); return s==null?'var(--ash)':(s>0.55?'#fff':'var(--ink)'); };
-  const totLbl=_umxScope==='bag'?(_umxMeasure==='antal'?'Bagv. stk':'Bagv. i alt'):(_umxMeasure==='db'?'DB i alt':(_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv')));
+  const totLbl=_umxScope==='bag'?(_umxMeasure==='antal'?'Bagv. stk':(_umxMeasure==='db'?'Bagv. DB':'Bagv. i alt')):(_umxMeasure==='db'?'DB i alt':(_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv')));
   let head=`<tr><th style="text-align:left;padding:8px 6px;width:64px;">Uge</th>`
     +DAGE.map(d=>`<th class="num" style="padding:8px 10px;">${d}</th>`).join('')
     +`<th class="num" style="padding:8px 10px;border-left:2px solid rgba(255,255,255,.15);">${totLbl}</th>`
@@ -10562,7 +10562,7 @@ function renderUgeMatrix(){
   wrap.innerHTML=`<table class="aar2-tbl" style="width:100%;min-width:660px;"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`;
   const scopeTxt=_umxScope==='bag'?'kun bagværk':'hele butikken';
   const unit=_umxScope==='bag'
-    ? (_umxMeasure==='antal'?'antal stk bagværk':'kr bagværks-omsætning (inkl. moms)')
+    ? (_umxMeasure==='antal'?'antal stk bagværk':(_umxMeasure==='db'?'kr bagværks-DB (ex moms)':'kr bagværks-omsætning (inkl. moms)'))
     : (_umxMeasure==='db'?'kr dækningsbidrag (DB, ex moms)':(_umxMeasure==='kunder'?'antal kunder (distinkte bons)':(_umxMeasure==='kurv'?'kr pr. kunde (omsætning ÷ kunder)':'kr omsætning (inkl. moms)')));
   const farveTxt=_umxFarve==='col'?'farve pr. ugedag (mandage mod mandage)':'farve på samlet skala';
   const evNavne=[...new Set(uger.filter(r=>r.event&&r.event.navn).map(r=>r.event.navn))];

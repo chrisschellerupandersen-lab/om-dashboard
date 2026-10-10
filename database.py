@@ -1408,6 +1408,26 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
             SELECT dato, SUM(db_korrekt) AS db FROM v_transaktioner
             GROUP BY dato ORDER BY dato DESC LIMIT ?
         """, (int(uger) * 7,)).fetchall()}
+        bemanding, loen_ov, lev_ov, frost_per, _sen = _db_shopbox_kontekst(conn)
+    # Resultat (DB − løn − omk − levering), netto spild og resultat-e-spild pr. dag
+    res_day: Dict[str, float] = {}
+    spild_day: Dict[str, float] = {}
+    for r in rows:
+        dt = str(r["dato"])[:10]
+        dd = _d.fromisoformat(dt); wd0 = dd.weekday()
+        iy, iw, _w = dd.isocalendar()
+        bem = bemanding.get((iy, iw)); fuld = bem == "fuld"
+        ov = loen_ov.get(dt)
+        loennet = (ov == 1) if ov is not None else _db_loennet_dag(dt, wd0, fuld)
+        loen = 300.0 if ((dd.year, dd.month) >= _LOEN_START and loennet) else 0.0
+        lov = lev_ov.get(dt)
+        leveret = (lov == 1) if lov is not None else _db_leveret_dag(dt, wd0)
+        levering = _levering_pris(dt) if leveret else 0.0
+        res_day[dt] = round(db_day.get(dt, 0.0) - loen - 500.0 - levering)
+        sp = 0.0
+        if dt >= _ORGANIC_START:
+            sp = max(0.0, float(hent_dagens_spild_vaerdi(dt, detaljer=False) or 0) - float(frost_per.get(dt, 0.0)))
+        spild_day[dt] = round(sp)
     wk: Dict = {}
     for r in rows:
         dt = str(r["dato"])[:10]
@@ -1416,13 +1436,16 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         rec = wk.setdefault((y, w), {"aar": y, "uge": w, "oms": [None] * 7,
                                      "bons": [None] * 7, "oms_bag": [None] * 7,
                                      "stk_bag": [None] * 7, "db": [None] * 7,
-                                     "db_bag": [None] * 7})
+                                     "db_bag": [None] * 7, "res_e_spild": [None] * 7,
+                                     "spild": [None] * 7})
         rec["oms"][wd - 1] = round(float(r["oms"] or 0))
         rec["bons"][wd - 1] = int(r["bons"] or 0)
         rec["oms_bag"][wd - 1] = round(oms_bag.get(dt, 0.0))
         rec["stk_bag"][wd - 1] = int(stk_bag.get(dt, 0))
         rec["db"][wd - 1] = round(db_day.get(dt, 0.0))
         rec["db_bag"][wd - 1] = round(db_bag.get(dt, 0.0))
+        rec["spild"][wd - 1] = spild_day.get(dt, 0)
+        rec["res_e_spild"][wd - 1] = res_day.get(dt, 0) - spild_day.get(dt, 0)
     iso_i = _d.today().isocalendar()
     ud = []
     for key in sorted(wk.keys(), reverse=True):
@@ -1433,6 +1456,8 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         rec["stk_bag_total"] = sum(x for x in rec["stk_bag"] if x)
         rec["db_total"] = round(sum(x for x in rec["db"] if x))
         rec["db_bag_total"] = round(sum(x for x in rec["db_bag"] if x))
+        rec["res_e_spild_total"] = round(sum(x for x in rec["res_e_spild"] if x is not None))
+        rec["spild_total"] = round(sum(x for x in rec["spild"] if x is not None))
         rec["indevaerende"] = (rec["aar"] == iso_i[0] and rec["uge"] == iso_i[1])
         # Mærkedag/begivenhed for ugen (mors dag, påske, fastelavn m.fl.) — så man
         # kan se hvorfor en dag stikker af. dage = ugedags-index (0=man) der påvirkes.

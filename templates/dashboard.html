@@ -10476,7 +10476,7 @@ async function loadBagRegnskab(){
 // ── UGE × UGEDAG MATRIX ───────────────────────────────────────────────────────
 let _umxData = null, _umxScope = 'butik', _umxMeasure = 'db', _umxFarve = 'col', _umxUger = 16;
 const _UMX_MEASURES = {
-  butik: [['db','DB'],['res_spild','Resultat e. spild'],['oms','Omsætning'],['kunder','Kunder'],['kurv','Kurvstørrelse']],
+  butik: [['oms','Omsætning'],['db','DB'],['res_spild','Resultat e. spild'],['kunder','Kunder'],['kurv','Kurvstørrelse']],
   bag:   [['db','DB'],['oms','Omsætning'],['antal','Antal stk']],
 };
 async function loadUgeMatrix(){

@@ -767,10 +767,12 @@ async def api_produkt_salg_periode(request: Request, fra: str, til: str,
 
 
 @app.get("/api/salg/rest-kategori")
-async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None):
+async def api_dagens_rest_kategori(request: Request, dato: Optional[str] = None,
+                                   secret: Optional[str] = None):
     """Dagens restlager pr. kategori (bestilt − solgt) med sell-through til
-    'termometer' på Seneste dag. Uden dato bruges seneste dag."""
-    _kræv_login(request)
+    'termometer' på Seneste dag. Uden dato bruges seneste dag. Login ELLER ?secret=."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
     return database.hent_dagens_rest_kategori(dato)
 
 

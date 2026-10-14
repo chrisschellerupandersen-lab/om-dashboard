@@ -2133,6 +2133,75 @@ def hent_svind_kpi(dage: int = 28) -> Dict:
     }
 
 
+def hent_dagsopstilling(dato: str = None) -> Dict:
+    """Struktureret dags-opstilling pr. gruppe og vare til dashboardet: bestilt,
+    tastet salg, rapport-rest + klassifikation (udsolgt/oversolgt/rest/combo) og
+    pr. gruppe et estimat af svind (ikke-tastet salg = perishable net-rest værdisat
+    ved udsalgspris) og reelt spild-ref (kostpris). Kager bæres over."""
+    rk = hent_dagens_rest_kategori(dato)
+    if not rk.get("dato"):
+        return {"dato": None, "grupper": [], "total": {}}
+    PERISH = {"Brød", "Focaccia", "Boller", "Wiener"}
+    pk: Dict = {}
+    for p in _ORGANIC_BAKERY:
+        k = _organic_kat(p["navn"]) or _bakery_kat(p["navn"])
+        if not k:
+            continue
+        pk.setdefault(k, {"kost": [], "salg": []})
+        pk[k]["kost"].append(p["indkoeb"])
+        pk[k]["salg"].append(p["udsalg"])
+    catpris = {k: {"kost": sum(v["kost"]) / len(v["kost"]),
+                   "salg": sum(v["salg"]) / len(v["salg"])} for k, v in pk.items()}
+    if "Focaccia" not in catpris and "Brød" in catpris:
+        catpris["Focaccia"] = catpris["Brød"]
+
+    grupper = []
+    tot_tastet = tot_bestilt = 0
+    tot_svind_kr = tot_spild_kr = 0.0
+    tot_svind_stk = 0
+    for k in rk.get("kategorier", []):
+        perish = k["kategori"] in PERISH
+        varer = []
+        for v in k["varer"]:
+            r = v["rest"]
+            if v["type"] == "combo":
+                st = "combo"
+            elif not perish:
+                st = "baeres_over"
+            elif r < 0:
+                st = "oversolgt"
+            elif r == 0:
+                st = "udsolgt"
+            else:
+                st = "rest"
+            varer.append({"navn": v["varenavn"], "type": v["type"],
+                          "bestilt": v["bestilt"], "tastet": v["solgt"], "rest": r, "status": st})
+        pr = catpris.get(k["kategori"], {"kost": 0, "salg": 0})
+        net = max(0, int(k["rest"]))
+        svind_stk = net if perish else 0
+        svind_kr = net * pr["salg"] if perish else 0
+        spild_kr = net * pr["kost"] if perish else 0
+        grupper.append({
+            "kat": k["kategori"], "perishable": perish,
+            "bestilt": k["bestilt"], "tastet": k["solgt"], "rest": k["rest"],
+            "combo": k.get("combo_antal", 0), "varer": varer,
+            "svind_stk": svind_stk, "svind_kr": round(svind_kr), "spild_kr": round(spild_kr),
+            "baeres_over": (int(k["rest"]) if not perish else 0),
+        })
+        tot_bestilt += k["bestilt"]
+        tot_tastet += k["solgt"]
+        if perish:
+            tot_svind_stk += svind_stk
+            tot_svind_kr += svind_kr
+            tot_spild_kr += spild_kr
+    return {
+        "dato": rk["dato"], "grupper": grupper,
+        "total": {"bestilt": tot_bestilt, "tastet": tot_tastet,
+                  "svind_stk": tot_svind_stk, "svind_kr": round(tot_svind_kr),
+                  "spild_kr": round(tot_spild_kr)},
+    }
+
+
 def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     """Værdi (kr ex moms) af dagens bagværks-spild = Σ (bestilt − solgt friskt) ×
     kostpris pr. vare, ekskl. kager (sælges over flere dage). Kaffe-comboer tæller

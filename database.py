@@ -2154,6 +2154,17 @@ def hent_dagsopstilling(dato: str = None) -> Dict:
                    "salg": sum(v["salg"]) / len(v["salg"])} for k, v in pk.items()}
     if "Focaccia" not in catpris and "Brød" in catpris:
         catpris["Focaccia"] = catpris["Brød"]
+    # per-vare priser (katalogets faktiske kost/udsalg, matchet på navn)
+    navnpris = {p["navn"].strip().lower(): (p["indkoeb"], p["udsalg"]) for p in _ORGANIC_BAKERY}
+
+    def _vpris(navn):
+        n = (navn or "").strip().lower()
+        if n in navnpris:
+            return navnpris[n]
+        for key, val in navnpris.items():
+            if key in n or n in key:
+                return val
+        return (None, None)
 
     grupper = []
     tot_tastet = tot_bestilt = 0
@@ -2174,8 +2185,11 @@ def hent_dagsopstilling(dato: str = None) -> Dict:
                 st = "udsolgt"
             else:
                 st = "rest"
+            kstk, ustk = _vpris(v["varenavn"])
             varer.append({"navn": v["varenavn"], "type": v["type"],
-                          "bestilt": v["bestilt"], "tastet": v["solgt"], "rest": r, "status": st})
+                          "bestilt": v["bestilt"], "tastet": v["solgt"], "rest": r, "status": st,
+                          "kost_stk": (round(kstk, 2) if kstk is not None else None),
+                          "udsalg_stk": (round(ustk, 2) if ustk is not None else None)})
         pr = catpris.get(k["kategori"], {"kost": 0, "salg": 0})
         net = max(0, int(k["rest"]))
         svind_stk = net if perish else 0

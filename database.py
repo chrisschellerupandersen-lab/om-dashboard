@@ -2294,6 +2294,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     # variant-bestillingen i stedet for at efterlade falsk spild.
     kat_prod = {k: [] for k in KAT}
     ex = {k: 0 for k in KAT}          # bundle/combo-forbrug pr. kategori (valgfri varer)
+    oversold = {k: 0 for k in KAT}    # oversolgte varer modregner rest i samme kategori (kategori-netto)
     ex_lines = {k: [] for k in KAT}
     fam_agg: Dict[str, Dict] = {}     # fam -> {kat, bestilt, pris, navne}
     for b in best:
@@ -2311,6 +2312,8 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
         solgt_f = sum(solgt_pr_sku.get(s, 0) for s in fam_skus.get(fam, []))
         solgt_fam_total += solgt_f
         spild_f = max(0, a["bestilt"] - solgt_f)
+        if solgt_f > a["bestilt"]:                       # oversolgt familie modregner kategoriens rest
+            oversold[a["kat"]] += solgt_f - a["bestilt"]
         if spild_f > 0:
             label = _SPILD_FAMILIE_LABEL.get(fam) or a["navne"][0]
             kat_prod[a["kat"]].append({"navn": label, "pris": a["pris"], "stk": spild_f,
@@ -2340,7 +2343,7 @@ def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     for k in KAT:
         prods = kat_prod[k]
         gross = sum(p["stk"] for p in prods)
-        reduce = min(ex[k], gross)
+        reduce = min(ex[k] + oversold[k], gross)         # combo-forbrug + oversolgt (kategori-netto)
         alloc = [0] * len(prods)
         if gross > 0 and reduce > 0:
             raw = [p["stk"] / gross * reduce for p in prods]

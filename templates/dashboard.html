@@ -1633,9 +1633,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
         </div>
         <div class="card" id="dag-rest-card" hidden>
-          <div class="aar2-chart-hdr">
-            <span class="aar2-chart-ttl">Rest i dag pr. kategori</span>
-            <span class="aar2-chart-sub" id="dag-rest-sub">bestilt → solgt · tæller ned mod udsolgt</span>
+          <div class="aar2-chart-hdr" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;">
+              <span class="aar2-chart-ttl">Rest i dag pr. kategori</span>
+              <span class="aar2-chart-sub" id="dag-rest-sub">bestilt → solgt · tæller ned mod udsolgt</span>
+            </div>
+            <button onclick="openDagsopstilling()" style="font-family:'DM Mono',monospace;font-size:12px;padding:8px 14px;border:1px solid var(--forest);border-radius:7px;cursor:pointer;background:var(--forest);color:#fff;white-space:nowrap;">📋 Dagsopstilling</button>
           </div>
           <div id="dag-rest"></div>
         </div>
@@ -14041,8 +14044,106 @@ if (typeof loadReturStatus === 'function') {
   <div id="vf-modal-body" style="overflow-y:auto;padding:20px;flex:1;"></div>
 </div>
 
+<!-- DAGSOPSTILLING MODAL -->
+<div id="dop-overlay" onclick="lukDagsopstilling()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:1000;"></div>
+<div id="dop-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--white);border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.25);
+  z-index:1001;min-width:320px;max-width:780px;width:94vw;max-height:88vh;overflow:hidden;flex-direction:column;">
+  <div style="background:var(--forest);padding:14px 20px;display:flex;align-items:center;gap:12px;">
+    <span id="dop-titel" style="flex:1;font-family:'DM Mono',monospace;font-size:12px;letter-spacing:.06em;color:#fff;">Dagsopstilling</span>
+    <button onclick="lukDagsopstilling()" style="background:none;border:none;color:rgba(255,255,255,.7);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
+  </div>
+  <div id="dop-body" style="overflow-y:auto;padding:18px 20px;flex:1;"></div>
+</div>
+
 <script>
 const MND_NAVNE_LANG = ['Januar','Februar','Marts','April','Maj','Juni','Juli','August','September','Oktober','November','December'];
+
+const _DOP_UGEDAGE=['mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag'];
+function lukDagsopstilling(){ document.getElementById('dop-overlay').style.display='none';
+  document.getElementById('dop-modal').style.display='none'; }
+async function openDagsopstilling(){
+  const ov=document.getElementById('dop-overlay'), md=document.getElementById('dop-modal'), bd=document.getElementById('dop-body');
+  ov.style.display='block'; md.style.display='flex';
+  bd.innerHTML='<div class="empty" style="padding:40px;">Indlæser…</div>';
+  try{
+    const dq = (typeof _senesteDagDato!=='undefined' && _senesteDagDato) ? ('?dato='+_senesteDagDato) : '';
+    const d = await api('/api/salg/dagsopstilling'+dq);
+    renderDagsopstilling(d);
+  }catch(e){ bd.innerHTML='<div class="empty" style="padding:40px;">Kunne ikke hente opstilling</div>'; }
+}
+function _dopBadge(st){
+  const m={udsolgt:['#eef2ea','var(--moss)','udsolgt'],
+           oversolgt:['#eef2ea','var(--slate,#5c6f7a)','oversolgt'],
+           rest:['rgba(179,84,30,.12)','#b3541e','rest'],
+           combo:['#eef2ea','var(--moss)','combo'],
+           baeres_over:['rgba(92,111,122,.14)','#5c6f7a','bæres over']};
+  const x=m[st]||m.rest;
+  return '<span style="display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:'+x[0]+';color:'+x[1]+';white-space:nowrap;">'+x[2]+'</span>';
+}
+function renderDagsopstilling(d){
+  const bd=document.getElementById('dop-body');
+  if(!d || !d.dato){ bd.innerHTML='<div class="empty" style="padding:40px;">Ingen data for dagen</div>'; return; }
+  const mono="font-family:'DM Mono',monospace;";
+  const kr=v=>Math.round(v||0).toLocaleString('da-DK')+' kr';
+  const dt=new Date(d.dato+'T00:00:00');
+  const ugd=_DOP_UGEDAGE[(dt.getDay()+6)%7];
+  document.getElementById('dop-titel').textContent='Dagsopstilling · '+ugd+' '+dt.getDate()+'/'+(dt.getMonth()+1);
+  const t=d.total;
+  // resumé-tiles
+  const tiles=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;">
+    <div style="background:var(--surface,#fff);border:1px solid var(--line,#e2e7dd);border-left:4px solid var(--moss);border-radius:10px;padding:11px 13px;min-width:0;">
+      <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">Tastet solgt</div>
+      <div style="${mono}font-size:21px;font-weight:600;color:var(--moss);">${t.tastet}</div>
+      <div style="${mono}font-size:10px;color:var(--ash);">af ${t.bestilt} bestilt</div></div>
+    <div style="background:var(--surface,#fff);border:1px solid var(--line,#e2e7dd);border-left:4px solid #bf8a2a;border-radius:10px;padding:11px 13px;min-width:0;">
+      <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">Rest (perishable)</div>
+      <div style="${mono}font-size:21px;font-weight:600;color:#bf8a2a;">${t.svind_stk} stk</div>
+      <div style="${mono}font-size:10px;color:var(--ash);">spild-ref ${kr(t.spild_kr)}</div></div>
+    <div style="background:var(--surface,#fff);border:1px solid var(--line,#e2e7dd);border-left:4px solid #b3541e;border-radius:10px;padding:11px 13px;min-width:0;">
+      <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">Est. svind (tabt oms.)</div>
+      <div style="${mono}font-size:21px;font-weight:600;color:#b3541e;">${kr(t.svind_kr)}</div>
+      <div style="${mono}font-size:10px;color:var(--ash);">hvis ikke-tastet salg</div></div>
+    <div style="background:var(--surface,#fff);border:1px solid var(--line,#e2e7dd);border-left:4px solid #5c6f7a;border-radius:10px;padding:11px 13px;min-width:0;">
+      <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">Bæres over</div>
+      <div style="${mono}font-size:21px;font-weight:600;color:#5c6f7a;">${(d.grupper.find(g=>!g.perishable)||{}).baeres_over||0}</div>
+      <div style="${mono}font-size:10px;color:var(--ash);">kager → i morgen</div></div>
+  </div>`;
+  // grupper
+  const grps=d.grupper.map(g=>{
+    const rows=g.varer.map(v=>`<tr>
+      <td style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--line,#eee);${v.type==='combo'?'color:var(--ash);font-style:italic;':''}">${v.type==='combo'?'+ ':''}${v.navn}</td>
+      <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.type==='combo'?'—':v.bestilt}</td>
+      <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.tastet}</td>
+      <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.type==='combo'?'—':v.rest}</td>
+      <td style="text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${_dopBadge(v.status)}</td></tr>`).join('');
+    const info = g.perishable
+      ? `rest ${g.rest} · est. svind ${kr(g.svind_kr)}`
+      : `bæres til i morgen`;
+    return `<div style="background:var(--surface,#fff);border:1px solid var(--line,#e2e7dd);border-radius:12px;padding:14px 15px;margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <h3 style="margin:0;font-size:17px;">${g.kat}</h3>
+        <span style="${mono}font-size:11px;color:var(--ash);">bestilt ${g.bestilt} · tastet ${g.tastet} · ${info}</span></div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:380px;">
+        <thead><tr>
+          <th style="text-align:left;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Vare</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Bestilt</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Tastet</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Rest</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Status</th>
+        </tr></thead><tbody>${rows}</tbody>
+        <tfoot><tr style="font-weight:700;background:rgba(47,90,48,.05);">
+          <td style="text-align:left;padding:7px 8px;border-top:2px solid var(--line,#ddd);">I alt — ${g.kat}</td>
+          <td style="${mono}text-align:right;padding:7px 8px;border-top:2px solid var(--line,#ddd);">${g.bestilt}</td>
+          <td style="${mono}text-align:right;padding:7px 8px;border-top:2px solid var(--line,#ddd);">${g.tastet}</td>
+          <td style="${mono}text-align:right;padding:7px 8px;border-top:2px solid var(--line,#ddd);">${g.rest}</td>
+          <td style="text-align:right;padding:7px 8px;border-top:2px solid var(--line,#ddd);">${g.perishable?('<span style=\"'+mono+'font-size:11px;color:#b3541e;\">'+kr(g.svind_kr)+'</span>'):'<span style=\"'+mono+'font-size:11px;color:#5c6f7a;\">over</span>'}</td>
+        </tr></tfoot></table></div></div>`;
+  }).join('');
+  const note=`<div style="font-size:12px;color:var(--ash);line-height:1.6;background:rgba(47,90,48,.05);border-radius:10px;padding:12px 14px;margin-top:4px;">
+    <b>Sådan læses den:</b> Butikken er ubemandet, og combo-menuerne er krediteret korrekt. Forskel mellem bestilt og tastet er enten <b style="color:#bf8a2a;">reelt spild</b> (stod tilbage) eller <b style="color:#b3541e;">svind</b> (solgt uden at blive tastet). "Est. svind" værdisætter perishable-rest til udsalgspris. Kager bæres over (ikke spild). Combo-stk fordeles på gruppen, ikke på enkeltvarer.</div>`;
+  bd.innerHTML=tiles+grps+note;
+}
 
 async function vfDrillDown(aar, maaned, type) {
   const modal   = document.getElementById('vf-modal');

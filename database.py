@@ -2190,11 +2190,24 @@ def hent_dagsopstilling(dato: str = None) -> Dict:
                           "bestilt": v["bestilt"], "tastet": v["solgt"], "rest": r, "status": st,
                           "kost_stk": (round(kstk, 2) if kstk is not None else None),
                           "udsalg_stk": (round(ustk, 2) if ustk is not None else None)})
+        # Netto-rest værdisættes på de varer der FAKTISK har rest (vægtet efter deres
+        # egen pris), ikke gruppens snit — ellers trækker fx Focaccia brød-snittet skævt.
         pr = catpris.get(k["kategori"], {"kost": 0, "salg": 0})
         net = max(0, int(k["rest"]))
         svind_stk = net if perish else 0
-        svind_kr = net * pr["salg"] if perish else 0
-        spild_kr = net * pr["kost"] if perish else 0
+        pos = [vv for vv in varer if vv["type"] != "combo" and vv["rest"] > 0
+               and vv.get("kost_stk") is not None]
+        p_sum = sum(vv["rest"] for vv in pos)
+        if perish and net > 0 and p_sum > 0:
+            w_kost = sum(vv["rest"] * vv["kost_stk"] for vv in pos) / p_sum
+            w_salg = sum(vv["rest"] * (vv["udsalg_stk"] or 0) for vv in pos) / p_sum
+            svind_kr = net * w_salg
+            spild_kr = net * w_kost
+        elif perish and net > 0:
+            svind_kr = net * pr["salg"]
+            spild_kr = net * pr["kost"]
+        else:
+            svind_kr = spild_kr = 0
         grupper.append({
             "kat": k["kategori"], "perishable": perish,
             "bestilt": k["bestilt"], "tastet": k["solgt"], "rest": k["rest"],

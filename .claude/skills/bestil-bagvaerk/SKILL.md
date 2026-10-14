@@ -14,7 +14,7 @@ Hjælp brugeren med at lægge ugens bagværksordre i Organic Bakery's webshop, b
 - Hvis noget er uklart (vare kan ikke findes, pris/antal ser forkert ud), så **stop og spørg** frem for at gætte.
 
 ## Webshop
-Organic Bakery's webshop (Shopify-baseret). **URL:** spørg brugeren første gang hvis den ikke er oplyst, og foreslå at den bliver skrevet ind her i skillen bagefter, så den huskes. (Når URL'en kendes, erstat denne linje med: `URL: <url>`.)
+Organic Bakery's webshop (Shopify-baseret). **URL: https://organicbakery.dk/** — åbn denne i brugerens Chrome. Bestillingen/kontoen kan ligge bag login eller en "Min konto"/"Bestilling"-side; naviger derhen, og bed brugeren logge ind selv hvis nødvendigt.
 
 ## Fremgangsmåde
 

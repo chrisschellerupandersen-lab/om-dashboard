@@ -1873,6 +1873,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           <h2>Spild-håndtering</h2>
           <p>Hvor gode er vi til at håndtere spild? Kvalitet (spild% mod 15 %-norm) og konsekvens (hvor meget af resultatet spildet æder) — Organic-æraen.</p>
         </div>
+        <div id="svindkpi-wrap" style="margin-bottom:22px;"><div class="empty" style="padding:24px;">Indlæser…</div></div>
         <div id="spildscore-wrap"><div class="empty" style="padding:40px;">Indlæser…</div></div>
       </div>
 
@@ -8464,7 +8465,77 @@ function renderUgeSammenlign(d){
 // ── SPILD-HÅNDTERING (score) ───────────────────────────────────────────────
 function _spildFarve(p){ return p<15?'var(--moss)':(p<25?'#8a6800':'var(--danger)'); }
 function _spildStatusTxt(s){ return s==='god'?'Fremragende':(s==='ok'?'Ok — kan strammes':'For højt'); }
+async function loadSvindKpi(){
+  const wrap = document.getElementById('svindkpi-wrap');
+  if(!wrap) return;
+  wrap.innerHTML = '<div class="empty" style="padding:24px;">Indlæser…</div>';
+  try { const d = await api('/api/svind/kpi?dage=42'); renderSvindKpi(d); }
+  catch(e){ wrap.innerHTML = '<div class="empty" style="padding:24px;">Kunne ikke hente svind-data</div>'; }
+}
+function renderSvindKpi(d){
+  const wrap = document.getElementById('svindkpi-wrap');
+  if(!d || !d.total || !d.dage || !d.dage.length){ wrap.innerHTML=''; return; }
+  const mono="font-family:'DM Mono',monospace;";
+  const kr = v => Math.round(v||0).toLocaleString('da-DK')+' kr';
+  const t=d.total;
+  const tr=t.trend_pct;
+  const trTxt = tr==null?'—':(tr>0?'+'+tr+'%':tr+'%');
+  const trCol = tr==null?'var(--ash)':(tr>0?'#b3541e':'var(--moss)');   // mindre svind = godt
+  // uge-søjler (sidste ~6 hele uger), skaleret til max
+  const uger=(d.uger||[]).slice(-6);
+  const maxU=Math.max(1,...uger.map(u=>u.svind_salg));
+  const bars=uger.map(u=>{ const h=Math.round(8+72*u.svind_salg/maxU);
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+      <div style="${mono}font-size:10px;color:var(--ash);">${kr(u.svind_salg)}</div>
+      <div title="u.${u.uge}: ${kr(u.svind_salg)} (${u.stk} stk, ${u.dage} dage)" style="width:70%;max-width:38px;height:${h}px;background:linear-gradient(180deg,#d98a3d,#b3541e);border-radius:4px 4px 0 0;"></div>
+      <div style="${mono}font-size:10px;color:var(--charcoal);font-weight:600;">u.${u.uge}</div>
+      <div style="${mono}font-size:9px;color:var(--ash);">${Math.round(u.svind_salg/Math.max(1,u.dage))}/dag</div>
+    </div>`; }).join('');
+  // seneste 3 dage mini
+  const sidste=(d.dage||[]).slice(-3).map(x=>{
+    const katTxt=Object.entries(x.pr_kat||{}).map(([k,v])=>k+' '+v).join(' · ')||'—';
+    const dd=x.dato.slice(5);
+    return `<div style="display:flex;justify-content:space-between;gap:10px;${mono}font-size:11px;padding:3px 0;border-bottom:1px solid var(--line-soft,rgba(30,58,30,.08));">
+      <span style="color:var(--charcoal);">${dd}${x.idag?' <span style=\"color:var(--gold);\">i dag*</span>':''}</span>
+      <span style="color:var(--ash);">${katTxt}</span>
+      <span style="color:#b3541e;font-weight:600;min-width:58px;text-align:right;">${kr(x.svind_salg)}</span></div>`;
+  }).join('');
+  wrap.innerHTML=`
+  <div class="card" style="padding:18px 20px;border-left:4px solid #b3541e;">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px;margin-bottom:4px;">
+      <h3 style="margin:0;font-size:16px;">Svind — ikke-tastet salg (tabt omsætning)</h3>
+      <span style="${mono}font-size:11px;color:${trCol};">seneste uge ${trTxt} vs. ugen før</span>
+    </div>
+    <p style="margin:0 0 16px;font-size:12px;color:var(--ash);line-height:1.5;">
+      Butikken er ubemandet, og combo-beregningen er korrekt — så perishable-"rest" (bestilt − tastet salg) er i praksis salg der ikke bliver tastet/betalt. Værdisat til <b>udsalgspris</b>. Kager holdt ude (sælges over flere dage).
+    </p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;">
+      <div style="background:rgba(179,84,30,.06);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--ash);margin-bottom:2px;">Tabt omsætning / dag</div>
+        <div style="${mono}font-size:24px;font-weight:700;color:#b3541e;">${kr(t.pr_dag_salg)}</div>
+        <div style="${mono}font-size:11px;color:var(--ash);">${t.pr_dag_stk} stk/dag</div>
+      </div>
+      <div style="background:rgba(179,84,30,.06);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--ash);margin-bottom:2px;">Pr. måned (ca.)</div>
+        <div style="${mono}font-size:24px;font-weight:700;color:#b3541e;">${kr(t.pr_maaned_salg)}</div>
+        <div style="${mono}font-size:11px;color:var(--ash);">~30 dage</div>
+      </div>
+      <div style="background:rgba(30,58,30,.05);border-radius:8px;padding:12px;">
+        <div style="font-size:11px;color:var(--ash);margin-bottom:2px;">Kostpris-ref (reelt spild hvis kasseret)</div>
+        <div style="${mono}font-size:24px;font-weight:700;color:var(--forest);">${kr(Math.round(t.svind_kost/Math.max(1,t.n_dage)))}</div>
+        <div style="${mono}font-size:11px;color:var(--ash);">/dag · ${t.n_dage} hele dage</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:6px;height:120px;margin-bottom:14px;">${bars}</div>
+    <div style="margin-top:6px;">
+      <div style="font-size:11px;color:var(--ash);margin-bottom:4px;">Seneste dage:</div>
+      ${sidste}
+      <div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">*i dag kan være ufærdig og tælles ikke med i snit/totaler.</div>
+    </div>
+  </div>`;
+}
 async function loadSpildScore(){
+  loadSvindKpi();
   const wrap = document.getElementById('spildscore-wrap');
   wrap.innerHTML = '<div class="empty" style="padding:24px;">Indlæser…</div>';
   const d = await api('/api/spild/score?antal_uger=10');

@@ -2188,10 +2188,16 @@ def hent_dagsopstilling(dato: str = None) -> Dict:
             else:
                 st = "rest"
             kstk, ustk = _vpris(v["varenavn"])
+            gange = faktor = None
+            if v["type"] == "combo":
+                rolle = _bageri_rolle(v["varenavn"])
+                faktor = rolle[2] if rolle else 1
+                gange = round(v["solgt"] / faktor) if faktor else v["solgt"]
             varer.append({"navn": v["varenavn"], "type": v["type"],
                           "bestilt": v["bestilt"], "tastet": v["solgt"], "rest": r, "status": st,
                           "kost_stk": (round(kstk, 2) if kstk is not None else None),
-                          "udsalg_stk": (round(ustk, 2) if ustk is not None else None)})
+                          "udsalg_stk": (round(ustk, 2) if ustk is not None else None),
+                          "gange": gange, "faktor": faktor})
         # Netto-rest værdisættes på de varer der FAKTISK har rest (vægtet efter deres
         # egen pris), ikke gruppens snit — ellers trækker fx Focaccia brød-snittet skævt.
         pr = catpris.get(k["kategori"], {"kost": 0, "salg": 0})

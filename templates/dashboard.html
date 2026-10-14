@@ -14114,7 +14114,7 @@ function renderDagsopstilling(d){
     const rows=g.varer.map(v=>{
       const kostCell=(v.type==='combo'||v.kost_stk==null)?'—':`${Math.round(v.kost_stk)} kr`;
       return `<tr>
-      <td style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--line,#eee);${v.type==='combo'?'color:var(--ash);font-style:italic;':''}">${v.type==='combo'?'+ ':''}${v.navn}</td>
+      <td style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--line,#eee);${v.type==='combo'?'color:var(--ash);font-style:italic;':''}">${v.type==='combo'?'+ ':''}${v.navn}${(v.type==='combo'&&v.gange!=null)?` <span style="${mono}font-style:normal;font-size:11px;color:var(--moss);">· solgt ${v.gange} ${v.gange===1?'gang':'gange'}${v.faktor>1?' à '+v.faktor:''}</span>`:''}</td>
       <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.type==='combo'?'—':v.bestilt}</td>
       <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.tastet}</td>
       <td style="${mono}text-align:right;padding:6px 8px;border-bottom:1px solid var(--line,#eee);">${v.type==='combo'?'—':v.rest}</td>

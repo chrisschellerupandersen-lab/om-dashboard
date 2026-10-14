@@ -2412,6 +2412,15 @@ async def api_bagvaerk_anbefaling(request: Request, antal: int = 12):
     return database.hent_bestilling_anbefaling(int(antal))
 
 
+@app.get("/api/svind/kpi")
+async def api_svind_kpi(request: Request, dage: int = 28, secret: Optional[str] = None):
+    """Svind-KPI (ubemandet butik): perishable-rest = ikke-tastet salg → tabt
+    omsætning. Login ELLER ?secret=."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_svind_kpi(int(dage))
+
+
 @app.get("/api/spild/dagsniveau")
 async def api_spild_dagsniveau(request: Request, uge: Optional[int] = None, aar: Optional[int] = None):
     _kræv_login(request)

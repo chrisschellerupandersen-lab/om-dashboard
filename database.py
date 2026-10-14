@@ -2045,6 +2045,94 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
                       "pct": round(tot_s / tot_b * 100) if tot_b > 0 else 0}}
 
 
+def hent_svind_kpi(dage: int = 28) -> Dict:
+    """Svind-KPI til den UBEMANDEDE butik. Combo-beregningen er korrekt, så den
+    daglige perishable-rest (bestilt − tastet salg) er i praksis IKKE-TASTET salg
+    (svind), ikke spild — butikken sælger reelt ud (verificeret fysisk). Vi
+    værdisætter rest ved UDSALGSPRIS = estimeret TABT OMSÆTNING, og viser kostpris
+    som reference. Kager holdes ude (sælges over flere dage). Dagens dato regnes
+    med i listen men holdes ude af totaler/snit (kan være ufærdig)."""
+    from datetime import date as _d, timedelta
+    PERISH = ["Brød", "Focaccia", "Boller", "Wiener"]
+    pk: Dict = {}
+    for p in _ORGANIC_BAKERY:
+        k = _organic_kat(p["navn"]) or _bakery_kat(p["navn"])
+        if not k:
+            continue
+        pk.setdefault(k, {"kost": [], "salg": []})
+        pk[k]["kost"].append(p["indkoeb"])
+        pk[k]["salg"].append(p["udsalg"])
+    catpris = {k: {"kost": sum(v["kost"]) / len(v["kost"]),
+                   "salg": sum(v["salg"]) / len(v["salg"])} for k, v in pk.items()}
+    if "Focaccia" not in catpris and "Brød" in catpris:
+        catpris["Focaccia"] = catpris["Brød"]
+
+    with _conn() as conn:
+        row = conn.execute("SELECT MAX(dato) AS d FROM transaktioner").fetchone()
+        seneste = row["d"] if row else None
+    if not seneste:
+        return {"dage": [], "uger": [], "total": {}, "seneste": None}
+    slut = _d.fromisoformat(str(seneste)[:10])
+    start = slut - timedelta(days=max(1, dage) - 1)
+    idag = _d.today().isoformat()
+
+    dage_liste = []
+    d = start
+    while d <= slut:
+        rk = hent_dagens_rest_kategori(d.isoformat())
+        if not rk.get("dato"):
+            d += timedelta(days=1)
+            continue
+        sv_salg = sv_kost = 0.0
+        stk = 0
+        per_kat: Dict = {}
+        for k in rk.get("kategorier", []):
+            if k["kategori"] not in PERISH:
+                continue
+            nr = max(0, int(k["rest"]))
+            if nr <= 0:
+                continue
+            pr = catpris.get(k["kategori"], {"kost": 0, "salg": 0})
+            sv_salg += nr * pr["salg"]
+            sv_kost += nr * pr["kost"]
+            stk += nr
+            per_kat[k["kategori"]] = nr
+        dage_liste.append({"dato": d.isoformat(), "ugedag": d.weekday(), "stk": stk,
+                           "svind_salg": round(sv_salg), "svind_kost": round(sv_kost),
+                           "pr_kat": per_kat, "idag": d.isoformat() == idag})
+        d += timedelta(days=1)
+
+    hele = [x for x in dage_liste if not x["idag"]]      # totaler kun på færdige dage
+    uger: Dict = {}
+    for x in hele:
+        dt = _d.fromisoformat(x["dato"])
+        iy, iw, _ = dt.isocalendar()
+        u = uger.setdefault((iy, iw), {"aar": iy, "uge": iw, "stk": 0,
+                                       "svind_salg": 0, "svind_kost": 0, "dage": 0})
+        u["stk"] += x["stk"]
+        u["svind_salg"] += x["svind_salg"]
+        u["svind_kost"] += x["svind_kost"]
+        u["dage"] += 1
+    uger_liste = sorted(uger.values(), key=lambda u: (u["aar"], u["uge"]))
+
+    n = len(hele) or 1
+    tot_salg = sum(x["svind_salg"] for x in hele)
+    tot_kost = sum(x["svind_kost"] for x in hele)
+    tot_stk = sum(x["stk"] for x in hele)
+    trend = None
+    if len(uger_liste) >= 2:
+        a, b = uger_liste[-1], uger_liste[-2]
+        ad = a["svind_salg"] / max(1, a["dage"])
+        bd = b["svind_salg"] / max(1, b["dage"])
+        trend = round((ad - bd) / bd * 100) if bd else None
+    return {
+        "dage": dage_liste, "uger": uger_liste, "seneste": seneste,
+        "total": {"stk": tot_stk, "svind_salg": round(tot_salg), "svind_kost": round(tot_kost),
+                  "pr_dag_salg": round(tot_salg / n), "pr_dag_stk": round(tot_stk / n, 1),
+                  "pr_maaned_salg": round(tot_salg / n * 30), "n_dage": n, "trend_pct": trend},
+    }
+
+
 def hent_dagens_spild_vaerdi(dato: str, detaljer: bool = False):
     """Værdi (kr ex moms) af dagens bagværks-spild = Σ (bestilt − solgt friskt) ×
     kostpris pr. vare, ekskl. kager (sælges over flere dage). Kaffe-comboer tæller

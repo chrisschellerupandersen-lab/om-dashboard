@@ -15,6 +15,9 @@ const WEBHOOK_SECRET = 'OM-Greve-2026-Hemlig';
 const SØGEORD        = '{Varesalgsrapport "Items Sales Report"}';
 const FRA_ADRESSE    = '';
 const LABEL_NAVN     = 'rapport-sendt';
+// Oprydning: behold de nyeste N behandlede rapporter (resten flyttes til papirkurv).
+// De nyeste beholdes, så opdaterLøbende stadig kan genbruge et friskt download-link.
+const BEHOLD_RAPPORTER = 5;
 
 // ── HOVEDFUNKTION ─────────────────────────────────────────────────────────────
 function tjekMail() {
@@ -85,6 +88,27 @@ function tjekMail() {
       Logger.log('✗ Fejl: ' + e.toString());
     }
   }
+
+  ryddGamleRapporter();
+}
+
+// ── OPRYDNING: FLYT GAMLE BEHANDLEDE RAPPORTER TIL PAPIRKURV ───────────────────
+/**
+ * Shopbox sender rapporten meget ofte (hvert par minutter), så de behandlede
+ * mails hober sig op. Denne rydder op: beholder de NYESTE BEHOLD_RAPPORTER
+ * (så opdaterLøbende stadig har et friskt download-link) og flytter resten til
+ * papirkurven. Rører KUN mails med label 'rapport-sendt' = allerede sendt til
+ * Railway + dashboard, så der mistes aldrig data. (Papirkurv = 30 dages fortrydelse.)
+ */
+function ryddGamleRapporter() {
+  var tråde = GmailApp.search('label:' + LABEL_NAVN, 0, 200);  // nyeste først
+  var antal = 0;
+  for (var i = BEHOLD_RAPPORTER; i < tråde.length; i++) {
+    tråde[i].moveToTrash();
+    antal++;
+  }
+  Logger.log('Oprydning: ' + antal + ' gamle rapport(er) flyttet til papirkurv (beholdt ' +
+             Math.min(BEHOLD_RAPPORTER, tråde.length) + ')');
 }
 
 // ── FIND SHOPBOX DOWNLOAD-LINK ────────────────────────────────────────────────

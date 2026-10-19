@@ -139,7 +139,7 @@ def _bakery_kat(n: str) -> Optional[str]:
                             "kødbolle", "kodbolle", "kød bolle", "frikadelle",
                             "boller i karry", "boller i tomat", "fiskefrikadelle",
                             "knæk", "knaek", "glutenfri", "glutenfrit",
-                            "samsø", "samso", "samsoe")):
+                            "samsø", "samso", "samsoe", "anker", "ankers")):
         return None
     # Kaffe-combos: bagværks-delen tæller med (tjekkes FØR de generiske regler,
     # da "wienerbrød" ellers fanges af "brød"). Ren kaffe uden bagværk = None.

@@ -106,6 +106,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},
+    {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [],
+     "seed": {"man": 0, "tir": 2, "ons": 0, "tor": 0, "fre": 3, "loe": 0, "son": 0}},  # NY vare (uge 43, ordre #1079) — endnu intet kassesalg/SKU; tilføj salg_kilde-varenummer når den har solgt (vare-opslag q=banan). udsalg 79,2 = 2× kost (bekræft rigtig pris)
 ]
 
 # Bundle-varer: sælges som 1 kasselinje, men er reelt N stk af en basisvare.
@@ -148,7 +150,8 @@ def _bakery_kat(n: str) -> Optional[str]:
             return "Boller"                        # Kaffe m BMO (bolle med ost)
         return None
     if any(k in n for k in ("gulerodskage", "cookie", "kage", "muffin", "brownie",
-                            "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat")):
+                            "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat",
+                            "bananbrød", "bananbrod")):
         return "Kage"
     if "wien" in n:                                           # wienerbrød/wienerstang → Wiener (FØR 'brød')
         return "Wiener"
@@ -198,7 +201,7 @@ def _kombo_navn(navn: str) -> str:
 def _organic_kat(navn: str) -> str:
     """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
     n = (navn or "").lower()
-    if any(k in n for k in ("gulerodskage", "cookie")):
+    if any(k in n for k in ("gulerodskage", "cookie", "bananbrød", "bananbrod")):
         return "Kage"
     if "bolle" in n:                                   # tebolle + surdejsbolle
         return "Boller"

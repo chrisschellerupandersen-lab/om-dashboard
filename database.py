@@ -88,7 +88,7 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 6, "tir": 8, "ons": 8, "tor": 10, "fre": 16, "loe": 26, "son": 26}},  # startbud ~100/uge = faktisk niveau (sælger ud ~86% ST; mis-indtastning gør SKU-salg upålideligt)
     {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10482],
      "seed": {"man": 4, "tir": 5, "ons": 5, "tor": 5, "fre": 9, "loe": 14, "son": 12}},  # NY vare — SKU 10482 til solgt/spild; startbud ~54/uge indtil historik
-    {"navn": "Focaccia",                "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [11158, 10434]},
+    # Focaccia UDGÅET (sælges ikke mere, okt 2026) — fjernet fra anbefaling/bestilling.
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},

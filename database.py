@@ -7339,6 +7339,16 @@ def hent_bestillings_uge_sellthrough(maal_uge: int, maal_aar: int,
     }
 
 
+# Ferie-/atypiske uger der UDELUKKES fra normal-uge-grundlaget (median + trend + gns2),
+# så fx en stille efterårsferie ikke trækker forecastet for en normal uge skævt.
+# Data slettes IKKE — selve ferie-/helligdagsugen håndteres som event-faktor på MÅL-ugen
+# (_events_for_aar). Tøm sættet for at slå udelukkelsen fra. Nøgle = (iso_aar, iso_uge).
+_FERIE_UGER = {(2026, 42)}   # efterårsferie 2026
+
+def _uge_er_ferie(iso_aar: int, iso_uge: int) -> bool:
+    return (iso_aar, iso_uge) in _FERIE_UGER
+
+
 def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                                  service: dict = None) -> Dict:
     """Organic Bakery-anbefaling (fra 1/9): fuld liste over de 16 nye varer.
@@ -7366,6 +7376,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             SELECT DISTINCT dato FROM transaktioner
             WHERE dato >= ? AND dato < ? ORDER BY dato
         """, (vindue_start, maal_mon)).fetchall()]
+        # Udeluk ferie-/atypiske uger fra grundlaget (median/trend/gns2 bygger kun på
+        # 'aabne' + aabne_set). Data i salg{} bevares, men tilgås kun via disse datoer.
+        if _FERIE_UGER:
+            aabne = [d for d in aabne
+                     if not _uge_er_ferie(*date.fromisoformat(d).isocalendar()[:2])]
         salg: Dict = {}
         if alle_kilde:
             ph = ",".join("?" * len(alle_kilde))
@@ -7431,7 +7446,17 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     _idag       = date.today()
     _denne_mon  = _idag - timedelta(days=_idag.weekday())        # mandag i indeværende uge
     _sidste_hele_mon = _denne_mon - timedelta(days=7)            # ugen før = seneste hele uge
-    forrige_mon = min(mon_dato - timedelta(days=7), _sidste_hele_mon)
+    def _ikke_ferie_bagud(start_mon, n):
+        """De n seneste hele IKKE-ferie-uge-mandage t.o.m. start_mon (nyeste først)."""
+        out = []; m = start_mon
+        while len(out) < n and m.isoformat() >= _ORGANIC_START:
+            if not _uge_er_ferie(*m.isocalendar()[:2]):
+                out.append(m)
+            m -= timedelta(days=7)
+        return out
+    _cap_mon = min(mon_dato - timedelta(days=7), _sidste_hele_mon)
+    _nf_mon = _ikke_ferie_bagud(_cap_mon, 1)
+    forrige_mon = _nf_mon[0] if _nf_mon else _cap_mon           # spring ferie-uger over
     # Udelad de ugedage anbefalingen IKKE dækker (fx mandag 31/8 i uge 36 = gammel
     # bager, anbefalet=0), så forrige-uge-tallet kan sammenlignes æble-til-æble.
     nul_wd = {i for i in range(7)
@@ -7441,7 +7466,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     sidste_dage  = [d for d in aabne if sidste_start <= d < sidste_slut
                     and date.fromisoformat(d).weekday() not in nul_wd]
     # Til "Forslag gns. sidste 2 uger": de 2 seneste hele ugers mandage + sæt af åbne dage
-    _2uger_mon = [forrige_mon, forrige_mon - timedelta(days=7)]
+    _2uger_mon = _ikke_ferie_bagud(forrige_mon, 2) or [forrige_mon]
     aabne_set  = set(aabne)
 
     # ── Weekend-buffer på spildfri varer ──────────────────────────────────────
@@ -7450,9 +7475,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # dage. Spild-tunge varer (og risiko/kage) rører vi IKKE — de holdes stramme.
     WEEKEND_BUFFER = {"fre": 1.08, "loe": 1.18, "son": 1.18}
     SPILDFRI_TAERSKEL = 0.85          # solgt ÷ bestilt ≥ 85 % ⇒ spildfri
-    _recent_mons = [m for m in (forrige_mon, forrige_mon - timedelta(days=7),
-                                forrige_mon - timedelta(days=14))
-                    if m.isoformat() >= _ORGANIC_START]
+    _recent_mons = _ikke_ferie_bagud(forrige_mon, 3)
     _best_tot: Dict[str, float] = {}
     with _conn() as conn:
         for wkmon in _recent_mons:
@@ -7784,8 +7807,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
         # Hvilken uge "Forrige uge"/"sidste_uge" (faktisk salg) refererer til —
         # seneste HELE uge før målugen (kan være måluge−1 eller −2). Til kolonne-labels.
         "forrige_uge":  {"uge": forrige_mon.isocalendar()[1], "aar": forrige_mon.isocalendar()[0]},
-        "gns2_uger":    [forrige_mon.isocalendar()[1],
-                         (forrige_mon - timedelta(days=7)).isocalendar()[1]],
+        "gns2_uger":    [m.isocalendar()[1] for m in _2uger_mon],
+        "ferie_udeladt": sorted(f"{a}-u{u}" for (a, u) in _FERIE_UGER),
         "faktisk":      False,
     }
 

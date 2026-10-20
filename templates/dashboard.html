@@ -4558,7 +4558,7 @@ async function _bageriRender(){
     let katPrev = 0, katPrevHar = false, katGns2 = 0;
     body += `<tr style="background:rgba(45,74,45,.07);"><td colspan="${nCols}" style="font-weight:600;font-size:11px;color:var(--forest);letter-spacing:.04em;">${kat.toUpperCase()}</td></tr>`;
     prods.forEach(p=>{
-      if (isDelta && p.kombo) return;   // combo har ingen bestilling → ikke relevant i Δ-visning
+      if (p.kombo) return;   // combo/bundle-salg kan ikke bestilles hos bageriet → vis dem ikke i bestillingen (krediteres allerede de enkelte varer)
       const risk = p.risikogruppe==='risiko';
       const badge = risk
         ? `<span class="bageri-badge" style="background:#8a3a3a;color:#fff;" title="Ikke-fryse-egnet — bestilt stramt">stram</span>` : '';

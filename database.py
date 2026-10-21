@@ -7505,7 +7505,7 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     # end løssalget alene viser, så de får dobbelt vægt i fordelingen (snurrer trækkes
     # tilsvarende ned). Vægten ganges på varens salg, når combo-andelen beregnes.
     _COMBO_PREF = {"Croissant", "Pain au Chocolate", "Tebirkes"}
-    _COMBO_PREF_VAEGT = 2.0
+    _COMBO_PREF_VAEGT = 2.5
     def _cvaegt(_navn):
         return _COMBO_PREF_VAEGT if _navn in _COMBO_PREF else 1.0
     kat_wsold_d: Dict = {}          # (kat, dato) -> Σ vægt × standalone-salg
@@ -7575,6 +7575,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                 if aeldre > 0:
                     trend = nyere / aeldre
             trend = max(0.80, min(1.20, trend))
+            # Trend-gulv for wienerbrød: de sælges hurtigt ud (meget via 3x-comboen), så
+            # en faldende trend må ikke trække topsælgerne for langt ned — ellers render vi
+            # tør. Wiener-trenden gulves derfor ved 0.95 (max 5% nedjustering).
+            if _pk == "Wiener":
+                trend = max(0.95, trend)
             basis_dag, anb_dag = {}, {}
             wb = p["navn"] in spildfri
             for i, dn in enumerate(DAGE):

@@ -81,6 +81,11 @@
   .dnum{width:22px;text-align:center;font-weight:700;color:var(--muted)}
   .dname{flex:1;font-size:.9rem}
   .badge-paid{font-size:.66rem;background:var(--green);color:#fff;padding:2px 7px;border-radius:999px}
+  .box.clk{cursor:pointer}
+  .approve{font-size:.68rem;padding:3px 10px;border-radius:999px;background:#f0ece2;color:var(--muted);border:1px solid var(--line);cursor:pointer;white-space:nowrap}
+  .approve:hover{background:#e7e1d6;color:var(--ink)}
+  .approve.paid{background:var(--green);color:#fff;border-color:var(--green)}
+  .approve.paid:hover{background:var(--green2)}
   .dhrs{font-size:.8rem;color:var(--muted);min-width:30px;text-align:right}
   .modal-actions{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
   .modal-note{font-size:.76rem;color:var(--muted);margin-top:10px}
@@ -157,10 +162,10 @@
     </div>
     <div id="mdWeeks"></div>
     <div class="modal-actions">
-      <button class="btn" id="mdGodkend">✓ Godkend månedens timer til løn</button>
-      <button class="btn-sm btn-rust" id="mdFortryd">Fortryd godkendelse</button>
+      <button class="btn" id="mdGodkend">✓ Godkend alle ikke-betalte (måned)</button>
+      <button class="btn-sm btn-rust" id="mdFortryd">Fortryd månedens godkendelse</button>
     </div>
-    <div class="modal-note">Grønne dage med “betalt” er udbetalt løn og er låst. Klik en ikke-betalt dag for at rette (fx tastefejl). Godkendelse markerer alle månedens ikke-betalte dage som udbetalt.</div>
+    <div class="modal-note">Klik <b>“godkend”</b> ud for hver dag, der skal med i denne lønkørsel — så ruller resten videre til næste gang (lønnen skærer sjældent præcis ved månedsskifte). <b>“✓ betalt”</b> = udbetalt og låst; tryk igen for at fortryde. Boksen til venstre retter om dagen var en arbejdsdag (kun ikke-betalte dage).</div>
   </div>
 </div>
 
@@ -248,22 +253,40 @@ async function loadMd(){
     const list=document.createElement("div");list.className="days";
     u.dage.forEach(day=>{
       const row=document.createElement("div");
-      const paid=day.betalt&&day.afkrydset;
-      row.className="day"+(day.afkrydset?" on":"")+(paid?" paid":"")+(day.weekend?" weekend":"")+(day.afkrydset&&!paid?" clk":(!day.afkrydset?" clk":""));
-      row.innerHTML=`<span class="box">${day.afkrydset?"✓":""}</span>
-        <span class="dnum">${day.dag_nr}</span>
-        <span class="dname">${day.ugedag}</span>
-        ${paid?'<span class="badge-paid">betalt</span>':''}
-        <span class="dhrs">${day.afkrydset?day.timer+" t":"–"}</span>`;
-      if(!paid) row.addEventListener("click",()=>mdToggle(day));
+      const paid=!!(day.betalt&&day.afkrydset);
+      row.className="day"+(day.afkrydset?" on":"")+(paid?" paid":"")+(day.weekend?" weekend":"");
+      // arbejdsdag-boks (til/fra) — låst hvis betalt
+      const box=document.createElement("span");
+      box.className="box"+(paid?"":" clk");box.textContent=day.afkrydset?"✓":"";
+      box.title=paid?"Betalt — fjern godkendelsen først":"Markér arbejdsdag til/fra";
+      if(!paid) box.addEventListener("click",()=>mdToggleWorked(day));
+      const num=document.createElement("span");num.className="dnum";num.textContent=day.dag_nr;
+      const name=document.createElement("span");name.className="dname";name.textContent=day.ugedag;
+      row.appendChild(box);row.appendChild(num);row.appendChild(name);
+      // per-dag løn-godkendelse (kun arbejdsdage)
+      if(day.afkrydset){
+        const ap=document.createElement("button");
+        ap.className="approve"+(paid?" paid":"");
+        ap.textContent=paid?"✓ betalt":"godkend";
+        ap.addEventListener("click",()=>mdBetal(day,!paid));
+        row.appendChild(ap);
+      }
+      const hrs=document.createElement("span");hrs.className="dhrs";
+      hrs.textContent=day.afkrydset?(day.timer+" t"):"–";
+      row.appendChild(hrs);
       list.appendChild(row);
     });
     sec.appendChild(list);wrap.appendChild(sec);
   });
 }
 
-async function mdToggle(day){
+async function mdToggleWorked(day){
   try{ await api("/api/timer/admin/toggle",{method:"POST",body:JSON.stringify({id:mdId,dato:day.dato})}); loadMd(); }
+  catch(e){ toast(e.message); }
+}
+async function mdBetal(day,betalt){
+  try{ await api("/api/timer/admin/betal",{method:"POST",body:JSON.stringify({id:mdId,dato:day.dato,betalt})});
+       toast(betalt?"Godkendt til løn ✓":"Godkendelse fjernet"); loadMd(); }
   catch(e){ toast(e.message); }
 }
 

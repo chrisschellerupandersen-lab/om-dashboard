@@ -11976,3 +11976,21 @@ def timer_godkend_fortryd(med_id, aar, maaned):
             (int(med_id), foerste, sidste))
         n = cur.rowcount
     return {"ok": True, "fortrudt_dage": n}
+
+
+def timer_saet_betalt(med_id, dato, betalt):
+    """Godkend/afgodkend ÉN dag til løn (per-dag afkrydsning). Lønkørslen skærer
+    sjældent ved månedsskifte, så admin godkender præcis de dage der er med nu."""
+    from datetime import date
+    with _conn() as conn:
+        r = conn.execute("SELECT id FROM timer_registrering WHERE medarbejder_id=? AND dato=?",
+                         (int(med_id), dato)).fetchone()
+        if not r:
+            return {"ok": False, "fejl": "dagen er ikke registreret som arbejdsdag"}
+        if betalt:
+            conn.execute("UPDATE timer_registrering SET betalt=1, betalt_dato=? WHERE id=?",
+                         (date.today().isoformat(), r["id"]))
+        else:
+            conn.execute("UPDATE timer_registrering SET betalt=0, betalt_dato='' WHERE id=?",
+                         (r["id"],))
+    return {"ok": True, "betalt": 1 if betalt else 0}

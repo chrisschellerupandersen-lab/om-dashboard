@@ -738,6 +738,19 @@ async def api_timer_admin_godkend_fortryd(request: Request):
     return database.timer_godkend_fortryd(body.get("id"), body.get("aar"), body.get("maaned"))
 
 
+@app.post("/api/timer/admin/betal")
+async def api_timer_admin_betal(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    dato = (body.get("dato") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", dato):
+        raise HTTPException(status_code=400, detail="Ugyldig dato")
+    r = database.timer_saet_betalt(body.get("id"), dato, bool(body.get("betalt")))
+    if not r.get("ok"):
+        raise HTTPException(status_code=409, detail=r.get("fejl"))
+    return r
+
+
 @app.get("/api/data")
 async def api_data(request: Request):
     _kræv_login(request)

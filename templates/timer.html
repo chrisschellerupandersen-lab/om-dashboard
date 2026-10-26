@@ -44,6 +44,12 @@
   .summary{display:flex;gap:10px;margin-bottom:16px}
   .tile{flex:1;background:var(--green);color:#fff;border-radius:14px;padding:14px 12px;box-shadow:var(--shadow)}
   .tile.alt{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .paybar{display:flex;gap:10px;margin:-4px 0 16px;font-size:.82rem}
+  .paybar span{flex:1;background:#fff;border:1px solid var(--line);border-radius:12px;padding:9px 12px;color:var(--muted)}
+  .paybar b{font-variant-numeric:tabular-nums}
+  .paybar .paid{background:#eef5ef;border-color:#cfe3d4}
+  .paybar .paid b{color:var(--green2)}
+  .paybar .afv b{color:var(--rust)}
   .tile .n{font-size:1.5rem;font-weight:700;line-height:1}
   .tile .l{font-size:.72rem;opacity:.85;margin-top:5px;letter-spacing:.3px}
   .week{margin-bottom:16px}
@@ -112,6 +118,11 @@
     <div class="tile alt"><div class="n" id="tDage">0</div><div class="l">ARBEJDSDAGE</div></div>
   </div>
 
+  <div class="paybar">
+    <span class="paid">✓ Udbetalt (md): <b id="pBetalt">0</b> t</span>
+    <span class="afv">⏳ Afventer løn: <b id="pAfv">0</b> t</span>
+  </div>
+
   <div id="weeks"></div>
   <div class="hint">Tryk på en dag for at registrere/fjerne den. Hver dag = <b id="tpd">2</b> timer.</div>
 </div>
@@ -163,6 +174,8 @@ async function load(){
   $("#tTimer").textContent = d.total_timer;
   $("#tDage").textContent = d.total_dage;
   $("#tpd").textContent = d.timer_pr_dag;
+  $("#pBetalt").textContent = d.total_betalt;
+  $("#pAfv").textContent = d.afventer_total;
   const wrap=$("#weeks");wrap.innerHTML="";
   d.uger.forEach(u=>{
     const sec=document.createElement("div");sec.className="week";
@@ -192,11 +205,13 @@ async function toggle(day,row){
   try{
     const r=await api("/api/timer/toggle",{method:"POST",body:JSON.stringify({dato:day.dato})});
     if(!r.ok){toast(r.fejl||"Kan ikke ændres");busy=false;return;}
+    const dAfv = r.afkrydset ? r.timer : -(day.timer||0);
     day.afkrydset=r.afkrydset;day.timer=r.timer;
     row.classList.toggle("on",r.afkrydset);
     row.querySelector(".box").textContent=r.afkrydset?"✓":"";
     row.querySelector(".dhrs").textContent=r.afkrydset?(r.timer+" t"):"–";
     recalc();
+    const pa=$("#pAfv"); if(pa) pa.textContent=Math.max(0,(parseFloat(pa.textContent)||0)+dAfv);
     toast(r.afkrydset?"Registreret ✓":"Fjernet");
   }catch(e){toast("Noget gik galt");}
   busy=false;

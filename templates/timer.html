@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Mine timer — Organic Market</title>
+<style>
+  :root{
+    --bg:#f6f3ec; --card:#fff; --ink:#23201b; --muted:#8a8275;
+    --line:#e7e1d6; --green:#2f5d3a; --green2:#3c7a4b; --rust:#b4541f;
+    --amber:#e7a52e; --shadow:0 2px 10px rgba(0,0,0,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;padding:0 0 48px}
+  .wrap{max-width:560px;margin:0 auto;padding:16px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0 18px}
+  .brand{font-weight:700;font-size:1.05rem;letter-spacing:.2px}
+  .brand small{display:block;font-weight:500;color:var(--muted);font-size:.72rem;letter-spacing:.3px}
+  button{font:inherit;cursor:pointer;border:0;border-radius:12px}
+  .btn-ghost{background:transparent;color:var(--muted);padding:8px 10px;border:1px solid var(--line)}
+  .btn-ghost:hover{color:var(--ink)}
+  /* login */
+  .login{max-width:360px;margin:8vh auto 0;background:var(--card);border-radius:18px;
+    box-shadow:var(--shadow);padding:26px 22px}
+  .login h1{margin:0 0 4px;font-size:1.25rem}
+  .login p{margin:0 0 18px;color:var(--muted);font-size:.9rem}
+  label{display:block;font-size:.8rem;color:var(--muted);margin:12px 0 6px}
+  input[type=text],input[type=password]{width:100%;padding:13px 14px;border:1px solid var(--line);
+    border-radius:12px;font-size:1rem;background:#fff;color:var(--ink)}
+  input:focus{outline:2px solid var(--green2);outline-offset:1px;border-color:var(--green2)}
+  .btn-primary{width:100%;background:var(--green);color:#fff;padding:14px;font-weight:600;
+    margin-top:18px;font-size:1rem}
+  .btn-primary:hover{background:var(--green2)}
+  .fejl{color:var(--rust);font-size:.85rem;margin-top:12px;min-height:1em}
+  /* month */
+  .monthbar{display:flex;align-items:center;justify-content:space-between;
+    background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:8px 10px;margin-bottom:14px}
+  .monthbar b{font-size:1.05rem;text-transform:capitalize}
+  .nav{width:40px;height:40px;border-radius:12px;background:#f0ece2;color:var(--ink);font-size:1.2rem;
+    display:flex;align-items:center;justify-content:center}
+  .nav:hover{background:#e7e1d6}
+  .summary{display:flex;gap:10px;margin-bottom:16px}
+  .tile{flex:1;background:var(--green);color:#fff;border-radius:14px;padding:14px 12px;box-shadow:var(--shadow)}
+  .tile.alt{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .tile .n{font-size:1.5rem;font-weight:700;line-height:1}
+  .tile .l{font-size:.72rem;opacity:.85;margin-top:5px;letter-spacing:.3px}
+  .week{margin-bottom:16px}
+  .week-h{display:flex;justify-content:space-between;align-items:baseline;
+    padding:0 4px 7px;color:var(--muted);font-size:.78rem;font-weight:600;letter-spacing:.4px}
+  .week-h .wt{color:var(--green2)}
+  .days{background:var(--card);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .day{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);
+    cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s}
+  .day:last-child{border-bottom:0}
+  .day:hover{background:#faf8f3}
+  .day.on{background:#eef5ef}
+  .day.weekend .dname{color:var(--rust)}
+  .box{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);flex:none;
+    display:flex;align-items:center;justify-content:center;color:#fff;font-size:.95rem;transition:all .12s}
+  .day.on .box{background:var(--green);border-color:var(--green)}
+  .dnum{width:26px;text-align:center;font-weight:700;color:var(--muted)}
+  .day.on .dnum{color:var(--ink)}
+  .dname{flex:1;font-size:.95rem}
+  .dhrs{font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
+  .day.on .dhrs{color:var(--green2);font-weight:600}
+  .hint{text-align:center;color:var(--muted);font-size:.78rem;margin:18px 4px 0}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;
+    opacity:0;pointer-events:none;transition:.2s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginView" class="hidden">
+  <div class="login">
+    <h1>Mine timer</h1>
+    <p>Log ind for at registrere dine arbejdsdage.</p>
+    <form id="loginForm" autocomplete="on">
+      <label for="bru">Brugernavn</label>
+      <input id="bru" type="text" autocapitalize="none" autocomplete="username" required>
+      <label for="pw">Adgangskode</label>
+      <input id="pw" type="password" autocomplete="current-password" required>
+      <button class="btn-primary" type="submit">Log ind</button>
+      <div class="fejl" id="loginFejl"></div>
+    </form>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appView" class="wrap hidden">
+  <header class="top">
+    <div class="brand">Mine timer<small id="navn">Organic Market</small></div>
+    <button class="btn-ghost" id="logout">Log ud</button>
+  </header>
+
+  <div class="monthbar">
+    <button class="nav" id="prev" aria-label="Forrige måned">‹</button>
+    <b id="mlabel">—</b>
+    <button class="nav" id="next" aria-label="Næste måned">›</button>
+  </div>
+
+  <div class="summary">
+    <div class="tile"><div class="n" id="tTimer">0</div><div class="l">TIMER I MÅNEDEN</div></div>
+    <div class="tile alt"><div class="n" id="tDage">0</div><div class="l">ARBEJDSDAGE</div></div>
+  </div>
+
+  <div id="weeks"></div>
+  <div class="hint">Tryk på en dag for at registrere/fjerne den. Hver dag = <b id="tpd">2</b> timer.</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+let cur = new Date(); cur.setDate(1);
+let busy = false;
+
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
+
+async function api(path, opts){
+  const r = await fetch(path, Object.assign({headers:{"Content-Type":"application/json"}}, opts||{}));
+  if(r.status===401){showLogin();throw new Error("401");}
+  if(!r.ok){let d={};try{d=await r.json()}catch(e){} throw new Error(d.detail||("HTTP "+r.status));}
+  return r.json();
+}
+
+function showLogin(){$("#appView").classList.add("hidden");$("#loginView").classList.remove("hidden");$("#bru").focus();}
+function showApp(){$("#loginView").classList.add("hidden");$("#appView").classList.remove("hidden");}
+
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();$("#loginFejl").textContent="";
+  try{
+    const d = await (await fetch("/api/timer/login",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({brugernavn:$("#bru").value,password:$("#pw").value})})).json().catch(()=>({}));
+    const r = await fetch("/api/timer/me");
+    if(!r.ok){$("#loginFejl").textContent="Forkert brugernavn eller adgangskode";return;}
+    $("#pw").value="";showApp();start();
+  }catch(err){$("#loginFejl").textContent="Forkert brugernavn eller adgangskode";}
+});
+
+$("#logout").addEventListener("click", async ()=>{
+  await fetch("/api/timer/logout",{method:"POST"});showLogin();
+});
+
+$("#prev").addEventListener("click",()=>{cur.setMonth(cur.getMonth()-1);load();});
+$("#next").addEventListener("click",()=>{cur.setMonth(cur.getMonth()+1);load();});
+
+async function load(){
+  const aar=cur.getFullYear(), m=cur.getMonth()+1;
+  let d;
+  try{ d = await api(`/api/timer/maaned?aar=${aar}&maaned=${m}`); }catch(e){return;}
+  $("#navn").textContent = d.medarbejder.navn;
+  $("#mlabel").textContent = `${d.maaned_navn} ${d.aar}`;
+  $("#tTimer").textContent = d.total_timer;
+  $("#tDage").textContent = d.total_dage;
+  $("#tpd").textContent = d.timer_pr_dag;
+  const wrap=$("#weeks");wrap.innerHTML="";
+  d.uger.forEach(u=>{
+    const sec=document.createElement("div");sec.className="week";
+    sec.innerHTML=`<div class="week-h"><span>UGE ${u.uge}</span>
+      <span class="wt">${u.timer} t · ${u.dage_antal} dage</span></div>`;
+    const list=document.createElement("div");list.className="days";
+    u.dage.forEach(day=>{
+      const row=document.createElement("div");
+      row.className="day"+(day.afkrydset?" on":"")+(day.weekend?" weekend":"");
+      row.innerHTML=`<span class="box">${day.afkrydset?"✓":""}</span>
+        <span class="dnum">${day.dag_nr}</span>
+        <span class="dname">${day.ugedag}</span>
+        <span class="dhrs">${day.afkrydset?day.timer+" t":"–"}</span>`;
+      row.addEventListener("click",()=>toggle(day,row));
+      list.appendChild(row);
+    });
+    sec.appendChild(list);wrap.appendChild(sec);
+  });
+}
+
+async function toggle(day,row){
+  if(busy)return;busy=true;
+  try{
+    const r=await api("/api/timer/toggle",{method:"POST",body:JSON.stringify({dato:day.dato})});
+    day.afkrydset=r.afkrydset;day.timer=r.timer;
+    row.classList.toggle("on",r.afkrydset);
+    row.querySelector(".box").textContent=r.afkrydset?"✓":"";
+    row.querySelector(".dhrs").textContent=r.afkrydset?(r.timer+" t"):"–";
+    recalc();
+    toast(r.afkrydset?"Registreret ✓":"Fjernet");
+  }catch(e){toast("Noget gik galt");}
+  busy=false;
+}
+
+function recalc(){
+  // opdater uge- og månedstotaler ud fra DOM uden at genhente
+  let mTimer=0,mDage=0;
+  document.querySelectorAll(".week").forEach(sec=>{
+    let wt=0,wd=0;
+    sec.querySelectorAll(".day.on").forEach(()=>{wd++;});
+    // timer = dage × timer_pr_dag
+    const tpd=parseFloat($("#tpd").textContent)||2;
+    wt=wd*tpd;mTimer+=wt;mDage+=wd;
+    const h=sec.querySelector(".week-h .wt");if(h)h.textContent=`${wt} t · ${wd} dage`;
+  });
+  $("#tTimer").textContent=mTimer;$("#tDage").textContent=mDage;
+}
+
+function start(){ load(); }
+
+// init: er vi allerede logget ind?
+(async()=>{
+  try{ const r=await fetch("/api/timer/me"); if(r.ok){showApp();start();} else {showLogin();} }
+  catch(e){ showLogin(); }
+})();
+</script>
+</body>
+</html>

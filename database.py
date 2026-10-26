@@ -643,6 +643,27 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_prissnap_dato ON prissnapshot(dato);
             CREATE INDEX IF NOT EXISTS idx_prissnap_sku  ON prissnapshot(sku);
 
+            -- ── Timesystem: medarbejder-afkrydsning (2 timer pr. arbejdsdag) ────
+            CREATE TABLE IF NOT EXISTS timer_medarbejdere (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                navn         TEXT    NOT NULL,
+                brugernavn   TEXT    NOT NULL UNIQUE,
+                pw_hash      TEXT    NOT NULL,
+                pw_salt      TEXT    NOT NULL,
+                timer_pr_dag REAL    NOT NULL DEFAULT 2,
+                aktiv        INTEGER NOT NULL DEFAULT 1,
+                oprettet     TEXT    DEFAULT (datetime('now','localtime'))
+            );
+            CREATE TABLE IF NOT EXISTS timer_registrering (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                medarbejder_id INTEGER NOT NULL,
+                dato           TEXT    NOT NULL,
+                timer          REAL    NOT NULL DEFAULT 2,
+                oprettet       TEXT    DEFAULT (datetime('now','localtime')),
+                UNIQUE(medarbejder_id, dato) ON CONFLICT REPLACE
+            );
+            CREATE INDEX IF NOT EXISTS idx_timer_reg_md ON timer_registrering(medarbejder_id, dato);
+
             DROP VIEW IF EXISTS v_transaktioner;
             CREATE VIEW v_transaktioner AS
             WITH bon_has_zero AS (
@@ -11708,3 +11729,181 @@ def hent_db_shopbox_poster(slags: str, periode: str) -> dict:
         "mangler_kost_antal": sum(1 for p in poster if p["mangler_kost"]),
     }
     return {"slags": slags, "periode": periode, "poster": poster, "total": total}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TIMESYSTEM — medarbejder-afkrydsning (fast 2 timer pr. arbejdsdag)
+# Hver medarbejder logger ind og ser KUN egne timer. Admin opretter brugere.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_TIMER_MDR = ["", "januar", "februar", "marts", "april", "maj", "juni", "juli",
+              "august", "september", "oktober", "november", "december"]
+_TIMER_UGEDAGE = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
+
+
+def _timer_hash(password, salt_hex=None):
+    import hashlib, secrets
+    if salt_hex is None:
+        salt_hex = secrets.token_hex(16)
+    h = hashlib.pbkdf2_hmac("sha256", (password or "").encode("utf-8"),
+                            bytes.fromhex(salt_hex), 120_000)
+    return h.hex(), salt_hex
+
+
+def timer_opret_medarbejder(navn, brugernavn, password, timer_pr_dag=2.0):
+    navn = (navn or "").strip()
+    brugernavn = (brugernavn or "").strip().lower()
+    if not navn or not brugernavn or not password:
+        return {"ok": False, "fejl": "navn, brugernavn og password skal udfyldes"}
+    if len(password) < 4:
+        return {"ok": False, "fejl": "password skal være mindst 4 tegn"}
+    pw_hash, salt = _timer_hash(password)
+    try:
+        with _conn() as conn:
+            cur = conn.execute(
+                "INSERT INTO timer_medarbejdere (navn, brugernavn, pw_hash, pw_salt, timer_pr_dag) "
+                "VALUES (?,?,?,?,?)",
+                (navn, brugernavn, pw_hash, salt, float(timer_pr_dag)))
+            return {"ok": True, "id": cur.lastrowid, "brugernavn": brugernavn}
+    except sqlite3.IntegrityError:
+        return {"ok": False, "fejl": "brugernavnet findes allerede"}
+
+
+def timer_saet_password(med_id, password):
+    if not password or len(password) < 4:
+        return {"ok": False, "fejl": "password skal være mindst 4 tegn"}
+    pw_hash, salt = _timer_hash(password)
+    with _conn() as conn:
+        conn.execute("UPDATE timer_medarbejdere SET pw_hash=?, pw_salt=? WHERE id=?",
+                     (pw_hash, salt, int(med_id)))
+    return {"ok": True}
+
+
+def timer_saet_aktiv(med_id, aktiv):
+    with _conn() as conn:
+        conn.execute("UPDATE timer_medarbejdere SET aktiv=? WHERE id=?",
+                     (1 if aktiv else 0, int(med_id)))
+    return {"ok": True}
+
+
+def timer_login(brugernavn, password):
+    import hmac
+    brugernavn = (brugernavn or "").strip().lower()
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT * FROM timer_medarbejdere WHERE brugernavn=? AND aktiv=1",
+            (brugernavn,)).fetchone()
+    if not r:
+        return None
+    calc, _ = _timer_hash(password, r["pw_salt"])
+    if not hmac.compare_digest(calc, r["pw_hash"]):
+        return None
+    return {"id": r["id"], "navn": r["navn"], "brugernavn": r["brugernavn"],
+            "timer_pr_dag": r["timer_pr_dag"]}
+
+
+def timer_hent_medarbejder(med_id):
+    with _conn() as conn:
+        r = conn.execute("SELECT id, navn, brugernavn, timer_pr_dag, aktiv "
+                         "FROM timer_medarbejdere WHERE id=?", (int(med_id),)).fetchone()
+    return dict(r) if r else None
+
+
+def timer_liste_medarbejdere():
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT id, navn, brugernavn, timer_pr_dag, aktiv, oprettet "
+            "FROM timer_medarbejdere ORDER BY aktiv DESC, navn").fetchall()
+    return [dict(r) for r in rows]
+
+
+def timer_toggle(med_id, dato):
+    with _conn() as conn:
+        md = conn.execute("SELECT timer_pr_dag FROM timer_medarbejdere WHERE id=? AND aktiv=1",
+                          (int(med_id),)).fetchone()
+        if not md:
+            return {"ok": False, "fejl": "ukendt medarbejder"}
+        eks = conn.execute(
+            "SELECT id FROM timer_registrering WHERE medarbejder_id=? AND dato=?",
+            (int(med_id), dato)).fetchone()
+        if eks:
+            conn.execute("DELETE FROM timer_registrering WHERE id=?", (eks["id"],))
+            return {"ok": True, "afkrydset": False, "timer": 0}
+        t = float(md["timer_pr_dag"])
+        conn.execute("INSERT INTO timer_registrering (medarbejder_id, dato, timer) VALUES (?,?,?)",
+                     (int(med_id), dato, t))
+        return {"ok": True, "afkrydset": True, "timer": t}
+
+
+def timer_hent_maaned(med_id, aar, maaned):
+    import calendar
+    from datetime import date
+    md = timer_hent_medarbejder(med_id)
+    if not md:
+        return None
+    aar = int(aar); maaned = int(maaned)
+    antal_dage = calendar.monthrange(aar, maaned)[1]
+    foerste = date(aar, maaned, 1).isoformat()
+    sidste = date(aar, maaned, antal_dage).isoformat()
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT dato, timer FROM timer_registrering "
+            "WHERE medarbejder_id=? AND dato>=? AND dato<=?",
+            (int(med_id), foerste, sidste)).fetchall()
+    reg = {r["dato"]: r["timer"] for r in rows}
+    uger = {}
+    for d in range(1, antal_dage + 1):
+        dt = date(aar, maaned, d)
+        iso = dt.isocalendar()
+        key = (iso[0], iso[1])
+        iso_s = dt.isoformat()
+        uger.setdefault(key, []).append({
+            "dato": iso_s, "dag_nr": d,
+            "ugedag": _TIMER_UGEDAGE[dt.weekday()],
+            "weekend": dt.weekday() >= 5,
+            "afkrydset": iso_s in reg, "timer": reg.get(iso_s, 0),
+        })
+    uge_liste = []
+    for (uge_aar, uge), dage in sorted(uger.items()):
+        uge_liste.append({
+            "uge": uge, "uge_aar": uge_aar, "dage": dage,
+            "dage_antal": sum(1 for x in dage if x["afkrydset"]),
+            "timer": sum(x["timer"] for x in dage),
+        })
+    return {
+        "medarbejder": {"id": md["id"], "navn": md["navn"]},
+        "aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
+        "timer_pr_dag": md["timer_pr_dag"],
+        "uger": uge_liste,
+        "total_dage": sum(u["dage_antal"] for u in uge_liste),
+        "total_timer": sum(u["timer"] for u in uge_liste),
+    }
+
+
+def timer_oversigt(aar, maaned):
+    import calendar
+    from datetime import date
+    aar = int(aar); maaned = int(maaned)
+    antal_dage = calendar.monthrange(aar, maaned)[1]
+    foerste = date(aar, maaned, 1).isoformat()
+    sidste = date(aar, maaned, antal_dage).isoformat()
+    meds = timer_liste_medarbejdere()
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT medarbejder_id, COUNT(*) AS dage, COALESCE(SUM(timer),0) AS timer "
+            "FROM timer_registrering WHERE dato>=? AND dato<=? GROUP BY medarbejder_id",
+            (foerste, sidste)).fetchall()
+    agg = {r["medarbejder_id"]: r for r in rows}
+    out = []
+    for m in meds:
+        a = agg.get(m["id"])
+        out.append({
+            "id": m["id"], "navn": m["navn"], "brugernavn": m["brugernavn"],
+            "aktiv": m["aktiv"], "timer_pr_dag": m["timer_pr_dag"],
+            "dage": (a["dage"] if a else 0),
+            "timer": (a["timer"] if a else 0),
+        })
+    return {"aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
+            "medarbejdere": out,
+            "total_dage": sum(o["dage"] for o in out),
+            "total_timer": sum(o["timer"] for o in out)}

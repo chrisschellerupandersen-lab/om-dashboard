@@ -10,7 +10,7 @@ from typing import Optional
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Form, HTTPException, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
@@ -556,6 +556,150 @@ async def kager(request: Request):
 def _kræv_login(request: Request):
     if not get_session(request):
         raise HTTPException(status_code=401, detail="Ikke logget ind")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# TIMESYSTEM — medarbejder-timer (afkrydsning, 2 t/dag). Egen login pr. medarbejder,
+# så ingen kan se andres timer. Admin (dashboard-login/?secret=) opretter brugere.
+# ──────────────────────────────────────────────────────────────────────────────
+
+TIMER_COOKIE = "timer_session"
+
+
+def _timer_session(request: Request):
+    token = request.cookies.get(TIMER_COOKIE)
+    if not token:
+        return None
+    try:
+        data = signer.loads(token, max_age=SESSION_MAX_AGE)
+    except (BadSignature, SignatureExpired):
+        return None
+    if not isinstance(data, dict) or data.get("t") != "timer":
+        return None
+    return data.get("mid")
+
+
+def _kræv_timer(request: Request):
+    mid = _timer_session(request)
+    if not mid:
+        raise HTTPException(status_code=401, detail="Ikke logget ind")
+    return mid
+
+
+def _timer_admin_ok(request: Request) -> bool:
+    if get_session(request):
+        return True
+    sec = request.query_params.get("secret") or request.headers.get("X-Webhook-Secret")
+    return sec == WEBHOOK_SECRET
+
+
+def _kræv_timer_admin(request: Request):
+    if not _timer_admin_ok(request):
+        raise HTTPException(status_code=401, detail="Ikke logget ind som admin")
+
+
+@app.get("/timer", response_class=HTMLResponse)
+async def timer_side(request: Request):
+    resp = templates.TemplateResponse("timer.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@app.get("/timer-admin", response_class=HTMLResponse)
+async def timer_admin_side(request: Request):
+    if not _timer_admin_ok(request):
+        return RedirectResponse("/login", status_code=302)
+    resp = templates.TemplateResponse("timer_admin.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+# ── Medarbejder-API (egen login) ──────────────────────────────────────────────
+@app.post("/api/timer/login")
+async def api_timer_login(request: Request):
+    body = await request.json()
+    med = database.timer_login(body.get("brugernavn", ""), body.get("password", ""))
+    if not med:
+        raise HTTPException(status_code=401, detail="Forkert brugernavn eller password")
+    token = signer.dumps({"mid": med["id"], "t": "timer"})
+    svar = JSONResponse({"ok": True, "navn": med["navn"]})
+    svar.set_cookie(TIMER_COOKIE, token, httponly=True, samesite="lax", max_age=SESSION_MAX_AGE)
+    return svar
+
+
+@app.post("/api/timer/logout")
+async def api_timer_logout():
+    svar = JSONResponse({"ok": True})
+    svar.delete_cookie(TIMER_COOKIE)
+    return svar
+
+
+@app.get("/api/timer/me")
+async def api_timer_me(request: Request):
+    mid = _kræv_timer(request)
+    md = database.timer_hent_medarbejder(mid)
+    if not md or not md.get("aktiv"):
+        raise HTTPException(status_code=401, detail="Ikke aktiv")
+    return {"id": md["id"], "navn": md["navn"]}
+
+
+@app.get("/api/timer/maaned")
+async def api_timer_maaned(request: Request, aar: int, maaned: int):
+    mid = _kræv_timer(request)
+    data = database.timer_hent_maaned(mid, aar, maaned)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Ukendt medarbejder")
+    return data
+
+
+@app.post("/api/timer/toggle")
+async def api_timer_toggle(request: Request):
+    mid = _kræv_timer(request)
+    body = await request.json()
+    dato = (body.get("dato") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", dato):
+        raise HTTPException(status_code=400, detail="Ugyldig dato")
+    return database.timer_toggle(mid, dato)
+
+
+# ── Admin-API (dashboard-login eller ?secret=) ────────────────────────────────
+@app.get("/api/timer/admin/medarbejdere")
+async def api_timer_admin_liste(request: Request):
+    _kræv_timer_admin(request)
+    return database.timer_liste_medarbejdere()
+
+
+@app.post("/api/timer/admin/opret")
+async def api_timer_admin_opret(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    r = database.timer_opret_medarbejder(body.get("navn"), body.get("brugernavn"), body.get("password"))
+    if not r.get("ok"):
+        raise HTTPException(status_code=400, detail=r.get("fejl"))
+    return r
+
+
+@app.post("/api/timer/admin/password")
+async def api_timer_admin_password(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    r = database.timer_saet_password(body.get("id"), body.get("password"))
+    if not r.get("ok"):
+        raise HTTPException(status_code=400, detail=r.get("fejl"))
+    return r
+
+
+@app.post("/api/timer/admin/aktiv")
+async def api_timer_admin_aktiv(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    return database.timer_saet_aktiv(body.get("id"), bool(body.get("aktiv")))
+
+
+@app.get("/api/timer/admin/oversigt")
+async def api_timer_admin_oversigt(request: Request, aar: int, maaned: int):
+    _kræv_timer_admin(request)
+    return database.timer_oversigt(aar, maaned)
 
 
 @app.get("/api/data")

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Timer — admin</title>
+<style>
+  :root{--bg:#f6f3ec;--card:#fff;--ink:#23201b;--muted:#8a8275;--line:#e7e1d6;
+    --green:#2f5d3a;--green2:#3c7a4b;--rust:#b4541f;--amber:#e7a52e;--shadow:0 2px 10px rgba(0,0,0,.06);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:0 0 60px}
+  .wrap{max-width:860px;margin:0 auto;padding:18px}
+  h1{font-size:1.3rem;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:20px}
+  .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+  .card h2{font-size:1rem;margin:0 0 14px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:560px){.grid{grid-template-columns:1fr}}
+  label{display:block;font-size:.76rem;color:var(--muted);margin:0 0 5px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem;background:#fff;color:var(--ink)}
+  input:focus{outline:2px solid var(--green2);outline-offset:1px;border-color:var(--green2)}
+  button{font:inherit;cursor:pointer;border:0;border-radius:10px}
+  .btn{background:var(--green);color:#fff;padding:11px 16px;font-weight:600}
+  .btn:hover{background:var(--green2)}
+  .btn-sm{padding:7px 11px;font-size:.82rem;background:#f0ece2;color:var(--ink)}
+  .btn-sm:hover{background:#e7e1d6}
+  .btn-rust{background:#f7ebe4;color:var(--rust)}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--line)}
+  td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
+  tr.inaktiv{opacity:.5}
+  .pill{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:999px;background:#eef5ef;color:var(--green2)}
+  .pill.off{background:#f3efe8;color:var(--muted)}
+  .num{font-variant-numeric:tabular-nums;font-weight:600}
+  .monthbar{display:flex;align-items:center;gap:12px}
+  .nav{width:34px;height:34px;border-radius:9px;background:#f0ece2;font-size:1.1rem}
+  .nav:hover{background:#e7e1d6}
+  .fejl{color:var(--rust);font-size:.82rem;margin-top:8px}
+  .ok-box{background:#eef5ef;border:1px solid #cfe3d4;border-radius:12px;padding:14px;margin-top:14px;font-size:.88rem}
+  .ok-box code{background:#fff;padding:2px 7px;border-radius:6px;border:1px solid var(--line)}
+  .credlines{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px;font-size:.86rem;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .muted{color:var(--muted)}
+  .hidden{display:none!important}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.2s}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Timer — administration</h1>
+  <div class="sub">Opret medarbejdere, se timer pr. måned, og kopiér login-info til udsendelse. Medarbejderlink: <code id="empUrl">…/timer</code></div>
+
+  <!-- OPRET -->
+  <div class="card">
+    <h2>Opret ny medarbejder</h2>
+    <div class="grid">
+      <div><label>Navn</label><input id="nNavn" placeholder="Fx Mette Hansen"></div>
+      <div><label>Brugernavn</label><input id="nBru" autocapitalize="none" placeholder="fx mette"></div>
+      <div>
+        <label>Adgangskode</label>
+        <div style="display:flex;gap:8px">
+          <input id="nPw" placeholder="mindst 4 tegn">
+          <button class="btn-sm" id="genPw" title="Generér">🎲</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:flex-end">
+        <button class="btn" id="opret" style="width:100%">Opret medarbejder</button>
+      </div>
+    </div>
+    <div class="fejl" id="opretFejl"></div>
+    <div class="ok-box hidden" id="opretOk">
+      <b>Medarbejder oprettet ✓</b> — send disse oplysninger til medarbejderen:
+      <div class="credlines" id="credText"></div>
+      <div style="margin-top:10px"><button class="btn-sm" id="copyCred">📋 Kopiér login-info</button></div>
+    </div>
+  </div>
+
+  <!-- OVERSIGT -->
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0">Timer pr. medarbejder</h2>
+      <div class="monthbar">
+        <button class="nav" id="prev">‹</button>
+        <b id="mlabel" style="min-width:140px;text-align:center;text-transform:capitalize">—</b>
+        <button class="nav" id="next">›</button>
+      </div>
+    </div>
+    <table>
+      <thead><tr><th>Medarbejder</th><th>Brugernavn</th><th>Status</th><th style="text-align:right">Dage</th><th style="text-align:right">Timer</th><th>Handlinger</th></tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="muted">Indlæser…</td></tr></tbody>
+      <tfoot><tr><td colspan="3" style="font-weight:700">I alt</td>
+        <td style="text-align:right" class="num" id="totDage">0</td>
+        <td style="text-align:right" class="num" id="totTimer">0</td><td></td></tr></tfoot>
+    </table>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const SECRET=new URLSearchParams(location.search).get("secret");
+const Q=SECRET?("?secret="+encodeURIComponent(SECRET)):"";
+let cur=new Date();cur.setDate(1);
+const EMP_URL=location.origin+"/timer";
+$("#empUrl").textContent=EMP_URL;
+
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
+async function api(path,opts){
+  const sep=path.includes("?")?"&":"?";
+  const url=path+(SECRET?(sep+"secret="+encodeURIComponent(SECRET)):"");
+  const r=await fetch(url,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
+  if(!r.ok){let d={};try{d=await r.json()}catch(e){}throw new Error(d.detail||("HTTP "+r.status));}
+  return r.json();
+}
+function rnd(n){const c="abcdefghijkmnpqrstuvwxyz23456789";let s="";for(let i=0;i<n;i++)s+=c[Math.floor(Math.random()*c.length)];return s;}
+$("#genPw").addEventListener("click",()=>{$("#nPw").value=rnd(6);});
+
+$("#opret").addEventListener("click",async()=>{
+  $("#opretFejl").textContent="";$("#opretOk").classList.add("hidden");
+  const navn=$("#nNavn").value.trim(),bru=$("#nBru").value.trim(),pw=$("#nPw").value;
+  if(!navn||!bru||!pw){$("#opretFejl").textContent="Udfyld navn, brugernavn og adgangskode.";return;}
+  try{
+    await api("/api/timer/admin/opret",{method:"POST",body:JSON.stringify({navn,brugernavn:bru,password:pw})});
+    const txt=`Hej ${navn.split(" ")[0]} 👋\nHer er dit login til timeregistrering:\n\nLink: ${EMP_URL}\nBrugernavn: ${bru.toLowerCase()}\nAdgangskode: ${pw}\n\nLog ind og kryds de dage af, du har været på arbejde.`;
+    $("#credText").textContent=txt;$("#opretOk").classList.remove("hidden");
+    $("#nNavn").value="";$("#nBru").value="";$("#nPw").value="";
+    load();
+  }catch(e){$("#opretFejl").textContent=e.message;}
+});
+$("#copyCred").addEventListener("click",()=>{navigator.clipboard.writeText($("#credText").textContent).then(()=>toast("Kopieret ✓"));});
+
+$("#prev").addEventListener("click",()=>{cur.setMonth(cur.getMonth()-1);load();});
+$("#next").addEventListener("click",()=>{cur.setMonth(cur.getMonth()+1);load();});
+
+async function load(){
+  const aar=cur.getFullYear(),m=cur.getMonth()+1;
+  let d;try{d=await api(`/api/timer/admin/oversigt?aar=${aar}&maaned=${m}`);}catch(e){
+    $("#rows").innerHTML=`<tr><td colspan="6" class="fejl">${e.message}</td></tr>`;return;}
+  $("#mlabel").textContent=`${d.maaned_navn} ${d.aar}`;
+  $("#totDage").textContent=d.total_dage;$("#totTimer").textContent=d.total_timer;
+  const tb=$("#rows");tb.innerHTML="";
+  if(!d.medarbejdere.length){tb.innerHTML=`<tr><td colspan="6" class="muted">Ingen medarbejdere endnu — opret en ovenfor.</td></tr>`;return;}
+  d.medarbejdere.forEach(m=>{
+    const tr=document.createElement("tr");if(!m.aktiv)tr.className="inaktiv";
+    tr.innerHTML=`<td>${m.navn}</td><td class="muted">${m.brugernavn}</td>
+      <td>${m.aktiv?'<span class="pill">aktiv</span>':'<span class="pill off">inaktiv</span>'}</td>
+      <td style="text-align:right" class="num">${m.dage}</td>
+      <td style="text-align:right" class="num">${m.timer}</td>
+      <td><div class="row-actions">
+        <button class="btn-sm" data-act="pw" data-id="${m.id}" data-navn="${encodeURIComponent(m.navn)}" data-bru="${m.brugernavn}">Ny kode</button>
+        <button class="btn-sm ${m.aktiv?'btn-rust':''}" data-act="aktiv" data-id="${m.id}" data-aktiv="${m.aktiv?0:1}">${m.aktiv?'Deaktivér':'Aktivér'}</button>
+      </div></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("button[data-act]").forEach(b=>b.addEventListener("click",onAction));
+}
+
+async function onAction(e){
+  const b=e.currentTarget,act=b.dataset.act,id=parseInt(b.dataset.id);
+  if(act==="aktiv"){
+    try{await api("/api/timer/admin/aktiv",{method:"POST",body:JSON.stringify({id,aktiv:!!parseInt(b.dataset.aktiv)})});load();}
+    catch(err){toast(err.message);}
+  }else if(act==="pw"){
+    const navn=decodeURIComponent(b.dataset.navn),bru=b.dataset.bru;
+    const pw=prompt(`Ny adgangskode for ${navn} (${bru}):`, rnd(6));
+    if(!pw)return;
+    try{
+      await api("/api/timer/admin/password",{method:"POST",body:JSON.stringify({id,password:pw})});
+      const txt=`Hej ${navn.split(" ")[0]} 👋\nDit login til timeregistrering er opdateret:\n\nLink: ${EMP_URL}\nBrugernavn: ${bru}\nAdgangskode: ${pw}`;
+      navigator.clipboard.writeText(txt).then(()=>toast("Ny kode sat + login-info kopieret ✓"),()=>toast("Ny kode sat ✓"));
+    }catch(err){toast(err.message);}
+  }
+}
+load();
+</script>
+</body>
+</html>

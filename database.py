@@ -7568,7 +7568,8 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             _pk = _organic_kat(p["navn"])
             for d in aabne:
                 s = sum(salg.get((vn, d), 0.0) for vn in p["kilde"])
-                if _pk in _COMBO_KAT:                       # læg combo-andel oveni
+                s0 = s                                      # løssalg alene → trend-RETNING (combo må ikke forvride den)
+                if _pk in _COMBO_KAT:                       # læg combo-andel oveni (kun NIVEAU, ikke trend)
                     cu = combo_units.get((_pk, d), 0.0)
                     if cu:
                         totw = kat_wsold_d.get((_pk, d), 0.0)
@@ -7576,9 +7577,9 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                         andel = (cu * (w * s / totw)) if totw > 0 else (cu / max(1, kat_n.get(_pk, 1)))
                         s += andel
                         _combo_kredit += andel
-                pr_wd[wd_af_dato[d]].append(s)
+                pr_wd[wd_af_dato[d]].append(s)              # niveau/median = inkl. combo
                 wk = date.fromisoformat(d).isocalendar()[:2]
-                wk_tot[wk] = wk_tot.get(wk, 0.0) + s
+                wk_tot[wk] = wk_tot.get(wk, 0.0) + s0       # trend = kun løssalg → combo-udsving flytter ikke retningen
             # Trend-dæmpning: følg det AKTUELLE niveau, så faldende varer (fx kardemomme)
             # ikke overbestilles pga. tidligere stærke uger. Kun (næsten) HELE uger tælles
             # (delvis igangværende uge udelades), da en uge uden weekend ellers falsk

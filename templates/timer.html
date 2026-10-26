@@ -65,6 +65,9 @@
   .dname{flex:1;font-size:.95rem}
   .dhrs{font-size:.82rem;color:var(--muted);font-variant-numeric:tabular-nums}
   .day.on .dhrs{color:var(--green2);font-weight:600}
+  .badge-paid{font-size:.64rem;background:var(--green);color:#fff;padding:2px 7px;border-radius:999px;margin-right:2px}
+  .day.paid{background:#f0f6f1}
+  .day.paid .box{background:var(--green2);border-color:var(--green2)}
   .hint{text-align:center;color:var(--muted);font-size:.78rem;margin:18px 4px 0}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);
     background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;
@@ -168,10 +171,12 @@ async function load(){
     const list=document.createElement("div");list.className="days";
     u.dage.forEach(day=>{
       const row=document.createElement("div");
-      row.className="day"+(day.afkrydset?" on":"")+(day.weekend?" weekend":"");
+      const paid=day.betalt&&day.afkrydset;
+      row.className="day"+(day.afkrydset?" on":"")+(paid?" paid":"")+(day.weekend?" weekend":"");
       row.innerHTML=`<span class="box">${day.afkrydset?"✓":""}</span>
         <span class="dnum">${day.dag_nr}</span>
         <span class="dname">${day.ugedag}</span>
+        ${paid?'<span class="badge-paid">udbetalt</span>':''}
         <span class="dhrs">${day.afkrydset?day.timer+" t":"–"}</span>`;
       row.addEventListener("click",()=>toggle(day,row));
       list.appendChild(row);
@@ -181,9 +186,12 @@ async function load(){
 }
 
 async function toggle(day,row){
-  if(busy)return;busy=true;
+  if(busy)return;
+  if(day.betalt){toast("Udbetalt — kan ikke ændres");return;}
+  busy=true;
   try{
     const r=await api("/api/timer/toggle",{method:"POST",body:JSON.stringify({dato:day.dato})});
+    if(!r.ok){toast(r.fejl||"Kan ikke ændres");busy=false;return;}
     day.afkrydset=r.afkrydset;day.timer=r.timer;
     row.classList.toggle("on",r.afkrydset);
     row.querySelector(".box").textContent=r.afkrydset?"✓":"";

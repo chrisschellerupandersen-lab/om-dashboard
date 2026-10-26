@@ -702,6 +702,42 @@ async def api_timer_admin_oversigt(request: Request, aar: int, maaned: int):
     return database.timer_oversigt(aar, maaned)
 
 
+@app.get("/api/timer/admin/medarbejder/{med_id}/maaned")
+async def api_timer_admin_md_maaned(request: Request, med_id: int, aar: int, maaned: int):
+    _kræv_timer_admin(request)
+    data = database.timer_hent_maaned(med_id, aar, maaned)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Ukendt medarbejder")
+    return data
+
+
+@app.post("/api/timer/admin/toggle")
+async def api_timer_admin_toggle(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    dato = (body.get("dato") or "").strip()
+    if not re.match(r"^\d{4}-\d{2}-\d{2}$", dato):
+        raise HTTPException(status_code=400, detail="Ugyldig dato")
+    r = database.timer_toggle(body.get("id"), dato, admin=True)
+    if not r.get("ok"):
+        raise HTTPException(status_code=409, detail=r.get("fejl"))
+    return r
+
+
+@app.post("/api/timer/admin/godkend")
+async def api_timer_admin_godkend(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    return database.timer_godkend(body.get("id"), body.get("aar"), body.get("maaned"))
+
+
+@app.post("/api/timer/admin/godkend-fortryd")
+async def api_timer_admin_godkend_fortryd(request: Request):
+    _kræv_timer_admin(request)
+    body = await request.json()
+    return database.timer_godkend_fortryd(body.get("id"), body.get("aar"), body.get("maaned"))
+
+
 @app.get("/api/data")
 async def api_data(request: Request):
     _kræv_login(request)

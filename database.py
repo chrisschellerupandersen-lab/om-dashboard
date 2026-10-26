@@ -659,6 +659,8 @@ def init_db():
                 medarbejder_id INTEGER NOT NULL,
                 dato           TEXT    NOT NULL,
                 timer          REAL    NOT NULL DEFAULT 2,
+                betalt         INTEGER NOT NULL DEFAULT 0,
+                betalt_dato    TEXT    DEFAULT '',
                 oprettet       TEXT    DEFAULT (datetime('now','localtime')),
                 UNIQUE(medarbejder_id, dato) ON CONFLICT REPLACE
             );
@@ -747,6 +749,9 @@ def init_db():
             # Faktura godkendt → ugebestilling opdateret til faktisk leveret
             "ALTER TABLE bageri_fakturaer ADD COLUMN godkendt INTEGER DEFAULT 0",
             "ALTER TABLE bageri_fakturaer ADD COLUMN godkendt_dato TEXT DEFAULT ''",
+            # Timesystem: løn-godkendelse (betalt = udbetalt løn for de timer)
+            "ALTER TABLE timer_registrering ADD COLUMN betalt INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE timer_registrering ADD COLUMN betalt_dato TEXT DEFAULT ''",
         ]:
             try:
                 conn.execute(sql)
@@ -11818,22 +11823,27 @@ def timer_liste_medarbejdere():
     return [dict(r) for r in rows]
 
 
-def timer_toggle(med_id, dato):
+def timer_toggle(med_id, dato, admin=False):
+    """Afkryds/fjern en dag. admin=True tillader redigering uanset aktiv-status.
+    Betalte (løn-godkendte) dage kan ikke fjernes — godkendelsen skal fortrydes først."""
     with _conn() as conn:
-        md = conn.execute("SELECT timer_pr_dag FROM timer_medarbejdere WHERE id=? AND aktiv=1",
-                          (int(med_id),)).fetchone()
+        q = "SELECT timer_pr_dag FROM timer_medarbejdere WHERE id=?" + ("" if admin else " AND aktiv=1")
+        md = conn.execute(q, (int(med_id),)).fetchone()
         if not md:
             return {"ok": False, "fejl": "ukendt medarbejder"}
         eks = conn.execute(
-            "SELECT id FROM timer_registrering WHERE medarbejder_id=? AND dato=?",
+            "SELECT id, betalt FROM timer_registrering WHERE medarbejder_id=? AND dato=?",
             (int(med_id), dato)).fetchone()
         if eks:
+            if eks["betalt"]:
+                return {"ok": False, "laast": True, "afkrydset": True, "betalt": 1,
+                        "fejl": "dagen er godkendt til løn og kan ikke ændres"}
             conn.execute("DELETE FROM timer_registrering WHERE id=?", (eks["id"],))
-            return {"ok": True, "afkrydset": False, "timer": 0}
+            return {"ok": True, "afkrydset": False, "timer": 0, "betalt": 0}
         t = float(md["timer_pr_dag"])
         conn.execute("INSERT INTO timer_registrering (medarbejder_id, dato, timer) VALUES (?,?,?)",
                      (int(med_id), dato, t))
-        return {"ok": True, "afkrydset": True, "timer": t}
+        return {"ok": True, "afkrydset": True, "timer": t, "betalt": 0}
 
 
 def timer_hent_maaned(med_id, aar, maaned):
@@ -11848,21 +11858,28 @@ def timer_hent_maaned(med_id, aar, maaned):
     sidste = date(aar, maaned, antal_dage).isoformat()
     with _conn() as conn:
         rows = conn.execute(
-            "SELECT dato, timer FROM timer_registrering "
+            "SELECT dato, timer, betalt FROM timer_registrering "
             "WHERE medarbejder_id=? AND dato>=? AND dato<=?",
             (int(med_id), foerste, sidste)).fetchall()
-    reg = {r["dato"]: r["timer"] for r in rows}
+        afv = conn.execute(
+            "SELECT COALESCE(SUM(timer),0) AS t, COUNT(*) AS n "
+            "FROM timer_registrering WHERE medarbejder_id=? AND betalt=0",
+            (int(med_id),)).fetchone()
+    reg = {r["dato"]: r for r in rows}
     uger = {}
     for d in range(1, antal_dage + 1):
         dt = date(aar, maaned, d)
         iso = dt.isocalendar()
         key = (iso[0], iso[1])
         iso_s = dt.isoformat()
+        r = reg.get(iso_s)
         uger.setdefault(key, []).append({
             "dato": iso_s, "dag_nr": d,
             "ugedag": _TIMER_UGEDAGE[dt.weekday()],
             "weekend": dt.weekday() >= 5,
-            "afkrydset": iso_s in reg, "timer": reg.get(iso_s, 0),
+            "afkrydset": r is not None,
+            "timer": (r["timer"] if r else 0),
+            "betalt": (1 if (r and r["betalt"]) else 0),
         })
     uge_liste = []
     for (uge_aar, uge), dage in sorted(uger.items()):
@@ -11871,13 +11888,19 @@ def timer_hent_maaned(med_id, aar, maaned):
             "dage_antal": sum(1 for x in dage if x["afkrydset"]),
             "timer": sum(x["timer"] for x in dage),
         })
+    total_timer  = sum(u["timer"] for u in uge_liste)
+    total_betalt = sum(x["timer"] for u in uge_liste for x in u["dage"] if x["betalt"])
     return {
         "medarbejder": {"id": md["id"], "navn": md["navn"]},
         "aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
         "timer_pr_dag": md["timer_pr_dag"],
         "uger": uge_liste,
         "total_dage": sum(u["dage_antal"] for u in uge_liste),
-        "total_timer": sum(u["timer"] for u in uge_liste),
+        "total_timer": total_timer,
+        "total_betalt": total_betalt,
+        "total_afventer_mdr": total_timer - total_betalt,
+        "afventer_total": afv["t"],       # hele perioden → til næste løn
+        "afventer_dage": afv["n"],
     }
 
 
@@ -11891,20 +11914,65 @@ def timer_oversigt(aar, maaned):
     meds = timer_liste_medarbejdere()
     with _conn() as conn:
         rows = conn.execute(
-            "SELECT medarbejder_id, COUNT(*) AS dage, COALESCE(SUM(timer),0) AS timer "
+            "SELECT medarbejder_id, COUNT(*) AS dage, COALESCE(SUM(timer),0) AS timer, "
+            "COALESCE(SUM(CASE WHEN betalt=1 THEN timer ELSE 0 END),0) AS betalt "
             "FROM timer_registrering WHERE dato>=? AND dato<=? GROUP BY medarbejder_id",
             (foerste, sidste)).fetchall()
+        afv = conn.execute(
+            "SELECT medarbejder_id, COALESCE(SUM(timer),0) AS t "
+            "FROM timer_registrering WHERE betalt=0 GROUP BY medarbejder_id").fetchall()
     agg = {r["medarbejder_id"]: r for r in rows}
+    afvm = {r["medarbejder_id"]: r["t"] for r in afv}
     out = []
     for m in meds:
         a = agg.get(m["id"])
+        timer = (a["timer"] if a else 0)
+        betalt = (a["betalt"] if a else 0)
         out.append({
             "id": m["id"], "navn": m["navn"], "brugernavn": m["brugernavn"],
             "aktiv": m["aktiv"], "timer_pr_dag": m["timer_pr_dag"],
             "dage": (a["dage"] if a else 0),
-            "timer": (a["timer"] if a else 0),
+            "timer": timer,
+            "betalt": betalt,
+            "afventer_mdr": timer - betalt,
+            "afventer_total": afvm.get(m["id"], 0),
         })
     return {"aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
             "medarbejdere": out,
             "total_dage": sum(o["dage"] for o in out),
-            "total_timer": sum(o["timer"] for o in out)}
+            "total_timer": sum(o["timer"] for o in out),
+            "total_betalt": sum(o["betalt"] for o in out),
+            "total_afventer": sum(o["afventer_total"] for o in out)}
+
+
+def _timer_mdr_graenser(aar, maaned):
+    import calendar
+    from datetime import date
+    aar = int(aar); maaned = int(maaned)
+    antal = calendar.monthrange(aar, maaned)[1]
+    return date(aar, maaned, 1).isoformat(), date(aar, maaned, antal).isoformat()
+
+
+def timer_godkend(med_id, aar, maaned):
+    """Godkend (markér som betalt/udbetalt løn) alle IKKE-betalte dage i måneden."""
+    from datetime import date
+    foerste, sidste = _timer_mdr_graenser(aar, maaned)
+    with _conn() as conn:
+        cur = conn.execute(
+            "UPDATE timer_registrering SET betalt=1, betalt_dato=? "
+            "WHERE medarbejder_id=? AND dato>=? AND dato<=? AND betalt=0",
+            (date.today().isoformat(), int(med_id), foerste, sidste))
+        n = cur.rowcount
+    return {"ok": True, "godkendt_dage": n}
+
+
+def timer_godkend_fortryd(med_id, aar, maaned):
+    """Fortryd løn-godkendelsen for månedens betalte dage (fx ved fejl)."""
+    foerste, sidste = _timer_mdr_graenser(aar, maaned)
+    with _conn() as conn:
+        cur = conn.execute(
+            "UPDATE timer_registrering SET betalt=0, betalt_dato='' "
+            "WHERE medarbejder_id=? AND dato>=? AND dato<=? AND betalt=1",
+            (int(med_id), foerste, sidste))
+        n = cur.rowcount
+    return {"ok": True, "fortrudt_dage": n}

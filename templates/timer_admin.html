@@ -10,7 +10,7 @@
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:0 0 60px}
-  .wrap{max-width:860px;margin:0 auto;padding:18px}
+  .wrap{max-width:900px;margin:0 auto;padding:18px}
   h1{font-size:1.3rem;margin:6px 0 2px}
   .sub{color:var(--muted);font-size:.85rem;margin-bottom:20px}
   .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
@@ -31,8 +31,11 @@
   th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--line)}
   td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
   tr.inaktiv{opacity:.5}
+  tr.klik{cursor:pointer}
+  tr.klik:hover td{background:#faf8f3}
   .pill{display:inline-block;font-size:.7rem;padding:2px 8px;border-radius:999px;background:#eef5ef;color:var(--green2)}
   .pill.off{background:#f3efe8;color:var(--muted)}
+  .pill.warn{background:#fdf3e2;color:#9a6a12}
   .num{font-variant-numeric:tabular-nums;font-weight:600}
   .monthbar{display:flex;align-items:center;gap:12px}
   .nav{width:34px;height:34px;border-radius:9px;background:#f0ece2;font-size:1.1rem}
@@ -43,14 +46,50 @@
   .credlines{white-space:pre-wrap;background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px;font-size:.86rem;font-family:ui-monospace,Menlo,Consolas,monospace}
   .muted{color:var(--muted)}
   .hidden{display:none!important}
-  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.2s}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(35,32,27,.45);display:flex;align-items:flex-start;justify-content:center;
+    padding:24px 14px;overflow:auto;z-index:50}
+  .modal{background:var(--bg);border-radius:18px;box-shadow:0 20px 60px rgba(0,0,0,.3);width:100%;max-width:600px;padding:20px}
+  .modal-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .modal-top h2{margin:0;font-size:1.15rem}
+  .x{width:36px;height:36px;border-radius:10px;background:#efeae0;font-size:1.1rem}
+  .x:hover{background:#e3ddd2}
+  .tiles{display:flex;gap:10px;margin-bottom:14px}
+  .tile{flex:1;border-radius:14px;padding:13px 12px;box-shadow:var(--shadow)}
+  .tile .n{font-size:1.4rem;font-weight:700;line-height:1}
+  .tile .l{font-size:.68rem;margin-top:5px;letter-spacing:.3px}
+  .tile.warn{background:var(--amber);color:#3a2d08}
+  .tile.paid{background:var(--green);color:#fff}
+  .tile.plain{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .mmonth{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px 8px;margin-bottom:12px}
+  .mmonth b{text-transform:capitalize}
+  .week{margin-bottom:12px}
+  .week-h{display:flex;justify-content:space-between;padding:0 4px 6px;color:var(--muted);font-size:.74rem;font-weight:600}
+  .days{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .day{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:1px solid var(--line)}
+  .day:last-child{border-bottom:0}
+  .day.on{background:#eef5ef}
+  .day.paid{background:#f0f6f1}
+  .day.weekend .dname{color:var(--rust)}
+  .day.clk{cursor:pointer}
+  .day.clk:hover{background:#f6faf6}
+  .box{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:none;display:flex;align-items:center;justify-content:center;color:#fff;font-size:.8rem}
+  .day.on .box{background:var(--green);border-color:var(--green)}
+  .day.paid .box{background:var(--green2);border-color:var(--green2)}
+  .dnum{width:22px;text-align:center;font-weight:700;color:var(--muted)}
+  .dname{flex:1;font-size:.9rem}
+  .badge-paid{font-size:.66rem;background:var(--green);color:#fff;padding:2px 7px;border-radius:999px}
+  .dhrs{font-size:.8rem;color:var(--muted);min-width:30px;text-align:right}
+  .modal-actions{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
+  .modal-note{font-size:.76rem;color:var(--muted);margin-top:10px}
 </style>
 </head>
 <body>
 <div class="wrap">
   <h1>Timer — administration</h1>
-  <div class="sub">Opret medarbejdere, se timer pr. måned, og kopiér login-info til udsendelse. Medarbejderlink: <code id="empUrl">…/timer</code></div>
+  <div class="sub">Opret medarbejdere, klik på en for at se og godkende timer til løn. Medarbejderlink: <code id="empUrl">…/timer</code></div>
 
   <!-- OPRET -->
   <div class="card">
@@ -79,8 +118,8 @@
 
   <!-- OVERSIGT -->
   <div class="card">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-      <h2 style="margin:0">Timer pr. medarbejder</h2>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px">
+      <h2 style="margin:0">Timer pr. medarbejder <span class="muted" style="font-weight:400;font-size:.8rem">· klik for detaljer</span></h2>
       <div class="monthbar">
         <button class="nav" id="prev">‹</button>
         <b id="mlabel" style="min-width:140px;text-align:center;text-transform:capitalize">—</b>
@@ -88,12 +127,40 @@
       </div>
     </div>
     <table>
-      <thead><tr><th>Medarbejder</th><th>Brugernavn</th><th>Status</th><th style="text-align:right">Dage</th><th style="text-align:right">Timer</th><th>Handlinger</th></tr></thead>
+      <thead><tr><th>Medarbejder</th><th>Status</th><th style="text-align:right">Dage</th><th style="text-align:right">Timer (md)</th><th style="text-align:right">Betalt</th><th style="text-align:right">Afventer løn</th></tr></thead>
       <tbody id="rows"><tr><td colspan="6" class="muted">Indlæser…</td></tr></tbody>
-      <tfoot><tr><td colspan="3" style="font-weight:700">I alt</td>
+      <tfoot><tr><td colspan="2" style="font-weight:700">I alt</td>
         <td style="text-align:right" class="num" id="totDage">0</td>
-        <td style="text-align:right" class="num" id="totTimer">0</td><td></td></tr></tfoot>
+        <td style="text-align:right" class="num" id="totTimer">0</td>
+        <td style="text-align:right" class="num" id="totBetalt">0</td>
+        <td style="text-align:right" class="num" id="totAfv">0</td></tr></tfoot>
     </table>
+  </div>
+</div>
+
+<!-- DETALJE-MODAL -->
+<div class="overlay hidden" id="overlay">
+  <div class="modal">
+    <div class="modal-top">
+      <h2 id="mdNavn">—</h2>
+      <button class="x" id="mdClose">✕</button>
+    </div>
+    <div class="tiles">
+      <div class="tile warn"><div class="n" id="mdAfvTotal">0</div><div class="l">AFVENTER NÆSTE LØN (I ALT)</div></div>
+      <div class="tile paid"><div class="n" id="mdBetalt">0</div><div class="l">BETALT DENNE MÅNED</div></div>
+      <div class="tile plain"><div class="n" id="mdAfvMdr">0</div><div class="l">AFVENTER DENNE MÅNED</div></div>
+    </div>
+    <div class="mmonth">
+      <button class="nav" id="mdPrev">‹</button>
+      <b id="mdMonth">—</b>
+      <button class="nav" id="mdNext">›</button>
+    </div>
+    <div id="mdWeeks"></div>
+    <div class="modal-actions">
+      <button class="btn" id="mdGodkend">✓ Godkend månedens timer til løn</button>
+      <button class="btn-sm btn-rust" id="mdFortryd">Fortryd godkendelse</button>
+    </div>
+    <div class="modal-note">Grønne dage med “betalt” er udbetalt løn og er låst. Klik en ikke-betalt dag for at rette (fx tastefejl). Godkendelse markerer alle månedens ikke-betalte dage som udbetalt.</div>
   </div>
 </div>
 
@@ -102,12 +169,13 @@
 <script>
 const $=s=>document.querySelector(s);
 const SECRET=new URLSearchParams(location.search).get("secret");
-const Q=SECRET?("?secret="+encodeURIComponent(SECRET)):"";
 let cur=new Date();cur.setDate(1);
+let md=new Date();md.setDate(1);      // modal-måned
+let mdId=null, mdNavn="";
 const EMP_URL=location.origin+"/timer";
 $("#empUrl").textContent=EMP_URL;
 
-function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1600);}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1800);}
 async function api(path,opts){
   const sep=path.includes("?")?"&":"?";
   const url=path+(SECRET?(sep+"secret="+encodeURIComponent(SECRET)):"");
@@ -141,39 +209,79 @@ async function load(){
     $("#rows").innerHTML=`<tr><td colspan="6" class="fejl">${e.message}</td></tr>`;return;}
   $("#mlabel").textContent=`${d.maaned_navn} ${d.aar}`;
   $("#totDage").textContent=d.total_dage;$("#totTimer").textContent=d.total_timer;
+  $("#totBetalt").textContent=d.total_betalt;$("#totAfv").textContent=d.total_afventer;
   const tb=$("#rows");tb.innerHTML="";
   if(!d.medarbejdere.length){tb.innerHTML=`<tr><td colspan="6" class="muted">Ingen medarbejdere endnu — opret en ovenfor.</td></tr>`;return;}
   d.medarbejdere.forEach(m=>{
-    const tr=document.createElement("tr");if(!m.aktiv)tr.className="inaktiv";
-    tr.innerHTML=`<td>${m.navn}</td><td class="muted">${m.brugernavn}</td>
+    const tr=document.createElement("tr");tr.className="klik"+(m.aktiv?"":" inaktiv");
+    const afvPill=m.afventer_total>0?`<span class="pill warn">${m.afventer_total} t</span>`:`<span class="pill">0 t</span>`;
+    tr.innerHTML=`<td><b>${m.navn}</b><div class="muted" style="font-size:.78rem">${m.brugernavn}</div></td>
       <td>${m.aktiv?'<span class="pill">aktiv</span>':'<span class="pill off">inaktiv</span>'}</td>
       <td style="text-align:right" class="num">${m.dage}</td>
       <td style="text-align:right" class="num">${m.timer}</td>
-      <td><div class="row-actions">
-        <button class="btn-sm" data-act="pw" data-id="${m.id}" data-navn="${encodeURIComponent(m.navn)}" data-bru="${m.brugernavn}">Ny kode</button>
-        <button class="btn-sm ${m.aktiv?'btn-rust':''}" data-act="aktiv" data-id="${m.id}" data-aktiv="${m.aktiv?0:1}">${m.aktiv?'Deaktivér':'Aktivér'}</button>
-      </div></td>`;
+      <td style="text-align:right" class="num">${m.betalt}</td>
+      <td style="text-align:right">${afvPill}</td>`;
+    tr.addEventListener("click",()=>openMd(m.id,m.navn));
     tb.appendChild(tr);
   });
-  tb.querySelectorAll("button[data-act]").forEach(b=>b.addEventListener("click",onAction));
 }
 
-async function onAction(e){
-  const b=e.currentTarget,act=b.dataset.act,id=parseInt(b.dataset.id);
-  if(act==="aktiv"){
-    try{await api("/api/timer/admin/aktiv",{method:"POST",body:JSON.stringify({id,aktiv:!!parseInt(b.dataset.aktiv)})});load();}
-    catch(err){toast(err.message);}
-  }else if(act==="pw"){
-    const navn=decodeURIComponent(b.dataset.navn),bru=b.dataset.bru;
-    const pw=prompt(`Ny adgangskode for ${navn} (${bru}):`, rnd(6));
-    if(!pw)return;
-    try{
-      await api("/api/timer/admin/password",{method:"POST",body:JSON.stringify({id,password:pw})});
-      const txt=`Hej ${navn.split(" ")[0]} 👋\nDit login til timeregistrering er opdateret:\n\nLink: ${EMP_URL}\nBrugernavn: ${bru}\nAdgangskode: ${pw}`;
-      navigator.clipboard.writeText(txt).then(()=>toast("Ny kode sat + login-info kopieret ✓"),()=>toast("Ny kode sat ✓"));
-    }catch(err){toast(err.message);}
-  }
+// ── MODAL ──
+function openMd(id,navn){mdId=id;mdNavn=navn;md=new Date(cur);$("#overlay").classList.remove("hidden");loadMd();}
+$("#mdClose").addEventListener("click",()=>{$("#overlay").classList.add("hidden");load();});
+$("#overlay").addEventListener("click",e=>{if(e.target.id==="overlay"){$("#overlay").classList.add("hidden");load();}});
+$("#mdPrev").addEventListener("click",()=>{md.setMonth(md.getMonth()-1);loadMd();});
+$("#mdNext").addEventListener("click",()=>{md.setMonth(md.getMonth()+1);loadMd();});
+
+async function loadMd(){
+  const aar=md.getFullYear(),m=md.getMonth()+1;
+  let d;try{d=await api(`/api/timer/admin/medarbejder/${mdId}/maaned?aar=${aar}&maaned=${m}`);}catch(e){toast(e.message);return;}
+  $("#mdNavn").textContent=d.medarbejder.navn;
+  $("#mdMonth").textContent=`${d.maaned_navn} ${d.aar}`;
+  $("#mdAfvTotal").textContent=d.afventer_total;
+  $("#mdBetalt").textContent=d.total_betalt;
+  $("#mdAfvMdr").textContent=d.total_afventer_mdr;
+  const wrap=$("#mdWeeks");wrap.innerHTML="";
+  d.uger.forEach(u=>{
+    const sec=document.createElement("div");sec.className="week";
+    sec.innerHTML=`<div class="week-h"><span>UGE ${u.uge}</span><span>${u.timer} t · ${u.dage_antal} dage</span></div>`;
+    const list=document.createElement("div");list.className="days";
+    u.dage.forEach(day=>{
+      const row=document.createElement("div");
+      const paid=day.betalt&&day.afkrydset;
+      row.className="day"+(day.afkrydset?" on":"")+(paid?" paid":"")+(day.weekend?" weekend":"")+(day.afkrydset&&!paid?" clk":(!day.afkrydset?" clk":""));
+      row.innerHTML=`<span class="box">${day.afkrydset?"✓":""}</span>
+        <span class="dnum">${day.dag_nr}</span>
+        <span class="dname">${day.ugedag}</span>
+        ${paid?'<span class="badge-paid">betalt</span>':''}
+        <span class="dhrs">${day.afkrydset?day.timer+" t":"–"}</span>`;
+      if(!paid) row.addEventListener("click",()=>mdToggle(day));
+      list.appendChild(row);
+    });
+    sec.appendChild(list);wrap.appendChild(sec);
+  });
 }
+
+async function mdToggle(day){
+  try{ await api("/api/timer/admin/toggle",{method:"POST",body:JSON.stringify({id:mdId,dato:day.dato})}); loadMd(); }
+  catch(e){ toast(e.message); }
+}
+
+$("#mdGodkend").addEventListener("click",async()=>{
+  const aar=md.getFullYear(),m=md.getMonth()+1;
+  if(!confirm(`Godkend alle ${mdNavn.split(" ")[0]}s ikke-betalte timer i måneden som UDBETALT løn? Dagene låses derefter.`))return;
+  try{const r=await api("/api/timer/admin/godkend",{method:"POST",body:JSON.stringify({id:mdId,aar,maaned:m})});
+    toast(`Godkendt: ${r.godkendt_dage} dage markeret som betalt ✓`);loadMd();}
+  catch(e){toast(e.message);}
+});
+$("#mdFortryd").addEventListener("click",async()=>{
+  const aar=md.getFullYear(),m=md.getMonth()+1;
+  if(!confirm("Fortryd løn-godkendelsen for månedens betalte dage?"))return;
+  try{const r=await api("/api/timer/admin/godkend-fortryd",{method:"POST",body:JSON.stringify({id:mdId,aar,maaned:m})});
+    toast(`${r.fortrudt_dage} dage sat tilbage til afventer`);loadMd();}
+  catch(e){toast(e.message);}
+});
+
 load();
 </script>
 </body>

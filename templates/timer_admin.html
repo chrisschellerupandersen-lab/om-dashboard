@@ -132,7 +132,7 @@
       </div>
     </div>
     <table>
-      <thead><tr><th>Medarbejder</th><th>Status</th><th style="text-align:right">Dage</th><th style="text-align:right">Timer (md)</th><th style="text-align:right">Betalt</th><th style="text-align:right">Afventer løn</th></tr></thead>
+      <thead><tr><th>Medarbejder</th><th>Status</th><th style="text-align:right">Dage</th><th style="text-align:right">Timer (periode)</th><th style="text-align:right">Betalt</th><th style="text-align:right">Afventer løn</th></tr></thead>
       <tbody id="rows"><tr><td colspan="6" class="muted">Indlæser…</td></tr></tbody>
       <tfoot><tr><td colspan="2" style="font-weight:700">I alt</td>
         <td style="text-align:right" class="num" id="totDage">0</td>
@@ -152,8 +152,8 @@
     </div>
     <div class="tiles">
       <div class="tile warn"><div class="n" id="mdAfvTotal">0</div><div class="l">AFVENTER NÆSTE LØN (I ALT)</div></div>
-      <div class="tile paid"><div class="n" id="mdBetalt">0</div><div class="l">BETALT DENNE MÅNED</div></div>
-      <div class="tile plain"><div class="n" id="mdAfvMdr">0</div><div class="l">AFVENTER DENNE MÅNED</div></div>
+      <div class="tile paid"><div class="n" id="mdBetalt">0</div><div class="l">BETALT DENNE PERIODE</div></div>
+      <div class="tile plain"><div class="n" id="mdAfvMdr">0</div><div class="l">AFVENTER DENNE PERIODE</div></div>
     </div>
     <div class="mmonth">
       <button class="nav" id="mdPrev">‹</button>
@@ -162,10 +162,10 @@
     </div>
     <div id="mdWeeks"></div>
     <div class="modal-actions">
-      <button class="btn" id="mdGodkend">✓ Godkend alle ikke-betalte (måned)</button>
-      <button class="btn-sm btn-rust" id="mdFortryd">Fortryd månedens godkendelse</button>
+      <button class="btn" id="mdGodkend">✓ Godkend alle ikke-betalte (perioden)</button>
+      <button class="btn-sm btn-rust" id="mdFortryd">Fortryd periodens godkendelse</button>
     </div>
-    <div class="modal-note">Klik <b>“godkend”</b> ud for hver dag, der skal med i denne lønkørsel — så ruller resten videre til næste gang (lønnen skærer sjældent præcis ved månedsskifte). <b>“✓ betalt”</b> = udbetalt og låst; tryk igen for at fortryde. Boksen til venstre retter om dagen var en arbejdsdag (kun ikke-betalte dage).</div>
+    <div class="modal-note">Lønperiode: <b>21. → 20.</b> Klik <b>“godkend”</b> ud for hver dag, der skal med i denne lønkørsel — eller godkend hele perioden med knappen. <b>“✓ betalt”</b> = udbetalt og låst; tryk igen for at fortryde. Boksen til venstre retter om dagen var en arbejdsdag (kun ikke-betalte dage).</div>
   </div>
 </div>
 
@@ -174,8 +174,10 @@
 <script>
 const $=s=>document.querySelector(s);
 const SECRET=new URLSearchParams(location.search).get("secret");
-let cur=new Date();cur.setDate(1);
-let md=new Date();md.setDate(1);      // modal-måned
+// Lønperiode 21.→20.; datoerne peger på SLUT-måneden (hvor den 20. ligger).
+function periodeEnd(){const t=new Date();const d=new Date(t.getFullYear(),t.getMonth(),1);if(t.getDate()>=21)d.setMonth(d.getMonth()+1);return d;}
+let cur=periodeEnd();
+let md=periodeEnd();      // modal-periode
 let mdId=null, mdNavn="";
 const EMP_URL=location.origin+"/timer";
 $("#empUrl").textContent=EMP_URL;
@@ -212,7 +214,7 @@ async function load(){
   const aar=cur.getFullYear(),m=cur.getMonth()+1;
   let d;try{d=await api(`/api/timer/admin/oversigt?aar=${aar}&maaned=${m}`);}catch(e){
     $("#rows").innerHTML=`<tr><td colspan="6" class="fejl">${e.message}</td></tr>`;return;}
-  $("#mlabel").textContent=`${d.maaned_navn} ${d.aar}`;
+  $("#mlabel").textContent=d.periode_label;
   $("#totDage").textContent=d.total_dage;$("#totTimer").textContent=d.total_timer;
   $("#totBetalt").textContent=d.total_betalt;$("#totAfv").textContent=d.total_afventer;
   const tb=$("#rows");tb.innerHTML="";
@@ -242,7 +244,7 @@ async function loadMd(){
   const aar=md.getFullYear(),m=md.getMonth()+1;
   let d;try{d=await api(`/api/timer/admin/medarbejder/${mdId}/maaned?aar=${aar}&maaned=${m}`);}catch(e){toast(e.message);return;}
   $("#mdNavn").textContent=d.medarbejder.navn;
-  $("#mdMonth").textContent=`${d.maaned_navn} ${d.aar}`;
+  $("#mdMonth").textContent=d.periode_label;
   $("#mdAfvTotal").textContent=d.afventer_total;
   $("#mdBetalt").textContent=d.total_betalt;
   $("#mdAfvMdr").textContent=d.total_afventer_mdr;
@@ -292,14 +294,14 @@ async function mdBetal(day,betalt){
 
 $("#mdGodkend").addEventListener("click",async()=>{
   const aar=md.getFullYear(),m=md.getMonth()+1;
-  if(!confirm(`Godkend alle ${mdNavn.split(" ")[0]}s ikke-betalte timer i måneden som UDBETALT løn? Dagene låses derefter.`))return;
+  if(!confirm(`Godkend alle ${mdNavn.split(" ")[0]}s ikke-betalte timer i perioden som UDBETALT løn? Dagene låses derefter.`))return;
   try{const r=await api("/api/timer/admin/godkend",{method:"POST",body:JSON.stringify({id:mdId,aar,maaned:m})});
     toast(`Godkendt: ${r.godkendt_dage} dage markeret som betalt ✓`);loadMd();}
   catch(e){toast(e.message);}
 });
 $("#mdFortryd").addEventListener("click",async()=>{
   const aar=md.getFullYear(),m=md.getMonth()+1;
-  if(!confirm("Fortryd løn-godkendelsen for månedens betalte dage?"))return;
+  if(!confirm("Fortryd løn-godkendelsen for periodens betalte dage?"))return;
   try{const r=await api("/api/timer/admin/godkend-fortryd",{method:"POST",body:JSON.stringify({id:mdId,aar,maaned:m})});
     toast(`${r.fortrudt_dage} dage sat tilbage til afventer`);loadMd();}
   catch(e){toast(e.message);}

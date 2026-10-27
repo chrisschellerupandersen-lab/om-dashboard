@@ -114,12 +114,12 @@
   </div>
 
   <div class="summary">
-    <div class="tile"><div class="n" id="tTimer">0</div><div class="l">TIMER I MÅNEDEN</div></div>
+    <div class="tile"><div class="n" id="tTimer">0</div><div class="l">TIMER I PERIODEN</div></div>
     <div class="tile alt"><div class="n" id="tDage">0</div><div class="l">ARBEJDSDAGE</div></div>
   </div>
 
   <div class="paybar">
-    <span class="paid">✓ Udbetalt (md): <b id="pBetalt">0</b> t</span>
+    <span class="paid">✓ Udbetalt (periode): <b id="pBetalt">0</b> t</span>
     <span class="afv">⏳ Afventer løn: <b id="pAfv">0</b> t</span>
   </div>
 
@@ -131,7 +131,9 @@
 
 <script>
 const $ = s => document.querySelector(s);
-let cur = new Date(); cur.setDate(1);
+// Lønperiode = 21.→20. "cur" peger på SLUT-måneden (måneden hvor den 20. ligger).
+function periodeEnd(){const t=new Date();const d=new Date(t.getFullYear(),t.getMonth(),1);if(t.getDate()>=21)d.setMonth(d.getMonth()+1);return d;}
+let cur = periodeEnd();
 let busy = false;
 
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");
@@ -170,7 +172,7 @@ async function load(){
   let d;
   try{ d = await api(`/api/timer/maaned?aar=${aar}&maaned=${m}`); }catch(e){return;}
   $("#navn").textContent = d.medarbejder.navn;
-  $("#mlabel").textContent = `${d.maaned_navn} ${d.aar}`;
+  $("#mlabel").textContent = d.periode_label;
   $("#tTimer").textContent = d.total_timer;
   $("#tDage").textContent = d.total_dage;
   $("#tpd").textContent = d.timer_pr_dag;

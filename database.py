@@ -11744,7 +11744,26 @@ def hent_db_shopbox_poster(slags: str, periode: str) -> dict:
 
 _TIMER_MDR = ["", "januar", "februar", "marts", "april", "maj", "juni", "juli",
               "august", "september", "oktober", "november", "december"]
+_TIMER_MDR_KORT = ["", "jan", "feb", "mar", "apr", "maj", "jun", "jul",
+                   "aug", "sep", "okt", "nov", "dec"]
 _TIMER_UGEDAGE = ["Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag", "Søndag"]
+
+
+def _timer_periode(aar, maaned):
+    """Lønperiode identificeret ved SLUT-måneden (aar, maaned): altid 21. i forrige
+    måned → 20. i slut-måneden. Fast lønperiode, fordi lønnen afregnes 21.→20."""
+    from datetime import date
+    aar = int(aar); maaned = int(maaned)
+    slut = date(aar, maaned, 20)
+    pm = maaned - 1 if maaned > 1 else 12
+    pa = aar if maaned > 1 else aar - 1
+    start = date(pa, pm, 21)
+    return start, slut
+
+
+def _timer_periode_label(aar, maaned):
+    s, e = _timer_periode(aar, maaned)
+    return f"21. {_TIMER_MDR_KORT[s.month]} – 20. {_TIMER_MDR_KORT[e.month]} {e.year}"
 
 
 def _timer_hash(password, salt_hex=None):
@@ -11847,40 +11866,38 @@ def timer_toggle(med_id, dato, admin=False):
 
 
 def timer_hent_maaned(med_id, aar, maaned):
-    import calendar
-    from datetime import date
+    """Henter en LØNPERIODE (21. forrige md → 20. i (aar,maaned)) for én medarbejder."""
+    from datetime import date, timedelta
     md = timer_hent_medarbejder(med_id)
     if not md:
         return None
-    aar = int(aar); maaned = int(maaned)
-    antal_dage = calendar.monthrange(aar, maaned)[1]
-    foerste = date(aar, maaned, 1).isoformat()
-    sidste = date(aar, maaned, antal_dage).isoformat()
+    start, slut = _timer_periode(aar, maaned)
     with _conn() as conn:
         rows = conn.execute(
             "SELECT dato, timer, betalt FROM timer_registrering "
             "WHERE medarbejder_id=? AND dato>=? AND dato<=?",
-            (int(med_id), foerste, sidste)).fetchall()
+            (int(med_id), start.isoformat(), slut.isoformat())).fetchall()
         afv = conn.execute(
             "SELECT COALESCE(SUM(timer),0) AS t, COUNT(*) AS n "
             "FROM timer_registrering WHERE medarbejder_id=? AND betalt=0",
             (int(med_id),)).fetchone()
     reg = {r["dato"]: r for r in rows}
     uger = {}
-    for d in range(1, antal_dage + 1):
-        dt = date(aar, maaned, d)
+    dt = start
+    while dt <= slut:
         iso = dt.isocalendar()
         key = (iso[0], iso[1])
         iso_s = dt.isoformat()
         r = reg.get(iso_s)
         uger.setdefault(key, []).append({
-            "dato": iso_s, "dag_nr": d,
+            "dato": iso_s, "dag_nr": dt.day,
             "ugedag": _TIMER_UGEDAGE[dt.weekday()],
             "weekend": dt.weekday() >= 5,
             "afkrydset": r is not None,
             "timer": (r["timer"] if r else 0),
             "betalt": (1 if (r and r["betalt"]) else 0),
         })
+        dt += timedelta(days=1)
     uge_liste = []
     for (uge_aar, uge), dage in sorted(uger.items()):
         uge_liste.append({
@@ -11892,25 +11909,23 @@ def timer_hent_maaned(med_id, aar, maaned):
     total_betalt = sum(x["timer"] for u in uge_liste for x in u["dage"] if x["betalt"])
     return {
         "medarbejder": {"id": md["id"], "navn": md["navn"]},
-        "aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
+        "aar": aar, "maaned": maaned,
+        "periode_label": _timer_periode_label(aar, maaned),
+        "periode_start": start.isoformat(), "periode_slut": slut.isoformat(),
         "timer_pr_dag": md["timer_pr_dag"],
         "uger": uge_liste,
         "total_dage": sum(u["dage_antal"] for u in uge_liste),
         "total_timer": total_timer,
         "total_betalt": total_betalt,
         "total_afventer_mdr": total_timer - total_betalt,
-        "afventer_total": afv["t"],       # hele perioden → til næste løn
+        "afventer_total": afv["t"],       # alle ikke-betalte timer → til næste løn
         "afventer_dage": afv["n"],
     }
 
 
 def timer_oversigt(aar, maaned):
-    import calendar
-    from datetime import date
-    aar = int(aar); maaned = int(maaned)
-    antal_dage = calendar.monthrange(aar, maaned)[1]
-    foerste = date(aar, maaned, 1).isoformat()
-    sidste = date(aar, maaned, antal_dage).isoformat()
+    start, slut = _timer_periode(aar, maaned)
+    foerste = start.isoformat(); sidste = slut.isoformat()
     meds = timer_liste_medarbejdere()
     with _conn() as conn:
         rows = conn.execute(
@@ -11937,7 +11952,8 @@ def timer_oversigt(aar, maaned):
             "afventer_mdr": timer - betalt,
             "afventer_total": afvm.get(m["id"], 0),
         })
-    return {"aar": aar, "maaned": maaned, "maaned_navn": _TIMER_MDR[maaned],
+    return {"aar": aar, "maaned": maaned,
+            "periode_label": _timer_periode_label(aar, maaned),
             "medarbejdere": out,
             "total_dage": sum(o["dage"] for o in out),
             "total_timer": sum(o["timer"] for o in out),
@@ -11946,11 +11962,9 @@ def timer_oversigt(aar, maaned):
 
 
 def _timer_mdr_graenser(aar, maaned):
-    import calendar
-    from datetime import date
-    aar = int(aar); maaned = int(maaned)
-    antal = calendar.monthrange(aar, maaned)[1]
-    return date(aar, maaned, 1).isoformat(), date(aar, maaned, antal).isoformat()
+    """Grænser for lønperioden (21.→20.) — bruges af godkend/fortryd."""
+    start, slut = _timer_periode(aar, maaned)
+    return start.isoformat(), slut.isoformat()
 
 
 def timer_godkend(med_id, aar, maaned):

@@ -46,7 +46,8 @@ _PROD_MAP = {
     "21": "Karamelliseret croissant",
     "22": "Surdejsbolle m. birkes",
     "23": "Müsli surdejsbolle",
-    "24": "Brunsvigersnegl",
+    "24": "Brunsvigersnegl",            # udgået okt 2026 → erstattet af PROD-25
+    "25": "Tebolle m. æblekompot & remonce",  # erstatter Brunsvigersnegl
     "26": "Bananbrød",
 }
 

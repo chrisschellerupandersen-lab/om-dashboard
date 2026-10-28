@@ -5273,14 +5273,15 @@ async function loadDbsMaaned(val){
     return `<td style="text-align:right;color:#8a6d3a;font-weight:600;${clk}" ${oc}>${spild} <span style="font-size:10px;font-weight:400;color:${_spPctClr(bp)};">${Math.round(bp)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${Math.round(np)}%)</span></td>`;
   };
   document.getElementById('dbs-maaned-tot').innerHTML =
-      tile('DB i alt', t.db_kr)
+    // Omsætning først, så DB/omkostninger/resultat, derefter spild og prognose
+      tile('Omsætning', t.oms_ex, 'var(--ash)')
+    + tile('MobilePay', t.mp_ex, 'var(--moss)')
+    + tile('Omsætning i alt', (t.oms_ialt!=null?t.oms_ialt:t.oms_ex), 'var(--forest)')
+    + tile('DB i alt', t.db_kr)
     + tile('Løn i alt', t.loen, '#8a3a3a')
     + tile('Omk i alt', t.omk, '#8a3a3a')
     + tile('Levering i alt', t.levering, '#8a3a3a')
     + tile('Resultat (til dato)', t.resultat, resClr)
-    + tile('Omsætning', t.oms_ex, 'var(--ash)')
-    + tile('MobilePay', t.mp_ex, 'var(--moss)')
-    + tile('Omsætning i alt', (t.oms_ialt!=null?t.oms_ialt:t.oms_ex), 'var(--forest)')
     + tile('Værdi spild', t.vaerdi_spild, '#8a6d3a')
     + _pctTile
     + tile('Frost salg', t.frost_salg, 'var(--moss)')

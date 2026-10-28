@@ -411,6 +411,34 @@ def _planlagt_social_generering():
         print(f"[Social generering exception] {str(e)[:150]}")
 
 
+def _planlagt_mobilepay_sync():
+    """Ugentlig MobilePay-sync: henter de seneste 8 dages omsætning fra Vipps
+    MobilePay Report API (client-credentials, ingen manuel eksport) og gemmer
+    direkte i mobilepay_dag. Idempotent — overlap på dage er harmløst.
+    Kører kun hvis MP-credentials er sat som env-variabler på serveren."""
+    from datetime import date as _d, timedelta as _td
+    if not (os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_LEDGER_ID")):
+        print("[MobilePay auto-sync] springer over — MP_CLIENT_ID/MP_LEDGER_ID mangler")
+        return
+    try:
+        import mobilepay_sync as mps
+        idag = _d.today()
+        datoer = [(idag - _td(days=i)).isoformat() for i in range(7, -1, -1)]  # 8 dage m. overlap
+        linjer = []
+        for dato in datoer:
+            try:
+                inkl = mps.fetch_dag(dato)
+            except Exception as e:
+                print(f"[MobilePay auto-sync] {dato} fejl: {str(e)[:80]}")
+                continue
+            linjer.append({"dato": dato, "omsaetning_inkl": inkl, "kilde": "api"})
+        if linjer:
+            n = database.gem_mobilepay_dag(linjer)
+            print(f"[MobilePay auto-sync OK] {n} dage opdateret ({datoer[0]}..{datoer[-1]})")
+    except Exception as e:
+        print(f"[MobilePay auto-sync exception] {str(e)[:150]}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
@@ -426,6 +454,10 @@ async def lifespan(app: FastAPI):
     # Social selling: generér dagens opslag hver morgen kl. 06:30
     _scheduler.add_job(_planlagt_social_generering, "cron", hour=6, minute=30)
     jobs.append("Social opslag: dagligt 06:30")
+    # MobilePay: ugentlig sync fra Vipps Report API (kun hvis credentials er sat)
+    if os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_LEDGER_ID"):
+        _scheduler.add_job(_planlagt_mobilepay_sync, "cron", day_of_week="mon", hour=5, minute=30)
+        jobs.append("MobilePay auto-sync: mandag 05:30")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")

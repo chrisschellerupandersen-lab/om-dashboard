@@ -1608,18 +1608,13 @@ def _mp_uge_netto(iso_aar: int, iso_uge: int) -> float:
             (mandag.isoformat(), sondag.isoformat())
         ).fetchall()
 
+    # Kun eksakt daglig data — sum af faktiske MobilePay-dage i ugen.
+    # (Ingen pro-rata af månedstotal: det gav fantom-tal på uger uden data,
+    #  i modstrid med DB-Shopbox-dagstabellen der viser de faktiske dage.)
     if dag_rows:
-        # Eksakt: sum af faktiske dage i ugen
         total_inkl = sum(r["omsaetning_inkl"] for r in dag_rows)
         return round(total_inkl / 1.25, 0)
-
-    # Fallback: pro-rater månedstotal (ugens mandag bestemmer måned)
-    mp = _mp_map_alle()
-    mp_inkl = mp.get((mandag.year, mandag.month), 0.0)
-    if not mp_inkl:
-        return 0.0
-    days = _mr(mandag.year, mandag.month)[1]
-    return round((mp_inkl / 1.25) / days * 7, 0)
+    return 0.0
 
 
 def gem_mobilepay_dag(linjer: list) -> int:

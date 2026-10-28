@@ -1216,7 +1216,12 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <div class="ov-metric">
               <div class="kpi-l">Omsætning · dag</div>
               <div class="kpi-v" id="new-ov-omsat">—</div>
-              <div class="kpi-s">incl. moms</div>
+              <div class="kpi-s" id="new-ov-omsat-sub">incl. moms</div>
+            </div>
+            <div class="ov-metric">
+              <div class="kpi-l">MobilePay · dag</div>
+              <div class="kpi-v" id="new-ov-mp" style="color:var(--moss);">—</div>
+              <div class="kpi-s">incl. moms · heraf i omsætning</div>
             </div>
             <div class="ov-metric">
               <div class="kpi-l">Vareforbrug</div>
@@ -1580,6 +1585,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
               </div>
             </div>
             <div class="dag-kpi-ref" id="dag-omsat-ref">forrige uge: —</div>
+            <div class="dag-kpi-ref" id="dag-omsat-split" style="margin-top:3px;font-size:11px;line-height:1.5;"></div>
           </div>
 
           <!-- Kunder -->
@@ -6353,10 +6359,18 @@ function buildForside(kpi, dage, uger, idag, katUge) {
       const el1 = document.getElementById('new-ov-omsat');
       if (el1 && dag.omsaetning != null) el1.textContent = kr(dag.omsaetning);
       if (el1) {
-        const subEl = el1.parentElement.querySelector('.kpi-s');
-        if (subEl) subEl.textContent = (dag.ekstra_mp > 0 || dag.ekstra_faktura > 0)
-          ? `incl. moms · +${kr(dag.ekstra_mp)} MP +${kr(dag.ekstra_faktura)} B2B`
-          : 'incl. moms';
+        const subEl = document.getElementById('new-ov-omsat-sub') || el1.parentElement.querySelector('.kpi-s');
+        if (subEl) {
+          const posIncl = dag.omsaetning_shopbox != null ? kr(dag.omsaetning_shopbox) : '—';
+          subEl.textContent = `incl. moms · POS ${posIncl}`;
+        }
+      }
+
+      // MobilePay dag (separat tal ved siden af POS) — inkl. moms
+      const elMp = document.getElementById('new-ov-mp');
+      if (elMp) {
+        const mpIncl = dag.ekstra_mp_incl != null ? dag.ekstra_mp_incl : (dag.ekstra_mp || 0) * 1.25;
+        elMp.textContent = kr(mpIncl);
       }
 
       // Vareforbrug
@@ -7354,6 +7368,19 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       document.getElementById('dag-omsat-ref').textContent =
         'forrige uge: ' + Math.round(prevDagOms).toLocaleString('da-DK') + ' kr · ' +
         (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+    }
+
+    // Opdeling: POS (Shopbox) vs. MobilePay (begge inkl. moms) — vist adskilt
+    const _splitEl = document.getElementById('dag-omsat-split');
+    if (_splitEl) {
+      const posIncl = dag.omsaetning_shopbox != null ? dag.omsaetning_shopbox : null;
+      const mpIncl  = dag.ekstra_mp_incl != null ? dag.ekstra_mp_incl : (dag.ekstra_mp || 0) * 1.25;
+      const b2bIncl = (dag.ekstra_faktura || 0) * 1.25;
+      let html = '';
+      if (posIncl != null) html += `<span style="color:var(--ash);">POS Shopbox</span> <b>${kr(posIncl)}</b>`;
+      html += ` &nbsp;·&nbsp; <span style="color:var(--moss);">MobilePay</span> <b style="color:var(--moss);">${kr(mpIncl)}</b>`;
+      if (b2bIncl > 0) html += ` &nbsp;·&nbsp; <span style="color:var(--ash);">B2B</span> <b>${kr(b2bIncl)}</b>`;
+      _splitEl.innerHTML = html;
     }
 
     // Kunder

@@ -1276,6 +1276,7 @@ def hent_kpi(aar: int = None) -> Dict:
                 if (d.get("omsaetning") or 0) > 0:
                     d["db_pct"] = d["db_kr"] * 1.25 / d["omsaetning"] * 100
             d["ekstra_mp"]      = e["mp_netto"]
+            d["ekstra_mp_incl"] = e["mp_incl"]   # MobilePay inkl. moms (til separat visning ved siden af POS)
             d["ekstra_faktura"] = e["faktura"]
             return d
 

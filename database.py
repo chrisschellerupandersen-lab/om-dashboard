@@ -1714,6 +1714,21 @@ def hent_uger(aar: int = None) -> List[Dict]:
         row["netto_spild"] = komp["netto_spild"]
         row["resultat"] = round(res)
         row["resultat_e_spild"] = round(res - komp["netto_spild"])
+        # Justeret for MobilePay (antag MobilePay = uvarekoblet bagværkssalg, samme DG):
+        # vareforbrug lægges på MobilePay-salget, og tilsvarende spild reklassificeres
+        # som solgt (cap: ugens netto spild). Samme model som DB-Shopbox-visningen.
+        oms_ex_u = float(row.get("omsaetning") or 0) / 1.25
+        mp_ex_u  = float(mp_netto or 0)
+        dgf_u    = (float(row.get("db_kr") or 0) / oms_ex_u) if oms_ex_u > 0 else 0.0
+        mp_vf_u  = round(mp_ex_u * (1 - dgf_u))
+        mp_db_u  = mp_ex_u - mp_vf_u
+        ns_u     = float(komp["netto_spild"] or 0)
+        credit_u = min(mp_vf_u, max(0.0, ns_u))
+        adj_ns_u = ns_u - credit_u
+        row["mp_vf"] = mp_vf_u
+        row["adj_db_kr"] = round(float(row.get("db_kr") or 0) + mp_db_u)
+        row["adj_netto_spild"] = round(adj_ns_u)
+        row["adj_resultat_e_spild"] = round(res + mp_db_u - adj_ns_u)
         resultat.append(row)
     return resultat
 

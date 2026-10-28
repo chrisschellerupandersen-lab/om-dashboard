@@ -1679,9 +1679,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
           </div>
           <table class="aar2-tbl">
             <thead>
-              <tr><th>Uge</th><th class="num" title="Shopbox / POS">Omsætning</th><th class="num" title="MobilePay – samme momsgrundlag som Omsætning">MobilePay</th><th class="num" title="Omsætning + MobilePay">Omsætning i alt</th><th class="num">Vareforbrug</th><th class="num">DB kr</th><th class="num" title="DB − løn − omk − levering">Resultat</th><th class="num" title="DB − løn − omk − levering − netto spild">Resultat e. spild</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
+              <tr><th>Uge</th><th class="num" title="Shopbox / POS">Omsætning</th><th class="num" title="MobilePay – samme momsgrundlag som Omsætning">MobilePay</th><th class="num" title="Omsætning + MobilePay">Omsætning i alt</th><th class="num">Vareforbrug</th><th class="num">DB kr</th><th class="num" title="DB − løn − omk − levering">Resultat</th><th class="num" title="DB − løn − omk − levering − netto spild">Resultat e. spild</th><th class="num" title="Resultat e. spild hvis MobilePay regnes som bagværkssalg (samme avance): + MobilePay-DB og mindre spild. Hover for DB/spild justeret.">Res. e. spild (just.)</th><th class="num">DB%</th><th class="num">vs. snit</th><th class="num">Dage</th><th>Status</th></tr>
             </thead>
-            <tbody id="uge-tbody"><tr><td colspan="12" class="empty">Indlæser…</td></tr></tbody>
+            <tbody id="uge-tbody"><tr><td colspan="13" class="empty">Indlæser…</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -7780,6 +7780,7 @@ function buildUge(uger) {
       <td class="num" style="${mono}font-size:13px;">${r.db_kr > 0 ? Math.round(r.db_kr).toLocaleString('da-DK') + ' kr' : '—'}</td>
       <td class="num" style="${mono}font-size:13px;color:${r.resultat==null?'var(--ash)':(r.resultat>=0?'var(--moss)':'var(--danger)')};" title="DB − løn − omk − levering">${r.resultat==null?'—':Math.round(r.resultat).toLocaleString('da-DK')+' kr'}</td>
       <td class="num" style="${mono}font-size:13px;font-weight:600;color:${r.resultat_e_spild==null?'var(--ash)':(r.resultat_e_spild>=0?'var(--moss)':'var(--danger)')};" title="DB − løn − omk − levering − netto spild">${r.resultat_e_spild==null?'—':Math.round(r.resultat_e_spild).toLocaleString('da-DK')+' kr'}</td>
+      <td class="num" style="${mono}font-size:13px;font-weight:600;border-left:2px dashed var(--moss);color:${r.adj_resultat_e_spild==null?'var(--ash)':(r.adj_resultat_e_spild>=0?'var(--moss)':'var(--danger)')};" title="Justeret for MobilePay (samme avance som salget): DB just. ${r.adj_db_kr!=null?Math.round(r.adj_db_kr).toLocaleString('da-DK')+' kr':'—'} · netto spild just. ${r.adj_netto_spild!=null?Math.round(r.adj_netto_spild).toLocaleString('da-DK')+' kr':'—'}">${r.adj_resultat_e_spild==null?'—':Math.round(r.adj_resultat_e_spild).toLocaleString('da-DK')+' kr'}</td>
       <td class="num" style="font-size:14px;">${r.db_pct.toFixed(1)}%</td>
       <td class="num" style="font-size:14px;color:${pct>=0?'var(--moss)':'var(--danger)'};">${pct>=0?'+':''}${pct}%</td>
       <td class="num" style="font-size:14px;">${r.antal_dage}</td>

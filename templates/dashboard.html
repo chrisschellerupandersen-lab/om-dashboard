@@ -5302,7 +5302,7 @@ async function loadDbsMaaned(val){
     _jEl.innerHTML =
         jTile('Omsætning i alt', j.oms_ialt, 'var(--forest)', 'Shopbox + MobilePay')
       + jTile('MobilePay vareforbrug', j.mp_vf, '#8a3a3a', `samme DG (${_dbsPct(j.dg_pct)})`)
-      + jTile('DB i alt (just.)', j.db_kr, 'var(--forest)', `DG ${_dbsPct(j.dg_pct)}`)
+      + jTile('DB i alt (just.)', j.db_kr, 'var(--forest)', `+${_dbsKr((j.db_kr||0)-(t.db_kr||0))} MobilePay-DB · DG ${_dbsPct(j.dg_pct)}`)
       + jTile('Netto spild (just.)', j.netto_spild, '#8a6d3a', 'efter MobilePay-salg')
       + jTile('Resultat e. spild (just.)', j.resultat_e_spild, (j.resultat_e_spild||0)>=0?'var(--moss)':'var(--danger)', `${_dRes>=0?'+':''}${_dbsKr(_dRes)} vs. rent Shopbox`);
   }

@@ -3139,8 +3139,9 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             </div>
             <span id="dbs-maaned-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr/dag lør+søn · omk 500 kr/dag · resultat = DB − løn − omk</span>
           </div>
-          <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
-          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin:4px 0 8px;">Justeret for MobilePay · antager MobilePay = uvarekoblet bagværkssalg (samme avance) → vareforbrug på salget + mindre spild</div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin:2px 0 8px;font-weight:600;">① Kun Shopbox-salg · alt stemmer til kassen</div>
+          <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px;"></div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin:2px 0 8px;font-weight:600;">② Inkl. MobilePay · MobilePay = uvarekoblet bagværkssalg (samme avance) → omsætning, vareforbrug, DB og mindre spild regnes med</div>
           <div id="dbs-just-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
@@ -5272,11 +5273,9 @@ async function loadDbsMaaned(val){
     const oc  = dato?`title="Klik for at se spild pr. vare (stk)" onclick="dbsDagDetalje('${dato}','spildstk',this)"`:'';
     return `<td style="text-align:right;color:#8a6d3a;font-weight:600;${clk}" ${oc}>${spild} <span style="font-size:10px;font-weight:400;color:${_spPctClr(bp)};">${Math.round(bp)}%</span><span style="font-size:10px;font-weight:400;color:var(--ash);"> (${Math.round(np)}%)</span></td>`;
   };
+  // ① Kun Shopbox — rent regnskab der stemmer til kassen (ingen MobilePay)
   document.getElementById('dbs-maaned-tot').innerHTML =
-    // Omsætning først, så DB/omkostninger/resultat, derefter spild og prognose
       tile('Omsætning', t.oms_ex, 'var(--ash)')
-    + tile('MobilePay', t.mp_ex, 'var(--moss)')
-    + tile('Omsætning i alt', (t.oms_ialt!=null?t.oms_ialt:t.oms_ex), 'var(--forest)')
     + tile('DB i alt', t.db_kr)
     + tile('Løn i alt', t.loen, '#8a3a3a')
     + tile('Omk i alt', t.omk, '#8a3a3a')
@@ -5299,12 +5298,28 @@ async function loadDbsMaaned(val){
         ${sub?`<div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div>`:''}</div>`;
     const _resEsBase = (t.resultat||0)-_nettoSpild;
     const _dRes = (j.resultat_e_spild||0) - _resEsBase;
+    const _mpDb = (j.db_kr||0)-(t.db_kr||0);
+    const _jNettoSpildDag = Math.round((j.netto_spild||0)/_dbsDage);
+    // Prognose inkl. MobilePay = ren prognose + realiseret MobilePay-DB til dato
+    let _jProgTile = '';
+    if (d.har_forecast && d.prognose_total){
+      const _jp = (d.prognose_total.resultat||0) + _mpDb;
+      _jProgTile = jTile('Prognose resultat', _jp, 'var(--forest)', 'hele måneden inkl. MobilePay');
+    }
     _jEl.innerHTML =
         jTile('Omsætning i alt', j.oms_ialt, 'var(--forest)', 'Shopbox + MobilePay')
-      + jTile('MobilePay vareforbrug', j.mp_vf, '#8a3a3a', `samme DG (${_dbsPct(j.dg_pct)})`)
-      + jTile('DB i alt (just.)', j.db_kr, 'var(--forest)', `+${_dbsKr((j.db_kr||0)-(t.db_kr||0))} MobilePay-DB · DG ${_dbsPct(j.dg_pct)}`)
-      + jTile('Netto spild (just.)', j.netto_spild, '#8a6d3a', 'efter MobilePay-salg')
-      + jTile('Resultat e. spild (just.)', j.resultat_e_spild, (j.resultat_e_spild||0)>=0?'var(--moss)':'var(--danger)', `${_dRes>=0?'+':''}${_dbsKr(_dRes)} vs. rent Shopbox`);
+      + jTile('MobilePay', j.mp_ex, 'var(--moss)', 'ex moms')
+      + jTile('Vareforbrug i alt', j.vareforbrug, '#8a3a3a', `heraf +${_dbsKr(j.mp_vf)} MobilePay`)
+      + jTile('DB i alt', j.db_kr, 'var(--forest)', `+${_dbsKr(_mpDb)} MobilePay-DB · DG ${_dbsPct(j.dg_pct)}`)
+      + jTile('Løn i alt', j.loen, '#8a3a3a')
+      + jTile('Omk i alt', j.omk, '#8a3a3a')
+      + jTile('Levering i alt', j.levering, '#8a3a3a')
+      + jTile('Resultat (til dato)', j.resultat, (j.resultat||0)>=0?'var(--moss)':'var(--danger)', `+${_dbsKr(_mpDb)} vs. Shopbox`)
+      + jTile('Værdi spild', j.vaerdi_spild, '#8a6d3a', 'efter MobilePay-salg')
+      + jTile('Netto spild', j.netto_spild, '#8a6d3a', 'efter MobilePay-salg')
+      + jTile('Netto spild/dag', _jNettoSpildDag, '#8a6d3a')
+      + jTile('Resultat e. spild', j.resultat_e_spild, (j.resultat_e_spild||0)>=0?'var(--moss)':'var(--danger)', `${_dRes>=0?'+':''}${_dbsKr(_dRes)} vs. Shopbox`)
+      + _jProgTile;
   }
   // Dag-tabel
   const tbl = document.getElementById('dbs-maaned-tabel');

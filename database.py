@@ -11649,7 +11649,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     # reduceres tilsvarende (cap: dagens netto spild). Nettoeffekt på "resultat efter
     # spild" = + MobilePay-omsætning når vareforbruget kan dækkes af spildet.
     period_dg_frac = (tot["db_kr"] / tot["oms_ex"]) if tot["oms_ex"] > 0 else 0.0
-    jt = {"mp_ex": 0.0, "mp_vf": 0.0, "db_kr": 0.0, "netto_spild": 0.0, "resultat_e_spild": 0.0}
+    jt = {"mp_ex": 0.0, "mp_vf": 0.0, "db_kr": 0.0, "vaerdi_spild": 0.0,
+          "netto_spild": 0.0, "resultat_e_spild": 0.0}
     for dd in dage:
         oms_d = dd["oms_ex"]; db_d = dd["db_kr"]; mp_d = dd["mp_ex"]
         dgf = (db_d / oms_d) if oms_d > 0 else period_dg_frac
@@ -11658,20 +11659,31 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         ns = dd["vaerdi_spild"] - dd["frost_salg"]   # netto spild (uden justering)
         credit = min(mp_vf, max(0, ns))          # spild der reklassificeres til solgt
         adj_ns = ns - credit
+        adj_vaerdi = dd["vaerdi_spild"] - credit  # værdi spild efter MobilePay-salg
         adj_res_es = (dd["resultat"] + mp_db) - adj_ns
         dd["mp_vf"] = mp_vf
         dd["adj_db_kr"] = round(db_d + mp_db)
         dd["adj_netto_spild"] = round(adj_ns)
         dd["adj_resultat_e_spild"] = round(adj_res_es)
         jt["mp_ex"] += mp_d; jt["mp_vf"] += mp_vf; jt["db_kr"] += (db_d + mp_db)
+        jt["vaerdi_spild"] += adj_vaerdi
         jt["netto_spild"] += adj_ns; jt["resultat_e_spild"] += adj_res_es
     _oms_ialt = tot["oms_ex"] + tot["mp_ex"]
+    _vf_ialt  = (tot["oms_ex"] - tot["db_kr"]) + jt["mp_vf"]   # vareforbrug inkl. MobilePay
+    _res_just = jt["db_kr"] - tot["loen"] - tot["omk"] - tot["levering"]
     justeret = {
         "oms_ialt":        round(_oms_ialt),
         "mp_ex":           round(jt["mp_ex"]),
         "mp_vf":           round(jt["mp_vf"]),
+        "vareforbrug":     round(_vf_ialt),
         "db_kr":           round(jt["db_kr"]),
         "dg_pct":          round(jt["db_kr"] / _oms_ialt * 100, 1) if _oms_ialt > 0 else 0.0,
+        "loen":            round(tot["loen"]),
+        "omk":             round(tot["omk"]),
+        "levering":        round(tot["levering"]),
+        "resultat":        round(_res_just),
+        "vaerdi_spild":    round(jt["vaerdi_spild"]),
+        "frost_salg":      round(tot["frost_salg"]),
         "netto_spild":     round(jt["netto_spild"]),
         "resultat_e_spild": round(jt["resultat_e_spild"]),
     }

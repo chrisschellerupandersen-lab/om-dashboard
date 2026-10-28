@@ -882,9 +882,9 @@ async def api_dage(request: Request, n: int = 14, aar: Optional[int] = None):
 
 
 @app.get("/api/salg/uger")
-async def api_uger(request: Request, aar: Optional[int] = None):
+async def api_uger(request: Request, aar: Optional[int] = None, til_dato: int = 0):
     _kræv_login(request)
-    return database.hent_uger(aar)
+    return database.hent_uger(aar, til_dato=bool(til_dato))
 
 
 @app.get("/api/salg/timer")

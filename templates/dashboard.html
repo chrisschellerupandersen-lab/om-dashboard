@@ -1665,9 +1665,15 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
 
       <!-- UGEOVERSIGT -->
       <div class="panel" id="p-uge">
-        <div class="page-hdr">
-          <h2>Ugeoversigt</h2>
-          <p>Omsætning og avance per uge</p>
+        <div class="page-hdr" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2>Ugeoversigt</h2>
+            <p id="uge-sub">Omsætning og avance per uge</p>
+          </div>
+          <div style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-family:'DM Mono',monospace;font-size:11px;">
+            <button id="uge-mode-hel" onclick="ugeSaetMode(false)" style="padding:7px 12px;border:none;cursor:pointer;background:var(--forest);color:#fff;">Hele uge</button>
+            <button id="uge-mode-tildato" onclick="ugeSaetMode(true)" style="padding:7px 12px;border:none;cursor:pointer;background:transparent;color:var(--charcoal);">Uge til dato</button>
+          </div>
         </div>
         <div class="card">
           <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Ugeomsætning</span></div>
@@ -6285,7 +6291,7 @@ async function loadAll() {
   const [kpi, dage, uger, idag, timer, timerForrige, timerSnit, kategorier, top, katUge] = await Promise.all([
     api(`/api/kpi?aar=${a}`),
     api(`/api/salg/dage?n=30&aar=${a}`),
-    api(`/api/salg/uger?aar=${a}`),
+    api(`/api/salg/uger?aar=${a}${_ugeTilDato?'&til_dato=1':''}`),
     api(`/api/salg/idag?aar=${a}`),
     api(`/api/salg/timer?aar=${a}`),
     api(`/api/salg/timer/forrige-uge?aar=${a}`),
@@ -7757,7 +7763,29 @@ function renderDagBonner(d){
   }).join('');
 }
 
+let _ugeTilDato = false;
+const _UGEDAG_NAVN = ['', 'mandag','tirsdag','onsdag','torsdag','fredag','lørdag','søndag'];
+async function ugeSaetMode(tilDato){
+  _ugeTilDato = !!tilDato;
+  const bH = document.getElementById('uge-mode-hel'), bT = document.getElementById('uge-mode-tildato');
+  if (bH && bT){
+    bH.style.background = _ugeTilDato ? 'transparent' : 'var(--forest)';
+    bH.style.color      = _ugeTilDato ? 'var(--charcoal)' : '#fff';
+    bT.style.background = _ugeTilDato ? 'var(--forest)' : 'transparent';
+    bT.style.color      = _ugeTilDato ? '#fff' : 'var(--charcoal)';
+  }
+  const uger = await api(`/api/salg/uger?aar=${VALGT_AAR}${_ugeTilDato?'&til_dato=1':''}`);
+  buildUge(uger);
+}
+
 function buildUge(uger) {
+  const _subEl = document.getElementById('uge-sub');
+  if (_subEl){
+    const cd = uger && uger.length ? (uger[uger.length-1].cutoff_dage || 7) : 7;
+    _subEl.textContent = (_ugeTilDato && cd < 7)
+      ? `Uge til dato · alle uger talt man–${_UGEDAG_NAVN[cd]} (sammenlignelig)`
+      : 'Omsætning og avance per uge';
+  }
   if (!uger || !uger.length) return;
 
   // Farv hver søjle: grøn = bedre end forrige uge, rød = dårligere, grå = ingen forrige

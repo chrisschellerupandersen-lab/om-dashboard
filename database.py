@@ -1593,13 +1593,12 @@ def _mp_dag_map(fra_dato: str, til_dato: str) -> Dict:
     return {r["dato"]: r["omsaetning_inkl"] for r in rows}
 
 
-def _mp_uge_netto(iso_aar: int, iso_uge: int) -> float:
-    """Returner MobilePay netto (÷1.25) for en ISO-uge.
-    Bruger daglig data hvis tilgængelig, ellers pro-rater månedstotal."""
+def _mp_uge_netto(iso_aar: int, iso_uge: int, cutoff_days: int = 7) -> float:
+    """Returner MobilePay netto (÷1.25) for en ISO-uge (kun eksakt daglig data).
+    cutoff_days<7 (uge-til-dato): medtag kun ugens første N ugedage."""
     from datetime import date as _d, timedelta as _td
-    from calendar import monthrange as _mr
     mandag = _d.fromisocalendar(iso_aar, iso_uge, 1)
-    sondag = mandag + _td(days=6)
+    sondag = mandag + _td(days=max(1, min(cutoff_days, 7)) - 1)
 
     with _conn() as conn:
         # Check om der er daglig data for nogen dag i ugen
@@ -1660,12 +1659,24 @@ def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]
     return [dict(r) for r in rows]
 
 
-def hent_uger(aar: int = None) -> List[Dict]:
+def hent_uger(aar: int = None, til_dato: bool = False) -> List[Dict]:
     from datetime import date as _date
     from calendar import monthrange
     with _conn() as conn:
         where = "WHERE strftime('%Y', dato) = ?" if aar else ""
         params = (str(aar),) if aar else ()
+        # Uge-til-dato: skær alle uger til samme ugedag som seneste data-dato,
+        # så sammenligningen mellem uger bliver fair (fx man–ons for alle uger).
+        cutoff_days = 7
+        if til_dato:
+            _sen = conn.execute(
+                f"SELECT MAX(dato) FROM v_transaktioner {where}", params).fetchone()[0]
+            if _sen:
+                cutoff_days = _date.fromisoformat(_sen).isoweekday()  # man=1..søn=7
+        wd_sql = ""
+        if cutoff_days < 7:
+            # ISO-ugedag i SQLite: ((%w+6)%7)+1  (man=1..søn=7)
+            wd_sql = f" AND (((CAST(strftime('%w', dato) AS INTEGER)+6)%7)+1) <= {cutoff_days}"
         rows = conn.execute(f"""
             SELECT
                 strftime('%Y', dato)  AS aar,
@@ -1679,7 +1690,7 @@ def hent_uger(aar: int = None) -> List[Dict]:
                      ELSE 0 END, 1)                   AS db_pct,
                 COUNT(DISTINCT dato)                  AS antal_dage
             FROM v_transaktioner
-            {where}
+            {where}{wd_sql}
             GROUP BY strftime('%Y-%W', dato)
             ORDER BY dato ASC
         """, params).fetchall()
@@ -1692,16 +1703,19 @@ def hent_uger(aar: int = None) -> List[Dict]:
         d = _date.fromisoformat(r["min_dato"])
         iso = d.isocalendar()
         try:
-            mp_netto = _mp_uge_netto(iso[0], iso[1])
+            mp_netto = _mp_uge_netto(iso[0], iso[1], cutoff_days)
         except Exception:
             mp_netto = 0.0
         row = dict(r)
         row["uge"] = iso[1]  # Brug ISO week i stedet for %W
         row["aar"] = iso[0]  # Brug ISO år
         row["mp_netto"] = mp_netto
+        row["til_dato"] = til_dato
+        row["cutoff_dage"] = cutoff_days
         # Resultat efter spild = DB − løn − omk − levering − netto spild
         komp = _uge_efter_spild(iso[0], iso[1], seneste_iso,
-                                bemanding, loen_ov, lev_ov, frost_per)
+                                bemanding, loen_ov, lev_ov, frost_per,
+                                cutoff_days=cutoff_days)
         res = float(row.get("db_kr") or 0) - komp["kostnader"]
         row["loen"] = komp["loen"]
         row["omk"] = komp["omk"]
@@ -11320,10 +11334,12 @@ def _db_shopbox_kontekst(conn):
 
 
 def _uge_efter_spild(iso_y, iso_w, seneste_iso, bemanding, loen_ov, lev_ov, frost_per,
-                     loen_beloeb: float = 300.0, omk_pr_dag: float = 500.0) -> dict:
+                     loen_beloeb: float = 300.0, omk_pr_dag: float = 500.0,
+                     cutoff_days: int = 7) -> dict:
     """Komponenter til 'resultat efter spild' for én ISO-uge (DB-Shopbox-modellen):
     løn (weekend-standard), omk pr. dag, levering på leveringsdage, og netto spild
-    (brutto spild-kost − frost-salg) for Organic-æra-dage. Kun dage <= seneste_iso."""
+    (brutto spild-kost − frost-salg) for Organic-æra-dage. Kun dage <= seneste_iso.
+    cutoff_days<7 (uge-til-dato): medtag kun ugens første N ugedage (man=1..søn=7)."""
     from datetime import date as _d, timedelta as _td
     try:
         mon = _d.fromisocalendar(int(iso_y), int(iso_w), 1)
@@ -11334,6 +11350,8 @@ def _uge_efter_spild(iso_y, iso_w, seneste_iso, bemanding, loen_ov, lev_ov, fros
     fuld = bem == "fuld"
     loen = omk = levering = brutto = frost = 0.0
     for i in range(7):
+        if i >= cutoff_days:          # uge-til-dato: stop efter N ugedage
+            break
         dd = mon + _td(days=i)
         iso = dd.isoformat()
         if iso > seneste_iso:

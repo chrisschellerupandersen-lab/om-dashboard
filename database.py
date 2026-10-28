@@ -87,6 +87,7 @@ _ORGANIC_BAKERY = [
     {"navn": "Surdejsbolle m. sesam",   "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10426],
      "seed": {"man": 6, "tir": 8, "ons": 8, "tor": 10, "fre": 16, "loe": 26, "son": 26}},  # startbud ~100/uge = faktisk niveau (sælger ud ~86% ST; mis-indtastning gør SKU-salg upålideligt)
     {"navn": "Müsli surdejsbolle",      "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10482],
+     "kun_dage": ["fre", "loe", "son"],  # sælger ikke i hverdagen (okt 2026) → kun fre-søn, hverdags-efterspørgsel droppes
      "seed": {"man": 4, "tir": 5, "ons": 5, "tor": 5, "fre": 9, "loe": 14, "son": 12}},  # NY vare — SKU 10482 til solgt/spild; startbud ~54/uge indtil historik
     # Focaccia UDGÅET (sælges ikke mere, okt 2026) — fjernet fra anbefaling/bestilling.
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
@@ -105,7 +106,8 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},  # NY vare (erstatter Gulerodskage 1 pers) — SKU 10479 til solgt/spild; startbud indtil historik
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
-    {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408]},
+    {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408],
+     "kun_dage": ["tor", "son"], "kun_dage_saml": True},  # købes kun tor+søn (holder) → ugens efterspørgsel konsolideres på de to købsdage
     {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [],
      "seed": {"man": 0, "tir": 2, "ons": 0, "tor": 0, "fre": 3, "loe": 0, "son": 0}},  # NY vare (uge 43, ordre #1079) — endnu intet kassesalg/SKU; tilføj salg_kilde-varenummer når den har solgt (vare-opslag q=banan). udsalg 79,2 = 2× kost (bekræft rigtig pris)
 ]
@@ -7780,6 +7782,44 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
                                       * (_x["udsalg_ex_moms"] - _x["indkoeb_ex_moms"]), 2)
             if _x.get("total_bestilt") is not None:
                 _x["afvig_bestilt"] = _x["total_bestilt"] - _x["total_anbefalet"]
+
+    # ── Varer med fast dag-sortiment ("kun_dage") ──────────────────────────────
+    # Varer der kun købes/sælges bestemte dage. Default: nulstil øvrige dage (drop
+    # efterspørgsel — varen sælger ikke de dage, fx Müsli surdejsbolle fre-søn).
+    # Med "kun_dage_saml": konsolidér hver anden dags efterspørgsel på den seneste
+    # tilladte købsdag ≤ dagen (cyklisk) — for varer der holder og købes forud på
+    # få dage (fx Cookie tor+søn: tor dækker tor-lør, søn dækker søn-ons).
+    _DAGE_ORD = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
+    for _kp in _ORGANIC_BAKERY:
+        _kd = _kp.get("kun_dage")
+        if not _kd:
+            continue
+        m = _prod_map.get(_kp["navn"].strip().lower())
+        if not m:
+            continue
+        _allowed = [d for d in _DAGE_ORD if d in _kd]
+        if _kp.get("kun_dage_saml") and _allowed:
+            for i, d in enumerate(_DAGE_ORD):
+                if d in _kd:
+                    continue
+                _v = m["anbefalet"].get(d, 0)
+                if not _v:
+                    continue
+                _target = next((_DAGE_ORD[j] for j in range(i, -1, -1)
+                                if _DAGE_ORD[j] in _kd), _allowed[-1])
+                m["anbefalet"][_target] = m["anbefalet"].get(_target, 0) + _v
+                m["anbefalet"][d] = 0
+        else:
+            for d in _DAGE_ORD:
+                if d not in _kd:
+                    m["anbefalet"][d] = 0
+        m["kun_dage"] = list(_kd)
+        m["total_anbefalet"] = sum(m["anbefalet"].values())
+        m["total_pris"] = round(m["total_anbefalet"] * m["pris_ex_moms"], 2)
+        m["db_ved_salg"] = round(m["total_anbefalet"]
+                                 * (m["udsalg_ex_moms"] - m["indkoeb_ex_moms"]), 2)
+        if m.get("total_bestilt") is not None:
+            m["afvig_bestilt"] = m["total_bestilt"] - m["total_anbefalet"]
 
     # Kombo-salg i forrige hele uge (3x valgfri wienerbrød, kaffe+bolle m.fl.) ligger
     # på egne varenumre uden for katalogets SKU'er → tilføjes som egne KOMBO-linjer pr.

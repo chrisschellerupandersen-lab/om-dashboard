@@ -11628,6 +11628,39 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         "antal_dage": len(dage),
     }
 
+    # ── Justeret for MobilePay (antag MobilePay = uvarekoblet bagværkssalg) ──────
+    # Samme DG som dagens salg → vareforbrug lægges på MobilePay-varerne. Varerne
+    # talte før som spild (de blev aldrig tastet som solgt i Shopbox), så spildet
+    # reduceres tilsvarende (cap: dagens netto spild). Nettoeffekt på "resultat efter
+    # spild" = + MobilePay-omsætning når vareforbruget kan dækkes af spildet.
+    period_dg_frac = (tot["db_kr"] / tot["oms_ex"]) if tot["oms_ex"] > 0 else 0.0
+    jt = {"mp_ex": 0.0, "mp_vf": 0.0, "db_kr": 0.0, "netto_spild": 0.0, "resultat_e_spild": 0.0}
+    for dd in dage:
+        oms_d = dd["oms_ex"]; db_d = dd["db_kr"]; mp_d = dd["mp_ex"]
+        dgf = (db_d / oms_d) if oms_d > 0 else period_dg_frac
+        mp_vf = round(mp_d * (1 - dgf))          # vareforbrug på MobilePay-varerne
+        mp_db = mp_d - mp_vf                      # MobilePay-dækningsbidrag
+        ns = dd["vaerdi_spild"] - dd["frost_salg"]   # netto spild (uden justering)
+        credit = min(mp_vf, max(0, ns))          # spild der reklassificeres til solgt
+        adj_ns = ns - credit
+        adj_res_es = (dd["resultat"] + mp_db) - adj_ns
+        dd["mp_vf"] = mp_vf
+        dd["adj_db_kr"] = round(db_d + mp_db)
+        dd["adj_netto_spild"] = round(adj_ns)
+        dd["adj_resultat_e_spild"] = round(adj_res_es)
+        jt["mp_ex"] += mp_d; jt["mp_vf"] += mp_vf; jt["db_kr"] += (db_d + mp_db)
+        jt["netto_spild"] += adj_ns; jt["resultat_e_spild"] += adj_res_es
+    _oms_ialt = tot["oms_ex"] + tot["mp_ex"]
+    justeret = {
+        "oms_ialt":        round(_oms_ialt),
+        "mp_ex":           round(jt["mp_ex"]),
+        "mp_vf":           round(jt["mp_vf"]),
+        "db_kr":           round(jt["db_kr"]),
+        "dg_pct":          round(jt["db_kr"] / _oms_ialt * 100, 1) if _oms_ialt > 0 else 0.0,
+        "netto_spild":     round(jt["netto_spild"]),
+        "resultat_e_spild": round(jt["resultat_e_spild"]),
+    }
+
     # ── Forecast for månedens resterende dage (kun når der er dage tilbage) ────
     # Baseret på indeværende måneds egne dage: omsætning = snit pr. ugedag (fald
     # tilbage til dag-snit hvis en ugedag mangler); DB = omsætning × månedens DG.
@@ -11691,7 +11724,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "maaned_navn": _DK_MDR[foerste.month].capitalize(),
             "loen_aktiv": loen_aktiv,
             "maaneder": maaneder,
-            "dage": dage, "total": total,
+            "dage": dage, "total": total, "justeret": justeret,
             "spild_kategori": {k: round(v) for k, v in spild_kat.items()},
             "har_forecast": bool(forecast_dage),
             "forecast_dage": forecast_dage,

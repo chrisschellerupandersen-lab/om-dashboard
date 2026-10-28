@@ -3140,6 +3140,8 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
             <span id="dbs-maaned-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr/dag lør+søn · omk 500 kr/dag · resultat = DB − løn − omk</span>
           </div>
           <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
+          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin:4px 0 8px;">Justeret for MobilePay · antager MobilePay = uvarekoblet bagværkssalg (samme avance) → vareforbrug på salget + mindre spild</div>
+          <div id="dbs-just-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
           </div>
@@ -5215,6 +5217,7 @@ async function loadDbsMaaned(val){
   try { d = await fetch(url).then(r=>r.json()); }
   catch(e){ return; }
   const t = d.total || {};
+  const j = d.justeret || {};
   // Måneds-vælger (populér / bevar valg)
   const sel = document.getElementById('dbs-maaned-vaelg');
   if (sel && (d.maaneder||[]).length) {
@@ -5286,6 +5289,22 @@ async function loadDbsMaaned(val){
     + tile('Resultat e. spild/frost', (t.resultat||0)-_nettoSpild,
            ((t.resultat||0)-_nettoSpild)>=0?'var(--moss)':'var(--danger)')
     + prognoseTile;
+  // Justeret for MobilePay — egne nøgletal (MobilePay = uvarekoblet bagværkssalg)
+  const _jEl = document.getElementById('dbs-just-tot');
+  if (_jEl) {
+    const jTile = (lbl,val,clr,sub)=>`<div style="background:var(--card,#fff);border:1px dashed var(--moss);border-radius:10px;padding:12px 14px;">
+        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin-bottom:5px;">${lbl}</div>
+        <div style="font-size:20px;font-weight:700;line-height:1;color:${clr||'var(--ink)'};">${_dbsKr(val)}</div>
+        ${sub?`<div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div>`:''}</div>`;
+    const _resEsBase = (t.resultat||0)-_nettoSpild;
+    const _dRes = (j.resultat_e_spild||0) - _resEsBase;
+    _jEl.innerHTML =
+        jTile('Omsætning i alt', j.oms_ialt, 'var(--forest)', 'Shopbox + MobilePay')
+      + jTile('MobilePay vareforbrug', j.mp_vf, '#8a3a3a', `samme DG (${_dbsPct(j.dg_pct)})`)
+      + jTile('DB i alt (just.)', j.db_kr, 'var(--forest)', `DG ${_dbsPct(j.dg_pct)}`)
+      + jTile('Netto spild (just.)', j.netto_spild, '#8a6d3a', 'efter MobilePay-salg')
+      + jTile('Resultat e. spild (just.)', j.resultat_e_spild, (j.resultat_e_spild||0)>=0?'var(--moss)':'var(--danger)', `${_dRes>=0?'+':''}${_dbsKr(_dRes)} vs. rent Shopbox`);
+  }
   // Dag-tabel
   const tbl = document.getElementById('dbs-maaned-tabel');
   let html = `<thead><tr>
@@ -5377,6 +5396,24 @@ async function loadDbsMaaned(val){
       ${(()=>{const ns=(t.vaerdi_spild||0)-(t.frost_salg||0); const re=(t.resultat||0)-ns; const reClr=re>=0?'var(--moss)':'var(--danger)';
         return `<td style="text-align:right;color:#8a6d3a;">${_dbsKr(ns)}</td>`
              + `<td style="text-align:right;color:${reClr};">${_dbsKr(re)}</td>`;})()}</tr>`;
+  html += `<tr style="border-top:1px dashed var(--moss);font-weight:600;color:var(--moss);" title="Antager MobilePay = uvarekoblet bagværkssalg (samme avance): vareforbrug lægges på, og tilsvarende spild reklassificeres som solgt.">
+      <td style="text-align:left;">Justeret f. MobilePay</td><td></td>
+      <td style="text-align:right;">${_dbsKr(t.oms_ex)}</td>
+      <td style="text-align:right;">${_dbsKr(j.mp_ex)}</td>
+      <td style="text-align:right;">${_dbsKr(j.oms_ialt)}</td>
+      <td style="text-align:right;">${_dbsKr(j.db_kr)}</td>
+      <td style="text-align:right;">${j.oms_ialt>0?_dbsPct(j.dg_pct):'—'}</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:var(--ash);">—</td>
+      <td style="text-align:right;color:#8a6d3a;">${_dbsKr(j.netto_spild)}</td>
+      <td style="text-align:right;color:${(j.resultat_e_spild||0)>=0?'var(--moss)':'var(--danger)'};">${_dbsKr(j.resultat_e_spild)}</td></tr>`;
   if (d.har_forecast && (d.prognose_total)){
     const p = d.prognose_total; const pClr = p.resultat>=0?'var(--moss)':'var(--danger)';
     html += `<tr style="font-weight:700;color:var(--forest);background:rgba(30,58,30,.05);">

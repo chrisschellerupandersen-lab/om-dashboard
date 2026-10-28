@@ -3127,7 +3127,7 @@ body{background:var(--cream);color:var(--charcoal);font-family:'DM Sans',sans-se
       <div class="panel" id="p-dbshopbox">
         <div class="page-hdr">
           <h2>DB — kun Shopbox-salg</h2>
-          <p>Dækningsbidrag (DB, kr) og dækningsgrad (DG, %) for de varer vi sælger i Shopbox · MobilePay og faktura-B2B er IKKE med · omsætning ex moms</p>
+          <p>Dækningsbidrag (DB, kr) og dækningsgrad (DG, %) for de varer vi sælger i Shopbox · MobilePay vist separat + i "Omsætning i alt" (indgår ikke i DB/DG, da det ikke er varekoblet) · faktura-B2B ikke med · omsætning ex moms</p>
         </div>
 
         <!-- Indeværende måned — resultat (DB − løn − omk) -->
@@ -5276,6 +5276,8 @@ async function loadDbsMaaned(val){
     + tile('Levering i alt', t.levering, '#8a3a3a')
     + tile('Resultat (til dato)', t.resultat, resClr)
     + tile('Omsætning', t.oms_ex, 'var(--ash)')
+    + tile('MobilePay', t.mp_ex, 'var(--moss)')
+    + tile('Omsætning i alt', (t.oms_ialt!=null?t.oms_ialt:t.oms_ex), 'var(--forest)')
     + tile('Værdi spild', t.vaerdi_spild, '#8a6d3a')
     + _pctTile
     + tile('Frost salg', t.frost_salg, 'var(--moss)')
@@ -5288,7 +5290,10 @@ async function loadDbsMaaned(val){
   const tbl = document.getElementById('dbs-maaned-tabel');
   let html = `<thead><tr>
     <th style="text-align:left;">Dato</th><th style="text-align:left;">Dag</th>
-    <th style="text-align:right;">Omsætning</th><th style="text-align:right;">DB kr</th>
+    <th style="text-align:right;" title="Shopbox / POS (ex moms)">Omsætning</th>
+    <th style="text-align:right;" title="MobilePay (ex moms) — indgår ikke i DB/DG">MobilePay</th>
+    <th style="text-align:right;" title="Omsætning + MobilePay (ex moms)">Omsætning i alt</th>
+    <th style="text-align:right;">DB kr</th>
     <th style="text-align:right;">DG %</th><th style="text-align:right;">Løn</th>
     <th style="text-align:right;">Omk</th>
     <th style="text-align:right;" title="Levering pr. drop (fra 1/10: 250 kr, kun lør+søn; før 175 kr fre–søn). I henter selv de øvrige dage. Klik en dag for at rette.">Levering</th>
@@ -5311,6 +5316,8 @@ async function loadDbsMaaned(val){
       <td style="text-align:left;">${fmtDato(x.dato)}</td>
       <td style="text-align:left;color:var(--ash);">${x.ugedag}${fuldBadge}</td>
       <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
+      <td style="text-align:right;color:var(--moss);">${x.mp_ex>0?_dbsKr(x.mp_ex):'—'}</td>
+      <td style="text-align:right;font-weight:600;">${_dbsKr(x.oms_ialt!=null?x.oms_ialt:x.oms_ex)}</td>
       <td style="text-align:right;font-weight:600;">${_dbsKr(x.db_kr)}</td>
       <td style="text-align:right;color:var(--ash);">${x.oms_ex>0?_dbsPct(x.dg_pct):'—'}</td>
       ${_dbsLoenCell(x)}
@@ -5329,7 +5336,7 @@ async function loadDbsMaaned(val){
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];
   if (d.har_forecast && fc.length){
-    html += `<tr><td colspan="16" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
+    html += `<tr><td colspan="18" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
     fc.forEach(x=>{
       const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
       const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -5337,6 +5344,8 @@ async function loadDbsMaaned(val){
         <td style="text-align:left;">${fmtDato(x.dato)}</td>
         <td style="text-align:left;">${x.ugedag}</td>
         <td style="text-align:right;">${_dbsKr(x.oms_ex)}</td>
+        <td style="text-align:right;color:var(--ash);">—</td>
+        <td style="text-align:right;">${_dbsKr(x.oms_ialt!=null?x.oms_ialt:x.oms_ex)}</td>
         <td style="text-align:right;">${_dbsKr(x.db_kr)}</td>
         <td style="text-align:right;">${_dbsPct(x.dg_pct)}</td>
         ${_dbsLoenCell(x)}
@@ -5352,6 +5361,8 @@ async function loadDbsMaaned(val){
     <tfoot><tr style="border-top:2px solid var(--border);font-weight:700;">
       <td style="text-align:left;">Faktisk til dato</td><td></td>
       <td style="text-align:right;">${_dbsKr(t.oms_ex)}</td>
+      <td style="text-align:right;color:var(--moss);">${t.mp_ex>0?_dbsKr(t.mp_ex):'—'}</td>
+      <td style="text-align:right;">${_dbsKr(t.oms_ialt!=null?t.oms_ialt:t.oms_ex)}</td>
       <td style="text-align:right;">${_dbsKr(t.db_kr)}</td>
       <td style="text-align:right;">${t.oms_ex>0?_dbsPct(t.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(t.loen)}</td>
@@ -5371,6 +5382,8 @@ async function loadDbsMaaned(val){
     html += `<tr style="font-weight:700;color:var(--forest);background:rgba(30,58,30,.05);">
       <td style="text-align:left;">Prognose hele måneden</td><td></td>
       <td style="text-align:right;">${_dbsKr(p.oms_ex)}</td>
+      <td style="text-align:right;color:var(--moss);">${p.mp_ex>0?_dbsKr(p.mp_ex):'—'}</td>
+      <td style="text-align:right;">${_dbsKr(p.oms_ialt!=null?p.oms_ialt:p.oms_ex)}</td>
       <td style="text-align:right;">${_dbsKr(p.db_kr)}</td>
       <td style="text-align:right;">${p.oms_ex>0?_dbsPct(p.dg_pct):'—'}</td>
       <td style="text-align:right;">${_dbsKr(p.loen)}</td>

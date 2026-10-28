@@ -11536,12 +11536,19 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             if rolle and rolle[0] == "reddet" and "frost" in navn.lower():
                 frost_per[fr["dato"]] = frost_per.get(fr["dato"], 0.0) + float(fr["kr"] or 0)
                 frost_stk_per[fr["dato"]] = frost_stk_per.get(fr["dato"], 0) + int((fr["stk"] or 0) * rolle[2])
+        # MobilePay pr. dag (ex moms = inkl ÷ 1.25) — vist som separat kolonne + 'i alt'
+        mp_per: Dict[str, float] = {}
+        for mr in conn.execute("""
+            SELECT dato, COALESCE(SUM(omsaetning_inkl),0) AS inkl
+            FROM mobilepay_dag WHERE dato>=? AND dato<=? GROUP BY dato
+        """, (foerste.isoformat(), sidste.isoformat())).fetchall():
+            mp_per[str(mr["dato"])[:10]] = float(mr["inkl"] or 0) / 1.25
     per = {str(x["dato"])[:10]: x for x in rows}
 
     loen_aktiv = (y, m) >= _LOEN_START
 
     dage = []
-    tot = {"oms_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0,
+    tot = {"oms_ex": 0.0, "mp_ex": 0.0, "db_kr": 0.0, "loen": 0.0, "omk": 0.0, "levering": 0.0,
            "resultat": 0.0, "vaerdi_spild": 0.0, "frost_salg": 0.0,
            "bestilt_stk": 0, "solgt_stk": 0, "spild_stk": 0, "frost_stk": 0}
     spild_kat = {"Brød": 0.0, "Boller": 0.0, "Wiener": 0.0}
@@ -11568,10 +11575,13 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
         for _kk, _kv in vspild_d.get("kategorier", {}).items():
             if _kk in spild_kat:
                 spild_kat[_kk] += _kv
+        mp_ex = mp_per.get(iso, 0.0)
         dage.append({
             "dato":     iso,
             "ugedag":   _DK_DAGE[d.weekday()],
             "oms_ex":   round(oms),
+            "mp_ex":    round(mp_ex),
+            "oms_ialt": round(oms + mp_ex),
             "db_kr":    round(db),
             "dg_pct":   round(db / oms * 100, 1) if oms > 0 else 0.0,
             "loen":     round(loen),
@@ -11589,7 +11599,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             "loen_override": ov,       # None=auto · 0=tvungen fra · 1=tvungen til
             "levering_override": lov,  # None=auto · 0=selv hentet · 1=leveret
         })
-        tot["oms_ex"] += oms; tot["db_kr"] += db
+        tot["oms_ex"] += oms; tot["mp_ex"] += mp_ex; tot["db_kr"] += db
         tot["loen"] += loen; tot["omk"] += omk; tot["levering"] += levering; tot["resultat"] += res
         tot["vaerdi_spild"] += vspild
         tot["frost_salg"] += frost_per.get(iso, 0.0)
@@ -11601,6 +11611,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
 
     total = {
         "oms_ex":   round(tot["oms_ex"]),
+        "mp_ex":    round(tot["mp_ex"]),
+        "oms_ialt": round(tot["oms_ex"] + tot["mp_ex"]),
         "db_kr":    round(tot["db_kr"]),
         "loen":     round(tot["loen"]),
         "omk":      round(tot["omk"]),
@@ -11650,7 +11662,7 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
             res = db - loen - omk_pr_dag - levering
             forecast_dage.append({
                 "dato": iso, "ugedag": _DK_DAGE[wd],
-                "oms_ex": round(oms), "db_kr": round(db),
+                "oms_ex": round(oms), "mp_ex": 0, "oms_ialt": round(oms), "db_kr": round(db),
                 "dg_pct": round(dg_frac * 100, 1),
                 "loen": round(loen), "omk": round(omk_pr_dag), "levering": round(levering),
                 "resultat": round(res),
@@ -11664,6 +11676,8 @@ def hent_db_shopbox_maaned(aar: int = None, maaned: int = None,
     forecast_total["antal_dage"] = len(forecast_dage)
     prognose_total = {
         "oms_ex":   round(tot["oms_ex"] + ft["oms_ex"]),
+        "mp_ex":    round(tot["mp_ex"]),
+        "oms_ialt": round(tot["oms_ex"] + ft["oms_ex"] + tot["mp_ex"]),
         "db_kr":    round(tot["db_kr"] + ft["db_kr"]),
         "loen":     round(tot["loen"] + ft["loen"]),
         "omk":      round(tot["omk"] + ft["omk"]),

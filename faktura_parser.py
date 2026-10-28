@@ -45,7 +45,21 @@ _PROD_MAP = {
     "19": "Kanelsnurre",
     "21": "Karamelliseret croissant",
     "22": "Surdejsbolle m. birkes",
+    "23": "Müsli surdejsbolle",
+    "24": "Brunsvigersnegl",
+    "26": "Bananbrød",
 }
+
+# Gentagne side-header/-footer-linjer der skal fjernes før varelinje-parsing, så en
+# ugedag der er ombrudt hen over et sideskift sidder lige efter sin "stk."-linje.
+# VIGTIGT: "Henter selv mandag - fredag" i headeren indeholder ugedage og ville
+# ellers blive opfanget som en varelinjes ugedag.
+_BOILER_RE = re.compile(
+    r"(Organic Bakery ApS|Leveringsadresse|Greve Strandvej|^2670 Greve|^Danmark$|"
+    r"^Denmark$|Att:|CVR-nr|Linda Andersen|Organic Market Greve|^FAKTURA$|Fakturanr|"
+    r"Fakturadato|Henter selv|Kundenr|^Side |vrigref|^Nr\. Tekst|Forts.ttes|"
+    r"^OrganicBakeryApS|^Tlf|^Bank|^\d{1,2}/\d{1,2}-\d{1,2}/\d{1,2})",
+    re.IGNORECASE)
 
 DAGE = ["man", "tir", "ons", "tor", "fre", "loe", "son"]
 
@@ -92,7 +106,10 @@ def parse_faktura_tekst(tekst: str, override_uge: Optional[int] = None,
                         override_aar: Optional[int] = None) -> Dict:
     """Parser råtekst (fra pdfplumber) af en Organic Bakery-faktura.
     Returnerer header, aggregerede varelinjer (man..søn), fragt og totaler."""
-    linjer = [l.rstrip() for l in tekst.replace("\r", "").split("\n")]
+    # Fjern gentagne side-header/-footer-linjer, så ombrudte ugedage (fx hen over et
+    # sideskift) sidder lige efter deres "stk."-linje og kan samles korrekt.
+    linjer = [l.rstrip() for l in tekst.replace("\r", "").split("\n")
+              if l.strip() and not _BOILER_RE.search(l)]
     n = len(linjer)
 
     # ── Header (tag første forekomst; gentages pr. side) ──────────────────────
@@ -138,7 +155,7 @@ def parse_faktura_tekst(tekst: str, override_uge: Optional[int] = None,
             # Ugedag: på selve linjen, ellers på næste 1-2 fortsættelseslinjer.
             dag = _find_ugedag(linje)
             if not dag:
-                for k in range(i + 1, min(i + 3, n)):
+                for k in range(i + 1, min(i + 4, n)):
                     nxt = linjer[k]
                     if _QTY_RE.search(nxt) or _PROD_RE.search(nxt) or _FRAGT_RE.match(nxt.strip()):
                         break

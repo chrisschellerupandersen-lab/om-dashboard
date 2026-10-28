@@ -32,9 +32,13 @@ søgefunktion eller via kurvens søgefelt ("Tilføj produkter efter navn, SKU el
 ## Varer der IKKE tilbydes alle dage (webshoppen viser kun nogle dage)
 - **Kardemommesnurre:** kun fre/lør/søn.
 - **Tebolle m. chokolade:** kun fre/lør/søn.
-- **Cookie:** kun ons/fre/søn.
 - **Gulerodskage (5-6 pers):** KUN tirsdag + fredag (rød OBS-tekst på produktsiden).
 - **Focaccia:** UDGÅET — bestil aldrig.
+- **Brunsvigersnegl:** UDGÅET okt-2026 → erstattet af Tebolle m. æblekompot & remonce (PROD-25).
+
+## Anbefalings-dagregler (model, fra uge 46 — `kun_dage` i _ORGANIC_BAKERY)
+- **Müsli surdejsbolle:** kun fre/lør/søn (sælger ikke i hverdagen → hverdags-efterspørgsel droppes).
+- **Cookie:** kun tor+søn (købes kun de dage, holder → ugens efterspørgsel konsolideres: tor dækker tor-lør, søn dækker søn-ons). `kun_dage_saml`.
 
 Når planen har antal på en dag varen ikke tilbydes, så spring den dag over og notér det i afstemningen.
 

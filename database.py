@@ -102,14 +102,17 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10479],
-     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},  # NY vare (erstatter Gulerodskage 1 pers) — SKU 10479 til solgt/spild; startbud indtil historik
+    # Brunsvigersnegl UDGÅET okt 2026 → erstattet af Tebolle m. æblekompot & remonce (PROD-25).
+    # Brunsvigers historiske salg (SKU 10479) er IKKE i kataloget og vises derfor automatisk
+    # som salgs-drevet Wiener-combo-linje DER hvor den blev solgt (forsvinder ikke af data).
+    {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 6.0, "udsalg": 12.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512],
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512; startbud ~48/uge indtil historik (bekræft indkøbspris fra faktura)
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408],
      "kun_dage": ["tor", "son"], "kun_dage_saml": True},  # købes kun tor+søn (holder) → ugens efterspørgsel konsolideres på de to købsdage
-    {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [],
-     "seed": {"man": 0, "tir": 2, "ons": 0, "tor": 0, "fre": 3, "loe": 0, "son": 0}},  # NY vare (uge 43, ordre #1079) — endnu intet kassesalg/SKU; tilføj salg_kilde-varenummer når den har solgt (vare-opslag q=banan). udsalg 79,2 = 2× kost (bekræft rigtig pris)
+    {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [10508],
+     "seed": {"man": 0, "tir": 2, "ons": 0, "tor": 0, "fre": 3, "loe": 0, "son": 0}},  # NY vare (uge 43, ordre #1079) — kassesalg på SKU 10508. udsalg 79,2 = 2× kost (bekræft rigtig pris)
 ]
 
 # Bundle-varer: sælges som 1 kasselinje, men er reelt N stk af en basisvare.

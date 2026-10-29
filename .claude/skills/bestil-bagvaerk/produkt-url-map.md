@@ -19,12 +19,12 @@ søgefunktion eller via kurvens søgefelt ("Tilføj produkter efter navn, SKU el
 | Pain au Chocolate | oko-landbrod | PROD-09 | risiko (premium) |
 | Kanelsnurre | oko-kanelsnurre | PROD-19 | standard |
 | Kardemommesnurre | oko-kernebrod | PROD-08 | kun fre/lør/søn |
-| ~~Brunsvigersnegl~~ (UDGÅET okt-2026) | oko-brunsvigersnegl | PROD-24 | erstattet af PROD-25 |
-| Tebolle m. æblekompot & remonce | (erstatter Brunsvigersnegl) | PROD-25 | standard · 12 kr/stk · alle dage |
+| ~~Brunsvigersnegl~~ (UDGÅET okt-2026) | oko-brunsvigersnegl | PROD-24 | erstattet af PROD-25 · salgs-SKU 10479 (historik) |
+| Tebolle m. æblekompot & remonce | (erstatter Brunsvigersnegl) | PROD-25 | standard · udsalg 12 kr · salgs-SKU **10512** · alle dage |
 | Tebolle m. chokolade | oko-tebolle-med-choko | PROD-17 | kun fre/lør/søn |
 | Cookie | oko-cookie | PROD-16 | kun ons/fre/søn |
 | Gulerodskage 5-6 pers | oko-cheesecake-lemon-5-6-personer | PROD-15 | KUN tir+fre (OBS-tekst på siden) |
-| Bananbrød | oko-bananbrod | PROD-26 | kage |
+| Bananbrød | oko-bananbrod | PROD-26 | kage · salgs-SKU **10508** |
 
 **Dag-koder i SKU-suffiks:** `-01`=Mandag, `-02`=Tirsdag, `-03`=Onsdag, `-04`=Torsdag,
 `-05`=Fredag, `-06`=Lørdag, `-07`=Søndag. Så fx `PROD-12-06` = Tebirkes lørdag.

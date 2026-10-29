@@ -105,8 +105,8 @@ _ORGANIC_BAKERY = [
     # Brunsvigersnegl UDGÅET okt 2026 → erstattet af Tebolle m. æblekompot & remonce (PROD-25).
     # Brunsvigers historiske salg (SKU 10479) er IKKE i kataloget og vises derfor automatisk
     # som salgs-drevet Wiener-combo-linje DER hvor den blev solgt (forsvinder ikke af data).
-    {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 6.0, "udsalg": 12.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512],
-     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512; startbud ~48/uge indtil historik (bekræft indkøbspris fra faktura)
+    {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 12.0, "udsalg": 24.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512],
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512; pris ex moms indkøb 12 / udsalg 24 (= 30 kr i kassen incl); startbud ~48/uge indtil historik
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408],

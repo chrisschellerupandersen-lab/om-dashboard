@@ -2025,8 +2025,10 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         navn_skus = {p["navn"].strip().lower():
                      [int(v) for v in (p["kilde"] + p.get("salg_kilde", []))]
                      for p in _ORGANIC_BAKERY}
-        alle_sku = sorted({s for b in best
-                           for s in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        # ALLE katalog-SKU'er (ikke kun de bestilte) — en katalogvare der har SOLGT uden
+        # at være bestilt (fx æblebollen i uge 44: glemt at bestille, leveret+solgt alligevel)
+        # fanges som sin egen vare-linje nedenfor i stedet for en anonym combo-linje.
+        alle_sku = sorted({s for skus in navn_skus.values() for s in skus})
         solgt_pr_sku: Dict[int, int] = {}
         if alle_sku:
             ph = ",".join("?" * len(alle_sku))
@@ -2084,6 +2086,32 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         agg[kat]["rest"]    += rest_p
         agg[kat]["varer"].append({"varenavn": navn, "bestilt": bestilt_p,
                                   "solgt": solgt_p, "rest": rest_p, "pct": pct_p,
+                                  "type": "vare"})
+
+    # Katalogvarer der har SOLGT i dag men IKKE er bestilt (fx æblebollen i uge 44: glemt
+    # at bestille, leveret+solgt alligevel) → vis som egen vare-linje (bestilt 0, oversolgt),
+    # matchet på katalog-SKU (10512 = Tebolle m. æblekompot & remonce), ikke som anonym combo.
+    _best_navne = {(b["varenavn"] or "").strip().lower() for b in best}
+    for p in _ORGANIC_BAKERY:
+        nl = p["navn"].strip().lower()
+        if nl in _best_navne:
+            continue
+        solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(nl, []))
+        if solgt_p <= 0:
+            continue
+        navn = p["navn"]
+        kat = _organic_kat(navn) or _bakery_kat(navn)
+        if "focaccia" in navn.lower():
+            kat = "Focaccia"
+        elif "rugbrød" in navn.lower() or "rugbrod" in navn.lower():
+            kat = "Rugbrød"
+        if kat not in agg:
+            continue
+        rest_p = -solgt_p
+        agg[kat]["solgt"] += solgt_p
+        agg[kat]["rest"]  += rest_p
+        agg[kat]["varer"].append({"varenavn": navn, "bestilt": 0,
+                                  "solgt": solgt_p, "rest": rest_p, "pct": 100,
                                   "type": "vare"})
 
     kategorier = []
@@ -3694,8 +3722,10 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
         navn_skus = {p["navn"].strip().lower():
                      [str(v) for v in (p["kilde"] + p.get("salg_kilde", [])) if v not in _BAGERI_BUNDLE]
                      for p in _ORGANIC_BAKERY}
-        alle_sku = sorted({sku for b in bestil
-                           for sku in navn_skus.get((b["varenavn"] or "").strip().lower(), [])})
+        # ALLE katalog-SKU'er (ikke kun de bestilte) — en katalogvare der har SOLGT uden at
+        # være bestilt (fx æblebollen i uge 44: glemt at bestille, leveret+solgt alligevel)
+        # får sin egen produkt-linje nedenfor i stedet for en anonym KOMBO-linje.
+        alle_sku = sorted({sku for skus in navn_skus.values() for sku in skus})
         salg_map: Dict = {}
         if alle_sku:
             ph_d = ','.join('?' * len(dage_datoer))
@@ -3743,6 +3773,34 @@ def hent_bagvaerk_dag_sammenligning(uge: int, aar: int) -> Dict:
             "tot_bestilt": tot_bestilt,
             "tot_solgt":   tot_solgt,
             "tot_diff":    tot_solgt - tot_bestilt,   # negativt = under-solgt
+        })
+
+    # Katalogvarer der har SOLGT i ugen men IKKE er bestilt (fx æblebollen i uge 44: glemt
+    # at bestille, leveret+solgt alligevel) → egen produkt-linje (bestilt 0), matchet på
+    # katalog-SKU (10512), i stedet for en anonym KOMBO-linje.
+    _sek_kat = {"Brød": 1, "Rugbrød": 1, "Focaccia": 1, "Boller": 2, "Wiener": 3, "Kage": 4}
+    _best_navne = {(b["varenavn"] or "").strip().lower() for b in bestil}
+    for p in _ORGANIC_BAKERY:
+        nl = p["navn"].strip().lower()
+        if nl in _best_navne:
+            continue
+        skus_p = navn_skus.get(nl, [])
+        if not skus_p:
+            continue
+        dage_data = []
+        tot_solgt = 0
+        for i, dag in enumerate(DAGE):
+            solgt = sum(salg_map.get(sku, {}).get(dage_datoer[i], 0) for sku in skus_p)
+            tot_solgt += solgt
+            dage_data.append({"bestilt": 0, "solgt": solgt, "diff": solgt})
+        if tot_solgt <= 0:
+            continue
+        _kat = _bakery_kat(p["navn"]) or "Andet"
+        produkter.append({
+            "varenummer": "", "varenavn": p["navn"], "kat": _kat,
+            "sektion": _sek_kat.get(_organic_kat(p["navn"]) or _kat, 1),
+            "dage": dage_data, "tot_bestilt": 0, "tot_solgt": tot_solgt,
+            "tot_diff": tot_solgt,
         })
 
     # Kombo-salg som egne linjer pr. kategori (bestilt=0) → kategoriens salg-total

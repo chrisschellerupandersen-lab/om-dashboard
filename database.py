@@ -102,11 +102,13 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    # Brunsvigersnegl UDGÅET okt 2026 → erstattet af Tebolle m. æblekompot & remonce (PROD-25).
-    # Brunsvigers historiske salg (SKU 10479) er IKKE i kataloget og vises derfor automatisk
-    # som salgs-drevet Wiener-combo-linje DER hvor den blev solgt (forsvinder ikke af data).
     {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 12.0, "udsalg": 24.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512],
-     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512; pris ex moms indkøb 12 / udsalg 24 (= 30 kr i kassen incl); startbud ~48/uge indtil historik
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512 (kassenavn "Æblebolle"); pris ex moms indkøb 12 / udsalg 24 (= 30 kr i kassen incl); startbud ~48/uge indtil historik
+    # Brunsvigersnegl UDGÅET okt 2026 (erstattet af æblebollen ovenfor). BLIVER i kataloget —
+    # historik må ALDRIG forsvinde: den vises fortsat i uger hvor den er bestilt/solgt (SKU
+    # 10479). "udgaaet": True → anbefales/vises aldrig i fremtidige (ubestilte) uger.
+    {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10479], "udgaaet": True,
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},
     {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408],
@@ -120,9 +122,11 @@ _ORGANIC_BAKERY = [
 # og SKU'et lægges i basisvarens kilde (fx 10445 i Surdejsbolle).
 _BAGERI_BUNDLE = {10445: 4}   # "4 x surdejsboller" = 4 Surdejsboller pr. salg
 
-# Udgåede varer (fjernet fra kataloget) forsvinder IKKE helt: deres rest-salg vises
-# som en øvrig/combo-linje NÅR der faktisk er salg (kunder/personale kan taste forkert),
-# og skjules automatisk når der ikke er salg — combo-aggregeringen er salgs-drevet.
+# Udgåede varer BLIVER i kataloget med "udgaaet": True (historik må ALDRIG forsvinde) —
+# de vises fortsat i de uger hvor de er bestilt/solgt, men anbefales aldrig fremadrettet
+# (udgang virker kun gående frem). Kun varer der ALDRIG har haft en katalog-linje (fx
+# kaffe-comboer "3 x Valgfri Wienerbrød") vises salgs-drevet som en øvrig/combo-linje NÅR
+# der faktisk er salg (kunder/personale kan taste forkert) — combo-aggregeringen er salgs-drevet.
 
 def _antal_sql(vn_expr: str = "CAST(CAST(varenummer AS REAL) AS INTEGER)") -> str:
     """SQL-udtryk for antal, hvor bundle-varer ganges op til reelt stk-antal."""
@@ -7668,7 +7672,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             vals = [sum(salg.get((vn, (wkmon + timedelta(days=i)).isoformat()), 0.0) for vn in _salg_kilde)
                     for wkmon in _2uger_mon if (wkmon + timedelta(days=i)).isoformat() in aabne_set]
             gns2[dn] = int(round(sum(vals) / len(vals))) if vals else 0
+        if p.get("udgaaet"):            # udgået vare: bevar salg/historik, men anbefal ALDRIG frem
+            anb_dag = {d: 0 for d in DAGE}
+            total_anb = 0
         produkter.append({
+            "udgaaet":         bool(p.get("udgaaet")),
             "varenavn":        p["navn"],
             "kategori":        _organic_kat(p["navn"]),
             "risikogruppe":    p["gruppe"],
@@ -7711,6 +7719,11 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
             x["bestilt"] = None
             x["total_bestilt"] = None
             x["afvig_bestilt"] = None
+
+    # Udgåede varer bliver i kataloget (historik bevares), men vises KUN i uger hvor de
+    # faktisk er bestilt — aldrig i fremtidige/ubestilte uger (udgang virker kun frem).
+    produkter = [x for x in produkter
+                 if not (x.get("udgaaet") and not x.get("total_bestilt"))]
 
     # ── Familie-pooling (mis-indtastning) ──────────────────────────────────────
     # Sesam/plain ringes ofte ind på hinandens/generiske SKU'er ved kassen, så

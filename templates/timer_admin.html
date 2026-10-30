@@ -162,10 +162,10 @@
     </div>
     <div id="mdWeeks"></div>
     <div class="modal-actions">
-      <button class="btn" id="mdGodkend">✓ Godkend alle ikke-betalte (perioden)</button>
+      <button class="btn" id="mdGodkend">✓ Godkend til denne måneds løn (overføres ikke)</button>
       <button class="btn-sm btn-rust" id="mdFortryd">Fortryd periodens godkendelse</button>
     </div>
-    <div class="modal-note">Lønperiode: <b>21. → 20.</b> Klik <b>“godkend”</b> ud for hver dag, der skal med i denne lønkørsel — eller godkend hele perioden med knappen. <b>“✓ betalt”</b> = udbetalt og låst; tryk igen for at fortryde. Boksen til venstre retter om dagen var en arbejdsdag (kun ikke-betalte dage).</div>
+    <div class="modal-note">Lønperiode: <b>21. → 20.</b> Klik <b>“godkend”</b> ud for hver dag, der skal med i denne lønkørsel — eller godkend hele perioden med knappen. Godkendte timer kommer med på <b>denne måneds løn</b> og overføres <b>ikke</b> til næste måned. <b>“✓ på lønnen”</b> = udbetalt og låst; tryk igen for at fortryde. Boksen til venstre retter om dagen var en arbejdsdag (kun ikke-betalte dage).</div>
   </div>
 </div>
 
@@ -269,7 +269,7 @@ async function loadMd(){
       if(day.afkrydset){
         const ap=document.createElement("button");
         ap.className="approve"+(paid?" paid":"");
-        ap.textContent=paid?"✓ betalt":"godkend";
+        ap.textContent=paid?"✓ på lønnen":"godkend";
         ap.addEventListener("click",()=>mdBetal(day,!paid));
         row.appendChild(ap);
       }

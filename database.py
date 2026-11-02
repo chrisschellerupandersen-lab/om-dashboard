@@ -8207,11 +8207,12 @@ def hent_bestillings_uge_organic(maal_uge: int, maal_aar: int,
     }
 
 
-def hent_bageri_spild(uge: int, aar: int) -> Dict:
+def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
     """Spild & redning pr. uge (Organic Bakery, ingen retur):
     Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går).
     Alt hentes automatisk fra Shopbox + ugebestilling — ingen daglig tastning.
-    Kategori-niveau (Brød/Boller/Wiener/Kage). Beløb ex moms."""
+    Kategori-niveau (Brød/Boller/Wiener/Kage). Beløb ex moms.
+    ekskl_manuel=True udelader manuelle bro-bonner (til før/efter-sammenligning)."""
     from datetime import date, timedelta
     KATS = ["Brød", "Boller", "Wiener"]   # Kager holdes ude af spild (sælges over 3-4 dage)
     mon = date.fromisocalendar(aar, uge, 1)
@@ -8262,13 +8263,14 @@ def hent_bageri_spild(uge: int, aar: int) -> Dict:
 
     with _conn() as conn:
         # Salg denne uge pr. varenavn (ex moms + korrekt DB, inkl. frost VF=0-regel)
-        for r in conn.execute("""
+        _flt = "AND COALESCE(kilde,'shopbox') <> 'manuel'" if ekskl_manuel else ""
+        for r in conn.execute(f"""
             SELECT varenummer, varenavn,
                    COALESCE(SUM(antal),0)              AS antal,
                    COALESCE(SUM(omsaetning_ex_moms),0) AS oms,
                    COALESCE(SUM(db_korrekt),0)         AS db
             FROM v_transaktioner
-            WHERE dato >= ? AND dato <= ?
+            WHERE dato >= ? AND dato <= ? {_flt}
             GROUP BY varenummer, varenavn
         """, (mon.isoformat(), sun.isoformat())).fetchall():
             rolle = _bageri_rolle(r["varenavn"])

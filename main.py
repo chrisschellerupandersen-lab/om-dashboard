@@ -1856,11 +1856,13 @@ async def api_bageri_prisstigning(request: Request, secret: Optional[str] = None
 
 
 @app.get("/api/bageri/spild")
-async def api_bageri_spild(request: Request, uge: int, aar: int, secret: Optional[str] = None):
-    """Spild & redning pr. uge (Organic Bakery). Login eller webhook-secret."""
+async def api_bageri_spild(request: Request, uge: int, aar: int,
+                          secret: Optional[str] = None, ekskl_manuel: int = 0):
+    """Spild & redning pr. uge (Organic Bakery). Login eller webhook-secret.
+    ekskl_manuel=1 udelader manuelle bro-bonner (til før/efter-sammenligning)."""
     if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
         _kræv_login(request)
-    return database.hent_bageri_spild(int(uge), int(aar))
+    return database.hent_bageri_spild(int(uge), int(aar), ekskl_manuel=bool(ekskl_manuel))
 
 
 @app.get("/api/bageri/spild-trend")

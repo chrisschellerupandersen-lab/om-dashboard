@@ -1006,11 +1006,11 @@ def gem_manuel_bon(bon: Dict) -> Dict:
             except (TypeError, ValueError):
                 return {"ok": False, "fejl": f"ugyldigt tal på linjen '{navn}'"}
             # SKU er afgørende: spild, solgte enheder og bestillingsberegneren matcher
-            # salg på varenummer — ikke navn. Slå SKU op ud fra ægte Shopbox-salg af
-            # samme varenavn, så den manuelle bon tæller med ALLE steder (ikke kun oms).
+            # salg på varenummer — ikke navn. Normalisér navn+SKU så den manuelle bon
+            # tæller med ALLE steder (ikke kun oms), præcis som ægte Shopbox-salg.
             vnr = str(l.get("varenummer") or "").strip()
             if not vnr:
-                vnr = _sku_for_varenavn(conn, navn)
+                navn, vnr = _manuel_normaliser(conn, navn)
             if not vnr:
                 uden_sku.append(navn)
             rows.append((
@@ -1052,6 +1052,30 @@ def _sku_for_varenavn(conn, navn: str) -> str:
     return str(r["varenummer"]) if r else ""
 
 
+def _manuel_normaliser(conn, navn: str):
+    """Bestem (varenavn, SKU) for en manuel linje, så den tæller præcis som ægte
+    Shopbox-salg. Rækkefølge: 1) nøjagtigt historisk SKU-opslag; 2) genkend
+    Shopbox' valgfri-menuer (moderlinje) og giv dem deres rigtige menu-SKU.
+
+    Menuerne håndteres forskelligt i pipelinen, så de skal rammes rigtigt:
+      • "N x valgfri boller"    → SKU 10445 (4-pak surdejsboller, _BAGERI_BUNDLE
+        folder ×4 ind i Surdejsbolle) — navnet er ligegyldigt, SKU styrer antallet.
+      • "N x valgfri wienerbrød" → SKU 10453, men tælles på NAVNET via _bageri_rolle
+        ('N x …' → N stk), så navnet kanoniseres til 'N x Valgfri Wienerbrød' —
+        ellers undertæller en stavefejl (fx manglende 'x') antallet."""
+    navn = (navn or "").strip()
+    sku = _sku_for_varenavn(conn, navn)
+    n_flad = re.sub(r"[^a-zæøå0-9]", "", navn.lower())
+    m_antal = re.match(r"\s*(\d+)", navn)
+    n_pre = m_antal.group(1) if m_antal else ""
+    if "valgfri" in n_flad and ("wien" in n_flad or "wiene" in n_flad):
+        kanon = (n_pre + " x Valgfri Wienerbrød").strip() if n_pre else "Valgfri Wienerbrød"
+        return kanon, (sku or "10453")
+    if "valgfri" in n_flad and "boll" in n_flad:
+        return navn, (sku or "10445")
+    return navn, sku
+
+
 def backfill_manuel_sku() -> Dict:
     """Sæt SKU på allerede-tastede manuelle bonner der mangler det (fx tastet før
     SKU-opslaget fandtes), så de nu tæller med i spild/solgte/bestilling."""
@@ -1063,10 +1087,10 @@ def backfill_manuel_sku() -> Dict:
               AND (varenummer='' OR varenummer IS NULL OR varenummer='0')
         """).fetchall()
         for r in rows:
-            sku = _sku_for_varenavn(conn, r["varenavn"])
+            navn, sku = _manuel_normaliser(conn, r["varenavn"])
             if sku:
-                conn.execute("UPDATE transaktioner SET varenummer=? WHERE id=?",
-                             (sku, r["id"]))
+                conn.execute("UPDATE transaktioner SET varenummer=?, varenavn=? WHERE id=?",
+                             (sku, navn, r["id"]))
                 opdateret += 1
             else:
                 uden.append(r["varenavn"])
@@ -1079,6 +1103,8 @@ def manuel_sku_tjek() -> Dict:
     bestilling). Bruges til at verificere at bro-bonnerne rammer rigtigt."""
     cat_sku = {str(int(v)) for p in _ORGANIC_BAKERY
                for v in (p["kilde"] + p.get("salg_kilde", []))}
+    # Menu-SKU'er der tæller via bundle/combo (ikke katalog-SKU, men tæller alligevel).
+    menu_sku = {"10445", "10453"}
     linjer, mangler = [], 0
     with _conn() as conn:
         rows = conn.execute("""
@@ -1090,19 +1116,24 @@ def manuel_sku_tjek() -> Dict:
         """).fetchall()
         for r in rows:
             nuv = str(r["varenummer"] or "").strip()
-            foreslaaet = nuv if nuv not in ("", "0") else _sku_for_varenavn(conn, r["varenavn"])
-            # Normalisér til heltal-streng for katalog-sammenligning.
+            if nuv not in ("", "0"):
+                foreslaaet = nuv
+            else:
+                _, foreslaaet = _manuel_normaliser(conn, r["varenavn"])
+            # Normalisér til heltal-streng for SKU-sammenligning.
             try:
                 sku_norm = str(int(float(foreslaaet))) if foreslaaet else ""
             except (TypeError, ValueError):
                 sku_norm = foreslaaet
             i_katalog = sku_norm in cat_sku
+            taeller = i_katalog or sku_norm in menu_sku     # katalog ELLER bundle/combo
             if not foreslaaet:
                 mangler += 1
             linjer.append({
                 "dato": r["dato"], "bon_nr": r["bon_nr"], "varenavn": r["varenavn"],
                 "antal": int(r["antal"] or 0), "beloeb": r["beloeb"],
-                "sku_nu": nuv, "sku_match": foreslaaet, "i_katalog": i_katalog,
+                "sku_nu": nuv, "sku_match": foreslaaet,
+                "i_katalog": i_katalog, "taeller": taeller,
             })
     return {"linjer": linjer, "antal_linjer": len(linjer), "uden_sku_match": mangler}
 

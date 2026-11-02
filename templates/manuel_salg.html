@@ -180,14 +180,14 @@ async function loadSkuStatus(){
     const d=await api("/api/salg/manuel-bon/sku-tjek");
     const el=$("#skuStatus");
     if(!d.antal_linjer){el.innerHTML="";return;}
-    const udenKat=d.linjer.filter(l=>!l.i_katalog);
-    if(!udenKat.length){
+    const udenTael=d.linjer.filter(l=>!l.taeller);
+    if(!udenTael.length){
       el.innerHTML='<div class="note" style="background:#eef5ef;border-color:#cfe3d4;color:#2f5d3a">'+
-        '✓ Alle '+d.antal_linjer+' linjer er matchet til et SKU i Organic-kataloget — de tæller med i <b>solgte enheder, spild og bestillingsberegneren</b>.</div>';
+        '✓ Alle '+d.antal_linjer+' bagværkslinjer er matchet til et SKU — de tæller med i <b>solgte enheder, spild og bestillingsberegneren</b> som rigtige Shopbox-salg.</div>';
     }else{
-      const navne=[...new Set(udenKat.map(l=>l.varenavn))];
-      el.innerHTML='<div class="note">⚠︎ '+udenKat.length+' linje(r) matcher ikke et katalog-SKU, så de tæller kun i omsætning (ikke spild/bestilling): <b>'+
-        navne.join(", ")+'</b>. Det er typisk ikke-katalog-varer (fx marmelade) — så er det helt fint.</div>';
+      const navne=[...new Set(udenTael.map(l=>l.varenavn))];
+      el.innerHTML='<div class="note">ℹ︎ '+udenTael.length+' linje(r) tæller kun i <b>omsætning</b> (ikke bagværks-spild/bestilling): <b>'+
+        navne.join(", ")+'</b>. Det er rigtigt for ikke-bagværk (marmelade, kaffe, nødder). Er en af dem bagværk, så tjek stavningen mod kassebonen.</div>';
     }
   }catch(e){/* stille */}
 }

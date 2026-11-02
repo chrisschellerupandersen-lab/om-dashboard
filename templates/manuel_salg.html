@@ -100,6 +100,7 @@
 
   <div class="card">
     <h2>Manuelt tastede bonner (bro) <span class="muted" id="antal"></span></h2>
+    <div id="skuStatus"></div>
     <div id="listeWrap"><div class="empty">Indlæser…</div></div>
   </div>
 </div>
@@ -166,9 +167,30 @@ $("#gem").addEventListener("click",async()=>{
     const res=await api("/api/salg/manuel-bon",{method:"POST",
       body:JSON.stringify({bon_nr,dato,tid,linjer})});
     toast(`Gemt: ${res.linjer} linjer · ${kr(res.total)} ✓`);
-    ryd(true);loadListe();
-  }catch(e){$("#fejl").textContent=e.message;}
+    if(res.uden_sku&&res.uden_sku.length){
+      $("#fejl").style.color="#9a6a12";
+      $("#fejl").textContent="Gemt — men uden SKU-match (tæller ikke i spild/bestilling): "+res.uden_sku.join(", ")+". Tjek at navnet staves som på kassebonen.";
+    }
+    ryd(true);loadListe();loadSkuStatus();
+  }catch(e){$("#fejl").style.color="";$("#fejl").textContent=e.message;}
 });
+
+async function loadSkuStatus(){
+  try{
+    const d=await api("/api/salg/manuel-bon/sku-tjek");
+    const el=$("#skuStatus");
+    if(!d.antal_linjer){el.innerHTML="";return;}
+    const udenKat=d.linjer.filter(l=>!l.i_katalog);
+    if(!udenKat.length){
+      el.innerHTML='<div class="note" style="background:#eef5ef;border-color:#cfe3d4;color:#2f5d3a">'+
+        '✓ Alle '+d.antal_linjer+' linjer er matchet til et SKU i Organic-kataloget — de tæller med i <b>solgte enheder, spild og bestillingsberegneren</b>.</div>';
+    }else{
+      const navne=[...new Set(udenKat.map(l=>l.varenavn))];
+      el.innerHTML='<div class="note">⚠︎ '+udenKat.length+' linje(r) matcher ikke et katalog-SKU, så de tæller kun i omsætning (ikke spild/bestilling): <b>'+
+        navne.join(", ")+'</b>. Det er typisk ikke-katalog-varer (fx marmelade) — så er det helt fint.</div>';
+    }
+  }catch(e){/* stille */}
+}
 
 async function loadListe(){
   try{
@@ -193,8 +215,14 @@ async function loadListe(){
   }catch(e){$("#listeWrap").innerHTML='<div class="fejl">'+e.message+'</div>';}
 }
 
+// Giv eksisterende manuelle bonner SKU (idempotent), så de tæller med alle
+// steder — og vis derefter listen + SKU-status.
+async function init(){
+  try{await api("/api/salg/manuel-bon/backfill-sku",{method:"POST",body:"{}"});}catch(e){}
+  loadListe();loadSkuStatus();
+}
 ryd(false);
-loadListe();
+init();
 </script>
 </body>
 </html>

@@ -994,6 +994,7 @@ def gem_manuel_bon(bon: Dict) -> Dict:
         conn.execute("DELETE FROM transaktioner WHERE bon_nr=? AND COALESCE(kilde,'')='manuel'",
                      (bon_nr,))
         rows = []
+        uden_sku = []
         for l in linjer:
             navn = str(l.get("varenavn") or "").strip()
             if not navn:
@@ -1004,8 +1005,16 @@ def gem_manuel_bon(bon: Dict) -> Dict:
                                else l.get("beloeb") or 0)
             except (TypeError, ValueError):
                 return {"ok": False, "fejl": f"ugyldigt tal på linjen '{navn}'"}
+            # SKU er afgørende: spild, solgte enheder og bestillingsberegneren matcher
+            # salg på varenummer — ikke navn. Slå SKU op ud fra ægte Shopbox-salg af
+            # samme varenavn, så den manuelle bon tæller med ALLE steder (ikke kun oms).
+            vnr = str(l.get("varenummer") or "").strip()
+            if not vnr:
+                vnr = _sku_for_varenavn(conn, navn)
+            if not vnr:
+                uden_sku.append(navn)
             rows.append((
-                dato, str(l.get("varenummer") or "").strip(), navn,
+                dato, vnr, navn,
                 str(l.get("kategori") or "").strip(),
                 antal, beloeb, 0, 0, 0, time_start, tid, bon_nr, "manuel",
             ))
@@ -1018,7 +1027,84 @@ def gem_manuel_bon(bon: Dict) -> Dict:
         """, rows)
         total = sum(r[5] for r in rows)
     return {"ok": True, "bon_nr": bon_nr, "dato": dato,
-            "linjer": len(rows), "total": round(total, 2)}
+            "linjer": len(rows), "total": round(total, 2),
+            "uden_sku": sorted(set(uden_sku))}
+
+
+def _sku_for_varenavn(conn, navn: str) -> str:
+    """Find det SKU (varenummer) som ægte Shopbox-salg bruger for et varenavn.
+    Giver manuelle bro-bonner samme SKU, så de tæller med i de SKU-baserede
+    visninger (spild, solgte enheder, bestillingsberegner) præcis som ægte salg.
+    Vælger det hyppigst brugte SKU for navnet (seneste ved uafgjort)."""
+    navn = (navn or "").strip()
+    if not navn:
+        return ""
+    r = conn.execute("""
+        SELECT varenummer, COUNT(*) AS n, MAX(dato) AS sidst
+        FROM transaktioner
+        WHERE COALESCE(kilde,'shopbox')='shopbox'
+          AND varenummer <> '' AND varenummer <> '0'
+          AND LOWER(TRIM(varenavn)) = LOWER(?)
+        GROUP BY varenummer
+        ORDER BY n DESC, sidst DESC
+        LIMIT 1
+    """, (navn,)).fetchone()
+    return str(r["varenummer"]) if r else ""
+
+
+def backfill_manuel_sku() -> Dict:
+    """Sæt SKU på allerede-tastede manuelle bonner der mangler det (fx tastet før
+    SKU-opslaget fandtes), så de nu tæller med i spild/solgte/bestilling."""
+    opdateret, uden = 0, []
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT id, varenavn FROM transaktioner
+            WHERE COALESCE(kilde,'')='manuel'
+              AND (varenummer='' OR varenummer IS NULL OR varenummer='0')
+        """).fetchall()
+        for r in rows:
+            sku = _sku_for_varenavn(conn, r["varenavn"])
+            if sku:
+                conn.execute("UPDATE transaktioner SET varenummer=? WHERE id=?",
+                             (sku, r["id"]))
+                opdateret += 1
+            else:
+                uden.append(r["varenavn"])
+    return {"ok": True, "opdateret": opdateret, "uden_match": sorted(set(uden))}
+
+
+def manuel_sku_tjek() -> Dict:
+    """Read-only diagnose: for hver manuel varelinje — nuværende SKU, hvilket SKU
+    den ville matche, og om det SKU findes i Organic-kataloget (tæller i spild/
+    bestilling). Bruges til at verificere at bro-bonnerne rammer rigtigt."""
+    cat_sku = {str(int(v)) for p in _ORGANIC_BAKERY
+               for v in (p["kilde"] + p.get("salg_kilde", []))}
+    linjer, mangler = [], 0
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT bon_nr, dato, varenavn, varenummer,
+                   SUM(antal) AS antal, ROUND(SUM(omsætning),2) AS beloeb
+            FROM transaktioner WHERE COALESCE(kilde,'')='manuel'
+            GROUP BY bon_nr, dato, varenavn, varenummer
+            ORDER BY dato DESC, bon_nr DESC, varenavn
+        """).fetchall()
+        for r in rows:
+            nuv = str(r["varenummer"] or "").strip()
+            foreslaaet = nuv if nuv not in ("", "0") else _sku_for_varenavn(conn, r["varenavn"])
+            # Normalisér til heltal-streng for katalog-sammenligning.
+            try:
+                sku_norm = str(int(float(foreslaaet))) if foreslaaet else ""
+            except (TypeError, ValueError):
+                sku_norm = foreslaaet
+            i_katalog = sku_norm in cat_sku
+            if not foreslaaet:
+                mangler += 1
+            linjer.append({
+                "dato": r["dato"], "bon_nr": r["bon_nr"], "varenavn": r["varenavn"],
+                "antal": int(r["antal"] or 0), "beloeb": r["beloeb"],
+                "sku_nu": nuv, "sku_match": foreslaaet, "i_katalog": i_katalog,
+            })
+    return {"linjer": linjer, "antal_linjer": len(linjer), "uden_sku_match": mangler}
 
 
 def liste_manuelle_bonner() -> List[Dict]:

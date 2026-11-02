@@ -2865,6 +2865,28 @@ async def salg_manuel_bon_slet(request: Request):
     return database.slet_manuel_bon(body.get("bon_nr"))
 
 
+@app.get("/api/salg/manuel-bon/sku-tjek")
+async def salg_manuel_bon_sku_tjek(request: Request):
+    """Read-only: viser hvilket SKU hver manuel linje matcher, og om det er i
+    Organic-kataloget (så den tæller i spild/solgte/bestilling)."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.manuel_sku_tjek()
+
+
+@app.post("/api/salg/manuel-bon/backfill-sku")
+async def salg_manuel_bon_backfill(request: Request):
+    """Sæt SKU på manuelle bonner der mangler det, så de tæller med alle steder."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.backfill_manuel_sku()
+
+
 @app.post("/api/prissnapshot/bulk")
 async def prissnapshot_bulk(request: Request):
     """Modtag prissnapshot fra pris_scraper.py."""

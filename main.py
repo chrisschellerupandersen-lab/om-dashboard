@@ -2832,9 +2832,14 @@ async def salg_ingest(request: Request):
 async def salg_manuel_bon(request: Request):
     """Manuel 'bro'-bon: indtast en Shopbox-bon der hænger usynkroniseret på
     kassen, så tallene stemmer indtil Shopbox får skubbet den op. Dedup'es
-    automatisk på bon-ID når den ægte synker. Login (admin)."""
-    _kræv_login(request)
-    body = await request.json()
+    automatisk på bon-ID når den ægte synker. Login ELLER webhook-secret."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
     r = database.gem_manuel_bon(body)
     if not r.get("ok"):
         raise HTTPException(status_code=409, detail=r.get("fejl"))
@@ -2843,14 +2848,20 @@ async def salg_manuel_bon(request: Request):
 
 @app.get("/api/salg/manuel-bon/liste")
 async def salg_manuel_bon_liste(request: Request):
-    _kræv_login(request)
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
     return {"bonner": database.liste_manuelle_bonner()}
 
 
 @app.post("/api/salg/manuel-bon/slet")
 async def salg_manuel_bon_slet(request: Request):
-    _kræv_login(request)
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
     return database.slet_manuel_bon(body.get("bon_nr"))
 
 

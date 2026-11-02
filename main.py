@@ -583,6 +583,16 @@ async def kager(request: Request):
     return resp
 
 
+@app.get("/manuel-salg", response_class=HTMLResponse)
+async def manuel_salg(request: Request):
+    if not get_session(request):
+        return RedirectResponse("/login", status_code=302)
+    resp = templates.TemplateResponse("manuel_salg.html", {"request": request})
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 # ── API ───────────────────────────────────────────────────────────────────────
 
 def _kræv_login(request: Request):
@@ -2816,6 +2826,32 @@ async def salg_ingest(request: Request):
         raise HTTPException(status_code=400, detail="Ingen transaktioner")
     res = database.gem_transaktioner_dage(trans)
     return {"ok": True, **res}
+
+
+@app.post("/api/salg/manuel-bon")
+async def salg_manuel_bon(request: Request):
+    """Manuel 'bro'-bon: indtast en Shopbox-bon der hænger usynkroniseret på
+    kassen, så tallene stemmer indtil Shopbox får skubbet den op. Dedup'es
+    automatisk på bon-ID når den ægte synker. Login (admin)."""
+    _kræv_login(request)
+    body = await request.json()
+    r = database.gem_manuel_bon(body)
+    if not r.get("ok"):
+        raise HTTPException(status_code=409, detail=r.get("fejl"))
+    return r
+
+
+@app.get("/api/salg/manuel-bon/liste")
+async def salg_manuel_bon_liste(request: Request):
+    _kræv_login(request)
+    return {"bonner": database.liste_manuelle_bonner()}
+
+
+@app.post("/api/salg/manuel-bon/slet")
+async def salg_manuel_bon_slet(request: Request):
+    _kræv_login(request)
+    body = await request.json()
+    return database.slet_manuel_bon(body.get("bon_nr"))
 
 
 @app.post("/api/prissnapshot/bulk")

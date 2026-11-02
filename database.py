@@ -746,6 +746,9 @@ def init_db():
             "ALTER TABLE transaktioner ADD COLUMN time_start INTEGER DEFAULT -1",
             "ALTER TABLE transaktioner ADD COLUMN tid TEXT DEFAULT ''",
             "ALTER TABLE transaktioner ADD COLUMN bon_nr TEXT DEFAULT ''",
+            # Kilde: 'shopbox' (ægte API-sync) el. 'manuel' (bro-bon tastet mens en
+            # bon hænger usynkroniseret på kassen). Manuelle dedup'es på bon_nr.
+            "ALTER TABLE transaktioner ADD COLUMN kilde TEXT DEFAULT 'shopbox'",
             "ALTER TABLE ugebestillinger ADD COLUMN sektion INTEGER DEFAULT 1",
             "ALTER TABLE varestamdata ADD COLUMN portioner INTEGER DEFAULT 1",
             "ALTER TABLE tgtg_poser ADD COLUMN kostpris_pose REAL DEFAULT 0",
@@ -915,8 +918,11 @@ def gem_transaktioner_dage(transaktioner: List[Dict]) -> Dict:
         _opdater_kostpris_historik(conn, trans, datoer[-1])
         for d in datoer:
             ny_antal = len(pr_dato[d])
+            # Tæl KUN ægte Shopbox-rækker i guarden — manuelle bro-bonner må ikke
+            # få en normal sync til at se ud som om den ville fjerne data.
             eksist = conn.execute(
-                "SELECT COUNT(*) FROM transaktioner WHERE dato = ?", (d,)
+                "SELECT COUNT(*) FROM transaktioner WHERE dato = ? "
+                "AND COALESCE(kilde,'shopbox')='shopbox'", (d,)
             ).fetchone()[0]
             # GUARD mod forældede øjebliksbilleder: en rapport der genudsendes
             # (fx opdaterLøbende) må ALDRIG erstatte en dags data med FÆRRE rækker
@@ -924,22 +930,122 @@ def gem_transaktioner_dage(transaktioner: List[Dict]) -> Dict:
             if eksist and ny_antal < eksist:
                 sprunget.append({"dato": d, "ny": ny_antal, "eksist": eksist})
                 continue
-            conn.execute("DELETE FROM transaktioner WHERE dato = ?", (d,))
+            # Erstat kun ægte Shopbox-rækker; manuelle bro-bonner bevares.
+            conn.execute("DELETE FROM transaktioner WHERE dato = ? "
+                         "AND COALESCE(kilde,'shopbox')='shopbox'", (d,))
             conn.executemany("""
                 INSERT INTO transaktioner
-                    (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, tid, bon_nr)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, tid, bon_nr, kilde)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'shopbox')
             """, [(
                 t["dato"][:10], t.get("varenummer", ""), t.get("varenavn", ""),
                 t.get("kategori", ""), t.get("antal", 0), t.get("omsætning", 0),
                 t.get("kostpris", 0), t.get("avance", 0), t.get("avance_pct", 0),
                 t.get("time_start", -1), t.get("tid", ""), t.get("bon_nr", ""),
             ) for t in pr_dato[d]])
+            # Auto-dedup: hvis en manuel bro-bon nu er kommet ægte fra Shopbox
+            # (samme bon_nr), fjernes den manuelle, så vi ikke dobbelttæller.
+            conn.execute("""
+                DELETE FROM transaktioner
+                WHERE dato = ? AND COALESCE(kilde,'')='manuel' AND bon_nr <> ''
+                  AND bon_nr IN (SELECT bon_nr FROM transaktioner
+                                 WHERE dato = ? AND COALESCE(kilde,'shopbox')='shopbox')
+            """, (d, d))
             opdateret.append(d)
         # Opdatér "sidst indlæst"-markør uden at nulstille uploads-historik
         conn.execute("INSERT INTO uploads (rapport_dato) VALUES (?)", (datoer[-1],))
     return {"raekker": sum(len(pr_dato[d]) for d in opdateret),
             "dage": opdateret, "sprunget_forældet": sprunget}
+
+
+def gem_manuel_bon(bon: Dict) -> Dict:
+    """Manuel 'bro'-bon: indtast en Shopbox-bon der hænger usynkroniseret på
+    kassen, så den tæller med i dashboardet, indtil Shopbox får skubbet den op.
+    Rækkerne markeres kilde='manuel' og dedup'es automatisk på bon_nr i
+    gem_transaktioner_dage, når den ægte bon senere synker (ingen dobbelttælling).
+
+    Forventet bon: {dato:'YYYY-MM-DD', tid:'HH:MM:SS', bon_nr:'<Shopbox-ID>',
+    linjer:[{varenavn, antal, omsætning, varenummer?, kategori?}, ...]}."""
+    import re as _re
+    dato   = str(bon.get("dato") or "")[:10]
+    bon_nr = str(bon.get("bon_nr") or "").strip()
+    tid    = str(bon.get("tid") or "").strip()
+    linjer = bon.get("linjer") or []
+    if not _re.match(r"^\d{4}-\d{2}-\d{2}$", dato):
+        return {"ok": False, "fejl": "dato skal være YYYY-MM-DD"}
+    if not bon_nr:
+        return {"ok": False, "fejl": "bon-ID (bon_nr) skal udfyldes"}
+    if not linjer:
+        return {"ok": False, "fejl": "mindst én varelinje"}
+    # Hel time (0-23) til dag-/time-visninger, udledt af tid "HH:MM[:SS]".
+    time_start = -1
+    m = _re.match(r"\s*(\d{1,2})\s*[:.]", tid)
+    if m and 0 <= int(m.group(1)) <= 23:
+        time_start = int(m.group(1))
+    with _conn() as conn:
+        # Lad være hvis den ægte allerede ER synket fra Shopbox — så ville vi dobbelttælle.
+        findes_aegte = conn.execute(
+            "SELECT COUNT(*) FROM transaktioner WHERE bon_nr=? "
+            "AND COALESCE(kilde,'shopbox')='shopbox'", (bon_nr,)).fetchone()[0]
+        if findes_aegte:
+            return {"ok": False, "fejl": "bonnen er allerede synkroniseret fra Shopbox",
+                    "bon_nr": bon_nr}
+        # Overskriv en evt. tidligere manuel indtastning af samme bon (ret-ved-fejl).
+        conn.execute("DELETE FROM transaktioner WHERE bon_nr=? AND COALESCE(kilde,'')='manuel'",
+                     (bon_nr,))
+        rows = []
+        for l in linjer:
+            navn = str(l.get("varenavn") or "").strip()
+            if not navn:
+                continue
+            try:
+                antal = float(l.get("antal") if l.get("antal") not in (None, "") else 1)
+                beloeb = float(l.get("omsætning") if l.get("omsætning") not in (None, "")
+                               else l.get("beloeb") or 0)
+            except (TypeError, ValueError):
+                return {"ok": False, "fejl": f"ugyldigt tal på linjen '{navn}'"}
+            rows.append((
+                dato, str(l.get("varenummer") or "").strip(), navn,
+                str(l.get("kategori") or "").strip(),
+                antal, beloeb, 0, 0, 0, time_start, tid, bon_nr, "manuel",
+            ))
+        if not rows:
+            return {"ok": False, "fejl": "ingen gyldige varelinjer"}
+        conn.executemany("""
+            INSERT INTO transaktioner
+                (dato, varenummer, varenavn, kategori, antal, omsætning, kostpris, avance, avance_pct, time_start, tid, bon_nr, kilde)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, rows)
+        total = sum(r[5] for r in rows)
+    return {"ok": True, "bon_nr": bon_nr, "dato": dato,
+            "linjer": len(rows), "total": round(total, 2)}
+
+
+def liste_manuelle_bonner() -> List[Dict]:
+    """Alle manuelle bro-bonner, grupperet pr. bon (til oversigt/sletning)."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT bon_nr, dato, MAX(tid) AS tid, COUNT(*) AS linjer,
+                   ROUND(SUM(omsætning),2) AS total
+            FROM transaktioner
+            WHERE COALESCE(kilde,'')='manuel'
+            GROUP BY bon_nr, dato
+            ORDER BY dato DESC, bon_nr DESC
+        """).fetchall()
+    return [dict(r) for r in rows]
+
+
+def slet_manuel_bon(bon_nr: str) -> Dict:
+    """Fjern en manuel bro-bon igen (fx tastet forkert)."""
+    bon_nr = str(bon_nr or "").strip()
+    if not bon_nr:
+        return {"ok": False, "fejl": "bon_nr mangler"}
+    with _conn() as conn:
+        cur = conn.execute(
+            "DELETE FROM transaktioner WHERE bon_nr=? AND COALESCE(kilde,'')='manuel'",
+            (bon_nr,))
+        n = cur.rowcount
+    return {"ok": True, "slettet": n}
 
 
 def gem_transaktioner(rapport_dato: str, transaktioner: List[Dict]) -> int:

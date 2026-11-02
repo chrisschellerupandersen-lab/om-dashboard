@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manuel salg — hængende bonner</title>
+<style>
+  :root{--bg:#f6f3ec;--card:#fff;--ink:#23201b;--muted:#8a8275;--line:#e7e1d6;
+    --green:#2f5d3a;--green2:#3c7a4b;--rust:#b4541f;--amber:#e7a52e;--shadow:0 2px 10px rgba(0,0,0,.06);}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:0 0 60px}
+  .wrap{max-width:820px;margin:0 auto;padding:18px}
+  h1{font-size:1.3rem;margin:6px 0 2px}
+  .sub{color:var(--muted);font-size:.85rem;margin-bottom:18px}
+  .card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+  .card h2{font-size:1rem;margin:0 0 14px}
+  .grid3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px}
+  @media(max-width:560px){.grid3{grid-template-columns:1fr}}
+  label{display:block;font-size:.76rem;color:var(--muted);margin:0 0 5px}
+  input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;font-size:.95rem;background:#fff;color:var(--ink)}
+  input:focus{outline:2px solid var(--green2);outline-offset:1px;border-color:var(--green2)}
+  button{font:inherit;cursor:pointer;border:0;border-radius:10px}
+  .btn{background:var(--green);color:#fff;padding:11px 16px;font-weight:600}
+  .btn:hover{background:var(--green2)}
+  .btn-sm{padding:7px 11px;font-size:.82rem;background:#f0ece2;color:var(--ink)}
+  .btn-sm:hover{background:#e7e1d6}
+  .btn-rust{background:#f7ebe4;color:var(--rust)}
+  .lines{margin:6px 0 2px}
+  .linerow{display:grid;grid-template-columns:1fr 70px 100px 36px;gap:8px;align-items:center;margin-bottom:8px}
+  .linerow input{padding:9px 10px}
+  .lhead{display:grid;grid-template-columns:1fr 70px 100px 36px;gap:8px;font-size:.72rem;color:var(--muted);margin-bottom:4px;padding:0 2px}
+  .xline{width:34px;height:34px;border-radius:9px;background:#f7ebe4;color:var(--rust);font-size:1.1rem;line-height:1}
+  .xline:hover{background:#efd9cd}
+  .totbar{display:flex;align-items:center;justify-content:space-between;margin:14px 0 2px;padding-top:12px;border-top:1px solid var(--line)}
+  .totbar .n{font-size:1.35rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .actions{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+  .fejl{color:var(--rust);font-size:.82rem;margin-top:10px}
+  .note{background:#fdf8ef;border:1px solid #efe2c9;border-radius:12px;padding:12px 14px;font-size:.84rem;color:#6b5a30;margin-bottom:18px}
+  .note b{color:#4a3f1f}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:.72rem;color:var(--muted);font-weight:600;letter-spacing:.3px;padding:8px;border-bottom:1px solid var(--line)}
+  td{padding:10px 8px;border-bottom:1px solid var(--line);font-size:.9rem;vertical-align:middle}
+  .num{font-variant-numeric:tabular-nums;font-weight:600}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem}
+  .muted{color:var(--muted)}
+  .empty{color:var(--muted);font-size:.88rem;padding:8px 2px}
+  .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.2s;z-index:60}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  a.back{color:var(--green2);text-decoration:none;font-size:.85rem}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <a class="back" href="/dashboard">← Dashboard</a>
+  <h1>Manuel salg — hængende Shopbox-bonner</h1>
+  <div class="sub">Tast en bon der hænger usynkroniseret på kassen, så tallene stemmer indtil Shopbox får skubbet den op.</div>
+
+  <div class="note">
+    Indtast <b>nøjagtig det bon-ID</b> der står på kassens <i>Logfiler</i>-skærm (fx <span class="mono">15772-261030071312</span>)
+    og de <b>prissatte linjer</b> som vist (menu-linjer som "4 x valgfri boller" tastes som én linje — ikke underbollerne til 0 kr).
+    Bonnen tæller straks med i dashboardet og <b>forsvinder automatisk af sig selv</b>, den dag Shopbox får synkroniseret den ægte bon
+    (dedup på bon-ID — ingen dobbelttælling).
+  </div>
+
+  <div class="card">
+    <h2>Ny bon</h2>
+    <div class="grid3">
+      <div>
+        <label>Bon-ID (fra kassen)</label>
+        <input id="bonId" placeholder="15772-261030071312" autocomplete="off">
+      </div>
+      <div>
+        <label>Dato</label>
+        <input id="dato" type="date">
+      </div>
+      <div>
+        <label>Tidspunkt (valgfri)</label>
+        <input id="tid" placeholder="07:24:25" autocomplete="off">
+      </div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="lhead"><span>Varenavn (som på bonen)</span><span>Antal</span><span>Beløb kr</span><span></span></div>
+      <div class="lines" id="lines"></div>
+      <button class="btn-sm" id="addLine">+ Tilføj linje</button>
+    </div>
+
+    <div class="totbar">
+      <span class="muted">Total</span>
+      <span class="n" id="tot">0,00 kr</span>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="gem">✓ Gem bon</button>
+      <button class="btn-sm" id="ryd">Ryd</button>
+    </div>
+    <div class="fejl" id="fejl"></div>
+  </div>
+
+  <div class="card">
+    <h2>Manuelt tastede bonner (bro) <span class="muted" id="antal"></span></h2>
+    <div id="listeWrap"><div class="empty">Indlæser…</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const SECRET=new URLSearchParams(location.search).get("secret");
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1900);}
+async function api(path,opts){
+  const sep=path.includes("?")?"&":"?";
+  const url=path+(SECRET?(sep+"secret="+encodeURIComponent(SECRET)):"");
+  const r=await fetch(url,Object.assign({headers:{"Content-Type":"application/json"}},opts||{}));
+  if(!r.ok){let d={};try{d=await r.json()}catch(e){}throw new Error(d.detail||("HTTP "+r.status));}
+  return r.json();
+}
+function kr(n){return (Number(n)||0).toLocaleString("da-DK",{minimumFractionDigits:2,maximumFractionDigits:2})+" kr";}
+
+// Default dato = i dag
+$("#dato").value=new Date().toISOString().slice(0,10);
+
+function addLine(navn="",antal="1",beloeb=""){
+  const row=document.createElement("div");row.className="linerow";
+  row.innerHTML=`<input class="l-navn" placeholder="fx Surdejsbrød sesam" autocomplete="off">
+    <input class="l-antal" type="number" min="0" step="1" inputmode="numeric">
+    <input class="l-bel" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00">
+    <button class="xline" title="Fjern linje">×</button>`;
+  row.querySelector(".l-navn").value=navn;
+  row.querySelector(".l-antal").value=antal;
+  row.querySelector(".l-bel").value=beloeb;
+  row.querySelector(".xline").addEventListener("click",()=>{row.remove();recalc();});
+  row.querySelector(".l-bel").addEventListener("input",recalc);
+  $("#lines").appendChild(row);
+  return row;
+}
+function recalc(){
+  let t=0;document.querySelectorAll(".l-bel").forEach(i=>t+=Number(i.value)||0);
+  $("#tot").textContent=kr(t);
+}
+function ryd(keepDate){
+  $("#lines").innerHTML="";$("#bonId").value="";$("#tid").value="";$("#fejl").textContent="";
+  if(!keepDate)$("#dato").value=new Date().toISOString().slice(0,10);
+  addLine();addLine();recalc();
+}
+$("#addLine").addEventListener("click",()=>{addLine().querySelector(".l-navn").focus();});
+$("#ryd").addEventListener("click",()=>ryd(false));
+
+$("#gem").addEventListener("click",async()=>{
+  $("#fejl").textContent="";
+  const bon_nr=$("#bonId").value.trim(), dato=$("#dato").value, tid=$("#tid").value.trim();
+  if(!bon_nr){$("#fejl").textContent="Udfyld bon-ID.";return;}
+  if(!dato){$("#fejl").textContent="Vælg dato.";return;}
+  const linjer=[];
+  document.querySelectorAll(".linerow").forEach(r=>{
+    const navn=r.querySelector(".l-navn").value.trim();
+    if(!navn)return;
+    linjer.push({varenavn:navn,
+      antal:Number(r.querySelector(".l-antal").value)||1,
+      omsætning:Number(r.querySelector(".l-bel").value)||0});
+  });
+  if(!linjer.length){$("#fejl").textContent="Tilføj mindst én varelinje med navn.";return;}
+  try{
+    const res=await api("/api/salg/manuel-bon",{method:"POST",
+      body:JSON.stringify({bon_nr,dato,tid,linjer})});
+    toast(`Gemt: ${res.linjer} linjer · ${kr(res.total)} ✓`);
+    ryd(true);loadListe();
+  }catch(e){$("#fejl").textContent=e.message;}
+});
+
+async function loadListe(){
+  try{
+    const {bonner}=await api("/api/salg/manuel-bon/liste");
+    $("#antal").textContent=bonner.length?`· ${bonner.length} stk`:"";
+    if(!bonner.length){$("#listeWrap").innerHTML='<div class="empty">Ingen manuelle bonner lige nu.</div>';return;}
+    let h='<table><thead><tr><th>Dato</th><th>Tid</th><th>Bon-ID</th><th>Linjer</th><th>Total</th><th></th></tr></thead><tbody>';
+    bonner.forEach(b=>{
+      h+=`<tr><td>${b.dato}</td><td class="muted">${b.tid||"—"}</td>
+        <td class="mono">${b.bon_nr}</td><td>${b.linjer}</td>
+        <td class="num">${kr(b.total)}</td>
+        <td><button class="btn-rust btn-sm xdel" data-bon="${encodeURIComponent(b.bon_nr)}">Slet</button></td></tr>`;
+    });
+    h+='</tbody></table>';
+    $("#listeWrap").innerHTML=h;
+    document.querySelectorAll(".xdel").forEach(btn=>btn.addEventListener("click",async()=>{
+      const bon=decodeURIComponent(btn.dataset.bon);
+      if(!confirm("Slet den manuelle bon "+bon+"?"))return;
+      try{await api("/api/salg/manuel-bon/slet",{method:"POST",body:JSON.stringify({bon_nr:bon})});
+        toast("Slettet ✓");loadListe();}catch(e){toast(e.message);}
+    }));
+  }catch(e){$("#listeWrap").innerHTML='<div class="fejl">'+e.message+'</div>';}
+}
+
+ryd(false);
+loadListe();
+</script>
+</body>
+</html>

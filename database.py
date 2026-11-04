@@ -93,11 +93,13 @@ _ORGANIC_BAKERY = [
     {"navn": "Softkernerugbrød",        "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10045, 10432]},   # +10432 nyt (Surdejsrugbrød)
     {"navn": "Surdejsbrød",             "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10040, 10043, 10428]},
     {"navn": "Surdejsbrød m. sesam",    "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [10044, 10430]},
-    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant)
+    {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant). Tebirkessnegl UDGÅR uge 46 og erstattes af klassisk Tebirkes = SAMME linje (10465 beholdes for historik)
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420],
      "weekend_kun": True, "hverdag_til": "Kanelsnurre"},  # bevidst sortiment: kun fre-søn; hverdags-snurre = kanel
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
+    {"navn": "Klassisk snegl",          "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [],
+     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — aldrig solgt før; startbud ~25/uge, vægt weekend. SKU mangler → tilføj salg_kilde når den har solgt, flyt til kilde når der er historik
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},

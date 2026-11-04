@@ -14,10 +14,11 @@ søgefunktion eller via kurvens søgefelt ("Tilføj produkter efter navn, SKU el
 | Surdejsbrød m. sesam | oko-ciabattaflute | PROD-01 | standard |
 | Softkernerugbrød | oko-softkernerugbrod-1400g | PROD-13 | standard |
 | Tebolle alm | oko-tebolle | PROD-18 | standard |
-| Tebirkes | oko-softkernerugbrod-1000g | PROD-12 | risiko (premium) |
+| Tebirkes | oko-softkernerugbrod-1000g | PROD-12 | risiko (premium) · Tebirkessnegl UDGÅR uge 46 → erstattet af klassisk Tebirkes = SAMME linje (salgs-SKU 10465 beholdes for historik) |
 | Croissant | oko-hvedebrod-m-birkes | PROD-06 | risiko (premium) |
 | Pain au Chocolate | oko-landbrod | PROD-09 | risiko (premium) |
 | Kanelsnurre | oko-kanelsnurre | PROD-19 | standard |
+| Klassisk snegl | (NY uge-46 — slug ukendt, søg i shoppen) | — | standard · indkøb 12 / udsalg 24 ex moms (30 kr) · aldrig solgt før → seed ~25/uge; SKU mangler endnu |
 | Kardemommesnurre | oko-kernebrod | PROD-08 | kun fre/lør/søn |
 | ~~Brunsvigersnegl~~ (UDGÅET okt-2026) | oko-brunsvigersnegl | PROD-24 | erstattet af PROD-25 · salgs-SKU 10479 (historik) |
 | Tebolle m. æblekompot & remonce | (erstatter Brunsvigersnegl) | PROD-25 | standard · indkøb 12 / udsalg 24 ex moms (30 kr i kassen) · salgs-SKU **10512** · alle dage |

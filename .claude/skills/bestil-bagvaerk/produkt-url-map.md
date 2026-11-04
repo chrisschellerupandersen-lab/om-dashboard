@@ -21,7 +21,7 @@ søgefunktion eller via kurvens søgefelt ("Tilføj produkter efter navn, SKU el
 | Klassisk snegl | (NY uge-46 — slug ukendt, søg i shoppen) | — | standard · indkøb 12 / udsalg 24 ex moms (30 kr) · aldrig solgt før → seed ~25/uge; SKU mangler endnu |
 | Kardemommesnurre | oko-kernebrod | PROD-08 | kun fre/lør/søn |
 | ~~Brunsvigersnegl~~ (UDGÅET okt-2026) | oko-brunsvigersnegl | PROD-24 | erstattet af PROD-25 · salgs-SKU 10479 (historik) |
-| Tebolle m. æblekompot & remonce | (erstatter Brunsvigersnegl) | PROD-25 | standard · indkøb 12 / udsalg 24 ex moms (30 kr i kassen) · salgs-SKU **10512** · alle dage |
+| ~~Tebolle m. æblekompot & remonce~~ (PAUSE fra uge 46, nov-2026) | (bestil IKKE) | PROD-25 | sælger ikke godt nok → på pause · salgs-SKU **10512** (historik uge 43-45 bevares) · genoptag = fjern udgaaet-flag |
 | Tebolle m. chokolade | oko-tebolle-med-choko | PROD-17 | kun fre/lør/søn |
 | Cookie | oko-cookie | PROD-16 | kun ons/fre/søn |
 | Gulerodskage 5-6 pers | oko-cheesecake-lemon-5-6-personer | PROD-15 | KUN tir+fre (OBS-tekst på siden) |

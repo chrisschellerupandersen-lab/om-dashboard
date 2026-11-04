@@ -104,8 +104,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
     {"navn": "Tebolle alm",             "indkoeb": 5.0,  "udsalg": 10.0,  "gruppe": "standard", "kilde": [10055, 10438]},
-    {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 12.0, "udsalg": 24.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512],
-     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # NY vare (PROD-25) — kassesalg på SKU 10512 (kassenavn "Æblebolle"); pris ex moms indkøb 12 / udsalg 24 (= 30 kr i kassen incl); startbud ~48/uge indtil historik
+    {"navn": "Tebolle m. æblekompot & remonce", "indkoeb": 12.0, "udsalg": 24.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10512], "udgaaet": True,
+     "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 6, "fre": 10, "loe": 10, "son": 10}},  # PROD-25 (kassenavn "Æblebolle", SKU 10512). PAUSE fra uge 46 (nov 2026) — sælger ikke godt nok. udgaaet=True → anbefales/bestilles ikke fremover; historik (uge 43-45) bevares. Fjern flaget for at genoptage
     # Brunsvigersnegl UDGÅET okt 2026 (erstattet af æblebollen ovenfor). BLIVER i kataloget —
     # historik må ALDRIG forsvinde: den vises fortsat i uger hvor den er bestilt/solgt (SKU
     # 10479). "udgaaet": True → anbefales/vises aldrig i fremtidige (ubestilte) uger.

@@ -2855,6 +2855,14 @@ async def salg_manuel_bon_liste(request: Request):
     return {"bonner": database.liste_manuelle_bonner()}
 
 
+@app.get("/api/salg/manuel-bon/linjer")
+async def salg_manuel_bon_linjer(request: Request, bon_nr: str = ""):
+    """Varelinjerne i én manuel bro-bon (til udfold i oversigten)."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_manuel_bon_linjer(bon_nr)
+
+
 @app.post("/api/salg/manuel-bon/slet")
 async def salg_manuel_bon_slet(request: Request):
     try:

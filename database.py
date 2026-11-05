@@ -1154,6 +1154,28 @@ def liste_manuelle_bonner() -> List[Dict]:
     return [dict(r) for r in rows]
 
 
+def hent_manuel_bon_linjer(bon_nr: str) -> Dict:
+    """Varelinjerne i én manuel bro-bon (til udfold-visning i oversigten).
+    Viser SKU-match pr. linje, så man kan se hvad der tæller i spild/bestilling."""
+    bon_nr = str(bon_nr or "").strip()
+    if not bon_nr:
+        return {"ok": False, "fejl": "bon_nr mangler", "linjer": []}
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT varenavn, varenummer, kategori,
+                   antal, ROUND(omsætning,2) AS omsætning
+            FROM transaktioner
+            WHERE bon_nr=? AND COALESCE(kilde,'')='manuel'
+            ORDER BY rowid
+        """, (bon_nr,)).fetchall()
+    linjer = []
+    for r in rows:
+        d = dict(r)
+        d["taeller"] = bool(str(d.get("varenummer") or "").strip())
+        linjer.append(d)
+    return {"ok": True, "bon_nr": bon_nr, "linjer": linjer}
+
+
 def slet_manuel_bon(bon_nr: str) -> Dict:
     """Fjern en manuel bro-bon igen (fx tastet forkert)."""
     bon_nr = str(bon_nr or "").strip()

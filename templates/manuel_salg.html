@@ -45,6 +45,19 @@
   .mono{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem}
   .muted{color:var(--muted)}
   .empty{color:var(--muted);font-size:.88rem;padding:8px 2px}
+  tr.bonrow{cursor:pointer}
+  tr.bonrow:hover td{background:#faf7f0}
+  tr.bonrow.open td{background:#f3efe6}
+  .caret{display:inline-block;width:14px;color:var(--muted);transition:transform .15s}
+  tr.bonrow.open .caret{transform:rotate(90deg)}
+  tr.detail td{padding:0;border-bottom:1px solid var(--line);background:#fbf9f4}
+  .detwrap{padding:10px 14px 14px 30px}
+  .detwrap table{margin:0}
+  .detwrap th{border-bottom:1px solid var(--line);padding:6px 8px}
+  .detwrap td{border-bottom:1px dashed var(--line);padding:7px 8px;font-size:.86rem;background:transparent}
+  .pill{display:inline-block;font-size:.68rem;padding:2px 7px;border-radius:999px;font-weight:600;white-space:nowrap}
+  .pill.ok{background:#e7f1e9;color:#2f5d3a}
+  .pill.no{background:#fbeee4;color:#b4541f}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:999px;font-size:.85rem;opacity:0;pointer-events:none;transition:.2s;z-index:60}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   a.back{color:var(--green2);text-decoration:none;font-size:.85rem}
@@ -192,21 +205,52 @@ async function loadSkuStatus(){
   }catch(e){/* stille */}
 }
 
+async function toggleDetail(row){
+  const i=row.dataset.i, det=$("#det-"+i), wrap=$("#detwrap-"+i);
+  if(det.style.display!=="none"){det.style.display="none";row.classList.remove("open");return;}
+  row.classList.add("open");det.style.display="";
+  wrap.innerHTML='<div class="empty">Indlæser linjer…</div>';
+  try{
+    const bon=decodeURIComponent(row.dataset.bon);
+    const d=await api("/api/salg/manuel-bon/linjer?bon_nr="+encodeURIComponent(bon));
+    const linjer=d.linjer||[];
+    if(!linjer.length){wrap.innerHTML='<div class="empty">Ingen linjer.</div>';return;}
+    let t='<table><thead><tr><th>Vare</th><th>SKU</th><th>Antal</th><th>Beløb</th><th>Tæller i spild/bestilling</th></tr></thead><tbody>';
+    linjer.forEach(l=>{
+      const pill=l.taeller?'<span class="pill ok">✓ ja</span>':'<span class="pill no">kun oms.</span>';
+      t+=`<tr><td>${l.varenavn||""}</td>
+        <td class="mono muted">${l.varenummer||"—"}</td>
+        <td class="num">${Number(l.antal||0).toLocaleString("da-DK")}</td>
+        <td class="num">${kr(l["omsætning"])}</td>
+        <td>${pill}</td></tr>`;
+    });
+    t+='</tbody></table>';
+    wrap.innerHTML=t;
+  }catch(e){wrap.innerHTML='<div class="fejl">'+e.message+'</div>';}
+}
+
 async function loadListe(){
   try{
     const {bonner}=await api("/api/salg/manuel-bon/liste");
     $("#antal").textContent=bonner.length?`· ${bonner.length} stk`:"";
     if(!bonner.length){$("#listeWrap").innerHTML='<div class="empty">Ingen manuelle bonner lige nu.</div>';return;}
     let h='<table><thead><tr><th>Dato</th><th>Tid</th><th>Bon-ID</th><th>Linjer</th><th>Total</th><th></th></tr></thead><tbody>';
-    bonner.forEach(b=>{
-      h+=`<tr><td>${b.dato}</td><td class="muted">${b.tid||"—"}</td>
+    bonner.forEach((b,i)=>{
+      const be=encodeURIComponent(b.bon_nr);
+      h+=`<tr class="bonrow" data-bon="${be}" data-i="${i}"><td><span class="caret">▶</span> ${b.dato}</td><td class="muted">${b.tid||"—"}</td>
         <td class="mono">${b.bon_nr}</td><td>${b.linjer}</td>
         <td class="num">${kr(b.total)}</td>
-        <td><button class="btn-rust btn-sm xdel" data-bon="${encodeURIComponent(b.bon_nr)}">Slet</button></td></tr>`;
+        <td><button class="btn-rust btn-sm xdel" data-bon="${be}">Slet</button></td></tr>`;
+      h+=`<tr class="detail" id="det-${i}" style="display:none"><td colspan="6"><div class="detwrap" id="detwrap-${i}"></div></td></tr>`;
     });
     h+='</tbody></table>';
     $("#listeWrap").innerHTML=h;
-    document.querySelectorAll(".xdel").forEach(btn=>btn.addEventListener("click",async()=>{
+    document.querySelectorAll(".bonrow").forEach(row=>row.addEventListener("click",e=>{
+      if(e.target.closest(".xdel"))return;
+      toggleDetail(row);
+    }));
+    document.querySelectorAll(".xdel").forEach(btn=>btn.addEventListener("click",async(e)=>{
+      e.stopPropagation();
       const bon=decodeURIComponent(btn.dataset.bon);
       if(!confirm("Slet den manuelle bon "+bon+"?"))return;
       try{await api("/api/salg/manuel-bon/slet",{method:"POST",body:JSON.stringify({bon_nr:bon})});

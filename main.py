@@ -2499,6 +2499,18 @@ async def api_mobilepay_status(request: Request):
     st = database.mobilepay_status()
     st["credentials_sat"] = har_creds
     st["auto_sync_aktiv"] = har_creds  # jobbet registreres kun når nøglerne er sat
+
+    def _mask(v):
+        """Maskeret diagnose: længde + yderste tegn + om der er usynligt mellemrum —
+        afslører IKKE selve værdien."""
+        if v is None:
+            return {"sat": False}
+        s = str(v)
+        return {"sat": True, "laengde": len(s),
+                "start": s[:3], "slut": s[-2:] if len(s) >= 2 else s,
+                "whitespace_i_kant": s != s.strip()}
+    st["env_diagnose"] = {k: _mask(os.environ.get(k)) for k in
+                          ("MP_CLIENT_ID", "MP_CLIENT_SECRET", "MP_MSN", "MP_LEDGER_ID")}
     return st
 
 

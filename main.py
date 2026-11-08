@@ -2555,7 +2555,14 @@ async def api_mobilepay_sync_nu(request: Request):
     try:
         import mobilepay_sync as mps
         from datetime import date as _d, timedelta as _td
-        if body.get("historisk"):
+        fra, til = body.get("fra"), body.get("til")
+        if fra and til:
+            # Autoritativ per-dato-backfill over et spænd (fylder også 0-dage).
+            d0 = _d.fromisoformat(fra); d1 = _d.fromisoformat(til)
+            datoer = [(d0 + _td(days=i)).isoformat() for i in range((d1 - d0).days + 1)]
+            linjer = [{"dato": dato, "omsaetning_inkl": mps.fetch_dag(dato), "kilde": "api"}
+                      for dato in datoer]
+        elif body.get("historisk"):
             day_totals = mps.fetch_historisk()
             linjer = [{"dato": d, "omsaetning_inkl": v, "kilde": "api-feed"}
                       for d, v in sorted(day_totals.items())]

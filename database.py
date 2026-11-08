@@ -1947,6 +1947,17 @@ def gem_mobilepay_dag(linjer: list) -> int:
     return count
 
 
+def slet_mobilepay_dage(datoer: list) -> int:
+    """Fjern mobilepay_dag-rækker for de angivne datoer (oprydning af fejl-rækker)."""
+    datoer = [str(d)[:10] for d in (datoer or []) if d]
+    if not datoer:
+        return 0
+    with _conn() as conn:
+        ph = ",".join("?" * len(datoer))
+        cur = conn.execute(f"DELETE FROM mobilepay_dag WHERE dato IN ({ph})", datoer)
+        return cur.rowcount
+
+
 def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]:
     with _conn() as conn:
         if fra_dato and til_dato:

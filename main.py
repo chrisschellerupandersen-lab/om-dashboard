@@ -2537,6 +2537,41 @@ async def api_mobilepay_ledgers(request: Request):
         return {"ok": False, "fejl": str(e)[:200]}
 
 
+@app.get("/api/mobilepay/debug-dato")
+async def api_mobilepay_debug_dato(request: Request, dato: str):
+    """Rå Vipps funds/dates-svar for én dato — til at forstå dato-nøgle (salgs- vs.
+    afregningsdato) og entryType. Secret ELLER login."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    try:
+        import mobilepay_sync as mps, requests as _rq
+        url = f"{mps.MP_BASE}/report/v2/ledgers/{mps.MP_LEDGER_ID}/funds/dates/{dato}"
+        r = _rq.get(url, headers=mps._hdrs(), timeout=15)
+        if r.status_code != 200:
+            return {"ok": False, "http": r.status_code, "body": r.text[:300]}
+        items = r.json().get("items", [])
+        typer = {}
+        for it in items:
+            typer[it.get("entryType")] = typer.get(it.get("entryType"), 0) + 1
+        return {"ok": True, "dato": dato, "antal_items": len(items),
+                "entryTypes": typer, "items": items[:15]}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)[:200]}
+
+
+@app.post("/api/mobilepay/slet-dag")
+async def api_mobilepay_slet_dag(request: Request):
+    """Fjern mobilepay_dag-rækker for bestemte datoer (oprydning). Secret ELLER login."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if (request.query_params.get("secret") != WEBHOOK_SECRET
+            and body.get("secret") != WEBHOOK_SECRET):
+        _kræv_login(request)
+    return {"slettet": database.slet_mobilepay_dage(body.get("datoer") or [])}
+
+
 @app.post("/api/mobilepay/sync-nu")
 async def api_mobilepay_sync_nu(request: Request):
     """Manuel MobilePay-sync (secret ELLER login): kør Vipps-synken med det samme

@@ -2577,6 +2577,8 @@ async def api_mobilepay_debug_sales(request: Request, dato: str = None, feed: in
             out["body"] = r.text[:400]; return out
         if isinstance(j, dict):
             out["top_keys"] = list(j.keys())
+            if r.status_code != 200:
+                out["fejl_body"] = json.dumps(j, ensure_ascii=False)[:400]
             items = j.get("items") or j.get("sales") or []
         else:
             items = j if isinstance(j, list) else []

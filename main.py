@@ -2502,6 +2502,29 @@ async def api_mobilepay_status(request: Request):
     return st
 
 
+@app.get("/api/mobilepay/ledgers")
+async def api_mobilepay_ledgers(request: Request):
+    """Slå ledger-ID op (secret ELLER login) når MP_CLIENT_ID/SECRET/MSN er sat på
+    Railway — så man kan finde værdien til MP_LEDGER_ID uden at køre noget lokalt."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    if not (os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_CLIENT_SECRET")
+            and os.environ.get("MP_MSN")):
+        return {"ok": False, "fejl": "Sæt MP_CLIENT_ID, MP_CLIENT_SECRET og MP_MSN på Railway først"}
+    try:
+        import mobilepay_sync as mps, requests as _rq
+        r = _rq.get(f"{mps.MP_BASE}/settlement/v1/ledgers", headers=mps._hdrs(), timeout=15)
+        if r.status_code != 200:
+            return {"ok": False, "fejl": f"HTTP {r.status_code}: {r.text[:150]}"}
+        items = r.json().get("items", [])
+        return {"ok": True, "ledgers": [
+            {"ledgerId": l.get("ledgerId"), "currency": l.get("currency"),
+             "salesUnits": [u.get("name") for u in l.get("salesUnits", [])]}
+            for l in items]}
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)[:200]}
+
+
 @app.post("/api/mobilepay/sync-nu")
 async def api_mobilepay_sync_nu(request: Request):
     """Manuel MobilePay-sync (secret ELLER login): kør Vipps-synken med det samme

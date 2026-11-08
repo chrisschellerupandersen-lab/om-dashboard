@@ -1015,9 +1015,13 @@ def gem_manuel_bon(bon: Dict) -> Dict:
                 navn, vnr = _manuel_normaliser(conn, navn)
             if not vnr:
                 uden_sku.append(navn)
+            # Kategori så linjen ikke havner i 'uden kategori' i solgte enheder.
+            kat = str(l.get("kategori") or "").strip()
+            if not kat:
+                kat = _kategori_for_sku(conn, vnr, navn)
             rows.append((
                 dato, vnr, navn,
-                str(l.get("kategori") or "").strip(),
+                kat,
                 antal, beloeb, 0, 0, 0, time_start, tid, bon_nr, "manuel",
             ))
         if not rows:
@@ -1052,6 +1056,35 @@ def _sku_for_varenavn(conn, navn: str) -> str:
         LIMIT 1
     """, (navn,)).fetchone()
     return str(r["varenummer"]) if r else ""
+
+
+def _kategori_for_sku(conn, sku: str, navn: str) -> str:
+    """Find den kategori ægte Shopbox-salg bruger for et SKU (ellers for varenavnet).
+    Manuelle bro-bonner får samme kategori, så de ikke havner i 'uden kategori' i
+    solgte enheder. Vælger den hyppigst brugte ikke-tomme kategori."""
+    sku = str(sku or "").strip()
+    if sku and sku not in ("0",):
+        r = conn.execute("""
+            SELECT kategori, COUNT(*) AS n, MAX(dato) AS sidst
+            FROM transaktioner
+            WHERE COALESCE(kilde,'shopbox')='shopbox'
+              AND varenummer = ? AND COALESCE(kategori,'') <> ''
+            GROUP BY kategori ORDER BY n DESC, sidst DESC LIMIT 1
+        """, (sku,)).fetchone()
+        if r:
+            return str(r["kategori"])
+    navn = (navn or "").strip()
+    if navn:
+        r = conn.execute("""
+            SELECT kategori, COUNT(*) AS n, MAX(dato) AS sidst
+            FROM transaktioner
+            WHERE COALESCE(kilde,'shopbox')='shopbox'
+              AND LOWER(TRIM(varenavn)) = LOWER(?) AND COALESCE(kategori,'') <> ''
+            GROUP BY kategori ORDER BY n DESC, sidst DESC LIMIT 1
+        """, (navn,)).fetchone()
+        if r:
+            return str(r["kategori"])
+    return ""
 
 
 def _manuel_normaliser(conn, navn: str):
@@ -1096,7 +1129,20 @@ def backfill_manuel_sku() -> Dict:
                 opdateret += 1
             else:
                 uden.append(r["varenavn"])
-    return {"ok": True, "opdateret": opdateret, "uden_match": sorted(set(uden))}
+        # Sæt kategori på manuelle rækker der mangler den → ikke 'uden kategori'
+        # i solgte enheder. Køres efter SKU-opdateringen, så vi slår op på rigtigt SKU.
+        kat_opdateret = 0
+        krows = conn.execute("""
+            SELECT id, varenummer, varenavn FROM transaktioner
+            WHERE COALESCE(kilde,'')='manuel' AND COALESCE(kategori,'')=''
+        """).fetchall()
+        for r in krows:
+            kat = _kategori_for_sku(conn, r["varenummer"], r["varenavn"])
+            if kat:
+                conn.execute("UPDATE transaktioner SET kategori=? WHERE id=?", (kat, r["id"]))
+                kat_opdateret += 1
+    return {"ok": True, "opdateret": opdateret, "kategori_opdateret": kat_opdateret,
+            "uden_match": sorted(set(uden))}
 
 
 def manuel_sku_tjek() -> Dict:

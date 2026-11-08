@@ -433,7 +433,7 @@ def _planlagt_mobilepay_sync():
                 continue
             linjer.append({"dato": dato, "omsaetning_inkl": inkl, "kilde": "api"})
         if linjer:
-            n = database.gem_mobilepay_dag(linjer)
+            n = database.gem_mobilepay_dag(linjer, beskyt_positiv=True)
             print(f"[MobilePay auto-sync OK] {n} dage opdateret ({datoer[0]}..{datoer[-1]})")
     except Exception as e:
         print(f"[MobilePay auto-sync exception] {str(e)[:150]}")
@@ -2607,7 +2607,7 @@ async def api_mobilepay_sync_nu(request: Request):
             datoer = [(idag - _td(days=i)).isoformat() for i in range(n - 1, -1, -1)]
             linjer = [{"dato": dato, "omsaetning_inkl": mps.fetch_dag(dato), "kilde": "api"}
                       for dato in datoer]
-        antal = database.gem_mobilepay_dag(linjer) if linjer else 0
+        antal = database.gem_mobilepay_dag(linjer, beskyt_positiv=True) if linjer else 0
         m_oms = sum(1 for l in linjer if (l.get("omsaetning_inkl") or 0) > 0)
         return {"ok": True, "credentials_sat": True, "dage_gemt": antal,
                 "dage_m_omsaetning": m_oms,

@@ -1918,11 +1918,15 @@ def _mp_uge_netto(iso_aar: int, iso_uge: int, cutoff_days: int = 7) -> float:
     return 0.0
 
 
-def gem_mobilepay_dag(linjer: list) -> int:
+def gem_mobilepay_dag(linjer: list, beskyt_positiv: bool = False) -> int:
     """Gem/opdater daglig MobilePay-omsætning.
     linjer = [{dato, omsaetning_netto, gebyr?, omsaetning_inkl?, kilde?}]
 
     Hvis kun omsaetning_inkl er givet (fra gammel API), bruges det som netto.
+
+    beskyt_positiv=True: en indkommende linje med 0/negativ omsætning springes over,
+    hvis der allerede findes en række for dagen med positiv omsætning. Bruges af API-
+    synken, så en tom/forsinket Vipps-respons ALDRIG nulstiller en ægte CSV-værdi.
     """
     with _conn() as conn:
         count = 0
@@ -1932,6 +1936,13 @@ def gem_mobilepay_dag(linjer: list) -> int:
             gebyr = l.get("gebyr", 0)
             omsaetning_inkl = l.get("omsaetning_inkl", omsaetning_netto + gebyr)
             kilde = l.get("kilde", "api")
+
+            if beskyt_positiv and (omsaetning_inkl or 0) <= 0:
+                eksist = conn.execute(
+                    "SELECT omsaetning_inkl FROM mobilepay_dag WHERE dato=?", (dato,)
+                ).fetchone()
+                if eksist and (eksist[0] or 0) > 0:
+                    continue  # bevar den ægte værdi — overskriv aldrig med 0
 
             conn.execute("""
                 INSERT INTO mobilepay_dag (dato, omsaetning_netto, gebyr, omsaetning_inkl, kilde)

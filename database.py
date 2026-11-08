@@ -1961,6 +1961,25 @@ def hent_mobilepay_dag(fra_dato: str = None, til_dato: str = None) -> List[Dict]
     return [dict(r) for r in rows]
 
 
+def mobilepay_status() -> Dict:
+    """Kort status på mobilepay_dag: antal dage, dato-spænd, sidste dato m. omsætning,
+    og de seneste 7 rækker. Til at verificere at Vipps-synken faktisk lander data."""
+    with _conn() as conn:
+        agg = conn.execute("""
+            SELECT COUNT(*) AS dage, MIN(dato) AS foerste, MAX(dato) AS sidste,
+                   ROUND(SUM(omsaetning_inkl),2) AS sum_inkl,
+                   MAX(CASE WHEN omsaetning_inkl > 0 THEN dato END) AS sidste_m_oms
+            FROM mobilepay_dag
+        """).fetchone()
+        sidste7 = conn.execute("""
+            SELECT dato, omsaetning_inkl, kilde FROM mobilepay_dag
+            ORDER BY dato DESC LIMIT 7
+        """).fetchall()
+    d = dict(agg) if agg else {}
+    d["seneste"] = [dict(r) for r in sidste7]
+    return d
+
+
 def hent_uger(aar: int = None, til_dato: bool = False) -> List[Dict]:
     from datetime import date as _date
     from calendar import monthrange

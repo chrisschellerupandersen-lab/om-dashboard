@@ -2489,6 +2489,57 @@ async def api_mobilepay_dag(request: Request, fra: str = None, til: str = None):
     return database.hent_mobilepay_dag(fra, til)
 
 
+@app.get("/api/mobilepay/status")
+async def api_mobilepay_status(request: Request):
+    """Diagnose (secret ELLER login): er Vipps-nøglerne sat på serveren, og hvor
+    friske er mobilepay_dag-data. Bruges til at se om auto-synken virker."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    har_creds = bool(os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_LEDGER_ID"))
+    st = database.mobilepay_status()
+    st["credentials_sat"] = har_creds
+    st["auto_sync_aktiv"] = har_creds  # jobbet registreres kun når nøglerne er sat
+    return st
+
+
+@app.post("/api/mobilepay/sync-nu")
+async def api_mobilepay_sync_nu(request: Request):
+    """Manuel MobilePay-sync (secret ELLER login): kør Vipps-synken med det samme
+    i stedet for at vente på mandags-jobbet. Body: {historisk:true} = fuld feed-
+    backfill af al historik; ellers {dage:N} (default 8 seneste dage, idempotent)."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if (request.query_params.get("secret") != WEBHOOK_SECRET
+            and body.get("secret") != WEBHOOK_SECRET):
+        _kræv_login(request)
+    if not (os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_LEDGER_ID")):
+        return {"ok": False, "credentials_sat": False,
+                "fejl": "MP_CLIENT_ID/MP_LEDGER_ID er ikke sat som env-vars på Railway"}
+    try:
+        import mobilepay_sync as mps
+        from datetime import date as _d, timedelta as _td
+        if body.get("historisk"):
+            day_totals = mps.fetch_historisk()
+            linjer = [{"dato": d, "omsaetning_inkl": v, "kilde": "api-feed"}
+                      for d, v in sorted(day_totals.items())]
+        else:
+            n = int(body.get("dage") or 8)
+            idag = _d.today()
+            datoer = [(idag - _td(days=i)).isoformat() for i in range(n - 1, -1, -1)]
+            linjer = [{"dato": dato, "omsaetning_inkl": mps.fetch_dag(dato), "kilde": "api"}
+                      for dato in datoer]
+        antal = database.gem_mobilepay_dag(linjer) if linjer else 0
+        m_oms = sum(1 for l in linjer if (l.get("omsaetning_inkl") or 0) > 0)
+        return {"ok": True, "credentials_sat": True, "dage_gemt": antal,
+                "dage_m_omsaetning": m_oms,
+                "foerste": linjer[0]["dato"] if linjer else None,
+                "sidste": linjer[-1]["dato"] if linjer else None}
+    except Exception as e:
+        return {"ok": False, "credentials_sat": True, "fejl": str(e)[:200]}
+
+
 @app.post("/api/mobilepay/upload-csv")
 async def mobilepay_upload_csv(request: Request, fil: UploadFile = File(...)):
     """Browser CSV/Excel upload fra MobilePay portal."""

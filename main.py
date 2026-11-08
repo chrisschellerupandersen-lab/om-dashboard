@@ -2559,6 +2559,34 @@ async def api_mobilepay_debug_dato(request: Request, dato: str):
         return {"ok": False, "fejl": str(e)[:200]}
 
 
+@app.get("/api/mobilepay/debug-sales")
+async def api_mobilepay_debug_sales(request: Request, dato: str = None, feed: int = 0):
+    """Test Vipps SALES-API (hvad der blev solgt, salgsdato) i stedet for funds.
+    /sales/report/v1/ledgers/{ledger}/dates/{dato}. Secret ELLER login."""
+    if request.query_params.get("secret") != WEBHOOK_SECRET:
+        _kræv_login(request)
+    try:
+        import mobilepay_sync as mps, requests as _rq
+        base = f"{mps.MP_BASE}/sales/report/v1/ledgers/{mps.MP_LEDGER_ID}"
+        url = f"{base}?pageSize=1000" if feed else f"{base}/dates/{dato}"
+        r = _rq.get(url, headers=mps._hdrs(), timeout=25)
+        out = {"ok": r.status_code == 200, "http": r.status_code, "url": url.replace(mps.MP_BASE, "")}
+        try:
+            j = r.json()
+        except Exception:
+            out["body"] = r.text[:400]; return out
+        if isinstance(j, dict):
+            out["top_keys"] = list(j.keys())
+            items = j.get("items") or j.get("sales") or []
+        else:
+            items = j if isinstance(j, list) else []
+        out["antal_items"] = len(items)
+        out["items"] = items[:5]
+        return out
+    except Exception as e:
+        return {"ok": False, "fejl": str(e)[:200]}
+
+
 @app.post("/api/mobilepay/slet-dag")
 async def api_mobilepay_slet_dag(request: Request):
     """Fjern mobilepay_dag-rækker for bestemte datoer (oprydning). Secret ELLER login."""

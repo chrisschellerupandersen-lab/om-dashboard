@@ -692,10 +692,6 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .mflip-b{position:absolute;inset:0;transform:rotateY(180deg);background:linear-gradient(152deg,#357036,#244425 46%,#16291a);color:#f4eee2;box-shadow:0 2px 6px rgba(30,58,30,.1),0 20px 44px rgba(30,58,30,.2);display:flex;flex-direction:column;justify-content:center;}
 .mflip-hint{position:absolute;top:10px;right:12px;font-size:13px;color:#b9c1b8;transition:transform .4s,color .2s;}
 .mflip:hover .mflip-hint{transform:rotate(180deg);color:var(--amber);}
-@media (prefers-reduced-motion:reduce){
-  .panel.active .kpi,.panel.active .card,.mflip,.kpi-delta,.mpill,.spk{animation:none;}
-  .mflip-in{transition:none;}
-}
 
 /* ── IMPROVED MOBILE ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
@@ -15850,7 +15846,6 @@ function updateMgmtKorselKPI() {
 // ── MOTION: nøgletal tæller op når de vises/opdateres ─────────────────────────
 // Rent visuelt: slut-teksten sættes altid tilbage til den præcise original.
 (function(){
-  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const SEL = '.kpi-v,.cu';
   const tok = new WeakMap();
   function countUp(el){

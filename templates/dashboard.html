@@ -684,7 +684,7 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .spk{transform-origin:bottom;animation:barGrow .6s cubic-bezier(.2,.8,.2,1) backwards;}
 /* Rest i dag pr. kategori — kompakt: én linje pr. kategori, flere spalter på bred skærm */
 .rest-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));column-gap:36px;row-gap:2px;align-items:start;}
-.rest-rk,.rest-vare{display:grid;grid-template-columns:minmax(80px,120px) 1fr 44px 84px;align-items:center;gap:10px;}
+.rest-rk,.rest-vare{display:grid;grid-template-columns:minmax(80px,120px) 1fr 48px 88px;align-items:center;gap:10px;}
 .rest-rk{padding:6px 6px;border-radius:8px;cursor:pointer;user-select:none;transition:background .15s;font-size:13.5px;}
 .rest-rk:hover{background:rgba(30,58,30,.045);}
 .rest-navn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -8536,7 +8536,7 @@ function renderDagRest(d){
       varer.map(v => {
         if (v.type === 'combo'){
           return `<div class="rest-vare" style="color:var(--ash);border-top:1px dashed rgba(30,58,30,.12);margin-top:3px;padding-top:5px;">
-            <span class="rest-navn">☕ ${v.varenavn}</span>
+            <span class="rest-navn"><span style="font-size:10px;padding:1px 6px;border-radius:999px;background:rgba(30,58,30,.07);margin-right:5px;">combo</span>${v.varenavn}</span>
             <span class="rest-tal" style="grid-column:2 / -1;text-align:right;">−${v.solgt} fra rest</span>
           </div>`;
         }
@@ -8554,7 +8554,7 @@ function renderDagRest(d){
       <div class="rest-rk" onclick="restFoldToggle('${key.replace(/'/g,"\'")}')" title="${tip}">
         <span class="rest-navn" style="font-weight:500;color:var(--charcoal);"><span style="color:var(--ash);font-size:9px;">${open?'▾':'▸'}</span> ${k.kategori}</span>
         <span class="rest-bar"><span style="width:${pct}%;background:${c};"></span></span>
-        <span class="rest-tal">${k.solgt}/${k.bestilt}${k.combo_antal>0?' ☕':''}</span>
+        <span class="rest-tal">${k.solgt}/${k.bestilt}</span>
         ${pill(k.rest, c)}
       </div>
       ${varerHtml}

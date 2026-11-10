@@ -1734,8 +1734,8 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
           <div id="dag-rest"></div>
         </div>
         <div class="card">
-          <div class="aar2-chart-hdr"><span class="aar2-chart-ttl">Salg per time</span></div>
-          <div id="dag-chart-wrap" style="position:relative;height:220px;"><canvas id="c-dag"></canvas></div>
+          <div class="aar2-chart-hdr" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;"><span class="aar2-chart-ttl">Salg per time</span><span id="dag-chart-legend" style="display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:#8a9589;"></span></div>
+          <div id="dag-chart-wrap" style="position:relative;height:170px;"><canvas id="c-dag"></canvas></div>
           <div id="dag-no-time" class="empty" style="display:none;">Tidsdata ikke tilgængeligt i denne rapport</div>
         </div>
         <div class="card">
@@ -7651,10 +7651,10 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
     const barColors  = alleTimer.map(h => {
       const idag = idagMap[h] ?? 0;
       const prev = prevMap[h];
-      if (prev == null) return 'rgba(74,124,74,.45)';      // ingen sammenligningsdata → neutral grøn
-      if (idag > prev)  return 'rgba(30,120,30,.55)';      // grøn — bedre
-      if (idag < prev)  return 'rgba(180,40,40,.45)';      // rød — dårligere
-      return 'rgba(74,124,74,.35)';
+      if (prev == null) return 'rgba(93,143,78,.45)';       // ingen sammenligningsdata → neutral grøn
+      if (idag > prev)  return '#5d8f4e';                    // dæmpet grøn — bedre
+      if (idag < prev)  return '#d08a6e';                    // terracotta — dårligere
+      return 'rgba(93,143,78,.45)';
     });
     const barBorders = alleTimer.map(h => {
       const idag = idagMap[h] ?? 0;
@@ -7680,9 +7680,10 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       label: 'I dag',
       data: alleTimer.map(h => Math.round(idagMap[h] ?? 0)),
       backgroundColor: barColors,
-      borderColor: barBorders,
-      borderWidth: 1,
-      borderRadius: 2,
+      borderWidth: 0,
+      borderRadius: 6,
+      borderSkipped: 'bottom',
+      maxBarThickness: 46,
       order: 3,
     }];
 
@@ -7691,13 +7692,14 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
         label: 'Sidste uge',
         type: 'line',
         data: prevData,
-        borderColor: 'rgba(100,100,100,.50)',
+        borderColor: 'rgba(107,124,107,.6)',
         backgroundColor: 'transparent',
         borderWidth: 1.5,
-        borderDash: [4, 3],
-        pointRadius: 3,
-        pointBackgroundColor: 'rgba(100,100,100,.5)',
-        tension: 0.2,
+        borderDash: [4, 4],
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointBackgroundColor: 'rgba(107,124,107,.8)',
+        tension: 0.35,
         spanGaps: false,
         order: 2,
       });
@@ -7708,27 +7710,42 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
         label: 'Normalt snit',
         type: 'line',
         data: snitData,
-        borderColor: 'rgba(180,130,30,.75)',
+        borderColor: '#b8943a',
         backgroundColor: 'transparent',
         borderWidth: 2,
-        borderDash: [6, 3],
-        pointRadius: 2,
-        pointBackgroundColor: 'rgba(180,130,30,.75)',
-        tension: 0.3,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointBackgroundColor: '#b8943a',
+        tension: 0.35,
         spanGaps: false,
         order: 1,
       });
     }
 
     mk('c-dag', 'bar', alleTimer.map(h => h+':00'), datasets, {
+      interaction: { mode:'index', intersect:false },
       scales: {
-        x: { ticks: { font: { size:11 }}},
-        y: { ticks: { font: { size:11 }, callback: v => Math.round(v)+' kr' }}
+        x: { grid: { display:false }, border: { display:false },
+             ticks: { color:'#8a9589', font: { family:"'DM Sans',sans-serif", size:11 }}},
+        y: { beginAtZero:true, border: { display:false }, grid: { color:'rgba(30,58,30,.06)' },
+             ticks: { color:'#9aa399', maxTicksLimit:5, font: { family:"'DM Sans',sans-serif", size:11 },
+                      callback: v => Math.round(v).toLocaleString('da-DK')+' kr' }}
       },
       plugins: {
-        legend: { display: hasPrev || hasSnit, labels: { font: { size:10 }, boxWidth:12 }}
+        legend: { display:false },
+        tooltip: { backgroundColor:'#1e3a1e', titleColor:'#e8c068', bodyColor:'#f4eee2', padding:10, cornerRadius:10,
+                   boxWidth:8, boxHeight:8, usePointStyle:true,
+                   titleFont:{ family:"'DM Sans',sans-serif", size:12, weight:'500' }, bodyFont:{ family:"'DM Sans',sans-serif", size:12 },
+                   callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y!=null ? Math.round(c.parsed.y).toLocaleString('da-DK')+' kr' : '—'}` }}
       }
     });
+    const lg = document.getElementById('dag-chart-legend');
+    if (lg) {
+      const dot = (bg, t) => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;"><span style="width:9px;height:9px;border-radius:3px;background:${bg};"></span>${t}</span>`;
+      const stg = (c, t, dash) => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;"><span style="width:16px;border-top:2px ${dash?'dashed':'solid'} ${c};"></span>${t}</span>`;
+      lg.innerHTML = dot('#5d8f4e','Bedre end sidste uge') + dot('#d08a6e','Dårligere')
+        + (hasPrev ? stg('rgba(107,124,107,.7)','Sidste uge',true) : '') + (hasSnit ? stg('#b8943a','Normalt snit',false) : '');
+    }
   } else {
     document.getElementById('dag-chart-wrap').style.display = 'none';
     document.getElementById('dag-no-time').style.display = '';
@@ -7783,6 +7800,7 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt){
   </div></div>`;
 }
 
+const _krRaa = v => Math.round(v).toLocaleString('da-DK') + ' kr';   // uden moms-omregning (DB er altid ex moms)
 function buildDagTop(kpi, dage){
   const el = document.getElementById('dag-top');
   if (!el || !kpi) return;
@@ -7808,9 +7826,9 @@ function buildDagTop(kpi, dage){
     + _metricCard('Kurvstørrelse', kNu!=null ? kr(kNu) : '—', kNu, kFoer,
         arr, x=> (x.transak>0 ? (oms(x.omsaetning)/x.transak) : 0),
         `kr pr. kurv · vs. sidste uge${kFoer!=null ? ': '+kr(kFoer) : ''}`, kr)
-    + _metricCard('Dækningsbidrag', D.db_kr!=null ? kr(D.db_kr) : '—', D.db_kr, PD.db_kr,
+    + _metricCard('Dækningsbidrag', D.db_kr!=null ? _krRaa(D.db_kr) : '—', D.db_kr, PD.db_kr,
         arr, x=> x.db_kr||0,
-        `${D.db_pct!=null ? 'DG '+D.db_pct.toFixed(1).replace('.',',')+'% · ' : ''}${dbMaal}`, kr);
+        `${D.db_pct!=null ? 'DG '+D.db_pct.toFixed(1).replace('.',',')+'% · ' : ''}${dbMaal}`, _krRaa);
   el.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">${cards}</div>`;
 }
 

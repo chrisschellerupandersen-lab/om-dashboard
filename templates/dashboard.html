@@ -7907,6 +7907,34 @@ function renderDagRes(){
   _dagResHtml = html; el.innerHTML = html;
 }
 
+// Kaffe-kort (5. nøgletal på Seneste dag) — data fra kaffe-siden (/api/salg/kaffe), eget element så de andre kort ikke gentegnes
+let _dagKaffe = null, _dagKaffeCtx = null, _dagKaffeHtml = '';
+async function loadDagKaffe(){
+  try { const d = await api(`/api/salg/kaffe?aar=${VALGT_AAR}`); if (d && d.dage) { _dagKaffe = d; renderDagKaffe(); } } catch (e) {}
+}
+function renderDagKaffe(){
+  const el = document.getElementById('dag-top-kaffe'), c = _dagKaffeCtx;
+  if (!el || !c) return;
+  const stk = v => Math.round(v) + ' stk';
+  let html;
+  if (!_dagKaffe) {
+    html = _metricCard('Solgte kaffer', '—', null, null, [], x => 0, 'henter…', stk);
+  } else {
+    const map = {};
+    (_dagKaffe.dage || []).forEach(r => { map[String(r.dato).slice(0,10)] = r; });
+    const nuR = map[c.dato];
+    const f = new Date(c.dato + 'T00:00:00Z'); f.setUTCDate(f.getUTCDate() - 7);
+    const foerR = map[f.toISOString().slice(0,10)];
+    const nu = nuR ? (nuR.antal || 0) : 0;
+    const top = (_dagKaffe.dage_produkter || []).find(r => String(r.dato).slice(0,10) === c.dato);   // sorteret: mest solgte først pr. dag
+    const sub = `kaffe-omsætning ${kr(nuR ? nuR.omsaetning : 0)}${top ? ` · mest solgt: ${top.varenavn} (${Math.round(top.total_antal)})` : ''}`;
+    html = _metricCard('Solgte kaffer', stk(nu), nu, foerR ? foerR.antal : null,
+      c.arr, x => { const r = map[String(x.dato).slice(0,10)]; return r ? (r.antal || 0) : 0; }, sub, stk);
+  }
+  if (html === _dagKaffeHtml && el.firstChild) return;      // uændret → ingen gentegning/animation
+  _dagKaffeHtml = html; el.innerHTML = html;
+}
+
 // ── BONNER (Seneste dag) ──────────────────────────────────────────────────────
 let _senesteDagDato = null, _dagBonnerLoaded = false;
 

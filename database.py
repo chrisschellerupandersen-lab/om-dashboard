@@ -1692,7 +1692,18 @@ def hent_dage(n: int = 14, aar: int = None) -> List[Dict]:
             ORDER BY dato DESC
             LIMIT ?
         """, params).fetchall()
-    return [dict(r) for r in reversed(rows)]
+        ud = [dict(r) for r in reversed(rows)]
+        # DB pr. dag (til sparkline på Seneste dag) — egen forespørgsel, så omsætning/kunder er uændrede
+        try:
+            if ud:
+                db = {str(r["dato"])[:10]: float(r["db_kr"] or 0) for r in conn.execute(
+                    "SELECT dato, COALESCE(SUM(db_korrekt),0) AS db_kr FROM v_transaktioner "
+                    "WHERE dato >= ? GROUP BY dato", (min(str(x["dato"]) for x in ud),)).fetchall()}
+                for x in ud:
+                    x["db_kr"] = db.get(str(x["dato"])[:10], 0.0)
+        except Exception:
+            pass
+    return ud
 
 
 def hent_omsaetning_matrix(uger: int = 16) -> Dict:

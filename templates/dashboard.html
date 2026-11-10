@@ -702,7 +702,7 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .mflip-in{position:relative;height:100%;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.9,.3,1);}
 .mflip:hover .mflip-in{transform:rotateY(7deg) translateY(-3px);}
 .mflip.flipped .mflip-in{transform:rotateY(180deg);}
-.mflip-f,.mflip-b{-webkit-backface-visibility:hidden;backface-visibility:hidden;border-radius:16px;padding:16px 18px;}
+.mflip-f,.mflip-b{-webkit-backface-visibility:hidden;backface-visibility:hidden;border-radius:16px;padding:13px 16px 12px;}
 .mflip-f{height:100%;position:relative;background:linear-gradient(180deg,#fff,#fdfbf7);border:1px solid rgba(30,58,30,.09);box-shadow:0 1px 2px rgba(30,58,30,.05),0 10px 24px rgba(30,58,30,.08);}
 .mflip-b{position:absolute;inset:0;transform:rotateY(180deg);background:linear-gradient(152deg,#357036,#244425 46%,#16291a);color:#f4eee2;box-shadow:0 2px 6px rgba(30,58,30,.1),0 20px 44px rgba(30,58,30,.2);display:flex;flex-direction:column;justify-content:center;}
 .mflip:nth-child(4){animation-delay:.18s;}
@@ -1651,8 +1651,9 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
           <h2>Seneste dag · <span id="hdr-dag-dato" style="font-weight:400;color:var(--ash);">—</span></h2>
           <p id="hdr-dag-sub">Omsætning, kunder og avance for dagen · sammenligning med samme dag forrige uge</p>
         </div>
-        <div id="dag-top" style="margin-bottom:18px;"></div>
-        <div class="kpi-row dag-kpi-row">
+        <div id="dag-top" style="margin-bottom:12px;"></div>
+        <!-- Ring-rækken er skjult: tallene vises nu i de fire kort i #dag-top (elementerne bevares, da JS udfylder dem) -->
+        <div class="kpi-row dag-kpi-row" style="display:none;">
 
           <!-- Omsætning -->
           <div class="kpi dag-kpi">
@@ -7754,13 +7755,13 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt){
     const vals = arr.map(valFn);
     const max = Math.max(1, ...vals);
     const bars = arr.map((x,i)=>{
-      const v = vals[i] || 0; const h = Math.max(3, Math.round(v / max * 40));
+      const v = vals[i] || 0; const h = Math.max(3, Math.round(v / max * 26));
       const last = i === arr.length - 1;
       const dd = x.dato.slice(8,10) + '/' + x.dato.slice(5,7);
       return `<div title="${dd}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
         <div class="spk" style="animation-delay:${(.25 + i*.03).toFixed(2)}s;height:${h}px;border-radius:2px 2px 0 0;background:${last ? 'var(--amber)' : 'rgba(47,90,48,.5)'};"></div></div>`;
     }).join('');
-    spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:9px;">${bars}</div>`;
+    spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:28px;margin-top:8px;">${bars}</div>`;
   }
   const diff = har ? (nu - foer) : null;
   const bag = har
@@ -7793,16 +7794,23 @@ function buildDagTop(kpi, dage){
   const exB2B = r => (r && r.omsaetning!=null) ? (r.omsaetning - (r.ekstra_faktura||0)*1.25) : null;
   const dSB=exB2B(D), pdSB=exB2B(PD), uSB=exB2B(U), puSB=exB2B(PU), mSB=exB2B(M), pmSB=exB2B(PM);
   const b2bDag = (D.ekstra_faktura||0)*1.25;
+  const mpDag = D.ekstra_mp_incl != null ? D.ekstra_mp_incl : (D.ekstra_mp||0)*1.25;
+  const dbMaal = D.db_pct == null ? '' : (D.db_pct >= 35
+    ? '<span style="color:#216e2c;">✓ over mål (≥35%)</span>' : D.db_pct >= 28
+    ? '<span style="color:#9a7a22;">~ tæt på mål (≥35%)</span>' : '<span style="color:#bb3828;">✗ under mål (≥35%)</span>');
   const cards =
       _metricCard('Omsætning i dag', dSB!=null ? kr(dSB) : '—', dSB, pdSB,
         arr, x=> oms(x.omsaetning)||0,
-        `ekskl. B2B (stemmer til Shopbox) · uge ${_pctTxt(uSB,puSB)} · md ${_pctTxt(mSB,pmSB)}${b2bDag>0?` · + B2B ${kr(b2bDag)}`:''}`, kr)
+        `uge ${_pctTxt(uSB,puSB)} · md ${_pctTxt(mSB,pmSB)}${D.omsaetning_shopbox!=null?` · POS ${kr(D.omsaetning_shopbox)}`:''} · MobilePay ${kr(mpDag)}${b2bDag>0?` · + B2B ${kr(b2bDag)}`:' · ekskl. B2B'}`, kr)
     + _metricCard('Kunder i dag', D.transak!=null ? D.transak : '—', D.transak, PD.transak,
         arr, x=> x.transak||0,
         `antal kunder · vs. samme dag sidste uge${PD.transak>0 ? ': '+PD.transak : ''}`)
     + _metricCard('Kurvstørrelse', kNu!=null ? kr(kNu) : '—', kNu, kFoer,
         arr, x=> (x.transak>0 ? (oms(x.omsaetning)/x.transak) : 0),
-        `kr pr. kurv · vs. sidste uge${kFoer!=null ? ': '+kr(kFoer) : ''}`, kr);
+        `kr pr. kurv · vs. sidste uge${kFoer!=null ? ': '+kr(kFoer) : ''}`, kr)
+    + _metricCard('Dækningsbidrag', D.db_kr!=null ? kr(D.db_kr) : '—', D.db_kr, PD.db_kr,
+        arr, x=> x.db_kr||0,
+        `${D.db_pct!=null ? 'DG '+D.db_pct.toFixed(1).replace('.',',')+'% · ' : ''}${dbMaal}`, kr);
   el.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">${cards}</div>`;
 }
 

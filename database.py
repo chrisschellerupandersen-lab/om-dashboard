@@ -272,6 +272,29 @@ def _conn() -> sqlite3.Connection:
     return conn
 
 
+def hent_bon_linjer(bon_numre: list) -> dict:
+    """Varelinjer pr. Shopbox-bon → {bon_nr: [{"navn", "antal", "beloeb"}]}.
+    Bruges til at vise kunden hvad der blev købt (loyalitets-appen)."""
+    numre = [str(b) for b in (bon_numre or []) if b]
+    if not numre:
+        return {}
+    ud: dict = {}
+    with _conn() as conn:
+        q = ",".join("?" * len(numre))
+        rows = conn.execute(
+            f"SELECT bon_nr, varenavn, SUM(antal) AS antal, SUM(omsætning) AS beloeb "
+            f"FROM transaktioner WHERE bon_nr IN ({q}) "
+            f"AND COALESCE(kilde,'shopbox')='shopbox' AND varenavn <> '' "
+            f"GROUP BY bon_nr, varenavn ORDER BY bon_nr, beloeb DESC", numre).fetchall()
+    for r in rows:
+        ud.setdefault(r["bon_nr"], []).append({
+            "navn": r["varenavn"],
+            "antal": round(float(r["antal"] or 0), 2),
+            "beloeb": round(float(r["beloeb"] or 0), 2),
+        })
+    return ud
+
+
 def init_db():
     with _conn() as conn:
         # Migration: varekostpris skal være unik per (varenummer, varenavn, gyldig_fra)

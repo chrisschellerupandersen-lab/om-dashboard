@@ -553,7 +553,7 @@ def _nulstil_token():
     TOKEN = os.environ.get("SHOPBOX_TOKEN", "")
 
 
-def send_kvitteringer_til_loyalitet(sider: int = 3) -> dict:
+def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     """Find de seneste bonner med kunde (= mail tastet for kvittering) og aflevér
     dem til loyalitets-appen. Appen dedup'er på order_hash, så gentagelser er harmløse.
     Returnerer kun antal — ingen kundedata."""
@@ -578,7 +578,7 @@ def send_kvitteringer_til_loyalitet(sider: int = 3) -> dict:
             if _f(b.get("total_amount")) <= 0:      # returbon / 0-kr.-bon giver ikke stempel
                 continue
             ud["med_kunde"] += 1
-            if oh not in _SENDTE_BONNER:
+            if alle or oh not in _SENDTE_BONNER:
                 kandidater.append(b)
 
     kvitteringer = []
@@ -598,6 +598,18 @@ def send_kvitteringer_til_loyalitet(sider: int = 3) -> dict:
             "tid": b.get("crdate") or b.get("tstamp"),
         })
 
+    # Varelinjer fra salgsrapporten, så kunden kan se hvad der blev købt.
+    # Rapporten kommer med op til ~10 min. forsinkelse — bonner uden linjer
+    # sendes igen ved næste kørsel, indtil linjerne er der.
+    try:
+        import database
+        linjer = database.hent_bon_linjer([k["orderHash"] for k in kvitteringer])
+    except Exception:
+        linjer = {}
+    for k in kvitteringer:
+        k["varer"] = linjer.get(k["orderHash"], [])
+    ud["med_varer"] = sum(1 for k in kvitteringer if k["varer"])
+
     if kvitteringer:
         r = requests.post(f"{LOYALITET_URL}/_api/shopbox/kvittering",
                           json={"kvitteringer": kvitteringer},
@@ -611,15 +623,15 @@ def send_kvitteringer_til_loyalitet(sider: int = 3) -> dict:
         ud["sendt"] = len(kvitteringer)
         ud["nye_i_app"] = svar.get("nye")
         ud["stempler_givet"] = svar.get("stempler")
-        _SENDTE_BONNER.update(k["orderHash"] for k in kvitteringer)
+        _SENDTE_BONNER.update(k["orderHash"] for k in kvitteringer if k["varer"])
     return ud
 
 
-def loyalitet_sync(sider: int = 3) -> dict:
+def loyalitet_sync(sider: int = 3, alle: bool = False) -> dict:
     """Som send_kvitteringer_til_loyalitet, men med ét nyt login-forsøg ved udløbet token."""
     for forsoeg in (1, 2):
         try:
-            return send_kvitteringer_til_loyalitet(sider)
+            return send_kvitteringer_til_loyalitet(sider, alle)
         except SystemExit as e:
             if forsoeg == 1 and "401" in str(e):
                 _nulstil_token()

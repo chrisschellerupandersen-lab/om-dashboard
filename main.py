@@ -3024,7 +3024,8 @@ async def loyalitet_sync_nu(request: Request):
         raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
     import shopbox_sync
     from starlette.concurrency import run_in_threadpool
-    return await run_in_threadpool(shopbox_sync.loyalitet_sync, body.get("sider", 3))
+    return await run_in_threadpool(shopbox_sync.loyalitet_sync, body.get("sider", 3),
+                                   bool(body.get("alle")))
 
 
 @app.post("/api/salg/ingest")

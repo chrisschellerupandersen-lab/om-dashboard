@@ -439,6 +439,23 @@ def _planlagt_mobilepay_sync():
         print(f"[MobilePay auto-sync exception] {str(e)[:150]}")
 
 
+_loyalitet_foerste_koersel = True
+
+def _planlagt_loyalitet_sync():
+    """Send Shopbox-bonner med kunde-mail til loyalitets-appen (stempler).
+    Første kørsel efter opstart går længere tilbage for at fange det missede."""
+    global _loyalitet_foerste_koersel
+    try:
+        import shopbox_sync
+        res = shopbox_sync.loyalitet_sync(15 if _loyalitet_foerste_koersel else 3)
+        if res.get("ok"):
+            _loyalitet_foerste_koersel = False
+        if not res.get("ok") or res.get("sendt"):
+            print(f"[Loyalitet-sync] {res}")
+    except BaseException as e:
+        print(f"[Loyalitet-sync exception] {str(e)[:150]}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
@@ -458,6 +475,11 @@ async def lifespan(app: FastAPI):
     if os.environ.get("MP_CLIENT_ID") and os.environ.get("MP_LEDGER_ID"):
         _scheduler.add_job(_planlagt_mobilepay_sync, "cron", day_of_week="mon", hour=5, minute=30)
         jobs.append("MobilePay auto-sync: mandag 05:30")
+    # Loyalitets-app: bonner med mail → stempler (kun hvis nøglen er sat)
+    if os.environ.get("SHOPBOX_INGEST_SECRET"):
+        _scheduler.add_job(_planlagt_loyalitet_sync, "interval", minutes=5,
+                           max_instances=1, coalesce=True)
+        jobs.append("Loyalitet-sync: hvert 5. min")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")
@@ -2988,6 +3010,21 @@ async def shopbox_kunde_diagnose(request: Request):
         return {"ok": False, "fejl": str(e)}
     except Exception as e:
         return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
+
+
+@app.post("/api/loyalitet/sync")
+async def loyalitet_sync_nu(request: Request):
+    """Kør loyalitets-sync nu (Shopbox-bonner med mail → stempler). Returnerer kun antal."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    import shopbox_sync
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(shopbox_sync.loyalitet_sync, body.get("sider", 3))
 
 
 @app.post("/api/salg/ingest")

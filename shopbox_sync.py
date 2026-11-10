@@ -539,3 +539,91 @@ def kunde_diagnose(sider: int = 10) -> dict:
     except SystemExit as e:
         out["kunderegister"] = {"fejl": str(e)[:150]}
     return out
+
+
+# ── Loyalitets-app: send bonner med kunde-mail, så appen kan give stempler ────
+
+LOYALITET_URL = os.environ.get("LOYALITET_URL", "https://organicmarket-greve.floot.app").rstrip("/")
+_SENDTE_BONNER: set = set()
+
+
+def _nulstil_token():
+    """Login-token kan udløbe — tving nyt login ved næste kald."""
+    global TOKEN
+    TOKEN = os.environ.get("SHOPBOX_TOKEN", "")
+
+
+def send_kvitteringer_til_loyalitet(sider: int = 3) -> dict:
+    """Find de seneste bonner med kunde (= mail tastet for kvittering) og aflevér
+    dem til loyalitets-appen. Appen dedup'er på order_hash, så gentagelser er harmløse.
+    Returnerer kun antal — ingen kundedata."""
+    secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
+    if not secret:
+        return {"ok": False, "fejl": "SHOPBOX_INGEST_SECRET mangler"}
+    _tjek_konfig()
+    sider = max(1, min(int(sider), 30))
+    ud = {"ok": True, "bonner_set": 0, "med_kunde": 0, "uden_mail": 0, "sendt": 0}
+
+    kandidater = []
+    for side in range(1, sider + 1):
+        j = api_get("/baskets") if side == 1 else api_get("/baskets", page=side)
+        data = (j.get("data") if isinstance(j, dict) else j) or []
+        if not data:
+            break
+        for b in data:
+            ud["bonner_set"] += 1
+            oh = b.get("order_hash")
+            if not b.get("customer") or not oh or b.get("canceled"):
+                continue
+            if _f(b.get("total_amount")) <= 0:      # returbon / 0-kr.-bon giver ikke stempel
+                continue
+            ud["med_kunde"] += 1
+            if oh not in _SENDTE_BONNER:
+                kandidater.append(b)
+
+    kvitteringer = []
+    for b in kandidater:
+        dj = api_get("/baskets/by-order-hash", orderHash=b.get("order_hash"))
+        db = dj.get("data") if isinstance(dj, dict) and "data" in dj else dj
+        c = (db or {}).get("customer0") or {}
+        mail = str(c.get("mail") or "").strip() if isinstance(c, dict) else ""
+        if "@" not in mail:
+            ud["uden_mail"] += 1
+            _SENDTE_BONNER.add(b.get("order_hash"))
+            continue
+        kvitteringer.append({
+            "orderHash": b.get("order_hash"),
+            "mail": mail,
+            "total": _f(b.get("total_amount"), BELOEB_DIVISOR),
+            "tid": b.get("crdate") or b.get("tstamp"),
+        })
+
+    if kvitteringer:
+        r = requests.post(f"{LOYALITET_URL}/_api/shopbox/kvittering",
+                          json={"kvitteringer": kvitteringer},
+                          headers={"X-Webhook-Secret": secret}, timeout=60)
+        if not r.ok:
+            return {**ud, "ok": False, "fejl": f"app svarede HTTP {r.status_code}: {r.text[:150]}"}
+        try:
+            svar = r.json()
+        except Exception:
+            return {**ud, "ok": False, "fejl": "app svarede ikke JSON"}
+        ud["sendt"] = len(kvitteringer)
+        ud["nye_i_app"] = svar.get("nye")
+        ud["stempler_givet"] = svar.get("stempler")
+        _SENDTE_BONNER.update(k["orderHash"] for k in kvitteringer)
+    return ud
+
+
+def loyalitet_sync(sider: int = 3) -> dict:
+    """Som send_kvitteringer_til_loyalitet, men med ét nyt login-forsøg ved udløbet token."""
+    for forsoeg in (1, 2):
+        try:
+            return send_kvitteringer_til_loyalitet(sider)
+        except SystemExit as e:
+            if forsoeg == 1 and "401" in str(e):
+                _nulstil_token()
+                continue
+            return {"ok": False, "fejl": str(e)[:200]}
+        except Exception as e:
+            return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:200]}"}

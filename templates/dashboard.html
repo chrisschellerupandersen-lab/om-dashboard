@@ -16090,7 +16090,7 @@ function updateMgmtKorselKPI() {
       return i + (dec ? sep + s[1] : '');
     };
     const my = {}; tok.set(el, my);
-    const t0 = performance.now(), DUR = 750;
+    const t0 = performance.now(), DUR = 1400;
     (function tick(now){
       if (tok.get(el) !== my || el.firstChild !== node) return;   // nyt indhold kom imens
       const p = Math.min(1, (now - t0) / DUR);

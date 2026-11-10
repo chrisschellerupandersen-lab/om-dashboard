@@ -2970,6 +2970,26 @@ async def shopbox_inspect(request: Request):
         return {"ok": False, "konfig": cfg, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
 
 
+@app.post("/api/shopbox/kunde-diagnose")
+async def shopbox_kunde_diagnose(request: Request):
+    """Diagnose: har Shopbox-bonner kunde/mail/tlf tilknyttet? Kun antal + maskerede typer."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    import importlib, shopbox_sync
+    importlib.reload(shopbox_sync)
+    try:
+        return {"ok": True, **shopbox_sync.kunde_diagnose(body.get("sider", 10))}
+    except SystemExit as e:
+        return {"ok": False, "fejl": str(e)}
+    except Exception as e:
+        return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:300]}"}
+
+
 @app.post("/api/salg/ingest")
 async def salg_ingest(request: Request):
     """Inkrementel salgs-indlæsning fra shopbox_sync.py (direkte API, ingen fil).

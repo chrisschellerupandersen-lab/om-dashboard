@@ -422,3 +422,120 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ── Diagnose: gemmes kvitterings-modtager (mail/tlf) på bonen? ────────────────
+
+_KUNDE_NOEGLE_RE = re.compile(r"mail|phone|mobil|sms|receipt|recipient|customer|subscrib", re.I)
+_EMAIL_RE = re.compile(r"[^@\s]+@[^@\s]+\.[a-z]{2,}", re.I)
+
+
+def _mask(v) -> str:
+    """Vis kun typen af en værdi — aldrig kundedata i klartekst."""
+    s = str(v).strip()
+    if _EMAIL_RE.fullmatch(s):
+        return "email(" + s.split("@")[-1].split(".")[-1] + ")"
+    cifre = re.sub(r"\D", "", s)
+    if len(cifre) >= 8 and len(cifre) >= len(s) - 4:
+        return f"tlf({len(cifre)} cifre)"
+    return f"{type(v).__name__}({len(s)} tegn)"
+
+
+def _find_kundefelter(obj, sti="", ud=None) -> dict:
+    """Gå rekursivt gennem en bon og notér ikke-tomme felter der ligner kundedata."""
+    ud = {} if ud is None else ud
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            _find_kundefelter(v, f"{sti}.{k}" if sti else str(k), ud)
+    elif isinstance(obj, list):
+        for v in obj[:5]:
+            _find_kundefelter(v, sti + "[]", ud)
+    elif obj not in (None, "", 0, "0", False):
+        sidste = sti.split(".")[-1]
+        if _KUNDE_NOEGLE_RE.search(sidste) or (isinstance(obj, str) and _EMAIL_RE.search(obj)):
+            ud[sti] = _mask(obj)
+    return ud
+
+
+def kunde_diagnose(sider: int = 10) -> dict:
+    """Tæl hvor mange af de seneste bonner der har kunde/mail/tlf tilknyttet.
+    Returnerer kun antal og maskerede typer — ingen kundedata."""
+    _tjek_konfig()
+    sider = max(1, min(int(sider), 30))
+    out = {"sider": sider, "bonner": 0, "med_customer": 0, "med_name": 0,
+           "med_extra_data": 0, "felt_fund": {}, "extra_data_noegler": {}}
+    med_kunde = []
+    datoer = []
+    for side in range(1, sider + 1):
+        try:
+            j = api_get("/baskets") if side == 1 else api_get("/baskets", page=side)
+        except SystemExit as e:
+            out.setdefault("side_fejl", []).append(f"side {side}: {str(e)[:120]}")
+            break
+        data = (j.get("data") if isinstance(j, dict) else j) or []
+        if not data:
+            break
+        for b in data:
+            out["bonner"] += 1
+            d = _dato_af_basket(b)
+            if d:
+                datoer.append(d)
+            if b.get("customer"):
+                out["med_customer"] += 1
+                med_kunde.append(b)
+            if b.get("name"):
+                out["med_name"] += 1
+            ed = b.get("extra_data")
+            if ed:
+                out["med_extra_data"] += 1
+                if isinstance(ed, str):
+                    try:
+                        ed = json.loads(ed)
+                    except Exception:
+                        ed = {"(tekst)": ed}
+                if isinstance(ed, dict):
+                    for k in ed:
+                        out["extra_data_noegler"][k] = out["extra_data_noegler"].get(k, 0) + 1
+            for sti, typ in _find_kundefelter(b).items():
+                noegle = f"{sti} = {typ}"
+                out["felt_fund"][noegle] = out["felt_fund"].get(noegle, 0) + 1
+    if datoer:
+        out["periode"] = f"{min(datoer)} .. {max(datoer)}"
+
+    # Slå op til 5 bonner med kunde op i detaljer — har kunden mail/tlf?
+    detaljer = []
+    for b in med_kunde[:5]:
+        try:
+            dj = api_get("/baskets/by-order-hash", orderHash=b.get("order_hash"))
+            db = dj.get("data") if isinstance(dj, dict) and "data" in dj else dj
+            c = (db or {}).get("customer0") or {}
+            detaljer.append({
+                "dato": _dato_af_basket(b),
+                "customer0_noegler": sorted(c.keys()) if isinstance(c, dict) else str(type(c)),
+                "har_mail": bool(isinstance(c, dict) and c.get("mail")),
+                "har_phone": bool(isinstance(c, dict) and c.get("phone")),
+                "har_name": bool(isinstance(c, dict) and c.get("name")),
+                "kunde_oprettet": (c.get("crdate_formatted") if isinstance(c, dict) else None),
+                "detalje_kundefelter": _find_kundefelter(db or {}),
+            })
+        except SystemExit as e:
+            detaljer.append({"fejl": str(e)[:150]})
+    out["kunde_detaljer"] = detaljer
+
+    # Kunderegisteret: hvor mange, hvor nye, og har de mail/tlf?
+    try:
+        cj = api_get("/customers")
+        cd = (cj.get("data") if isinstance(cj, dict) else cj) or []
+        pag = (cj.get("meta") or {}).get("pagination") if isinstance(cj, dict) else None
+        out["kunderegister"] = {
+            "total": (pag or {}).get("total"),
+            "paa_side1": len(cd),
+            "med_mail": sum(1 for c in cd if c.get("mail")),
+            "med_phone": sum(1 for c in cd if c.get("phone")),
+            "med_name": sum(1 for c in cd if c.get("name")),
+            "oprettet_datoer": sorted({str(c.get("crdate_formatted", ""))[:10] for c in cd})[-8:],
+            "noegler": sorted(cd[0].keys()) if cd else [],
+        }
+    except SystemExit as e:
+        out["kunderegister"] = {"fejl": str(e)[:150]}
+    return out

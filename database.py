@@ -98,8 +98,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420],
      "weekend_kun": True, "hverdag_til": "Kanelsnurre"},  # bevidst sortiment: kun fre-søn; hverdags-snurre = kanel
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
-    {"navn": "Klassisk snegl",          "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [],
-     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — aldrig solgt før; startbud ~25/uge, vægt weekend. SKU mangler → tilføj salg_kilde når den har solgt, flyt til kilde når der er historik
+    {"navn": "Klassisk snegl",          "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10516],
+     "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — kassenavn "Klassisk kanelsnegl - Øko", SKU 10516 til solgt/spild; startbud ~25/uge, vægt weekend. Flyt 10516 til kilde når der er historik
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},

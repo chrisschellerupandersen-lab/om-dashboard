@@ -7771,7 +7771,7 @@ function _pctTxt(nu, foer){
   return (p >= 0 ? '+' : '') + p.toFixed(0) + '%';
 }
 // Ét nøgletals-kort: dagens værdi, Δ vs. samme dag sidste uge, 14-dages sparkline
-function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt){
+function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt, foerLbl){
   fmt = fmt || (v => String(Math.round(v)));
   const har = (foer != null && foer > 0 && nu != null);
   const pct = har ? ((nu / foer - 1) * 100) : null;
@@ -7794,9 +7794,9 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt){
   }
   const diff = har ? (nu - foer) : null;
   const bag = har
-    ? `<div style="font-size:12.5px;font-weight:500;color:rgba(244,238,226,.7);">Samme dag sidste uge</div>
+    ? `<div style="font-size:12.5px;font-weight:500;color:rgba(244,238,226,.7);">${foerLbl || 'Samme dag sidste uge'}</div>
        <div style="font-size:26px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-top:7px;">${fmt(foer)}</div>
-       <div style="font-size:13px;margin-top:10px;color:${up?'#bfe3a8':'#f3b3a6'};">${up?'↑':'↓'} ${fmt(Math.abs(diff))} ${up?'mere':'mindre'} i dag (${up?'+':'−'}${Math.abs(pct).toFixed(0)}%)</div>`
+       <div style="font-size:13px;margin-top:10px;color:${up?'#bfe3a8':'#f3b3a6'};">${up?'↑':'↓'} ${fmt(Math.abs(diff))} ${up?'mere':'mindre'} ${foerLbl ? 'nu' : 'i dag'} (${up?'+':'−'}${Math.abs(pct).toFixed(0)}%)</div>`
     : `<div style="font-size:13px;color:rgba(244,238,226,.75);">Ingen sammenligning for samme dag sidste uge</div>`;
   return `<div class="mflip" onclick="this.classList.toggle('flipped')" title="Klik for at vende kortet"><div class="mflip-in">
    <div class="mflip-f">
@@ -7849,20 +7849,32 @@ function buildDagTop(kpi, dage){
   loadDagRes();
 }
 
-// Resultat efter spild inkl. MobilePay (kort mellem DB og kaffe) — samme tal som "Fuldt regnskab inkl. MobilePay"
-// på DB Shopbox-siden (adj_resultat_e_spild pr. dag). Henter dagens måned + evt. forrige måned (til sidste uge/søjler).
+// Resultat efter spild inkl. MobilePay (kort mellem DB og kaffe) — MÅNED TIL DATO, samme tal som flisen
+// "Resultat e. spild" under fuldt regnskab inkl. MobilePay på DB Shopbox-siden (justeret.resultat_e_spild),
+// med "+X kr vs. Shopbox". Sammenlignes med forrige måned til samme dag i måneden. Søjler = pr. dag.
 let _dagRes = null, _dagResHtml = '';
 async function loadDagRes(){
   const c = _dagKaffeCtx;
   if (!c || !c.dato) return;
   try {
-    const d0 = new Date(c.dato + 'T00:00:00Z'), d1 = new Date(d0); d1.setUTCDate(d1.getUTCDate() - 13);
-    const mdr = [[d0.getUTCFullYear(), d0.getUTCMonth()+1]];
-    if (d1.getUTCMonth() !== d0.getUTCMonth()) mdr.push([d1.getUTCFullYear(), d1.getUTCMonth()+1]);
-    const svar = await Promise.all(mdr.map(([a,m]) => api(`/api/db-shopbox/maaned?aar=${a}&maaned=${m}`)));
-    const map = {};
-    svar.forEach(r => ((r && r.dage) || []).forEach(x => { if (!x.forecast) map[String(x.dato).slice(0,10)] = x; }));
-    _dagRes = map; renderDagRes();
+    const d0 = new Date(c.dato + 'T00:00:00Z');
+    const pm = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() - 1, 1));
+    const [nu, foer] = await Promise.all([
+      api(`/api/db-shopbox/maaned?aar=${d0.getUTCFullYear()}&maaned=${d0.getUTCMonth()+1}`),
+      api(`/api/db-shopbox/maaned?aar=${pm.getUTCFullYear()}&maaned=${pm.getUTCMonth()+1}`)]);
+    if (!nu || !nu.justeret) return;
+    const dagMap = {};
+    [foer, nu].forEach(r => ((r && r.dage) || []).forEach(x => { dagMap[String(x.dato).slice(0,10)] = x; }));
+    const dagNr = d0.getUTCDate();
+    let foerSum = null;
+    ((foer && foer.dage) || []).forEach(x => {
+      if (parseInt(String(x.dato).slice(8,10)) <= dagNr && x.adj_resultat_e_spild != null) foerSum = (foerSum || 0) + x.adj_resultat_e_spild;
+    });
+    const t = nu.total || {}, j = nu.justeret;
+    const basis = (t.resultat || 0) - ((t.vaerdi_spild || 0) - (t.frost_salg || 0));      // rent Shopbox-resultat e. spild
+    _dagRes = { val: j.resultat_e_spild, vsShopbox: (j.resultat_e_spild || 0) - basis, mp: j.mp_ex, foerSum, dagMap,
+                navn: nu.maaned_navn || '' };
+    renderDagRes();
   } catch (e) {}
 }
 function renderDagRes(){
@@ -7870,47 +7882,17 @@ function renderDagRes(){
   if (!el || !c) return;
   const titel = 'Resultat e. spild · inkl. MobilePay';
   let html;
-  const nuR = _dagRes ? _dagRes[c.dato] : null;
-  if (!_dagRes) html = _metricCard(titel, '—', null, null, [], x => 0, 'henter…', _krRaa);
-  else if (!nuR || nuR.adj_resultat_e_spild == null) html = _metricCard(titel, '—', null, null, [], x => 0, 'ingen data for dagen endnu', _krRaa);
+  const r = _dagRes;
+  if (!r) html = _metricCard(titel, '—', null, null, [], x => 0, 'henter…', _krRaa);
+  else if (r.val == null) html = _metricCard(titel, '—', null, null, [], x => 0, 'ingen data for måneden endnu', _krRaa);
   else {
-    const f = new Date(c.dato + 'T00:00:00Z'); f.setUTCDate(f.getUTCDate() - 7);
-    const foerR = _dagRes[f.toISOString().slice(0,10)];
-    const nu = nuR.adj_resultat_e_spild;
-    const sub = `<span style="color:${nu >= 0 ? '#216e2c' : '#bb3828'};">${nu >= 0 ? 'overskud' : 'underskud'}</span> · netto spild ${_krRaa(nuR.adj_netto_spild || 0)} · MobilePay ${_krRaa(nuR.mp_ex || 0)} ex moms`;
-    html = _metricCard(titel, _krRaa(nu), nu, foerR ? foerR.adj_resultat_e_spild : null,
-      c.arr, x => { const r = _dagRes[String(x.dato).slice(0,10)]; return r ? (r.adj_resultat_e_spild || 0) : 0; }, sub, _krRaa);
+    const sub = `måned til dato · <span style="color:${r.vsShopbox >= 0 ? '#216e2c' : '#bb3828'};">${r.vsShopbox >= 0 ? '+' : '−'}${_krRaa(Math.abs(r.vsShopbox))} vs. Shopbox</span> · MobilePay ${_krRaa(r.mp || 0)}`;
+    html = _metricCard(titel, _krRaa(r.val), r.val, r.foerSum,
+      c.arr, x => { const d = r.dagMap[String(x.dato).slice(0,10)]; return d ? (d.adj_resultat_e_spild || 0) : 0; },
+      sub, _krRaa, 'Forrige måned til samme dag');
   }
   if (html === _dagResHtml && el.firstChild) return;
   _dagResHtml = html; el.innerHTML = html;
-}
-
-// Kaffe-kort (5. nøgletal på Seneste dag) — data fra kaffe-siden (/api/salg/kaffe), eget element så de andre kort ikke gentegnes
-let _dagKaffe = null, _dagKaffeCtx = null, _dagKaffeHtml = '';
-async function loadDagKaffe(){
-  try { const d = await api(`/api/salg/kaffe?aar=${VALGT_AAR}`); if (d && d.dage) { _dagKaffe = d; renderDagKaffe(); } } catch (e) {}
-}
-function renderDagKaffe(){
-  const el = document.getElementById('dag-top-kaffe'), c = _dagKaffeCtx;
-  if (!el || !c) return;
-  const stk = v => Math.round(v) + ' stk';
-  let html;
-  if (!_dagKaffe) {
-    html = _metricCard('Solgte kaffer', '—', null, null, [], x => 0, 'henter…', stk);
-  } else {
-    const map = {};
-    (_dagKaffe.dage || []).forEach(r => { map[String(r.dato).slice(0,10)] = r; });
-    const nuR = map[c.dato];
-    const f = new Date(c.dato + 'T00:00:00Z'); f.setUTCDate(f.getUTCDate() - 7);
-    const foerR = map[f.toISOString().slice(0,10)];
-    const nu = nuR ? (nuR.antal || 0) : 0;
-    const top = (_dagKaffe.dage_produkter || []).find(r => String(r.dato).slice(0,10) === c.dato);   // sorteret: mest solgte først pr. dag
-    const sub = `kaffe-omsætning ${kr(nuR ? nuR.omsaetning : 0)}${top ? ` · mest solgt: ${top.varenavn} (${Math.round(top.total_antal)})` : ''}`;
-    html = _metricCard('Solgte kaffer', stk(nu), nu, foerR ? foerR.antal : null,
-      c.arr, x => { const r = map[String(x.dato).slice(0,10)]; return r ? (r.antal || 0) : 0; }, sub, stk);
-  }
-  if (html === _dagKaffeHtml && el.firstChild) return;      // uændret → ingen gentegning/animation
-  _dagKaffeHtml = html; el.innerHTML = html;
 }
 
 // ── BONNER (Seneste dag) ──────────────────────────────────────────────────────

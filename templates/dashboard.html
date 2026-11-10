@@ -36,6 +36,14 @@ body{background:
     linear-gradient(162deg,#f4eee2 0%, #e9e0d0 100%);
   color:var(--charcoal);font-family:'DM Sans',sans-serif;font-weight:300;line-height:1.6;}
 
+/* Tynde, diskrete scrollbars (så brede tabeller ikke viser en klodset grå bjælke) */
+*{scrollbar-width:thin;scrollbar-color:rgba(30,58,30,.22) transparent;}
+::-webkit-scrollbar{height:8px;width:8px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:rgba(30,58,30,.2);border-radius:999px;border:2px solid transparent;background-clip:content-box;}
+::-webkit-scrollbar-thumb:hover{background:rgba(30,58,30,.34);background-clip:content-box;}
+::-webkit-scrollbar-corner{background:transparent;}
+
 #app{display:flex;height:100%;flex-direction:column;}
 
 /* TOPBAR */

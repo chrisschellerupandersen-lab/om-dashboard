@@ -7666,7 +7666,7 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
     const alleTimer = [...new Set([
       ...timer.map(r => r.time_start),
       ...Object.keys(prevMap).map(Number)
-    ])].sort((a,b) => a - b);
+    ])].sort((a,b) => b - a);   // nyeste time længst til venstre (samme retning som bonnerne)
 
     const idagMap = {};
     timer.forEach(r => { idagMap[r.time_start] = r.omsaetning; });
@@ -8004,6 +8004,7 @@ function renderDagBonGrid(){
     if (q) keys = timer.sort((a,b) => a-b).map(h => String(h).padStart(2,'0'));       // søgning: kun timer med træf
     else for (let h = Math.min(...timer); h <= Math.max(...timer); h++) keys.push(String(h).padStart(2,'0'));
   }
+  keys.reverse();                          // nyeste time længst til venstre (samme retning som grafen)
   if (grupper['uden']) keys.push('uden');
   const kortHtml = b => {
     const linjer = b.linjer.map(l =>
@@ -8020,7 +8021,7 @@ function renderDagBonGrid(){
   grid.innerHTML = `<div class="bon-pivot">` + keys.map(k => {
     const g = grupper[k] || {bonner:[], total:0};
     const titel = k === 'uden' ? 'Uden tid' : `${parseInt(k)}:00`;
-    const liste = g.bonner.slice().sort((x,y) => String(x.tid||'').localeCompare(String(y.tid||'')));
+    const liste = g.bonner.slice().sort((x,y) => String(y.tid||'').localeCompare(String(x.tid||'')));   // nyeste bon øverst
     return `<div class="bon-kol">
       <div class="bon-kol-hd"><b>${titel}</b><span>${g.bonner.length ? g.bonner.length + ' · ' + kr(g.total) : '—'}</span></div>
       ${liste.map(kortHtml).join('')}

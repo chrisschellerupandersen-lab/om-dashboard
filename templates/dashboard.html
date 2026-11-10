@@ -49,9 +49,9 @@ body{background:
 .tb-logo svg{width:24px;height:24px;opacity:.9;}
 .tb-brand{display:flex;flex-direction:column;line-height:1.15;}
 .tb-brand strong{font-size:13px;font-weight:400;color:var(--amber);}
-.tb-brand span{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;color:rgba(232,192,104,.5);text-transform:uppercase;}
+.tb-brand span{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;color:rgba(232,192,104,.5);text-transform:none;}
 .tb-divider{width:1px;height:20px;background:rgba(255,255,255,.1);}
-.tb-week{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;color:rgba(232,192,104,.6);text-transform:uppercase;}
+.tb-week{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;color:rgba(232,192,104,.6);text-transform:none;}
 .tb-right{display:flex;align-items:center;gap:8px;}
 .tb-sync{font-family:'DM Mono',monospace;font-size:9px;color:rgba(143,188,143,.7);}
 .tb-aar-pick{display:flex;align-items:center;gap:4px;}
@@ -60,7 +60,7 @@ body{background:
 .tb-aar-val{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--amber);min-width:34px;text-align:center;}
 .tb-aar-val.hist{color:var(--gold);opacity:.8;}
 .tb-btn{
-  font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;
+  font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;
   background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.05));color:rgba(232,192,104,.85);
   border:1px solid rgba(232,192,104,.28);border-radius:8px;
   padding:5px 11px;cursor:pointer;text-decoration:none;box-shadow:0 1px 0 rgba(255,255,255,.14) inset;
@@ -116,8 +116,8 @@ body{background:
 .nav-item.active svg{opacity:1;}
 /* Edit-mode: keep old section header style */
 .nav-section-hdr{
-  font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.13em;
-  text-transform:uppercase;color:rgba(200,168,75,.5);
+  font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;
+  text-transform:none;color:rgba(200,168,75,.5);
   padding:16px 16px 5px;display:flex;align-items:center;gap:8px;
 }
 .nav-section-hdr::after{content:'';flex:1;height:1px;background:rgba(200,168,75,.12);}
@@ -199,7 +199,7 @@ body{background:
 
 /* HJÆLP-SIDE */
 .hjaelp-sektion{margin-bottom:32px;}
-.hjaelp-sektion-hdr{display:flex;align-items:center;gap:10px;font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--forest);font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid rgba(30,58,30,.1);}
+.hjaelp-sektion-hdr{display:flex;align-items:center;gap:10px;font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:700;margin-bottom:16px;padding-bottom:10px;border-bottom:2px solid rgba(30,58,30,.1);}
 .hjaelp-sektion-ikon{font-size:16px;}
 .hjaelp-flow-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
 .hjaelp-flow-kort{background:var(--glass-sheen),var(--glass-streak),var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-brd);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow-soft),0 1px 0 rgba(255,255,255,.9) inset;border-left:3px solid rgba(30,58,30,.2);}
@@ -222,7 +222,7 @@ body{background:
 .hjaelp-begreb-def{font-size:12px;color:var(--ash);line-height:1.6;}
 .hjaelp-tech-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
 .hjaelp-tech-item{background:var(--glass-sheen),var(--glass-streak),var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-brd);border-radius:14px;padding:14px 18px;display:flex;gap:16px;align-items:baseline;box-shadow:var(--shadow-soft),0 1px 0 rgba(255,255,255,.9) inset;}
-.hjaelp-tech-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);white-space:nowrap;min-width:90px;}
+.hjaelp-tech-label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);white-space:nowrap;min-width:90px;}
 .hjaelp-tech-val{font-size:12px;color:var(--forest);}
 
 /* CARD */
@@ -232,7 +232,7 @@ body{background:
 
 /* TABLE */
 .om-table{width:100%;border-collapse:collapse;font-size:13px;}
-.om-table th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
+.om-table th{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
 .om-table td{padding:9px 12px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
 .om-table tr:last-child td{border-bottom:none;}
 .om-table tr:hover td{background:rgba(255,255,255,.45);}
@@ -244,7 +244,7 @@ body{background:
 
 /* TABS */
 .periode-tabs{display:flex;gap:6px;margin-bottom:16px;}
-.ptab{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:2px;cursor:pointer;background:var(--white);color:var(--ash);}
+.ptab{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:8px;cursor:pointer;background:#fff;color:#8a9589;}
 .ptab.active{background:var(--forest);color:var(--amber);border-color:var(--forest);}
 
 .empty{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);padding:24px 0;text-align:center;}
@@ -255,7 +255,7 @@ body{background:
 .tp-kpi:last-child{border-right:none;}
 .tp-kpi.morgen{background:var(--forest);color:var(--amber);}
 .tp-kpi.formiddag,.tp-kpi.eftermiddag,.tp-kpi.aften{background:var(--white);}
-.tp-kpi-lbl{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;opacity:.7;}
+.tp-kpi-lbl{font-family:'DM Sans',sans-serif;font-size:7px;letter-spacing:.01em;text-transform:none;margin-bottom:4px;opacity:.7;}
 .tp-kpi.morgen .tp-kpi-lbl{color:rgba(232,192,104,.8);}
 .tp-kpi:not(.morgen) .tp-kpi-lbl{color:var(--ash);}
 .tp-kpi-val{font-size:28px;font-weight:300;line-height:1;}
@@ -273,7 +273,7 @@ body{background:
 /* Heatmap */
 .heatmap-wrap{overflow-x:auto;}
 .heatmap{border-collapse:collapse;font-size:11px;width:100%;}
-.heatmap th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);padding:6px 8px;text-align:center;border-bottom:1px solid rgba(30,58,30,.12);}
+.heatmap th{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);padding:6px 8px;text-align:center;border-bottom:1px solid rgba(30,58,30,.12);}
 .heatmap th:first-child{text-align:left;}
 .heatmap td{padding:5px 6px;text-align:center;font-family:'DM Mono',monospace;font-size:10px;border-bottom:1px solid rgba(30,58,30,.04);min-width:34px;}
 .heatmap td:first-child{font-size:11px;font-weight:400;text-align:left;padding-left:8px;color:var(--charcoal);}
@@ -288,11 +288,11 @@ body{background:
 .dag-col{border-right:1px solid rgba(30,58,30,.08);}
 .dag-col:last-child{border-right:none;}
 .dag-col-hdr{background:var(--parchment);padding:14px 16px;border-bottom:2px solid var(--forest);}
-.dag-col-dato{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
+.dag-col-dato{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;}
 .dag-col-omsat{font-size:22px;font-weight:400;color:var(--forest);line-height:1.1;margin-bottom:4px;}
 .dag-col-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);}
 .dag-prod-hdr{display:flex;justify-content:space-between;padding:6px 16px 4px;border-bottom:1px solid rgba(30,58,30,.1);}
-.dag-prod-hdr span{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);}
+.dag-prod-hdr span{font-family:'DM Sans',sans-serif;font-size:7px;letter-spacing:.01em;text-transform:none;color:var(--ash);}
 .dag-prod-row{display:flex;align-items:baseline;gap:6px;padding:5px 16px;border-bottom:1px solid rgba(30,58,30,.04);font-size:12px;}
 .dag-prod-row:last-child{border-bottom:none;}
 .dag-prod-navn{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--charcoal);}
@@ -301,12 +301,12 @@ body{background:
 
 /* SHARED: missing aliases used by dynamic panels */
 .tbl{width:100%;border-collapse:collapse;font-size:13px;}
-.tbl th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
+.tbl th{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);padding:8px 12px;border-bottom:1px solid rgba(30,58,30,.12);text-align:left;}
 .tbl td{padding:9px 12px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
 .tbl tr:last-child td{border-bottom:none;}
 .tbl tr:hover td{background:var(--cream);}
 .kpi-card{background:var(--glass-sheen),var(--glass-streak),var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-brd);border-radius:14px;padding:16px 18px;box-shadow:var(--shadow-soft),0 1px 0 rgba(255,255,255,.9) inset;}
-.kpi-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
+.kpi-label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:8px;}
 .kpi-val{font-size:24px;font-weight:300;color:var(--forest);line-height:1;}
 .kpi-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
 
@@ -321,12 +321,12 @@ body{background:
 .ov-banner-top{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;margin-bottom:12px;border-bottom:1px solid rgba(30,58,30,.08);padding-bottom:12px;}
 .ov-banner-cmp{font-size:13px;color:var(--ash);margin-top:8px;display:flex;gap:16px;}
 .ov-metric{display:flex;flex-direction:column;}
-.ov-metric-label{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;font-weight:500;}
+.ov-metric-label{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;font-weight:500;}
 .ov-metric-value{font-size:28px;font-weight:300;color:var(--forest);line-height:1.1;margin-bottom:4px;}
 .ov-metric-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);}
 .ov-comparison{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:12px;}
 .ov-cmp-card{background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:14px 16px;}
-.ov-cmp-title{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;font-weight:500;}
+.ov-cmp-title{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;font-weight:500;}
 .ov-cmp-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(30,58,30,.06);font-size:13px;}
 .ov-cmp-row:last-child{border-bottom:none;}
 .ov-cmp-label{color:var(--charcoal);}
@@ -410,11 +410,11 @@ body{background:
 .aar-kpi-row .kpi-card:last-child{border-color:var(--amber);}
 .aar-kpi-row .kpi-card:last-child .kpi-val{color:var(--amber);}
 .aar-cfg{background:var(--white);border:1px solid rgba(30,58,30,.1);border-radius:3px;margin-bottom:18px;overflow:hidden;}
-.aar-cfg-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;user-select:none;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);}
+.aar-cfg-hdr{display:flex;align-items:center;gap:8px;padding:10px 16px;cursor:pointer;user-select:none;font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);}
 .aar-cfg-hdr:hover{background:var(--cream);}
 .aar-cfg-body{padding:16px 18px 14px;border-top:1px solid rgba(30,58,30,.08);}
 .aar-cfg-main{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px;}
-.aar-cfg-lbl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
+.aar-cfg-lbl{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;}
 .aar-cfg-inp{width:100%;border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:6px 8px;font-family:'DM Mono',monospace;font-size:12px;color:var(--charcoal);background:var(--parchment);box-sizing:border-box;}
 .aar-cfg-inp:focus{outline:none;border-color:var(--forest);}
 .scen-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
@@ -423,7 +423,7 @@ body{background:
 .scen-card.aktiv{background:var(--scen-farve);border-color:var(--scen-farve);}
 .scen-card.aktiv .scen-hdr,.scen-card.aktiv .scen-res{color:#fff;}
 .scen-card.aktiv .scen-hdr span,.scen-card.aktiv .scen-oms{color:rgba(255,255,255,.7);}
-.scen-hdr{font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--scen-farve);font-weight:600;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.scen-hdr{font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--scen-farve);font-weight:600;display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
 .scen-hdr span{font-size:8px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ash);}
 .scen-res{font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:var(--charcoal);margin-top:6px;}
 .scen-oms{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:2px;}
@@ -440,7 +440,7 @@ body{background:
 .aar2-top{display:grid;grid-template-columns:220px 1fr 1fr 1fr 1fr;gap:10px;margin-bottom:16px;}
 .aar2-mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 .aar2-mnd-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.aar2-mnd-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);}
+.aar2-mnd-label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);}
 .aar2-badge{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.05em;padding:3px 9px;border-radius:2px;}
 .aar2-badge.live{background:rgba(74,124,74,.1);color:#2d5a2d;border:1px solid rgba(74,124,74,.2);}
 .aar2-badge.prog{background:rgba(200,168,75,.12);color:#7a5c00;border:1px solid rgba(200,168,75,.25);}
@@ -452,22 +452,22 @@ body{background:
 .aar2-legend{display:flex;gap:14px;margin-bottom:14px;font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);}
 .aar2-legend-dot{display:inline-block;width:8px;height:8px;border-radius:1px;margin-right:3px;vertical-align:middle;}
 .aar2-mnd-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border-top:1px solid rgba(30,58,30,.08);padding-top:12px;}
-.aar2-stat-l{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;}
+.aar2-stat-l{font-family:'DM Sans',sans-serif;font-size:7px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;}
 .aar2-stat-v{font-size:17px;font-weight:300;color:var(--charcoal);}
 .aar2-prog-body{font-size:12px;line-height:1.8;font-family:'DM Mono',monospace;margin-bottom:14px;}
 .aar2-forecast{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;border-top:1px solid rgba(30,58,30,.08);padding-top:12px;}
 .aar2-fc-v{font-size:15px;font-weight:300;color:var(--charcoal);}
-.aar2-fc-l{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-top:2px;}
+.aar2-fc-l{font-family:'DM Sans',sans-serif;font-size:7px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-top:2px;}
 .aar2-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 .aar2-chart-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
 .aar2-chart-ttl{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:#8a9589;}
 .aar2-chart-sub{font-family:'DM Mono',monospace;font-size:7px;color:var(--ash);opacity:.6;}
 .aar2-tbl-wrap{border:1px solid rgba(30,58,30,.08);border-radius:12px;overflow:hidden;margin-bottom:14px;box-shadow:0 2px 8px rgba(30,58,30,.04);}
 .aar2-tbl-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;background:var(--forest);}
-.aar2-tbl-hdr-l{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--amber);}
+.aar2-tbl-hdr-l{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--amber);}
 .aar2-tbl-hdr-r{font-family:'DM Mono',monospace;font-size:8px;color:rgba(200,168,75,.55);}
 .aar2-tbl{width:100%;border-collapse:collapse;font-size:13px;}
-.aar2-tbl th{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:rgba(200,168,75,.75);padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.04);text-align:left;background:rgba(30,58,30,.95);}
+.aar2-tbl th{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:rgba(200,168,75,.75);padding:8px 16px;border-bottom:1px solid rgba(255,255,255,.04);text-align:left;background:rgba(30,58,30,.95);}
 .aar2-tbl th.num{text-align:right;}
 .aar2-tbl td{padding:10px 16px;border-bottom:1px solid rgba(30,58,30,.06);color:var(--charcoal);}
 .aar2-tbl tr.indev td{background:rgba(200,168,75,.04);}
@@ -497,7 +497,7 @@ body{background:
 .rec-card-hdr.op {background:rgba(74,124,74,.07);}
 .rec-card-hdr.ned{background:rgba(180,60,40,.06);}
 .rec-card-hdr.ny {background:rgba(200,168,75,.07);}
-.rec-card-ttl{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;font-weight:400;}
+.rec-card-ttl{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;font-weight:400;}
 .rec-card-ttl.op {color:#2d5a2d;}
 .rec-card-ttl.ned{color:#8b2a1a;}
 .rec-card-ttl.ny {color:#7a5c00;}
@@ -571,8 +571,8 @@ body{background:
   padding:10px 12px;display:flex;gap:6px;flex-shrink:0;
 }
 .nav-edit-toggle{
-  flex:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;
-  text-transform:uppercase;color:rgba(200,168,75,.5);
+  flex:1;font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;
+  text-transform:none;color:rgba(200,168,75,.5);
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
   border-radius:4px;padding:7px 8px;cursor:pointer;transition:all .12s;
 }
@@ -632,7 +632,7 @@ body{background:
 .sc-grade.A{color:var(--moss);}
 .sc-grade.B{color:var(--gold);}
 .sc-grade.C{color:var(--danger);}
-.sc-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;}
+.sc-label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;}
 .sc-val{font-size:18px;font-weight:300;color:var(--charcoal);line-height:1;}
 .sc-bench{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;}
 @media(max-width:768px){.scorecard{grid-template-columns:repeat(3,1fr);gap:8px;}.sc-grade{font-size:28px;}}
@@ -1006,23 +1006,23 @@ body{background:
 /* KØRSEL REGNSKAB STYLES */
 .mnd-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
 .mnd-cell{background:var(--glass-sheen),var(--glass-streak),var(--glass);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-brd);border-radius:14px;padding:16px 18px;text-align:center;box-shadow:var(--shadow-soft),0 1px 0 rgba(255,255,255,.9) inset;}
-.mnd-cell-label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;}
+.mnd-cell-label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:8px;}
 .mnd-cell-value{font-size:24px;font-weight:400;color:var(--forest);line-height:1;}
 .mnd-cell-value.up{color:var(--moss);}
 .mnd-cell-value.dn{color:var(--danger);}
 .mnd-cell-sub{font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:6px;}
 .form-group{margin-bottom:16px;display:flex;flex-direction:column;}
-.form-group label{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;font-weight:500;}
+.form-group label{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;font-weight:500;}
 .form-group input,.form-group select{width:100%;border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:8px 10px;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);background:var(--parchment);}
 .form-group input:focus,.form-group select:focus{outline:none;border-color:var(--forest);}
-.btn{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;background:var(--forest);color:var(--amber);border:1px solid var(--forest);border-radius:2px;padding:8px 16px;cursor:pointer;font-weight:500;transition:all .15s;}
+.btn{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;background:var(--forest);color:var(--amber);border:1px solid var(--forest);border-radius:2px;padding:8px 16px;cursor:pointer;font-weight:500;transition:all .15s;}
 .btn:hover{background:var(--moss);}
 .btn-light{background:var(--white);color:var(--forest);border:1px solid rgba(30,58,30,.2);border-radius:2px;padding:8px 12px;cursor:pointer;font-size:13px;font-family:'DM Sans',sans-serif;font-weight:400;}
 .btn-light:hover{background:var(--cream);}
 .btn-delete{background:#fff;border:1px solid var(--danger);color:var(--danger);padding:4px 8px;border-radius:2px;cursor:pointer;font-size:11px;font-family:'DM Mono',monospace;}
 .btn-delete:hover{background:rgba(192,57,43,.1);}
 .periode-tabs{display:flex;gap:6px;margin-bottom:16px;}
-.ptab{font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:2px;cursor:pointer;background:var(--white);color:var(--ash);}
+.ptab{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;letter-spacing:0;text-transform:none;padding:5px 12px;border:1px solid rgba(30,58,30,.2);border-radius:8px;cursor:pointer;background:#fff;color:#8a9589;}
 .ptab.active{background:var(--forest);color:var(--amber);border-color:var(--forest);}
 .daglist{list-style:none;padding:0;margin:0;}
 .daglist li{display:flex;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(30,58,30,.07);font-size:13px;}
@@ -1100,7 +1100,7 @@ body{background:
         <div id="mb-hdr" style="background:var(--forest);padding:20px 28px 16px;border-radius:0;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
             <div>
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.12em;color:rgba(200,168,75,.6);text-transform:uppercase;">Organic Market Greve</div>
+              <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;color:rgba(200,168,75,.6);text-transform:none;">Organic Market Greve</div>
               <div style="font-size:22px;font-weight:500;color:#fff;margin-top:2px;" id="mb-dato-label">—</div>
             </div>
             <div id="mb-deadline-badge" style="display:none;background:rgba(200,168,75,.15);border:1px solid rgba(200,168,75,.4);border-radius:20px;padding:6px 16px;text-align:center;">
@@ -1113,7 +1113,7 @@ body{background:
         <div style="padding:20px 28px 40px;">
 
           <!-- ZONE 1: DAG STATUS -->
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Status i dag</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;">Status i dag</div>
           <div class="mb-kpi-row" style="display:grid;grid-template-columns:1.4fr 1fr 1fr 1fr;gap:10px;margin-bottom:24px;">
 
             <div class="kpi" style="background:var(--forest);border-color:var(--forest);">
@@ -1142,7 +1142,7 @@ body{background:
           </div>
 
           <!-- ZONE 2: UGENS PULS -->
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Ugens puls · <span id="mb-uge-label">uge —</span></div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;">Ugens puls · <span id="mb-uge-label">uge —</span></div>
           <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:12px;padding:16px 18px;margin-bottom:24px;">
             <!-- Progress bar -->
             <div style="margin-bottom:12px;">
@@ -1170,7 +1170,7 @@ body{background:
 
           <!-- ZONE 3: AI DAGSBRIEFING -->
           <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">AI dagsbriefing</div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">AI dagsbriefing</div>
             <button onclick="mbLoadBriefing()" id="mb-brief-btn"
               style="background:none;border:1px solid rgba(30,58,30,.15);color:var(--ash);border-radius:4px;padding:3px 10px;font-size:10px;cursor:pointer;">
               🔄 Opdater
@@ -1183,7 +1183,7 @@ body{background:
           </div>
 
           <!-- ZONE 4: TRAFIKLAMPER -->
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Status · trafiklamper</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;">Status · trafiklamper</div>
           <div id="mb-lamper" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:24px;"></div>
 
           <!-- Spild mini-chips -->
@@ -1192,18 +1192,18 @@ body{background:
           <!-- ZONE 5: SPARKLINES -->
           <div class="mb-spark-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px;">
             <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Omsætning · 7 dage</div>
+              <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:8px;">Omsætning · 7 dage</div>
               <div style="position:relative;height:80px;"><canvas id="mb-spark-oms"></canvas></div>
             </div>
             <div style="background:var(--cream);border:1px solid rgba(30,58,30,.08);border-radius:10px;padding:12px 16px;">
-              <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">☕ Kaffe · 7 dage</div>
+              <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:8px;">☕ Kaffe · 7 dage</div>
               <div style="position:relative;height:80px;"><canvas id="mb-spark-kaffe"></canvas></div>
             </div>
           </div>
 
           <!-- ZONE 6: SMART ALERT -->
           <div id="mb-smart-alert" style="display:none;padding:12px 16px;border-radius:10px;margin-bottom:20px;border-left:4px solid var(--gold);">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">💡 Vigtigst lige nu</div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;">💡 Vigtigst lige nu</div>
             <div id="mb-alert-tekst" style="font-size:13px;font-weight:500;color:var(--charcoal);"></div>
           </div>
 
@@ -1453,7 +1453,7 @@ body{background:
         <!-- DAGSOVERBLIK VS. FORVENTET -->
         <div class="card" id="dag-progress-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Hvad sker der i dag</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Hvad sker der i dag</span>
             <span id="dag-prog-ref" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
           <div id="dag-prog-rows"></div>
@@ -2824,8 +2824,8 @@ body{background:
             <!-- Preview: vises n&aring;r Claude har ekstraheret data -->
             <div id="bager-pdf-preview" style="display:none;margin-top:16px;padding:14px 16px;
                  background:rgba(30,58,30,.04);border-radius:8px;border:1px solid rgba(30,58,30,.1);">
-              <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;
-                   text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Ekstraherede v&aelig;rdier — ret om n&oslash;dvendigt</div>
+              <div style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;
+                   text-transform:none;color:var(--ash);margin-bottom:10px;">Ekstraherede v&aelig;rdier — ret om n&oslash;dvendigt</div>
               <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:14px;">
                 <label style="font-size:12px;color:var(--ash);">Uge
                   <input id="bp-uge" type="number" class="inline-edit"
@@ -2888,7 +2888,7 @@ body{background:
         <!-- SPILD-UDVIKLING (20 uger, trend, uden indeværende) -->
         <div class="card" id="spild-trend-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Spild-udvikling · seneste 20 uger</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Spild-udvikling · seneste 20 uger</span>
             <span id="spild-trend-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
           <div style="position:relative;height:210px;"><canvas id="c-spild-trend"></canvas></div>
@@ -2896,7 +2896,7 @@ body{background:
 
           <!-- HEATMAP: ugedag × uge -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px;gap:10px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Spild pr. dag pr. uge — hvor går det galt?</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Spild pr. dag pr. uge — hvor går det galt?</span>
             <div style="display:flex;gap:4px;">
               <button id="spild-hm-efter" onclick="spildHeatmapMode('efter')" style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;cursor:pointer;background:var(--forest);color:var(--amber);">efter TGTG</button>
               <button id="spild-hm-foer" onclick="spildHeatmapMode('foer')" style="font-family:'DM Mono',monospace;font-size:9px;padding:4px 10px;border:1px solid var(--border);border-radius:5px;cursor:pointer;background:none;color:var(--charcoal);">før TGTG</button>
@@ -2908,7 +2908,7 @@ body{background:
         <!-- HVAD KOSTER SPILDET — KR PR. UGE -->
         <div class="card" id="spild-kr-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Hvad koster spildet? · kr pr. uge</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Hvad koster spildet? · kr pr. uge</span>
             <span id="spild-kr-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
           <div style="overflow-x:auto;">
@@ -2929,7 +2929,7 @@ body{background:
         <!-- BESTILLINGSHISTORIK CHART -->
         <div class="card" id="svind-hist-card" style="display:none;margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Indkøb & svind — seneste uger</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Indkøb & svind — seneste uger</span>
             <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);">søjle = indkøb kr · linje = svind %</span>
           </div>
           <div style="position:relative;height:200px;"><canvas id="c-svind-hist"></canvas></div>
@@ -2997,14 +2997,14 @@ body{background:
         <div class="aar2-top" id="pv-kpi" style="margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Prisændringer siden sidste snapshot</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Prisændringer siden sidste snapshot</span>
             <input id="pv-soeg" type="text" placeholder="Søg vare…" oninput="pvRender()"
                    style="padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:180px;">
           </div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:720px;" id="pv-tabel"></table></div>
         </div>
         <div class="card" id="pv-nye-card" style="display:none;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;">Nye og udgåede varer</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;">Nye og udgåede varer</div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:420px;" id="pv-nye"></table></div>
         </div>
       </div>
@@ -3017,7 +3017,7 @@ body{background:
         <div class="aar2-top" id="pa-kpi" style="margin-bottom:16px;"></div>
         <div class="card">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Prisændringer</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Prisændringer</span>
             <input id="pa-soeg" type="text" placeholder="Søg vare…" oninput="paRender()"
                    style="padding:7px 11px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:180px;">
           </div>
@@ -3031,7 +3031,7 @@ body{background:
         .bageri-prof-btn{padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:transparent;cursor:pointer;font-size:12px;font-family:inherit;color:var(--ash);}
         .bageri-prof-btn.active{background:var(--forest);color:#fff;border-color:var(--forest);}
         #bageri-tabel td, #bageri-tabel th{padding:5px 7px;}
-        .bageri-badge{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.03em;text-transform:uppercase;border-radius:4px;padding:1px 4px;margin-left:5px;}
+        .bageri-badge{font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;border-radius:4px;padding:1px 4px;margin-left:5px;}
       </style>
       <div class="panel" id="p-bageri">
         <div class="page-hdr">
@@ -3047,7 +3047,7 @@ body{background:
             </div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <div style="display:flex;gap:4px;align-items:center;" id="bageri-dagvis">
-                <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Pr. dag:</span>
+                <span style="font-family:'DM Sans',sans-serif;font-size:9px;color:var(--ash);text-transform:none;">Pr. dag:</span>
                 <button class="bageri-prof-btn" data-dv="forslag" onclick="bageriDagVis('forslag')">Forslag</button>
                 <button class="bageri-prof-btn" data-dv="bestilt" onclick="bageriDagVis('bestilt')">Bestilt</button>
                 <button class="bageri-prof-btn" data-dv="gns2" onclick="bageriDagVis('gns2')" title="Forslag = gennemsnit af de 2 seneste hele ugers faktiske salg pr. dag">Gns. 2 uger</button>
@@ -3072,7 +3072,7 @@ body{background:
 
         <div class="card" id="bageri-spild-kort" style="margin-top:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-            <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild &amp; redning — samme uge</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">Spild &amp; redning — samme uge</span>
             <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Spild = Bestilt − Friskt solgt − Reddet (frost + fra i går) · klik en kategori for varer · per-vare-match kræver at ordre + kasse deler varenr. (præcist fra 1/9 med de nye varer)</span>
           </div>
           <div id="bageri-spild-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px;"></div>
@@ -3084,7 +3084,7 @@ body{background:
 
         <div class="card" id="bageri-trend-kort" style="margin-top:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:6px;">
-            <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Spild-trend — seneste uger</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">Spild-trend — seneste uger</span>
             <div style="display:flex;gap:4px;" id="bageri-trend-toggle">
               <button class="bageri-prof-btn" data-tv="uger"   onclick="_bageriTrendView('uger')">Uger (drill-down)</button>
               <button class="bageri-prof-btn" data-tv="gruppe" onclick="_bageriTrendView('gruppe')">Pr. gruppe</button>
@@ -3106,11 +3106,11 @@ body{background:
         <div class="card" id="priser-intro" style="margin-bottom:16px;"></div>
         <div class="card" id="priser-oekonomi" style="margin-bottom:16px;"></div>
         <div class="card" style="margin-bottom:16px;">
-          <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">1) Prisstigning — nu → 1/9 (vejl. plan, 50% avance)</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;margin-bottom:10px;">1) Prisstigning — nu → 1/9 (vejl. plan, 50% avance)</div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;" id="priser-tabel1"></table></div>
         </div>
         <div class="card" style="margin-bottom:16px;">
-          <div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">2) Scenarie — plan → drøftet pris (brød 53 · wienerbrød 28 · pain 30)</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;margin-bottom:10px;">2) Scenarie — plan → drøftet pris (brød 53 · wienerbrød 28 · pain 30)</div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;" id="priser-tabel2"></table></div>
           <p id="priser-note2" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:10px;"></p>
         </div>
@@ -3157,14 +3157,14 @@ body{background:
         <div class="card" id="dbs-maaned-card" style="margin-bottom:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span id="dbs-maaned-titel" style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Månedsresultat</span>
+              <span id="dbs-maaned-titel" style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">Månedsresultat</span>
               <select id="dbs-maaned-vaelg" onchange="loadDbsMaaned(this.value)" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;"></select>
             </div>
             <span id="dbs-maaned-hint" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">Løn 300 kr/dag lør+søn · omk 500 kr/dag · resultat = DB − løn − omk</span>
           </div>
-          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin:2px 0 8px;font-weight:600;">① Kun Shopbox-salg · alt stemmer til kassen</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin:2px 0 8px;font-weight:600;">① Kun Shopbox-salg · alt stemmer til kassen</div>
           <div id="dbs-maaned-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:18px;"></div>
-          <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin:2px 0 8px;font-weight:600;">② Inkl. MobilePay · MobilePay = uvarekoblet bagværkssalg (samme avance) → omsætning, vareforbrug, DB og mindre spild regnes med</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--moss);margin:2px 0 8px;font-weight:600;">② Inkl. MobilePay · MobilePay = uvarekoblet bagværkssalg (samme avance) → omsætning, vareforbrug, DB og mindre spild regnes med</div>
           <div id="dbs-just-tot" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px;"></div>
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:560px;" id="dbs-maaned-tabel"></table>
@@ -3179,7 +3179,7 @@ body{background:
         <!-- Toggle + graf -->
         <div class="card" style="margin-bottom:14px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:12px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">DB kr (søjle) · DG % (linje)</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">DB kr (søjle) · DG % (linje)</span>
             <div id="dbs-toggle" style="display:flex;gap:4px;">
               <button onclick="dbsSetMode('dage')"     class="dbs-tab" data-m="dage">Dag</button>
               <button onclick="dbsSetMode('uger')"     class="dbs-tab" data-m="uger">Uge</button>
@@ -3191,7 +3191,7 @@ body{background:
 
         <!-- Tabel -->
         <div class="card">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:10px;" id="dbs-tabel-titel">Pr. dag</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:10px;" id="dbs-tabel-titel">Pr. dag</div>
           <div style="overflow-x:auto;">
             <table class="aar2-tbl" style="width:100%;min-width:440px;" id="dbs-tabel"></table>
           </div>
@@ -3214,7 +3214,7 @@ body{background:
         <!-- Værktøjslinje -->
         <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
           <button onclick="socialGenerer()" style="background:var(--forest);color:#fff;border:none;padding:9px 16px;border-radius:8px;font-size:13px;cursor:pointer;font-weight:600;">✍️ Generér nyt opslag</button>
-          <label style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);text-transform:uppercase;letter-spacing:.08em;">Dato
+          <label style="font-family:'DM Sans',sans-serif;font-size:10px;color:var(--ash);text-transform:none;letter-spacing:.01em;">Dato
             <input type="date" id="social-dato" style="margin-left:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;">
           </label>
           <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">(tom = i dag · motoren vælger opslagstype ud fra ugedagen)</span>
@@ -3237,7 +3237,7 @@ body{background:
           <!-- DB pr. uge -->
           <div class="card" style="margin-bottom:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:12px;flex-wrap:wrap;">
-              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">DB pr. uge (bagværk)</span>
+              <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">DB pr. uge (bagværk)</span>
               <span style="font-family:'DM Mono',monospace;font-size:8px;color:var(--ash);">søjle = DB kr · linje = indkøb kr</span>
             </div>
             <div style="position:relative;height:210px;"><canvas id="c-boek-db"></canvas></div>
@@ -3245,7 +3245,7 @@ body{background:
           <!-- Simulation: hvad nu hvis? -->
           <div class="card" style="margin-bottom:14px;">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;">
-              <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Simulation — hvad nu hvis?</span>
+              <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Simulation — hvad nu hvis?</span>
               <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ash);">
                 <label>Avance <input id="boek-sim-avance" type="number" value="25" step="1" oninput="boekSimuler()" style="width:62px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;"> %</label>
                 <label>TGTG <input id="boek-sim-tgtg" type="number" value="15" step="1" oninput="boekSimuler()" style="width:62px;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;"> %</label>
@@ -3260,19 +3260,19 @@ body{background:
           </div>
           <!-- Korrelationer -->
           <div class="card" style="margin-bottom:14px;">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">Hvad hænger sammen med høj DB? <span id="boek-korr-n" style="color:var(--ash);"></span></div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:12px;">Hvad hænger sammen med høj DB? <span id="boek-korr-n" style="color:var(--ash);"></span></div>
             <div id="boek-korr" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;"></div>
           </div>
           <!-- Bedste vs dårligste uger -->
           <div class="card" style="margin-bottom:14px;">
-            <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">Bedste vs. dårligste DB-uger — hvad kendetegner dem?</div>
+            <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:12px;">Bedste vs. dårligste DB-uger — hvad kendetegner dem?</div>
             <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;min-width:480px;" id="boek-profil"></table></div>
           </div>
         </div>
         <!-- Optimal bestilling pr. vare (newsvendor) — vises uanset faktura-data -->
         <div class="card" style="margin-bottom:14px;" id="boek-opt-card">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;gap:12px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);">Optimal bestillingsstrategi pr. vare</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Optimal bestillingsstrategi pr. vare</span>
             <span id="boek-opt-info" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
           <div style="overflow-x:auto;"><table class="aar2-tbl" style="width:100%;min-width:640px;">
@@ -3433,7 +3433,7 @@ body{background:
 
         <!-- Salgsmønster: sidst-solgt -->
         <div id="bern-sidst-solgt" style="display:none;margin-top:20px;border-top:1px solid rgba(30,58,30,.08);padding-top:16px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:12px;">
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:12px;">
             SALGSMØNSTER · SENESTE 4 UGER · hvornår sælger vi ud?
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -3728,7 +3728,7 @@ body{background:
         <!-- Varenummer-kontrol -->
         <div style="margin-top:28px;">
           <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
-            <h3 style="font-size:13px;font-weight:700;color:var(--forest);text-transform:uppercase;letter-spacing:.06em;margin:0;">Varenummer-kontrol</h3>
+            <h3 style="font-size:13px;font-weight:700;color:var(--forest);text-transform:none;letter-spacing:.01em;margin:0;">Varenummer-kontrol</h3>
             <button class="tb-btn" style="font-size:10px;padding:5px 12px;" onclick="loadVnrKontrol()">Kør kontrol</button>
             <span id="vnr-status" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);"></span>
           </div>
@@ -3781,20 +3781,20 @@ body{background:
         </div>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
           <div style="display:flex;gap:4px;align-items:center;" id="umx-scope">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Salg:</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;color:var(--ash);text-transform:none;">Salg:</span>
             <button class="bageri-prof-btn active" data-s="butik" onclick="umxScope('butik')">Butik (alt)</button>
             <button class="bageri-prof-btn"        data-s="bag"   onclick="umxScope('bag')">Bagværk</button>
           </div>
           <div style="display:flex;gap:4px;align-items:center;" id="umx-measure">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Mål:</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;color:var(--ash);text-transform:none;">Mål:</span>
           </div>
           <div style="display:flex;gap:4px;align-items:center;" id="umx-farve">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Farve:</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;color:var(--ash);text-transform:none;">Farve:</span>
             <button class="bageri-prof-btn active" data-f="col" onclick="umxFarve('col')" title="Hver ugedag farves i forhold til sig selv — mandage mod mandage">Pr. ugedag</button>
             <button class="bageri-prof-btn"        data-f="all" onclick="umxFarve('all')" title="Alle celler på samme skala">Samlet</button>
           </div>
           <div style="display:flex;gap:4px;align-items:center;" id="umx-uger">
-            <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Uger:</span>
+            <span style="font-family:'DM Sans',sans-serif;font-size:9px;color:var(--ash);text-transform:none;">Uger:</span>
             <button class="bageri-prof-btn"        data-u="8"  onclick="umxUger(8)">8</button>
             <button class="bageri-prof-btn active" data-u="16" onclick="umxUger(16)">16</button>
             <button class="bageri-prof-btn"        data-u="26" onclick="umxUger(26)">26</button>
@@ -4198,7 +4198,7 @@ function pvRenderKpi(){
   const c = document.getElementById('pv-kpi');
   c.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;';
   const tile=(l,v,s,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">${l}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">${l}</div>
       <div style="font-size:26px;font-weight:700;line-height:1;color:${clr||'var(--forest)'};">${v}</div>
       <div style="font-size:11px;color:var(--ash);margin-top:5px;">${s||''}</div></div>`;
   c.innerHTML = tile('Ændringer i alt', a.length, op.length+' op · '+ned.length+' ned')
@@ -4256,7 +4256,7 @@ function paRenderKpi(){
   const antalOp  = d.filter(x=>x.pct!=null && x.pct>0).length;
   const antalNed = d.filter(x=>x.pct!=null && x.pct<0).length;
   const tile=(lbl,val,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
-    <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">${lbl}</div>
+    <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">${lbl}</div>
     <div style="font-size:26px;font-weight:700;color:var(--forest);line-height:1;">${val}</div>
     <div style="font-size:11px;color:var(--ash);margin-top:5px;">${sub||''}</div></div>`;
   c.innerHTML = tile('Antal ændringer', d.length, antalOp+' op · '+antalNed+' ned')
@@ -4469,18 +4469,18 @@ async function bageriKontrol(){
   }
   box.innerHTML = `
     <div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:10px;">
-      <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;">Kontrol · anbefalet vs. faktisk salg (${d.sammenlign_dage}, snit seneste 8 uger)</span>
+      <span style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">Kontrol · anbefalet vs. faktisk salg (${d.sammenlign_dage}, snit seneste 8 uger)</span>
     </div>
     ${trendHtml}
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px;">
       <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Anbefalet i alt</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:none;color:var(--ash);margin-bottom:4px;">Anbefalet i alt</div>
         <div style="font-size:19px;font-weight:700;color:var(--forest);">${d.total_anbefalet} stk</div></div>
       <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Faktisk salg (snit)</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:none;color:var(--ash);margin-bottom:4px;">Faktisk salg (snit)</div>
         <div style="font-size:19px;font-weight:700;color:var(--ash);">${d.total_faktisk} stk</div></div>
       <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">Samlet afvigelse</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:none;color:var(--ash);margin-bottom:4px;">Samlet afvigelse</div>
         <div style="font-size:19px;font-weight:700;color:${farve(pct)};">${sgn(pct)}</div></div>
     </div>
     <div style="font-size:12px;color:${farve(pct)};margin-bottom:12px;font-weight:600;">${vurder}</div>
@@ -4523,7 +4523,7 @@ async function _bageriRender(){
   // Totaler
   const dbPot = (d.produkter||[]).reduce((s,p)=>s+(p.db_ved_salg||0),0);
   const tile = (lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${lbl}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;">${lbl}</div>
       <div style="font-size:19px;font-weight:700;line-height:1;color:${clr||'var(--forest)'};">${val}</div></div>`;
   document.getElementById('bageri-tot').innerHTML =
       tile('Antal i alt', d.total_stk + ' stk')
@@ -4743,7 +4743,7 @@ async function _bageriSpildRender(){
   } else {
     const sClr = (t.spild_pct||0) >= 15 ? 'var(--danger)' : (t.spild_pct||0) >= 8 ? '#e67e22' : 'var(--moss)';
     const tile=(l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;">${l}</div>
         <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
     totBox.innerHTML =
         tile('Spild', (t.spild||0)+' stk', sClr)
@@ -4799,7 +4799,7 @@ async function _bageriSpildRender(){
       ).join('');
       kBox.style.display = 'block';
       kBox.innerHTML =
-        `<div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Kager — uge i alt (holdes ude af spild · sælges over 3-4 dage)</div>`
+        `<div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Kager — uge i alt (holdes ude af spild · sælges over 3-4 dage)</div>`
       + `<div style="font-size:12px;">I alt: <strong>${kg.bestilt}</strong> bestilt · <strong style="color:var(--forest);">${kg.solgt}</strong> solgt over ugen</div>`
       + `<div style="font-size:11px;color:var(--ash);margin-top:5px;">${varer}</div>`;
     } else {
@@ -4995,11 +4995,11 @@ async function loadPriser(){
   const o = (d && d.oekonomi) || null;
   if (o){
     const tile=(l,v,c,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${l}</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:5px;">${l}</div>
         <div style="font-size:20px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div>
         ${sub?`<div style="font-size:10px;color:var(--ash);margin-top:4px;">${sub}</div>`:''}</div>`;
     document.getElementById('priser-oekonomi').innerHTML =
-      `<div style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--forest);font-weight:600;margin-bottom:10px;">Økonomisk konsekvens — årlig avance (ved nuværende volumen)</div>
+      `<div style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;margin-bottom:10px;">Økonomisk konsekvens — årlig avance (ved nuværende volumen)</div>
        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
         ${tile('Avance i dag', kr0(o.aar_gl)+' kr', 'var(--ash)', '~35% realiseret')}
         ${tile('Plan 1/9 (50%)', kr0(o.aar_plan)+' kr', 'var(--forest)', 'før spild')}
@@ -5124,9 +5124,9 @@ function _dbsLoenCell(x){
   const on = x.loen > 0;
   const ov = x.loen_override;
   const badge = ov===0
-      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
+      ? ` <span style="font-family:'DM Sans',sans-serif;font-size:8px;text-transform:none;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
     : ov===1
-      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--moss);color:#fff;border-radius:4px;padding:1px 4px;">+løn</span>`
+      ? ` <span style="font-family:'DM Sans',sans-serif;font-size:8px;text-transform:none;background:var(--moss);color:#fff;border-radius:4px;padding:1px 4px;">+løn</span>`
       : '';
   const tip = (on ? 'Klik: fjern løn (I var der selv)' : 'Klik: sæt løn (ekstra dag med hjælp)')
             + (ov!=null ? ' · klik igen = auto' : '');
@@ -5150,9 +5150,9 @@ function _dbsLevCell(x){
   const on = x.levering > 0;
   const ov = x.levering_override;
   const badge = ov===0
-      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
+      ? ` <span style="font-family:'DM Sans',sans-serif;font-size:8px;text-transform:none;background:var(--ash);color:#fff;border-radius:4px;padding:1px 4px;">selv</span>`
     : ov===1
-      ? ` <span style="font-family:'DM Mono',monospace;font-size:8px;text-transform:uppercase;background:#8a6d3a;color:#fff;border-radius:4px;padding:1px 4px;">lev</span>`
+      ? ` <span style="font-family:'DM Sans',sans-serif;font-size:8px;text-transform:none;background:#8a6d3a;color:#fff;border-radius:4px;padding:1px 4px;">lev</span>`
       : '';
   const tip = (on ? 'Klik: I hentede selv (fjern levering)' : 'Klik: leveret (tilføj fragt)')
             + (ov!=null ? ' · klik igen = auto' : '');
@@ -5196,7 +5196,7 @@ function _dbsSpildStkDet(s){
     const bundt = v.solgt_i_bundt > 0 ? ` <span style="color:var(--ash);">(${v.solgt_i_bundt} i bundt/combo)</span>` : '';
     return _dbsDetLinje(`${v.navn} <span style="color:var(--ash);">· indkøbt ${v.bestilt} / solgt ${v.solgt}</span>${bundt}`, `${v.spild} stk`);
   }).join('');
-  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Spild i stk — ikke solgt friskt</div>${rows}
+  return `<div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Spild i stk — ikke solgt friskt</div>${rows}
     <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${s.spild_stk} stk</span></div>`;
 }
 function _dbsDetLinje(venstre, hoejre, faded){
@@ -5222,7 +5222,7 @@ function _dbsSpildDet(s){
   const estNote = harEst
     ? `<div style="${mono}font-size:10px;color:var(--ash);margin-top:4px;">ⓘ <b>est.</b> = split er et skøn: bundt-salg (fx 3x valgfri) har intet varenummer pr. produkt og er fordelt forholdsmæssigt. Totalen er præcis; fordelingen pr. vare er vejledende.</div>`
     : '';
-  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild — ikke solgt friskt (netto × kostpris)</div>${rows}
+  return `<div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Værdi spild — ikke solgt friskt (netto × kostpris)</div>${rows}
     <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(s.total)}</span></div>${comboNote}${estNote}`;
 }
 function _dbsFrostDet(f){
@@ -5230,7 +5230,7 @@ function _dbsFrostDet(f){
   const mono = "font-family:'DM Mono',monospace;";
   const tot = f.reduce((a,x)=>a + (x.oms_ex||0), 0);
   const rows = f.map(x => _dbsDetLinje(`${x.varenavn} <span style="color:var(--ash);">· ${x.antal} stk</span>`, _dbsKr(x.oms_ex))).join('');
-  return `<div style="${mono}font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Frost salg — solgt af nedfrosset (ex moms)</div>${rows}
+  return `<div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Frost salg — solgt af nedfrosset (ex moms)</div>${rows}
     <div style="display:flex;justify-content:space-between;border-top:1px solid var(--border);margin-top:5px;padding-top:5px;font-weight:700;font-size:12.5px;"><span>I alt</span><span style="${mono}">${_dbsKr(tot)}</span></div>`;
 }
 
@@ -5256,14 +5256,14 @@ async function loadDbsMaaned(val){
     : 'Ingen løn (før juni 2026) · omk 500 kr/dag · resultat = DB − omk';
   // Totaler i toppen
   const tile=(lbl,val,clr)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${lbl}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:5px;">${lbl}</div>
       <div style="font-size:20px;font-weight:700;line-height:1;color:${clr||'var(--forest)'};">${_dbsKr(val)}</div></div>`;
   const resClr = (t.resultat>=0)?'var(--moss)':'var(--danger)';
   const p = d.prognose_total || {};
   const prognoseTile = d.har_forecast ? (()=>{
     const pClr = (p.resultat>=0)?'var(--moss)':'var(--danger)';
     return `<div style="background:var(--forest);border:1px solid var(--forest);border-radius:10px;padding:12px 14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.6);margin-bottom:5px;">Prognose resultat (hele mdr.)</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:rgba(255,255,255,.6);margin-bottom:5px;">Prognose resultat (hele mdr.)</div>
       <div style="font-size:20px;font-weight:700;line-height:1;color:var(--amber);">${_dbsKr(p.resultat)}</div>
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:rgba(255,255,255,.55);margin-top:4px;">oms ${_dbsKr(p.oms_ex)}</div></div>`;
   })() : '';
@@ -5275,7 +5275,7 @@ async function loadDbsMaaned(val){
   const _spildNettoStk = Math.max(0,(t.spild_stk||0)-(t.frost_stk||0));
   const _spildPctN = t.bestilt_stk>0 ? (_spildNettoStk/t.bestilt_stk*100) : 0;               // netto (efter frost)
   const _pctBox = (lbl,pct,sub)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);margin-bottom:5px;">${lbl}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:5px;">${lbl}</div>
       <div style="font-size:20px;font-weight:700;line-height:1;color:${_spPctClr(pct)};">${pct.toFixed(1)} %</div>
       <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div></div>`;
   const _pctTile = _pctBox('Spild % brutto', _spildPctB, `${t.spild_stk||0}/${t.bestilt_stk||0} stk · norm 15-25%`)
@@ -5316,7 +5316,7 @@ async function loadDbsMaaned(val){
   const _jEl = document.getElementById('dbs-just-tot');
   if (_jEl) {
     const jTile = (lbl,val,clr,sub)=>`<div style="background:var(--card,#fff);border:1px dashed var(--moss);border-radius:10px;padding:12px 14px;">
-        <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--moss);margin-bottom:5px;">${lbl}</div>
+        <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--moss);margin-bottom:5px;">${lbl}</div>
         <div style="font-size:20px;font-weight:700;line-height:1;color:${clr||'var(--ink)'};">${_dbsKr(val)}</div>
         ${sub?`<div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);margin-top:4px;">${sub}</div>`:''}</div>`;
     const _resEsBase = (t.resultat||0)-_nettoSpild;
@@ -5366,7 +5366,7 @@ async function loadDbsMaaned(val){
   (d.dage||[]).slice().reverse().forEach(x=>{
     const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
     const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
-    const _bemBadge = (bg,txt,ttl)=>` <span title="${ttl}" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.05em;text-transform:uppercase;background:${bg};color:#fff;border-radius:4px;padding:1px 4px;">${txt}</span>`;
+    const _bemBadge = (bg,txt,ttl)=>` <span title="${ttl}" style="font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;background:${bg};color:#fff;border-radius:4px;padding:1px 4px;">${txt}</span>`;
     const fuldBadge = x.bemanding==='fuld'    ? _bemBadge('#8a3a3a','fuld','Fuld bemanding — løn alle dage')
                     : x.bemanding==='weekend' ? _bemBadge('#b8860b','weekend','Weekend-bemanding — løn lør+søn')
                     : '';
@@ -5394,7 +5394,7 @@ async function loadDbsMaaned(val){
   // Forecast — resterende dage af måneden (snit pr. ugedag fra månedens egne dage)
   const fc = d.forecast_dage || [];
   if (d.har_forecast && fc.length){
-    html += `<tr><td colspan="18" style="padding:10px 8px 4px;font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
+    html += `<tr><td colspan="18" style="padding:10px 8px 4px;font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--gold);border-top:1px dashed var(--border);">Prognose · resten af måneden (${fc.length} dage · snit pr. ugedag)</td></tr>`;
     fc.forEach(x=>{
       const rClr = x.resultat>=0?'var(--moss)':'var(--danger)';
       const weekend = (x.ugedag==='lørdag'||x.ugedag==='søndag');
@@ -5482,11 +5482,11 @@ async function loadDbsMaaned(val){
       const chip = k => {
         const v = sk[k]||0; const pct = skTot>0?Math.round(v/skTot*100):0;
         return `<div style="flex:1;min-width:120px;border:1px solid var(--border);border-left:3px solid ${farve[k]};border-radius:8px;padding:8px 12px;">
-          <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);">${k}</div>
+          <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">${k}</div>
           <div style="font-size:16px;font-weight:700;color:${farve[k]};">${_dbsKr(v)}</div>
           <div style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${pct}% af spild</div></div>`;
       };
-      skBox.innerHTML = `<div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Værdi spild fordelt (måneden · ekskl. kager)</div>
+      skBox.innerHTML = `<div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Værdi spild fordelt (måneden · ekskl. kager)</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">${chip('Brød')}${chip('Boller')}${chip('Wiener')}</div>`;
     } else {
       skBox.innerHTML = '';
@@ -5525,7 +5525,7 @@ function dbsRenderBemanding(d){
       Uge ${w.uge}: ${lbl}</button>`;
   }).join(' ');
   box.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Bemanding (løn 300 kr/dag) · klik: ingen → weekend (lør+søn) → fuld (alle dage)</span>
+      <span style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Bemanding (løn 300 kr/dag) · klik: ingen → weekend (lør+søn) → fuld (alle dage)</span>
       ${chips}</div>`;
 }
 
@@ -5547,7 +5547,7 @@ function dbsRenderKpi(){
   const c = document.getElementById('dbs-kpi');
   c.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;';
   const tile = (titel,o)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">${titel}${o?' · '+o.label:''}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">${titel}${o?' · '+o.label:''}</div>
       <div style="font-size:26px;font-weight:700;color:var(--forest);line-height:1;">${o?_dbsKr(o.db_kr):'—'}</div>
       <div style="font-size:11px;color:var(--ash);margin-top:5px;">${o?('DG '+_dbsPct(o.dg_pct)+' · oms '+_dbsKr(o.oms_ex)):''}</div>
     </div>`;
@@ -5690,7 +5690,7 @@ function _dbsRenderDrill(){
   const th = (col,lbl,align)=>`<th style="text-align:${align};cursor:pointer;user-select:none;" onclick="dbsDrillSortBy('${col}')">${lbl}${_dbsDrillArrow(col)}</th>`;
   box.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-      <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Poster bag ${_dbsDrillLabel} — kun Shopbox, ex moms</span>
+      <span style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Poster bag ${_dbsDrillLabel} — kun Shopbox, ex moms</span>
       <button onclick="document.getElementById('dbs-drill').style.display='none'" style="background:none;border:1px solid var(--border);border-radius:6px;color:var(--ash);cursor:pointer;font-size:12px;padding:4px 10px;">Luk ✕</button>
     </div>
     ${advarsel}
@@ -5781,7 +5781,7 @@ function socialKort(o) {
   return `
   <div class="card" style="margin-bottom:12px;" data-sid="${o.id}">
     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-      <span style="background:${s.bg};color:${s.b};font-family:'DM Mono',monospace;font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;padding:3px 8px;border-radius:20px;">${s.t}</span>
+      <span style="background:${s.bg};color:${s.b};font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;text-transform:none;letter-spacing:.01em;padding:3px 8px;border-radius:20px;">${s.t}</span>
       <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--ash);">${o.dato} · ${typeLbl} · ${kilde}${o.ai?' · AI':''}</span>
       ${o.fb_post_id?`<span style="font-family:'DM Mono',monospace;font-size:9px;color:#1c4d80;">FB: ${o.fb_post_id}</span>`:''}
     </div>
@@ -7088,7 +7088,7 @@ function buildSpildKrTabel() {
       <td class="num" style="${mono}color:${nettoClr};font-weight:600;">${dk(r.netto_spild_kr)} kr</td>
     </tr>`;
   }).join('') + `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
-      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);">Total ${rows.length} uger</td>
+      <td style="${mono}font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);">Total ${rows.length} uger</td>
       <td class="num" style="${mono}font-weight:600;">${dk(tSolgt)} kr</td>
       <td class="num" style="${mono}font-weight:600;color:var(--moss);">${dk(tTgtg)} kr</td>
       <td class="num" style="${mono}font-weight:600;">${dk(tSpild)} kr</td>
@@ -7172,7 +7172,7 @@ function spildDagDrill(uge, aar) {
   }).join('');
   const totPct = tB > 0 ? (tSp / tB * 100).toFixed(1) : '—';
   const totalRow = `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
-      <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);padding:5px 8px;">Total</td>
+      <td style="${mono}font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);padding:5px 8px;">Total</td>
       <td class="num" style="${mono}font-size:12px;font-weight:600;">${dk(tB)}</td>
       <td class="num" style="${mono}font-size:12px;font-weight:600;">${dk(tS)}</td>
       <td class="num" style="${mono}font-size:12px;font-weight:600;color:var(--moss);">${dk(tT)}</td>
@@ -7184,7 +7184,7 @@ function spildDagDrill(uge, aar) {
   const harFaktura = (r.faktura_kr || 0) > 0;
   const afstem = `
     <div style="margin-top:16px;">
-      <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Afstemning i kr — mod bagerfakturaen</div>
+      <div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Afstemning i kr — mod bagerfakturaen</div>
       ${harFaktura ? `
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <tr><td style="padding:4px 8px;">Leverance (bagerfaktura)</td><td class="num" style="${mono}">${dk(r.faktura_kr)} kr</td></tr>
@@ -7193,7 +7193,7 @@ function spildDagDrill(uge, aar) {
         <tr style="border-top:1px solid var(--border);"><td style="padding:5px 8px;font-weight:600;">= Netto til bager</td><td class="num" style="${mono}font-weight:700;">${dk(r.netto_faktura_kr)} kr</td></tr>
       </table>`
       : `<div style="padding:8px;color:var(--ash);font-size:12px;">Bagerfaktura ikke importeret endnu for denne uge — leverance/retur i kr afventer.</div>`}
-      <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin:14px 0 6px;">Spild i kroner (kostpris)</div>
+      <div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin:14px 0 6px;">Spild i kroner (kostpris)</div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <tr><td style="padding:4px 8px;">Spild før TGTG (kostpris)</td><td class="num" style="${mono}">${dk(r.spild_kr)} kr</td></tr>
         <tr><td style="padding:4px 8px;">− TGTG-indtægt</td><td class="num" style="${mono}color:var(--moss);">−${dk(r.tgtg_kr)} kr</td></tr>
@@ -7238,7 +7238,7 @@ function boekSimuler(){
   const n = u.length, snitF = sumF/n, snitS = sumS/n, dSnit = snitS - snitF;
   const loeft = snitF > 0 ? (dSnit / snitF * 100) : 0;
   const tile = (l,v,c) => `<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.06em;color:var(--ash);margin-bottom:5px;">${l}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);margin-bottom:5px;">${l}</div>
       <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
   const pos = dSnit >= 0;
   el('boek-sim-tiles').innerHTML =
@@ -7769,7 +7769,7 @@ function renderDagBonner(d){
     const titel = k === 'uden' ? 'Uden tidspunkt' : `kl. ${k}–${String((parseInt(k)+1)%24).padStart(2,'0')}`;
     return `<div style="margin-top:14px;">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
-        <span style="font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--forest);font-weight:600;">${titel}</span>
+        <span style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">${titel}</span>
         <span style="flex:1;height:1px;background:rgba(30,58,30,.12);"></span>
         <span style="${mono}font-size:11px;color:var(--ash);">${g.bonner.length} bonner · ${kr(g.total)}</span>
       </div>
@@ -8143,7 +8143,7 @@ function renderDageDetaljer(dage, n) {
       return `<div style="border-bottom:1px solid rgba(30,58,30,.08);">
         <div onclick="katFoldToggle('${katKey.replace(/'/g,"\\'")}')" title="Klik for at folde produkter" style="display:flex;align-items:center;gap:4px;padding:5px 16px 4px;background:rgba(30,58,30,.04);border-bottom:1px solid rgba(30,58,30,.06);cursor:pointer;user-select:none;">
           <span style="width:9px;color:var(--ash);font-size:8px;">${katFoldet?'▸':'▾'}</span>
-          <span style="flex:1;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">${kat}</span>
+          <span style="flex:1;font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);">${kat}</span>
           <span style="font-family:'DM Mono',monospace;font-size:9px;color:var(--ash);">${Math.round(katAntal)} stk</span>
           <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--forest);margin-left:8px;">${Math.round(katOmsat).toLocaleString('da-DK')} kr</span>
         </div>
@@ -8212,7 +8212,7 @@ function renderFakturaAfstemning(af){
     ['Total inkl. moms', _fkr(af.total_kr)],
   ].map(([l,v],i)=>`<div style="flex:1;min-width:120px;border:1px solid var(--border);border-radius:10px;padding:10px 14px;
       ${i===4?'background:var(--forest);color:#fff;':''}">
-      <div style="font-size:10px;${mono}letter-spacing:.06em;text-transform:uppercase;opacity:.7;margin-bottom:3px;">${l}</div>
+      <div style="font-size:10px;${mono}letter-spacing:.01em;text-transform:none;opacity:.7;margin-bottom:3px;">${l}</div>
       <div style="font-size:16px;font-weight:700;">${v}</div></div>`).join('');
 
   // Afstemnings-total-linje
@@ -8701,7 +8701,7 @@ function renderSpildScore(d){
   const kort = `
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px;">
     <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
-      <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Spild-grad (kvalitet)</div>
+      <div style="${mono}font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Spild-grad (kvalitet)</div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
         <span style="font-size:40px;font-weight:700;line-height:1;color:${pctFarve};">${d.snit_spild_pct}%</span>
         <span style="font-size:13px;font-weight:600;color:${pctFarve};">${_spildStatusTxt(d.status)}</span>
@@ -8714,7 +8714,7 @@ function renderSpildScore(d){
       <div style="${mono}font-size:10px;color:var(--ash);margin-top:5px;">seneste uge: <b style="color:${_spildFarve(sen.spild_pct_netto||0)}">${sen.spild_pct_netto||0}%</b> (brutto ${sen.spild_pct_brutto||0}%)</div>
     </div>
     <div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:18px 20px;">
-      <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">Andel af resultat tabt (konsekvens)</div>
+      <div style="${mono}font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);">Andel af resultat tabt (konsekvens)</div>
       <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px;">
         <span style="font-size:40px;font-weight:700;line-height:1;color:${resFarve};">${d.snit_pct_resultat}%</span>
         <span style="font-size:13px;color:var(--ash);">af ugens resultat</span>
@@ -8727,7 +8727,7 @@ function renderSpildScore(d){
 
   // Trend-graf
   const chart = `<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin-bottom:16px;">
-    <div style="${mono}font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:8px;">Spild% netto pr. uge · målstreg 15 %</div>
+    <div style="${mono}font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:8px;">Spild% netto pr. uge · målstreg 15 %</div>
     <div style="height:220px;"><canvas id="c-spildscore"></canvas></div></div>`;
 
   // Tabel
@@ -9238,7 +9238,7 @@ function buildAar() {
 
       <!-- Hvad forventer vi hele måneden -->
       <div style="margin-bottom:4px;">
-        <span style="font-size:11px;font-family:'DM Mono',monospace;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">Forventet omsætning hele måneden</span>
+        <span style="font-size:11px;font-family:'DM Sans',sans-serif;letter-spacing:.01em;text-transform:none;color:var(--ash);">Forventet omsætning hele måneden</span>
       </div>
       <div class="aar2-proj-omsat">${dk(indev.totalProj)} kr</div>
       <div class="aar2-proj-sub" style="margin-bottom:14px;">
@@ -10500,7 +10500,7 @@ async function loadUgeOekonomi(){
   const kr = v => Math.round(v||0).toLocaleString('da-DK');
   const t = d.total || {};
   const tile = (l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;">${l}</div>
       <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
   const resClr = (t.resultat||0)>=0?'var(--moss)':'var(--danger)';
   const tb=t.bagvaerk||{}, tf=t.frost||{}, ta=t.andet||{};
@@ -10589,7 +10589,7 @@ async function loadBagRegnskab(){
   const kr = v => Math.round(v||0).toLocaleString('da-DK');
   const t = d.total || {};
   const tile = (l,v,c)=>`<div style="background:var(--card,#fff);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
-      <div style="font-family:'DM Mono',monospace;font-size:9px;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);margin-bottom:4px;">${l}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:4px;">${l}</div>
       <div style="font-size:19px;font-weight:700;line-height:1;color:${c||'var(--forest)'};">${v}</div></div>`;
   const resClr = (t.resultat||0)>=0?'var(--moss)':'var(--danger)';
   // Spild % (af bestilt, stk) mod branche-norm: <15% godt, 15-25% normalt, >25% højt
@@ -10709,7 +10709,7 @@ function _umxSyncMeasureBtns(){
   const box = document.getElementById('umx-measure'); if(!box) return;
   const opts = _UMX_MEASURES[_umxScope];
   if (!opts.some(o=>o[0]===_umxMeasure)) _umxMeasure = opts[0][0];
-  box.innerHTML = '<span style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);text-transform:uppercase;">Mål:</span>'
+  box.innerHTML = '<span style="font-family:\'DM Mono\',monospace;font-size:9px;color:var(--ash);text-transform:none;">Mål:</span>'
     + opts.map(o=>`<button class="bageri-prof-btn${o[0]===_umxMeasure?' active':''}" onclick="umxMeasure('${o[0]}')">${o[1]}</button>`).join('');
 }
 function umxScope(s){ _umxScope = s;
@@ -10915,7 +10915,7 @@ async function _loadDagUge(uge, aar) {
       </td>`;
     }).join('');
     return `<tr style="background:rgba(30,58,30,.05);border-top:2px solid rgba(30,58,30,.18);">
-      <td style="${mono}font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--forest);font-weight:700;padding:10px 8px;">${label}</td>
+      <td style="${mono}font-size:11px;text-transform:none;letter-spacing:.01em;color:var(--forest);font-weight:700;padding:10px 8px;">${label}</td>
       ${dagCeller}
       <td class="num" style="${mono}border-left:2px solid rgba(30,58,30,.1);color:var(--forest);font-weight:700;font-size:16px;">${totBestilt || '—'}</td>
       <td class="num" style="${mono}font-weight:700;font-size:16px;">${totSolgt}</td>
@@ -10927,7 +10927,7 @@ async function _loadDagUge(uge, aar) {
 
   function _sektionHeader(katNavn) {
     return `<tr style="background:rgba(45,74,45,.07);border-top:1px solid var(--border);">
-      <td colspan="${colSpanTot}" style="padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--forest);">${katNavn.toUpperCase()}</td>
+      <td colspan="${colSpanTot}" style="padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:.01em;text-transform:none;color:var(--forest);">${katNavn.toUpperCase()}</td>
     </tr>`;
   }
 
@@ -10993,7 +10993,7 @@ async function visBestillingDetalje(uge, aar) {
       </tr>`;
     }).join('') +
     `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
-      <td style="font-family:'DM Mono',monospace;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);">Total</td>
+      <td style="font-family:'DM Sans',sans-serif;font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);">Total</td>
       <td></td>
       ${dagTotaler.map(t => `<td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(t)}</td>`).join('')}
       <td class="num" style="font-family:'DM Mono',monospace;font-weight:400;">${Math.round(totalStk).toLocaleString('da-DK')}</td>
@@ -11169,12 +11169,12 @@ async function tgtgSpec(uge, aar) {
       <td class="num" style="${mono}font-size:13px;">${r.antal}</td>
       <td class="num" style="${mono}font-size:13px;color:var(--forest);">${dk(r.kreditering)} kr</td></tr>`).join('');
   body.innerHTML = `
-    <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Pr. posetype</div>
+    <div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Pr. posetype</div>
     <table style="width:100%;border-collapse:collapse;margin-bottom:18px;">
       <thead><tr style="border-bottom:1px solid var(--border);">
         ${th({t:'POSETYPE'})}${th({t:'ANTAL',r:1})}${th({t:'KREDITERING',r:1})}
       </tr></thead><tbody>${poseRows}</tbody></table>
-    <div style="${mono}font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);margin-bottom:6px;">Dag for dag</div>
+    <div style="${mono}font-size:9px;letter-spacing:.01em;text-transform:none;color:var(--ash);margin-bottom:6px;">Dag for dag</div>
     <table style="width:100%;border-collapse:collapse;">
       <thead><tr style="border-bottom:1px solid var(--border);">
         ${th({t:'DAG'})}${th({t:'POSETYPE'})}${th({t:'ANTAL',r:1})}${th({t:'KR',r:1})}
@@ -11335,7 +11335,7 @@ async function loadTgtg() {
       }).join('') +
       // Totalrække
       `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.03);">
-        <td style="${mono}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);padding:6px 8px;">Total</td>
+        <td style="${mono}font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);padding:6px 8px;">Total</td>
         <td class="num" style="${mono}font-size:13px;font-weight:500;">${ugerMedSum.reduce((s,r)=>s+(r.total_antal||0),0)}</td>
         <td class="num" style="${mono}font-size:13px;font-weight:500;color:var(--forest);">${ugerMedSum.reduce((s,r)=>s+(r.beregnet_kr||0),0).toFixed(2)} kr</td>
         <td class="num" style="${mono}font-size:13px;font-weight:500;color:var(--ash);">${ugerMedSum.filter(r=>r.bager_kr!=null).reduce((s,r)=>s+(r.bager_kr||0),0).toFixed(2)} kr</td>
@@ -11946,7 +11946,7 @@ async function _spildHent(uge, aar) {
 
     // Totalrække
     rows += `<tr style="border-top:2px solid rgba(30,58,30,.15);background:rgba(30,58,30,.04);">
-      <td style="${MONO}font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ash);padding:8px 10px;">Total uge</td>
+      <td style="${MONO}font-size:9px;text-transform:none;letter-spacing:.01em;color:var(--ash);padding:8px 10px;">Total uge</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;">${d.total_bestilt||0}</td>
       <td class="num" style="${MONO}font-size:13px;font-weight:600;padding:8px 10px;color:var(--forest);">${d.total_kassesalg||0}</td>
       <td class="num" style="${MONO}font-size:12px;font-weight:600;padding:8px 10px;color:var(--ash);">${d.total_kw||0}</td>
@@ -12327,7 +12327,7 @@ function _returTgtgCardHtml(d) {
   return `
     <div style="background:var(--cream);border:1px solid rgba(30,58,30,.1);border-radius:12px;padding:16px 18px;">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:6px;">
-        <span style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ash);">📦 Retur &amp; TGTG · forslag</span>
+        <span style="font-family:'DM Sans',sans-serif;font-size:10px;letter-spacing:.01em;text-transform:none;color:var(--ash);">📦 Retur &amp; TGTG · forslag</span>
         <span style="font-size:10px;color:var(--ash);">opdateret kl. ${klStr} · baseret på dagens bestilling &amp; salg</span>
       </div>
       <div style="display:flex;gap:10px;margin:10px 0 14px;flex-wrap:wrap;">
@@ -13131,7 +13131,7 @@ function _mdTilHtml(tekst) {
   return tekst
     .split('\n')
     .map(l => {
-      if (/^###\s+/.test(l)) return `<h5 style="margin:12px 0 4px;font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--forest);text-transform:uppercase;">${esc(l.replace(/^###\s+/,''))}</h5>`;
+      if (/^###\s+/.test(l)) return `<h5 style="margin:12px 0 4px;font-size:12px;font-weight:600;letter-spacing:.01em;color:var(--forest);text-transform:none;">${esc(l.replace(/^###\s+/,''))}</h5>`;
       if (/^##\s+/.test(l))  return `<h4 style="margin:14px 0 5px;font-size:13px;font-weight:600;color:var(--forest);">${esc(l.replace(/^##\s+/,''))}</h4>`;
       if (/^#\s+/.test(l))   return `<h3 style="margin:0 0 12px;font-size:14px;font-weight:600;color:var(--forest);">${esc(l.replace(/^#\s+/,''))}</h3>`;
       if (/^[-*]\s+/.test(l)) return `<div style="padding:2px 0 2px 14px;position:relative;"><span style="position:absolute;left:0;color:var(--moss);">•</span>${_inlineMd(esc(l.replace(/^[-*]\s+/,'').trim()))}</div>`;
@@ -13956,7 +13956,7 @@ function buildStamdataTbl(rows, highlightId) {
     if (!grp.length) continue;
     const label = type === '_andet' ? 'Andet' : type;
     html += `<tr style="background:rgba(30,58,30,.04);">
-      <td colspan="6" style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);padding:6px 14px;">${label} · ${grp.length} varer</td>
+      <td colspan="6" style="font-family:'DM Sans',sans-serif;font-size:8px;letter-spacing:.01em;text-transform:none;color:var(--ash);padding:6px 14px;">${label} · ${grp.length} varer</td>
     </tr>`;
     grp.forEach(r => {
       html += stamRow(r, r.id === highlightId);
@@ -14090,7 +14090,7 @@ async function loadVnrKontrol() {
   // --- Sektion 1: Bestillings-vnr UDEN nogen salgshistorik ---
   html += `<div style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--danger);">⚠ Bestillings-varenumre uden kassematch (${d.ingen_salg.length})</span>
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:none;letter-spacing:.01em;color:var(--danger);">⚠ Bestillings-varenumre uden kassematch (${d.ingen_salg.length})</span>
     </div>`;
   if (!d.ingen_salg.length) {
     html += `<p style="${mono}font-size:11px;color:var(--forest);">✓ Alle bestillings-varenumre er set i kassen</p>`;
@@ -14114,7 +14114,7 @@ async function loadVnrKontrol() {
   // --- Sektion 2: Salgs-vnr (seneste 90 dage) UDEN bestillings-match ---
   html += `<div style="margin-bottom:20px;">
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--amber);">◎ Salgsvarer ikke i nogen bestilling — seneste 90 dage (${d.kun_salg.length})</span>
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:none;letter-spacing:.01em;color:var(--amber);">◎ Salgsvarer ikke i nogen bestilling — seneste 90 dage (${d.kun_salg.length})</span>
     </div>`;
   if (!d.kun_salg.length) {
     html += `<p style="${mono}font-size:11px;color:var(--forest);">✓ Ingen salgsvarer uden bestillingspost</p>`;
@@ -14142,7 +14142,7 @@ async function loadVnrKontrol() {
   // --- Sektion 3: Korrekte matches ---
   html += `<div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <span style="${mono}font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--forest);">✓ Matches — bestilling ↔ kasse (${d.med_salg.length})</span>
+      <span style="${mono}font-size:10px;font-weight:700;text-transform:none;letter-spacing:.01em;color:var(--forest);">✓ Matches — bestilling ↔ kasse (${d.med_salg.length})</span>
     </div>
     <div style="border:1px solid rgba(30,58,30,.12);border-radius:8px;overflow:hidden;max-height:280px;overflow-y:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
@@ -14182,7 +14182,7 @@ if (typeof loadReturStatus === 'function') {
   background:var(--white);border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.25);
   z-index:1001;min-width:420px;max-width:640px;width:90vw;max-height:80vh;overflow:hidden;flex-direction:column;">
   <div style="background:var(--forest);padding:16px 20px;display:flex;align-items:center;gap:12px;">
-    <span id="vf-modal-titel" style="flex:1;font-family:'DM Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--amber);text-transform:uppercase;"></span>
+    <span id="vf-modal-titel" style="flex:1;font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;color:var(--amber);text-transform:none;"></span>
     <button onclick="vfModalLuk()" style="background:none;border:none;color:rgba(255,255,255,.6);font-size:18px;cursor:pointer;padding:0 4px;line-height:1;">✕</button>
   </div>
   <div id="vf-modal-body" style="overflow-y:auto;padding:20px;flex:1;"></div>
@@ -14273,12 +14273,12 @@ function renderDagsopstilling(d){
         <span style="${mono}font-size:11px;color:var(--ash);">bestilt ${g.bestilt} · tastet ${g.tastet} · ${info}</span></div>
       <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:380px;">
         <thead><tr>
-          <th style="text-align:left;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Vare</th>
-          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Bestilt</th>
-          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Tastet</th>
-          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Rest</th>
-          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);" title="kostpris/stk · kost af rest">Kost</th>
-          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:uppercase;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Status</th>
+          <th style="text-align:left;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Vare</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Bestilt</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Tastet</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Rest</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);" title="kostpris/stk · kost af rest">Kost</th>
+          <th style="text-align:right;padding:5px 8px;font-size:10px;text-transform:none;color:var(--ash);border-bottom:1px solid var(--line,#eee);">Status</th>
         </tr></thead><tbody>${rows}</tbody>
         <tfoot><tr style="font-weight:700;background:rgba(47,90,48,.05);">
           <td style="text-align:left;padding:7px 8px;border-top:2px solid var(--line,#ddd);">I alt — ${g.kat}</td>
@@ -15234,7 +15234,7 @@ function mgmtInitForslag() {
 
   // Label over forslagene
   const lbl = document.createElement('div');
-  lbl.style.cssText = 'font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.12em;color:var(--ash);margin-bottom:10px;text-transform:uppercase;';
+  lbl.style.cssText = 'font-family:"DM Sans",sans-serif;font-size:12px;font-weight:500;letter-spacing:0;color:#8a9589;margin-bottom:10px;text-transform:none;';
   lbl.textContent = 'Inspirerende spørgsmål — klik for at sende';
   el.appendChild(lbl);
 

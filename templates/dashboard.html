@@ -20,20 +20,20 @@
   --danger:#c0392b; --success:#2d5a2d;
   --bg:#fafaf8; --border:rgba(30,58,30,.15);
   /* glossy lag */
-  --glass:linear-gradient(158deg,rgba(255,255,255,.82),rgba(255,255,255,.58) 55%,rgba(245,240,232,.5));
-  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.9),rgba(255,255,255,0) 46%);
-  --glass-streak:linear-gradient(118deg,transparent 20%,rgba(255,255,255,.5) 32%,rgba(255,255,255,0) 46%);
-  --glass-brd:rgba(255,255,255,.85);
-  --blur:blur(18px) saturate(1.6);
-  --shadow-soft:0 1px 2px rgba(30,58,30,.07),0 10px 26px rgba(30,58,30,.12),0 26px 60px rgba(30,58,30,.09);
-  --shadow-lift:0 3px 8px rgba(30,58,30,.14),0 26px 60px rgba(30,58,30,.2);
+  --glass:linear-gradient(180deg,rgba(255,255,255,.97),rgba(251,248,242,.88) 50%,rgba(244,238,227,.82));
+  --glass-sheen:linear-gradient(180deg,rgba(255,255,255,.95),rgba(255,255,255,0) 42%);
+  --glass-streak:linear-gradient(118deg,transparent 16%,rgba(255,255,255,.6) 31%,rgba(255,255,255,0) 44%);
+  --glass-brd:rgba(255,255,255,.9);
+  --blur:blur(20px) saturate(1.7);
+  --shadow-soft:0 0 0 1px rgba(30,58,30,.05),0 2px 5px rgba(30,58,30,.09),0 16px 34px rgba(30,58,30,.16),0 34px 70px rgba(30,58,30,.12);
+  --shadow-lift:0 0 0 1px rgba(30,58,30,.06),0 5px 12px rgba(30,58,30,.2),0 34px 74px rgba(30,58,30,.28);
 }
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;}
 body{background:
-    radial-gradient(1200px 560px at 80% -10%, rgba(200,168,75,.2), transparent 58%),
-    radial-gradient(1000px 680px at -8% 112%, rgba(45,90,45,.16), transparent 55%),
-    linear-gradient(165deg,#f8f4ed 0%, #ebe4d6 100%);
+    radial-gradient(1200px 620px at 82% -10%, rgba(200,168,75,.42), transparent 56%),
+    radial-gradient(1050px 720px at -10% 116%, rgba(45,90,45,.34), transparent 55%),
+    linear-gradient(160deg,#efe7d7 0%, #e1d6c0 100%);
   color:var(--charcoal);font-family:'DM Sans',sans-serif;font-weight:300;line-height:1.6;}
 
 #app{display:flex;height:100%;flex-direction:column;}
@@ -125,9 +125,10 @@ body{background:
 
 /* CONTENT */
 .content{flex:1;overflow-y:auto;background:
-    radial-gradient(1100px 520px at 82% -6%, rgba(200,168,75,.16), transparent 58%),
-    radial-gradient(900px 620px at -6% 108%, rgba(45,90,45,.12), transparent 55%),
-    linear-gradient(165deg,#f8f4ed 0%, #ece5d8 100%);}
+    radial-gradient(1150px 560px at 84% -6%, rgba(200,168,75,.34), transparent 56%),
+    radial-gradient(950px 660px at -8% 110%, rgba(45,90,45,.26), transparent 55%),
+    radial-gradient(760px 520px at 48% 42%, rgba(255,255,255,.45), transparent 68%),
+    linear-gradient(162deg,#f1e9da 0%, #e3d8c3 100%);}
 .panel{display:none;padding:28px 28px 40px;}
 .panel.active{display:block;}
 

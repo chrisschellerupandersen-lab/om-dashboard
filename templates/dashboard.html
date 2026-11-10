@@ -360,15 +360,15 @@ body{background:
 .dag-kpi { background: var(--white) !important; border-color: rgba(30,58,30,.08) !important;
            border-left-color: rgba(30,58,30,.08) !important; align-items: center; text-align: center; }
 .dag-kpi .kpi-l, .dag-kpi-lbl {
-  font-family:'DM Mono',monospace; font-size:10px; letter-spacing:.06em; text-transform:uppercase;
-  color:var(--ash); margin-bottom:12px; font-weight:500; line-height:1.4;
+  font-family:'DM Sans',sans-serif; font-size:12.5px; letter-spacing:0; text-transform:none;
+  color:#8a9589; margin-bottom:12px; font-weight:500; line-height:1.35;
 }
 .dag-ring-wrap { position:relative; width:110px; height:110px; margin:0 auto 10px; }
 .dag-ring-svg  { width:100%; height:100%; }
 .dag-ring-inner { position:absolute; inset:0; display:flex; flex-direction:column;
                   align-items:center; justify-content:center; gap:2px; }
 .dag-ring-val  { font-size:18px; font-weight:600; color:var(--charcoal); line-height:1; }
-.dag-ring-sub  { font-family:'DM Mono',monospace; font-size:9px; color:var(--ash); }
+.dag-ring-sub  { font-family:'DM Sans',sans-serif; font-size:11px; color:#9aa399; }
 .dag-kpi-ref   { font-size:11px; color:var(--ash); margin-top:4px; }
 .dag-ring-val.up { color: var(--moss); }
 .dag-ring-val.dn { color: var(--danger); }
@@ -460,7 +460,7 @@ body{background:
 .aar2-fc-l{font-family:'DM Mono',monospace;font-size:7px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);margin-top:2px;}
 .aar2-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;}
 .aar2-chart-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
-.aar2-chart-ttl{font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);}
+.aar2-chart-ttl{font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:#8a9589;}
 .aar2-chart-sub{font-family:'DM Mono',monospace;font-size:7px;color:var(--ash);opacity:.6;}
 .aar2-tbl-wrap{border:1px solid rgba(30,58,30,.08);border-radius:12px;overflow:hidden;margin-bottom:14px;box-shadow:0 2px 8px rgba(30,58,30,.04);}
 .aar2-tbl-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 18px;background:var(--forest);}
@@ -7658,7 +7658,7 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub){
   const up = pct != null && pct >= 0;
   const clr = pct == null ? 'var(--ash)' : (up ? 'var(--moss)' : 'var(--danger)');
   const dtag = pct == null ? '' :
-    `<span style="font-size:13px;font-weight:600;color:${clr};white-space:nowrap;">${up ? '▲ +' : '▼ '}${Math.abs(pct).toFixed(0)}%</span>`;
+    `<span style="font-size:12px;font-weight:500;color:${up?'#216e2c':'#bb3828'};background:${up?'rgba(45,110,55,.13)':'rgba(192,57,43,.11)'};padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;">${up ? '↑ ' : '↓ '}${Math.abs(pct).toFixed(0)}%</span>`;
   let spark = '';
   if (arr.length >= 2){
     const vals = arr.map(valFn);
@@ -7672,12 +7672,12 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub){
     }).join('');
     spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:9px;">${bars}</div>`;
   }
-  return `<div style="flex:1;min-width:180px;background:var(--card,#fff);border:1px solid var(--border);border-radius:12px;padding:13px 15px;">
-    <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);">${titel}</div>
-    <div style="display:flex;align-items:baseline;gap:9px;margin-top:5px;">
-      <span style="font-size:23px;font-weight:700;line-height:1;">${valTxt}</span>${dtag}
+  return `<div style="flex:1;min-width:180px;background:linear-gradient(180deg,#fff,#fdfbf7);border:1px solid rgba(30,58,30,.09);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(30,58,30,.05),0 10px 24px rgba(30,58,30,.08);">
+    <div style="font-size:12.5px;font-weight:500;color:#8a9589;">${titel}</div>
+    <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px;">
+      <span style="font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.015em;color:var(--forest);">${valTxt}</span>${dtag}
     </div>
-    <div style="font-size:11px;color:var(--ash);margin-top:4px;">${sub}</div>
+    <div style="font-size:12.5px;color:#9aa399;margin-top:6px;">${sub}</div>
     ${spark}
   </div>`;
 }

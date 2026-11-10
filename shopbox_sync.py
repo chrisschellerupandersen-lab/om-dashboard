@@ -553,6 +553,36 @@ def _nulstil_token():
     TOKEN = os.environ.get("SHOPBOX_TOKEN", "")
 
 
+def _dagens_lager():
+    """Dagens restlager pr. kategori og vare til loyalitets-appen (samme tal som
+    'Rest i dag pr. kategori' i dashboardet). Kage holdes ude. Kun rest sendes —
+    ikke bestilt/solgt."""
+    try:
+        import database
+        from zoneinfo import ZoneInfo
+        idag = datetime.now(ZoneInfo("Europe/Copenhagen")).strftime("%Y-%m-%d")
+        d = database.hent_dagens_rest_kategori(idag) or {}
+        kategorier = []
+        for k in d.get("kategorier") or []:
+            navn = str(k.get("kategori") or "")
+            if not navn or navn.strip().lower().startswith("kage"):
+                continue
+            varer = [{"navn": v.get("varenavn"), "rest": max(0, int(round(v.get("rest") or 0)))}
+                     for v in (k.get("varer") or [])
+                     if v.get("type") == "vare" and (v.get("bestilt") or 0) > 0]
+            if not varer:
+                continue
+            kategorier.append({"kategori": navn,
+                               "rest": max(0, int(round(k.get("rest") or 0))),
+                               "varer": varer})
+        if not kategorier:
+            return None
+        return {"dato": d.get("dato") or idag, "kategorier": kategorier}
+    except Exception as e:
+        print(f"[Loyalitet-sync] lager-fejl: {str(e)[:120]}")
+        return None
+
+
 def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     """Find de seneste bonner med kunde (= mail tastet for kvittering) og aflevér
     dem til loyalitets-appen. Appen dedup'er på order_hash, så gentagelser er harmløse.
@@ -610,9 +640,12 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
         k["varer"] = linjer.get(k["orderHash"], [])
     ud["med_varer"] = sum(1 for k in kvitteringer if k["varer"])
 
-    if kvitteringer:
+    lager = _dagens_lager()
+    ud["lager_kategorier"] = len(lager["kategorier"]) if lager else 0
+
+    if kvitteringer or lager:
         r = requests.post(f"{LOYALITET_URL}/_api/shopbox/kvittering",
-                          json={"kvitteringer": kvitteringer},
+                          json={"kvitteringer": kvitteringer, "lager": lager},
                           headers={"X-Webhook-Secret": secret}, timeout=60)
         if not r.ok:
             return {**ud, "ok": False, "fejl": f"app svarede HTTP {r.status_code}: {r.text[:150]}"}
@@ -623,6 +656,7 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
         ud["sendt"] = len(kvitteringer)
         ud["nye_i_app"] = svar.get("nye")
         ud["stempler_givet"] = svar.get("stempler")
+        ud["lager_gemt"] = svar.get("lagerGemt")
         _SENDTE_BONNER.update(k["orderHash"] for k in kvitteringer if k["varer"])
     return ud
 

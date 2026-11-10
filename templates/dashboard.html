@@ -8531,8 +8531,9 @@ function renderDagRest(d){
     const c = _restFarve(pct);
     const key = k.kategori;
     const open = !!_restFold[key];
+    const info = `${pct}% solgt · ${k.solgt} af ${k.bestilt} bestilt${k.combo_antal>0?` · inkl. ${k.combo_antal} combo`:''}`;
     const varer = k.varer || [];
-    const varerHtml = !open ? '' : `<div class="rest-varer">` +
+    const varerHtml = !open ? '' : `<div class="rest-varer"><div style="font-size:11px;color:#8a9589;margin-bottom:4px;">${info}</div>` +
       varer.map(v => {
         if (v.type === 'combo'){
           return `<div class="rest-vare" style="color:var(--ash);border-top:1px dashed rgba(30,58,30,.12);margin-top:3px;padding-top:5px;">
@@ -8549,9 +8550,8 @@ function renderDagRest(d){
           ${pill(v.rest, vc)}
         </div>`;
       }).join('') + `</div>`;
-    const tip = `${pct}% solgt · solgt ${k.solgt} af ${k.bestilt} bestilt${k.combo_antal>0?` · inkl. ${k.combo_antal} combo`:''} — klik for varer`;
     return `<div>
-      <div class="rest-rk" onclick="restFoldToggle('${key.replace(/'/g,"\'")}')" title="${tip}">
+      <div class="rest-rk" onclick="restFoldToggle('${key.replace(/'/g,"\'")}')">
         <span class="rest-navn" style="font-weight:500;color:var(--charcoal);"><span style="color:var(--ash);font-size:9px;">${open?'▾':'▸'}</span> ${k.kategori}</span>
         <span class="rest-bar"><span style="width:${pct}%;background:${c};"></span></span>
         <span class="rest-tal">${k.solgt}/${k.bestilt}</span>

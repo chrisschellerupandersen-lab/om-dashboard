@@ -670,6 +670,33 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .panel.active{display:block;}
 @keyframes panelIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
 
+/* ── MOTION: blød indflyvning, voksende søjler, pop-pills, flip-kort ─────────── */
+@keyframes riseIn{from{opacity:0;transform:translateY(12px) scale(.985);}to{opacity:1;transform:none;}}
+@keyframes barGrow{from{transform:scaleY(0);}to{transform:scaleY(1);}}
+@keyframes pillPop{0%{opacity:0;transform:scale(.6);}70%{opacity:1;transform:scale(1.1);}100%{opacity:1;transform:scale(1);}}
+.panel.active .kpi,.panel.active .card,.mflip{animation:riseIn .5s cubic-bezier(.2,.7,.2,1) backwards;}
+.panel.active .kpi:nth-child(2),.panel.active .card:nth-child(2),.mflip:nth-child(2){animation-delay:.06s;}
+.panel.active .kpi:nth-child(3),.panel.active .card:nth-child(3),.mflip:nth-child(3){animation-delay:.12s;}
+.panel.active .kpi:nth-child(4),.panel.active .card:nth-child(4){animation-delay:.18s;}
+.panel.active .kpi:nth-child(5),.panel.active .card:nth-child(5){animation-delay:.24s;}
+.panel.active .kpi:nth-child(n+6),.panel.active .card:nth-child(n+6){animation-delay:.3s;}
+.kpi-delta,.mpill{animation:pillPop .45s cubic-bezier(.3,1.4,.5,1) .35s backwards;}
+.spk{transform-origin:bottom;animation:barGrow .6s cubic-bezier(.2,.8,.2,1) backwards;}
+/* Flip-kort (Seneste dag): klik = bagside med samme dag sidste uge */
+.mflip{flex:1;min-width:180px;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.mflip-in{position:relative;height:100%;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.9,.3,1);}
+.mflip:hover .mflip-in{transform:rotateY(7deg) translateY(-3px);}
+.mflip.flipped .mflip-in{transform:rotateY(180deg);}
+.mflip-f,.mflip-b{-webkit-backface-visibility:hidden;backface-visibility:hidden;border-radius:16px;padding:16px 18px;}
+.mflip-f{height:100%;position:relative;background:linear-gradient(180deg,#fff,#fdfbf7);border:1px solid rgba(30,58,30,.09);box-shadow:0 1px 2px rgba(30,58,30,.05),0 10px 24px rgba(30,58,30,.08);}
+.mflip-b{position:absolute;inset:0;transform:rotateY(180deg);background:linear-gradient(152deg,#357036,#244425 46%,#16291a);color:#f4eee2;box-shadow:0 2px 6px rgba(30,58,30,.1),0 20px 44px rgba(30,58,30,.2);display:flex;flex-direction:column;justify-content:center;}
+.mflip-hint{position:absolute;top:10px;right:12px;font-size:13px;color:#b9c1b8;transition:transform .4s,color .2s;}
+.mflip:hover .mflip-hint{transform:rotate(180deg);color:var(--amber);}
+@media (prefers-reduced-motion:reduce){
+  .panel.active .kpi,.panel.active .card,.mflip,.kpi-delta,.mpill,.spk{animation:none;}
+  .mflip-in{transition:none;}
+}
+
 /* ── IMPROVED MOBILE ─────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
   html,body{overflow:auto;height:auto;}
@@ -7654,13 +7681,14 @@ function _pctTxt(nu, foer){
   return (p >= 0 ? '+' : '') + p.toFixed(0) + '%';
 }
 // Ét nøgletals-kort: dagens værdi, Δ vs. samme dag sidste uge, 14-dages sparkline
-function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub){
+function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt){
+  fmt = fmt || (v => String(Math.round(v)));
   const har = (foer != null && foer > 0 && nu != null);
   const pct = har ? ((nu / foer - 1) * 100) : null;
   const up = pct != null && pct >= 0;
   const clr = pct == null ? 'var(--ash)' : (up ? 'var(--moss)' : 'var(--danger)');
   const dtag = pct == null ? '' :
-    `<span style="font-size:12px;font-weight:500;color:${up?'#216e2c':'#bb3828'};background:${up?'rgba(45,110,55,.13)':'rgba(192,57,43,.11)'};padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;">${up ? '↑ ' : '↓ '}${Math.abs(pct).toFixed(0)}%</span>`;
+    `<span class="mpill" style="display:inline-block;font-size:12px;font-weight:500;color:${up?'#216e2c':'#bb3828'};background:${up?'rgba(45,110,55,.13)':'rgba(192,57,43,.11)'};padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;">${up ? '↑ ' : '↓ '}${Math.abs(pct).toFixed(0)}%</span>`;
   let spark = '';
   if (arr.length >= 2){
     const vals = arr.map(valFn);
@@ -7670,18 +7698,28 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub){
       const last = i === arr.length - 1;
       const dd = x.dato.slice(8,10) + '/' + x.dato.slice(5,7);
       return `<div title="${dd}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
-        <div style="height:${h}px;border-radius:2px 2px 0 0;background:${last ? 'var(--amber)' : 'rgba(47,90,48,.5)'};"></div></div>`;
+        <div class="spk" style="animation-delay:${(.25 + i*.03).toFixed(2)}s;height:${h}px;border-radius:2px 2px 0 0;background:${last ? 'var(--amber)' : 'rgba(47,90,48,.5)'};"></div></div>`;
     }).join('');
     spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:42px;margin-top:9px;">${bars}</div>`;
   }
-  return `<div style="flex:1;min-width:180px;background:linear-gradient(180deg,#fff,#fdfbf7);border:1px solid rgba(30,58,30,.09);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(30,58,30,.05),0 10px 24px rgba(30,58,30,.08);">
+  const diff = har ? (nu - foer) : null;
+  const bag = har
+    ? `<div style="font-size:12.5px;font-weight:500;color:rgba(244,238,226,.7);">Samme dag sidste uge</div>
+       <div style="font-size:26px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-top:7px;">${fmt(foer)}</div>
+       <div style="font-size:13px;margin-top:10px;color:${up?'#bfe3a8':'#f3b3a6'};">${up?'↑':'↓'} ${fmt(Math.abs(diff))} ${up?'mere':'mindre'} i dag (${up?'+':'−'}${Math.abs(pct).toFixed(0)}%)</div>`
+    : `<div style="font-size:13px;color:rgba(244,238,226,.75);">Ingen sammenligning for samme dag sidste uge</div>`;
+  return `<div class="mflip" onclick="this.classList.toggle('flipped')" title="Klik for at vende kortet"><div class="mflip-in">
+   <div class="mflip-f">
+    <span class="mflip-hint">⟲</span>
     <div style="font-size:12.5px;font-weight:500;color:#8a9589;">${titel}</div>
     <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px;">
-      <span style="font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.015em;color:var(--forest);">${valTxt}</span>${dtag}
+      <span class="cu" style="font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.015em;color:var(--forest);">${valTxt}</span>${dtag}
     </div>
     <div style="font-size:12.5px;color:#9aa399;margin-top:6px;">${sub}</div>
     ${spark}
-  </div>`;
+   </div>
+   <div class="mflip-b">${bag}</div>
+  </div></div>`;
 }
 
 function buildDagTop(kpi, dage){
@@ -7698,13 +7736,13 @@ function buildDagTop(kpi, dage){
   const cards =
       _metricCard('Omsætning i dag', dSB!=null ? kr(dSB) : '—', dSB, pdSB,
         arr, x=> oms(x.omsaetning)||0,
-        `ekskl. B2B (stemmer til Shopbox) · uge ${_pctTxt(uSB,puSB)} · md ${_pctTxt(mSB,pmSB)}${b2bDag>0?` · + B2B ${kr(b2bDag)}`:''}`)
+        `ekskl. B2B (stemmer til Shopbox) · uge ${_pctTxt(uSB,puSB)} · md ${_pctTxt(mSB,pmSB)}${b2bDag>0?` · + B2B ${kr(b2bDag)}`:''}`, kr)
     + _metricCard('Kunder i dag', D.transak!=null ? D.transak : '—', D.transak, PD.transak,
         arr, x=> x.transak||0,
         `antal kunder · vs. samme dag sidste uge${PD.transak>0 ? ': '+PD.transak : ''}`)
     + _metricCard('Kurvstørrelse', kNu!=null ? kr(kNu) : '—', kNu, kFoer,
         arr, x=> (x.transak>0 ? (oms(x.omsaetning)/x.transak) : 0),
-        `kr pr. kurv · vs. sidste uge${kFoer!=null ? ': '+kr(kFoer) : ''}`);
+        `kr pr. kurv · vs. sidste uge${kFoer!=null ? ': '+kr(kFoer) : ''}`, kr);
   el.innerHTML = `<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;">${cards}</div>`;
 }
 
@@ -15807,5 +15845,78 @@ function updateMgmtKorselKPI() {
     <div id="spild-dag-body" style="margin-top:14px;"></div>
   </div>
 </div>
+
+<script>
+// ── MOTION: nøgletal tæller op når de vises/opdateres ─────────────────────────
+// Rent visuelt: slut-teksten sættes altid tilbage til den præcise original.
+(function(){
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const SEL = '.kpi-v,.cu';
+  const tok = new WeakMap();
+  function countUp(el){
+    if (!el.isConnected || el.children.length || el.offsetParent === null) return;
+    const node = el.firstChild;
+    if (!node || node.nodeType !== 3 || el.childNodes.length !== 1) return;
+    const txt = node.nodeValue;
+    if (/[\/:]/.test(txt)) return;                         // datoer / klokkeslæt
+    const m = txt.match(/\d[\d.]*(?:,\d+)?/);
+    if (!m) return;
+    const raw = m[0].replace(/\.+$/, '');
+    if (/^0\d/.test(raw)) return;
+    let thou = false, sep = '', dec = 0, val;
+    if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(raw)) {           // 12.345,50
+      thou = true; const p = raw.split(',');
+      if (p[1]) { sep = ','; dec = p[1].length; }
+      val = parseFloat(raw.replace(/\./g,'').replace(',','.'));
+    } else if (raw.includes(',')) {                        // 45,2
+      if (raw.includes('.')) return;
+      sep = ','; dec = raw.split(',')[1].length; val = parseFloat(raw.replace(',','.'));
+    } else if (raw.includes('.')) {                        // 45.2
+      if (raw.split('.').length !== 2) return;
+      sep = '.'; dec = raw.split('.')[1].length; val = parseFloat(raw);
+    } else {
+      val = parseInt(raw, 10);
+      if (raw.length === 4 && val >= 1900 && val <= 2100) return;   // årstal
+    }
+    if (!isFinite(val) || val === 0) return;
+    const pre = txt.slice(0, m.index), post = txt.slice(m.index + raw.length);
+    const fmt = v => {
+      const s = v.toFixed(dec).split('.');
+      const i = thou ? s[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') : s[0];
+      return i + (dec ? sep + s[1] : '');
+    };
+    const my = {}; tok.set(el, my);
+    const t0 = performance.now(), DUR = 750;
+    (function tick(now){
+      if (tok.get(el) !== my || el.firstChild !== node) return;   // nyt indhold kom imens
+      const p = Math.min(1, (now - t0) / DUR);
+      if (p >= 1) { node.nodeValue = txt; tok.delete(el); return; }
+      node.nodeValue = pre + fmt(val * (1 - Math.pow(1 - p, 3))) + post;
+      requestAnimationFrame(tick);
+    })(t0);
+  }
+  let queue = new Set(), planlagt = false;
+  function koe(el){
+    queue.add(el);
+    if (planlagt) return; planlagt = true;
+    requestAnimationFrame(() => { planlagt = false; const q = queue; queue = new Set(); q.forEach(countUp); });
+  }
+  new MutationObserver(muts => {
+    for (const mu of muts) {
+      const t = mu.target;
+      if (mu.type === 'attributes') {
+        if (t.classList.contains('panel') && t.classList.contains('active')) t.querySelectorAll(SEL).forEach(koe);
+        continue;
+      }
+      if (t.nodeType === 1 && t.matches(SEL)) { koe(t); continue; }
+      mu.addedNodes.forEach(n => {
+        if (n.nodeType !== 1) return;
+        if (n.matches(SEL)) koe(n);
+        else if (n.firstElementChild) n.querySelectorAll(SEL).forEach(koe);
+      });
+    }
+  }).observe(document.body, {childList:true, subtree:true, attributes:true, attributeFilter:['class']});
+})();
+</script>
 </body>
 </html>

@@ -709,6 +709,17 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .bon-l{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.35;padding:1px 3px;border-radius:4px;color:var(--charcoal);}
 .bon-l.hit{background:rgba(93,143,78,.18);font-weight:500;}
 .bon-kr{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--ash);white-space:nowrap;}
+/* Mobil: nøgletals-kort to pr. række, mindre tal, undertekst maks. 2 linjer */
+@media (max-width:640px){
+  #dag-top .mflip{min-width:0;flex:1 1 calc(50% - 5px);}
+  #dag-top .mflip-f,#dag-top .mflip-b{padding:11px 12px 10px;}
+  #dag-top .mc-val{font-size:21px !important;}
+  #dag-top .mc-sub{font-size:11px !important;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  #dag-top .mflip-b div{font-size:11.5px !important;}
+  #dag-top .mflip-b div:nth-child(2){font-size:20px !important;}
+  .mflip:hover .mflip-in{transform:none;}
+  .mflip.flipped:hover .mflip-in{transform:rotateY(180deg);}
+}
 /* Flip-kort (Seneste dag): klik = bagside med samme dag sidste uge */
 .mflip{flex:1;min-width:180px;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .mflip-in{position:relative;height:100%;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.9,.3,1);}
@@ -728,6 +739,7 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .ovb-diff{font-size:12px;text-align:right;}
 .ovb-sep{height:1px;background:rgba(255,255,255,.14);margin:8px 0;}
 .mflip-hint{position:absolute;top:10px;right:12px;font-size:13px;color:#b9c1b8;transition:transform .4s,color .2s;}
+.mflip-f>.mflip-hint+div{padding-right:20px;}
 .mflip:hover .mflip-hint{transform:rotate(180deg);color:var(--amber);}
 
 /* ── IMPROVED MOBILE ─────────────────────────────────────────────────────────── */
@@ -7802,10 +7814,10 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt, foerLbl){
    <div class="mflip-f">
     <span class="mflip-hint">⟲</span>
     <div style="font-size:12.5px;font-weight:500;color:#8a9589;">${titel}</div>
-    <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px;">
-      <span class="cu" style="font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.015em;color:var(--forest);">${valTxt}</span>${dtag}
+    <div style="display:flex;align-items:baseline;gap:9px;margin-top:7px;flex-wrap:wrap;">
+      <span class="cu mc-val" style="font-size:26px;font-weight:600;line-height:1.05;letter-spacing:-.015em;color:var(--forest);">${valTxt}</span>${dtag}
     </div>
-    <div style="font-size:12.5px;color:#9aa399;margin-top:6px;">${sub}</div>
+    <div class="mc-sub" style="font-size:12.5px;color:#9aa399;margin-top:6px;">${sub}</div>
     ${spark}
    </div>
    <div class="mflip-b">${bag}</div>

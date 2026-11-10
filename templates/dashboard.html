@@ -697,6 +697,18 @@ body{background:linear-gradient(170deg,#f4eee2 0%, #ebe3d4 100%);
 .rest-vare{padding:3px 0;font-size:12px;grid-template-columns:minmax(80px,1fr) 70px 40px 84px;}
 #dag-rest-card{padding-top:14px;padding-bottom:12px;}
 #dag-rest-card .aar2-chart-hdr{margin-bottom:8px;}
+/* Bonner (Seneste dag): time-kolonner venstre→højre som grafen + produktsøgning */
+.bon-soeg{flex:1;min-width:200px;max-width:340px;padding:7px 14px;border:1px solid rgba(30,58,30,.16);border-radius:999px;background:#fff;font-family:'DM Sans',sans-serif;font-size:13px;color:var(--charcoal);outline:none;transition:border-color .15s,box-shadow .15s;}
+.bon-soeg:focus{border-color:var(--sage);box-shadow:0 0 0 3px rgba(74,124,74,.14);}
+.bon-pivot{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(140px,1fr);gap:8px;overflow-x:auto;overflow-y:hidden;padding-bottom:6px;align-items:start;}
+.bon-kol{display:flex;flex-direction:column;gap:6px;min-width:0;}
+.bon-kol-hd{display:flex;justify-content:space-between;align-items:baseline;gap:6px;padding:5px 8px;border-radius:8px;background:rgba(30,58,30,.05);font-size:11px;color:#8a9589;white-space:nowrap;}
+.bon-kol-hd b{font-size:12.5px;font-weight:600;color:var(--forest);}
+.bon-kort{border:1px solid rgba(30,58,30,.09);border-radius:10px;padding:7px 9px;background:#fff;}
+.bon-hd{display:flex;justify-content:space-between;gap:8px;font-family:'DM Mono',monospace;font-size:12px;font-weight:600;color:var(--forest);padding-bottom:4px;margin-bottom:4px;border-bottom:1px solid rgba(30,58,30,.07);}
+.bon-l{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;line-height:1.35;padding:1px 3px;border-radius:4px;color:var(--charcoal);}
+.bon-l.hit{background:rgba(93,143,78,.18);font-weight:500;}
+.bon-kr{font-family:'DM Mono',monospace;font-size:10.5px;color:var(--ash);white-space:nowrap;}
 /* Flip-kort (Seneste dag): klik = bagside med samme dag sidste uge */
 .mflip{flex:1;min-width:180px;perspective:1100px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .mflip-in{position:relative;height:100%;transform-style:preserve-3d;transition:transform .65s cubic-bezier(.3,.9,.3,1);}
@@ -7861,49 +7873,68 @@ function renderDagBonner(d){
     return;
   }
   if (sub) sub.textContent = d.antal_bonner + ' bonner · ' + kr(d.total_kr);
-  const mono = "font-family:'DM Mono',monospace;";
-
-  // Gruppér bonner pr. time (fra tidspunkt HH:MM). Uden tidspunkt → egen gruppe sidst.
-  const grupper = {};       // "HH" → {bonner, total, key}
-  d.bonner.forEach(b => {
+  _dagBonData = d;
+  // Søgefelt + gitter hver for sig, så feltet beholder fokus mens der filtreres
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 0 10px;">
+      <input id="dag-bon-soeg" type="search" placeholder="Søg produkt på bonnerne…" value="${_dagBonSoeg.replace(/"/g,'&quot;')}"
+        oninput="_dagBonSoeg=this.value;renderDagBonGrid()" class="bon-soeg">
+      <span id="dag-bon-hits" style="font-size:12px;color:#8a9589;"></span>
+    </div><div id="dag-bon-grid"></div>`;
+  renderDagBonGrid();
+}
+let _dagBonData = null, _dagBonSoeg = '';
+function renderDagBonGrid(){
+  const grid = document.getElementById('dag-bon-grid'), hits = document.getElementById('dag-bon-hits');
+  const d = _dagBonData;
+  if (!grid || !d) return;
+  const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const q = _dagBonSoeg.trim().toLowerCase();
+  const match = l => q && String(l.varenavn || '').toLowerCase().includes(q);
+  const bonner = q ? d.bonner.filter(b => b.linjer.some(match)) : d.bonner;
+  if (hits) {
+    if (!q) hits.textContent = '';
+    else {
+      let stk = 0, sum = 0;
+      bonner.forEach(b => b.linjer.forEach(l => { if (match(l)) { stk += (l.antal || 0); sum += (l.omsaetning || 0); } }));
+      hits.textContent = bonner.length ? `${bonner.length} bonner · ${Math.round(stk)} stk · ${kr(sum)}` : 'Ingen bonner med det produkt';
+    }
+  }
+  // Pivot: én kolonne pr. time, venstre → højre som grafen "Salg per time"
+  const grupper = {};
+  bonner.forEach(b => {
     const t = b.tid || '';
     const key = /^\d{2}:/.test(t) ? t.slice(0,2) : 'uden';
     (grupper[key] = grupper[key] || {bonner:[], total:0}).bonner.push(b);
     grupper[key].total += b.total_kr;
   });
+  const timer = Object.keys(grupper).filter(k => k !== 'uden').map(Number);
+  let keys = [];
+  if (timer.length) {
+    if (q) keys = timer.sort((a,b) => a-b).map(h => String(h).padStart(2,'0'));       // søgning: kun timer med træf
+    else for (let h = Math.min(...timer); h <= Math.max(...timer); h++) keys.push(String(h).padStart(2,'0'));
+  }
+  if (grupper['uden']) keys.push('uden');
   const kortHtml = b => {
     const linjer = b.linjer.map(l =>
-      `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;font-size:12px;">
-        <span>${l.antal>1?('<b>'+Math.round(l.antal)+'×</b> '):''}${l.varenavn}</span>
-        <span style="${mono}color:var(--ash);white-space:nowrap;">${kr(l.omsaetning)}</span>
+      `<div class="bon-l${match(l) ? ' hit' : ''}">
+        <span>${l.antal>1?('<b>'+Math.round(l.antal)+'×</b> '):''}${esc(l.varenavn)}</span>
+        <span class="bon-kr">${kr(l.omsaetning)}</span>
       </div>`).join('');
     const tid = b.tid || (b.bon_nr ? '—' : 'Uden bon-nr');
-    return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 13px;">
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px;padding-bottom:5px;border-bottom:1px solid rgba(30,58,30,.08);">
-        <span style="font-weight:700;font-size:15px;">🧾 ${tid}</span>
-        <span style="${mono}font-size:13px;color:var(--forest);font-weight:600;">${kr(b.total_kr)}</span>
-      </div>
+    return `<div class="bon-kort">
+      <div class="bon-hd"><span>${esc(tid)}</span><span>${kr(b.total_kr)}</span></div>
       ${linjer}
-      <div style="${mono}font-size:10px;color:var(--ash);margin-top:6px;">${Math.round(b.antal_varer)} vare(r)</div>
     </div>`;
   };
-  // Timer med tal først (nyeste time øverst), 'uden' til sidst
-  const keys = Object.keys(grupper).filter(k => k !== 'uden').sort((a,b) => b.localeCompare(a));
-  if (grupper['uden']) keys.push('uden');
-  el.innerHTML = keys.map(k => {
-    const g = grupper[k];
-    const titel = k === 'uden' ? 'Uden tidspunkt' : `kl. ${k}–${String((parseInt(k)+1)%24).padStart(2,'0')}`;
-    return `<div style="margin-top:14px;">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
-        <span style="font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:.01em;text-transform:none;color:var(--forest);font-weight:600;">${titel}</span>
-        <span style="flex:1;height:1px;background:rgba(30,58,30,.12);"></span>
-        <span style="${mono}font-size:11px;color:var(--ash);">${g.bonner.length} bonner · ${kr(g.total)}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px;">
-        ${g.bonner.map(kortHtml).join('')}
-      </div>
+  grid.innerHTML = `<div class="bon-pivot">` + keys.map(k => {
+    const g = grupper[k] || {bonner:[], total:0};
+    const titel = k === 'uden' ? 'Uden tid' : `${parseInt(k)}:00`;
+    const liste = g.bonner.slice().sort((x,y) => String(x.tid||'').localeCompare(String(y.tid||'')));
+    return `<div class="bon-kol">
+      <div class="bon-kol-hd"><b>${titel}</b><span>${g.bonner.length ? g.bonner.length + ' · ' + kr(g.total) : '—'}</span></div>
+      ${liste.map(kortHtml).join('')}
     </div>`;
-  }).join('');
+  }).join('') + `</div>`;
 }
 
 let _ugeTilDato = false;

@@ -3162,6 +3162,20 @@ async def loyalitet_sync_nu(request: Request):
                                    bool(body.get("alle")))
 
 
+@app.post("/api/notifikationer/test")
+async def notifikationer_test(request: Request):
+    """Test push-notifikationer: kør daglig notifikations-job nu."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    header_secret = request.headers.get("X-Webhook-Secret", "")
+    if header_secret != WEBHOOK_SECRET and body.get("secret") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_send_daily_notifications)
+
+
 @app.post("/api/salg/ingest")
 async def salg_ingest(request: Request):
     """Inkrementel salgs-indlæsning fra shopbox_sync.py (direkte API, ingen fil).

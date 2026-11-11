@@ -544,13 +544,73 @@ def kunde_diagnose(sider: int = 10) -> dict:
 # ── Loyalitets-app: send bonner med kunde-mail, så appen kan give stempler ────
 
 LOYALITET_URL = os.environ.get("LOYALITET_URL", "https://organicmarket-greve.floot.app").rstrip("/")
+LOYALITET_API_KEY = os.environ.get("LOYALITET_API_KEY", "").strip()  # Floot API-nøgle til credit-indløsning
 _SENDTE_BONNER: set = set()
+_INDLOEST_CREDITS: set = set()  # Track hvilke bonner vi allerede har indløst credits for
 
 
 def _nulstil_token():
     """Login-token kan udløbe — tving nyt login ved næste kald."""
     global TOKEN
     TOKEN = os.environ.get("SHOPBOX_TOKEN", "")
+
+
+def _indloes_credits(bonner: list) -> dict:
+    """Detektér 0-kr varer (gratis brød) i bonner og registrér credit-indløsning i Floot.
+    Returnerer antal vellykket indløste credits."""
+    if not LOYALITET_API_KEY:
+        return {"ok": True, "indloest": 0, "fejl": "LOYALITET_API_KEY ikke sat"}
+
+    indloest = 0
+    fejl = []
+
+    for b in bonner:
+        oh = b.get("order_hash")
+        if not oh or oh in _INDLOEST_CREDITS:
+            continue
+        if b.get("canceled") or _f(b.get("total_amount"), BELOEB_DIVISOR) <= 0:
+            continue
+
+        # Hent detaljer med customer-mail
+        try:
+            dj = api_get("/baskets/by-order-hash", orderHash=oh)
+            db = dj.get("data") if isinstance(dj, dict) and "data" in dj else dj
+            c = (db or {}).get("customer0") or {}
+            mail = str(c.get("mail") or "").strip() if isinstance(c, dict) else ""
+            if "@" not in mail:
+                continue
+
+            # Tjek hvis der er 0-kr linjer (gratis brød)
+            linjer = _linjer_i_basket(db or {})
+            gratis_antal = 0
+            for l in linjer:
+                beloeb = _f(l.get("total") or l.get("amount") or 0, BELOEB_DIVISOR)
+                if beloeb == 0 and str(l.get("product_name") or "").strip():
+                    gratis_antal += int(_f(l.get("quantity") or 1))
+
+            if gratis_antal > 0:
+                # Send credit-indløsning til Floot
+                payload = {
+                    "orderHash": oh,
+                    "mail": mail,
+                    "credits": gratis_antal,
+                    "varenavn": ",".join(str(l.get("product_name") or "") for l in linjer
+                                        if _f(l.get("total") or 0, BELOEB_DIVISOR) == 0),
+                }
+                r = requests.post(f"{LOYALITET_URL}/_api/kunde/indfri",
+                                headers={"X-Webhook-Secret": LOYALITET_API_KEY},
+                                json=payload, timeout=30)
+                if r.ok:
+                    indloest += gratis_antal
+                    _INDLOEST_CREDITS.add(oh)
+                else:
+                    fejl.append(f"{oh}: HTTP {r.status_code}")
+        except SystemExit as e:
+            fejl.append(f"{oh}: {str(e)[:80]}")
+        except Exception as e:
+            fejl.append(f"{oh}: {type(e).__name__}")
+
+    return {"ok": len(fejl) == 0, "indloest": indloest, "fejl": fejl if fejl else None}
 
 
 def _dagens_lager():
@@ -643,7 +703,14 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     lager = _dagens_lager()
     ud["lager_kategorier"] = len(lager["kategorier"]) if lager else 0
 
-    if kvitteringer or lager:
+    # Indløs credits fra 0-kr varer (gratis brød)
+    credit_res = _indloes_credits(kandidater)
+    ud["credits_indloest"] = credit_res.get("indloest", 0)
+    if credit_res.get("fejl"):
+        ud.setdefault("credit_fejl", []).extend(credit_res["fejl"])
+        print(f"[Loyalitet-sync] credit-fejl: {credit_res['fejl']}")
+
+    if kvitteringer or lager or ud.get("credits_indloest", 0) > 0:
         r = requests.post(f"{LOYALITET_URL}/_api/shopbox/kvittering",
                           json={"kvitteringer": kvitteringer, "lager": lager},
                           headers={"X-Webhook-Secret": secret}, timeout=60)

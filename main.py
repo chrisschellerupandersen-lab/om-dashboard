@@ -440,6 +440,135 @@ def _planlagt_mobilepay_sync():
 
 
 _loyalitet_foerste_koersel = True
+_notifikation_foerste_koersel = True
+
+async def _send_daily_notifications():
+    """Send personaliserede daglige notifikationer til kunder på email.
+    Analyserer deres køb-historie og sender info om deres favorit-varer hvis de er tilgængelige i dag."""
+    global _notifikation_foerste_koersel
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        import requests
+
+        FLOOT_API_URL = os.environ.get("FLOOT_API_URL", "https://35af1b2d-5dd0-4f5b-be97-921e8f3ec362.sandbox.floot.app").rstrip("/")
+        FLOOT_API_KEY = os.environ.get("FLOOT_API_KEY", "").strip()
+
+        if not FLOOT_API_KEY:
+            print("[Notifikation] FLOOT_API_KEY mangler — hop over")
+            return
+
+        # Hent alle kunder fra Floot
+        r = requests.post(f"{FLOOT_API_URL}/_api/admin/kunder",
+                         headers={"X-Webhook-Secret": FLOOT_API_KEY},
+                         json={"limit": 1000}, timeout=30)
+        if not r.ok:
+            print(f"[Notifikation] Fejl ved hent kunder: HTTP {r.status_code}")
+            return
+
+        kunder = r.json().get("kunder", [])
+        if not kunder:
+            print("[Notifikation] Ingen kunder fundet")
+            return
+
+        # Hent dagens lager
+        lager = shopbox_sync._dagens_lager()
+        if not lager:
+            print("[Notifikation] Intet lager i dag")
+            return
+
+        # Byg lager-lookup
+        lager_dict = {}
+        for kat in lager.get("kategorier", []):
+            for vare in kat.get("varer", []):
+                if vare.get("rest", 0) > 0:
+                    lager_dict[vare["navn"].lower()] = vare["rest"]
+
+        # Send notifikation til hver kunde
+        sendt = 0
+        for kunde in kunder:
+            email = kunde.get("email")
+            if not email or "@" not in email:
+                continue
+
+            kundenavn = kunde.get("name") or email.split("@")[0]
+            customer_id = kunde.get("id")
+
+            # Hent kundens top-varer fra køb-historie
+            conn = database._conn()
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT varenavn, COUNT(*) as antal
+                FROM transaktioner
+                WHERE kilde = 'shopbox' AND dato >= date('now', '-90 days')
+                GROUP BY varenavn
+                ORDER BY antal DESC
+                LIMIT 5
+            """)
+            top_varer = [r[0] for r in cur.fetchall()]
+            conn.close()
+
+            # Find hvilke top-varer der er i dag
+            tilgaengelige = [v for v in top_varer if v.lower() in lager_dict]
+
+            if not tilgaengelige:
+                continue  # Intet af kundens favoritter i dag
+
+            # Byg email
+            emne = f"🥐 Dine favoritter er friske i dag!"
+            liste_html = "\n".join([
+                f"<li><strong>{v}</strong> — {lager_dict[v.lower()]} stk tilgængelige</li>"
+                for v in tilgaengelige[:3]
+            ])
+
+            html = f"""
+            <html style="font-family: Arial, sans-serif; color: #333;">
+            <body style="background: #f5f5f5; padding: 20px;">
+            <div style="max-width: 600px; background: white; padding: 30px; border-radius: 10px;">
+                <h2 style="color: #6B4226;">Hej {kundenavn}! 👋</h2>
+                <p>Dine favoritter er friske i dag hos Organic Market Greve:</p>
+                <ul>{liste_html}</ul>
+                <p><strong>Butikken åbner kl. 06:30!</strong> Kom først for bedste udvalg.</p>
+                <p style="margin-top: 30px;">
+                    <a href="https://organicmarket-greve.floot.app/stempelkort"
+                       style="background: #d4a853; color: white; padding: 12px 24px;
+                              border-radius: 5px; text-decoration: none; display: inline-block;">
+                        Åbn appen
+                    </a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+                <p style="font-size: 12px; color: #999;">
+                    Organic Market Greve · Ubemandet butik åben 06:30-20:00
+                </p>
+            </div>
+            </body>
+            </html>
+            """
+
+            # Send email (via SMTP eller simpel POST)
+            try:
+                r_email = requests.post(
+                    f"{FLOOT_API_URL}/_api/notifikation/email",
+                    headers={"X-Webhook-Secret": FLOOT_API_KEY},
+                    json={
+                        "email": email,
+                        "subject": emne,
+                        "html": html,
+                    },
+                    timeout=10
+                )
+                if r_email.ok:
+                    sendt += 1
+                    print(f"[Notifikation] Sendt til {email}")
+            except Exception as e:
+                print(f"[Notifikation] Email-fejl for {email}: {str(e)[:100]}")
+
+        print(f"[Notifikation] {sendt} emails sendt")
+        _notifikation_foerste_koersel = False
+
+    except Exception as e:
+        print(f"[Notifikation exception] {str(e)[:200]}")
+
 
 def _planlagt_loyalitet_sync():
     """Send Shopbox-bonner med kunde-mail til loyalitets-appen (stempler).
@@ -480,6 +609,11 @@ async def lifespan(app: FastAPI):
         _scheduler.add_job(_planlagt_loyalitet_sync, "interval", minutes=5,
                            max_instances=1, coalesce=True)
         jobs.append("Loyalitet-sync: hvert 5. min")
+    # Push-notifikationer: personaliserede email hver morgen (kun hvis Floot-nøgle er sat)
+    if os.environ.get("FLOOT_API_KEY"):
+        _scheduler.add_job(_send_daily_notifications, "cron", hour=6, minute=29,
+                          timezone="Europe/Copenhagen")
+        jobs.append("Push-notifikationer: dagligt 06:29")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")

@@ -7896,12 +7896,23 @@ function renderDagRes(){
   let html;
   const r = _dagRes;
   if (!r) html = _metricCard(titel, '—', null, null, [], x => 0, 'henter…', _krRaa);
-  else if (r.val == null) html = _metricCard(titel, '—', null, null, [], x => 0, 'ingen data for måneden endnu', _krRaa);
   else {
-    const sub = `måned til dato · <span style="color:${r.vsShopbox >= 0 ? '#216e2c' : '#bb3828'};">${r.vsShopbox >= 0 ? '+' : '−'}${_krRaa(Math.abs(r.vsShopbox))} vs. Shopbox</span> · MobilePay ${_krRaa(r.mp || 0)}`;
-    html = _metricCard(titel, _krRaa(r.val), r.val, r.foerSum,
-      c.arr, x => { const d = r.dagMap[String(x.dato).slice(0,10)]; return d ? (d.adj_resultat_e_spild || 0) : 0; },
-      sub, _krRaa, 'Forrige måned til samme dag');
+    // Hovedtal = DAGENS resultat e. spild inkl. MobilePay; måned til dato står i underteksten
+    const dg = r.dagMap[String(c.dato).slice(0,10)];
+    const f = x => { const d = r.dagMap[String(x.dato).slice(0,10)]; return d ? (d.adj_resultat_e_spild || 0) : 0; };
+    if (!dg || dg.adj_resultat_e_spild == null) html = _metricCard(titel, '—', null, null, c.arr, f,
+      'ingen data for dagen endnu' + (r.val != null ? ` · måned til dato ${_krRaa(r.val)}` : ''), _krRaa);
+    else {
+      const val = dg.adj_resultat_e_spild;
+      const basis = (dg.resultat || 0) - ((dg.vaerdi_spild || 0) - (dg.frost_salg || 0));   // rent Shopbox-resultat e. spild
+      const vs = val - basis;
+      const d7 = new Date(c.dato + 'T00:00:00Z'); d7.setUTCDate(d7.getUTCDate() - 7);
+      const fd = r.dagMap[d7.toISOString().slice(0,10)];
+      const foer = fd && fd.adj_resultat_e_spild != null ? fd.adj_resultat_e_spild : null;
+      const sub = `<span style="color:${vs >= 0 ? '#216e2c' : '#bb3828'};">${vs >= 0 ? '+' : '−'}${_krRaa(Math.abs(vs))} vs. Shopbox</span> · MobilePay ${_krRaa(dg.mp_ex || 0)}`
+        + (r.val != null ? ` · måned til dato ${_krRaa(r.val)}` : '');
+      html = _metricCard(titel, _krRaa(val), val, foer, c.arr, f, sub, _krRaa);
+    }
   }
   if (html === _dagResHtml && el.firstChild) return;
   _dagResHtml = html; el.innerHTML = html;

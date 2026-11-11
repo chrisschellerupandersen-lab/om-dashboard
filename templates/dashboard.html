@@ -7734,12 +7734,12 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
         label: 'Normalt snit',
         type: 'line',
         data: snitData,
-        borderColor: '#b8943a',
+        borderColor: '#1e3a1e',
         backgroundColor: 'transparent',
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4,
-        pointBackgroundColor: '#b8943a',
+        pointBackgroundColor: '#1e3a1e',
         tension: 0.35,
         spanGaps: false,
         order: 1,
@@ -7757,7 +7757,7 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       },
       plugins: {
         legend: { display:false },
-        tooltip: { backgroundColor:'#1e3a1e', titleColor:'#e8c068', bodyColor:'#f4eee2', padding:10, cornerRadius:10,
+        tooltip: { backgroundColor:'#1e3a1e', titleColor:'#cfe3c2', bodyColor:'#f4eee2', padding:10, cornerRadius:10,
                    boxWidth:8, boxHeight:8, usePointStyle:true,
                    titleFont:{ family:"'DM Sans',sans-serif", size:12, weight:'500' }, bodyFont:{ family:"'DM Sans',sans-serif", size:12 },
                    callbacks: { label: c => ` ${c.dataset.label}: ${c.parsed.y!=null ? Math.round(c.parsed.y).toLocaleString('da-DK')+' kr' : '—'}` }}
@@ -7768,7 +7768,7 @@ function buildDag(kpi, timer, timerForrige, timerSnit) {
       const dot = (bg, t) => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;"><span style="width:9px;height:9px;border-radius:3px;background:${bg};"></span>${t}</span>`;
       const stg = (c, t, dash) => `<span style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;"><span style="width:16px;border-top:2px ${dash?'dashed':'solid'} ${c};"></span>${t}</span>`;
       lg.innerHTML = dot('#5d8f4e','Bedre end sidste uge') + dot('#d08a6e','Dårligere')
-        + (hasPrev ? stg('rgba(107,124,107,.7)','Sidste uge',true) : '') + (hasSnit ? stg('#b8943a','Normalt snit',false) : '');
+        + (hasPrev ? stg('rgba(107,124,107,.7)','Sidste uge',true) : '') + (hasSnit ? stg('#1e3a1e','Normalt snit',false) : '');
     }
   } else {
     document.getElementById('dag-chart-wrap').style.display = 'none';

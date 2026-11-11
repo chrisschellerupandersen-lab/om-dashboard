@@ -45,6 +45,7 @@ _NAVN_MAP = {
     "croissant":                      "Croissant",
     "kanelsnurre":                    "Kanelsnurre",
     "kardemommesnurre":               "Kardemommesnurre",
+    "klassisk kanelsnegl":            "Klassisk snegl",   # portalnavn → dashboardets varenavn
     "softkernerugbrød 900g":          "Softkernerugbrød",
     "softkernerugbrod 900g":          "Softkernerugbrød",
     "8x12 surdejs focaccia":          "Focaccia",

@@ -7787,9 +7787,11 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt, foerLbl){
   fmt = fmt || (v => String(Math.round(v)));
   const har = (foer != null && foer > 0 && nu != null);
   const pct = har ? ((nu / foer - 1) * 100) : null;
-  const up = pct != null && pct >= 0;
-  const clr = pct == null ? 'var(--ash)' : (up ? 'var(--moss)' : 'var(--danger)');
-  const dtag = pct == null ? '' :
+  // Sidste uges tal findes, men er 0 eller negativt → procent giver ikke mening; vis forskellen i stedet
+  const kunDiff = (!har && foer != null && nu != null);
+  const up = kunDiff ? (nu >= foer) : (pct != null && pct >= 0);
+  const pill = t => `<span class="mpill" style="display:inline-block;font-size:12px;font-weight:500;color:${up?'#216e2c':'#bb3828'};background:${up?'rgba(45,110,55,.13)':'rgba(192,57,43,.11)'};padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;">${up ? '↑ ' : '↓ '}${t}</span>`;
+  const dtag = kunDiff ? pill(fmt(Math.abs(nu - foer))) : pct == null ? '' :
     `<span class="mpill" style="display:inline-block;font-size:12px;font-weight:500;color:${up?'#216e2c':'#bb3828'};background:${up?'rgba(45,110,55,.13)':'rgba(192,57,43,.11)'};padding:3px 9px;border-radius:999px;white-space:nowrap;letter-spacing:-.01em;">${up ? '↑ ' : '↓ '}${Math.abs(pct).toFixed(0)}%</span>`;
   let spark = '';
   if (arr.length >= 2){
@@ -7804,8 +7806,12 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt, foerLbl){
     }).join('');
     spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:28px;margin-top:8px;">${bars}</div>`;
   }
-  const diff = har ? (nu - foer) : null;
-  const bag = har
+  const diff = (har || kunDiff) ? (nu - foer) : null;
+  const bag = kunDiff
+    ? `<div style="font-size:12.5px;font-weight:500;color:rgba(244,238,226,.7);">${foerLbl || 'Samme dag sidste uge'}</div>
+       <div style="font-size:26px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-top:7px;">${fmt(foer)}</div>
+       <div style="font-size:13px;margin-top:10px;color:${up?'#bfe3a8':'#f3b3a6'};">${up?'↑':'↓'} ${fmt(Math.abs(diff))} ${up?'mere':'mindre'} ${foerLbl ? 'nu' : 'i dag'}</div>`
+    : har
     ? `<div style="font-size:12.5px;font-weight:500;color:rgba(244,238,226,.7);">${foerLbl || 'Samme dag sidste uge'}</div>
        <div style="font-size:26px;font-weight:600;line-height:1.1;letter-spacing:-.015em;margin-top:7px;">${fmt(foer)}</div>
        <div style="font-size:13px;margin-top:10px;color:${up?'#bfe3a8':'#f3b3a6'};">${up?'↑':'↓'} ${fmt(Math.abs(diff))} ${up?'mere':'mindre'} ${foerLbl ? 'nu' : 'i dag'} (${up?'+':'−'}${Math.abs(pct).toFixed(0)}%)</div>`

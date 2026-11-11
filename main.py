@@ -3162,8 +3162,8 @@ async def loyalitet_sync_nu(request: Request):
                                    bool(body.get("alle")))
 
 
-@app.post("/api/notifikationer/test")
-async def notifikationer_test(request: Request):
+@app.post("/api/notifikation/test")
+async def notifikation_test(request: Request):
     """Test push-notifikationer: kør daglig notifikations-job nu."""
     try:
         body = await request.json()

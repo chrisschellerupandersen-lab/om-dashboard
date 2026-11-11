@@ -450,6 +450,7 @@ def _send_daily_notifications():
         from datetime import datetime
         from zoneinfo import ZoneInfo
         import requests
+        import shopbox_sync
 
         FLOOT_API_URL = shopbox_sync.LOYALITET_URL
         # Appen godkender dashboardets kald med samme hemmelighed som kvitterings-sync.

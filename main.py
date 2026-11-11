@@ -442,7 +442,7 @@ def _planlagt_mobilepay_sync():
 _loyalitet_foerste_koersel = True
 _notifikation_foerste_koersel = True
 
-async def _send_daily_notifications():
+def _send_daily_notifications():
     """Send personaliserede daglige notifikationer til kunder på email.
     Analyserer deres køb-historie og sender info om deres favorit-varer hvis de er tilgængelige i dag."""
     global _notifikation_foerste_koersel

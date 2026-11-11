@@ -451,31 +451,32 @@ def _send_daily_notifications():
         from zoneinfo import ZoneInfo
         import requests
 
-        FLOOT_API_URL = os.environ.get("FLOOT_API_URL", "https://35af1b2d-5dd0-4f5b-be97-921e8f3ec362.sandbox.floot.app").rstrip("/")
-        FLOOT_API_KEY = os.environ.get("FLOOT_API_KEY", "").strip()
+        FLOOT_API_URL = shopbox_sync.LOYALITET_URL
+        # Appen godkender dashboardets kald med samme hemmelighed som kvitterings-sync.
+        FLOOT_API_KEY = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
 
         if not FLOOT_API_KEY:
-            print("[Notifikation] FLOOT_API_KEY mangler — hop over")
-            return
+            print("[Notifikation] SHOPBOX_INGEST_SECRET mangler — hop over")
+            return {"ok": False, "fejl": "SHOPBOX_INGEST_SECRET mangler"}
 
         # Hent alle kunder fra Floot
-        r = requests.post(f"{FLOOT_API_URL}/_api/admin/kunder",
+        r = requests.get(f"{FLOOT_API_URL}/_api/admin/kunder",
                          headers={"X-Webhook-Secret": FLOOT_API_KEY},
-                         json={"limit": 1000}, timeout=30)
+                         params={"limit": 1000}, timeout=30)
         if not r.ok:
             print(f"[Notifikation] Fejl ved hent kunder: HTTP {r.status_code}")
-            return
+            return {"ok": False, "fejl": f"hent kunder: HTTP {r.status_code}"}
 
         kunder = r.json().get("kunder", [])
         if not kunder:
             print("[Notifikation] Ingen kunder fundet")
-            return
+            return {"ok": True, "kunder": 0, "sendt": 0}
 
         # Hent dagens lager
         lager = shopbox_sync._dagens_lager()
         if not lager:
             print("[Notifikation] Intet lager i dag")
-            return
+            return {"ok": True, "kunder": len(kunder), "sendt": 0, "note": "intet lager i dag"}
 
         # Byg lager-lookup
         lager_dict = {}
@@ -486,6 +487,7 @@ def _send_daily_notifications():
 
         # Send notifikation til hver kunde
         sendt = 0
+        fejl = []
         for kunde in kunder:
             email = kunde.get("email")
             if not email or "@" not in email:
@@ -560,14 +562,18 @@ def _send_daily_notifications():
                 if r_email.ok:
                     sendt += 1
                     print(f"[Notifikation] Sendt til {email}")
+                else:
+                    fejl.append(f"{email}: HTTP {r_email.status_code} {r_email.text[:100]}")
             except Exception as e:
-                print(f"[Notifikation] Email-fejl for {email}: {str(e)[:100]}")
+                fejl.append(f"{email}: {str(e)[:100]}")
 
-        print(f"[Notifikation] {sendt} emails sendt")
+        print(f"[Notifikation] {sendt} emails sendt, {len(fejl)} fejl")
         _notifikation_foerste_koersel = False
+        return {"ok": not fejl, "kunder": len(kunder), "sendt": sendt, "fejl": fejl}
 
     except Exception as e:
         print(f"[Notifikation exception] {str(e)[:200]}")
+        return {"ok": False, "fejl": str(e)[:200]}
 
 
 def _planlagt_loyalitet_sync():

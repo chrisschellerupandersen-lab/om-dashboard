@@ -598,7 +598,7 @@ def _indloes_credits(bonner: list) -> dict:
                                         if _f(l.get("total") or 0, BELOEB_DIVISOR) == 0),
                 }
                 r = requests.post(f"{LOYALITET_URL}/_api/kunde/indfri",
-                                headers={"X-Webhook-Secret": LOYALITET_API_KEY},
+                                headers={"X-Webhook-Secret": os.environ.get("SHOPBOX_INGEST_SECRET", "").strip() or LOYALITET_API_KEY},
                                 json=payload, timeout=30)
                 if r.ok:
                     indloest += gratis_antal

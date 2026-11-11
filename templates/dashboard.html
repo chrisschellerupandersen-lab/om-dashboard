@@ -7802,7 +7802,7 @@ function _metricCard(titel, valTxt, nu, foer, arr, valFn, sub, fmt, foerLbl){
       const last = i === arr.length - 1;
       const dd = x.dato.slice(8,10) + '/' + x.dato.slice(5,7);
       return `<div title="${dd}" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;">
-        <div class="spk" style="animation-delay:${(.25 + i*.03).toFixed(2)}s;height:${h}px;border-radius:2px 2px 0 0;background:${last ? 'var(--amber)' : 'rgba(47,90,48,.5)'};"></div></div>`;
+        <div class="spk" style="animation-delay:${(.25 + i*.03).toFixed(2)}s;height:${h}px;border-radius:2px 2px 0 0;background:${last ? '#1e3a1e' : 'rgba(47,90,48,.45)'};"></div></div>`;
     }).join('');
     spark = `<div style="display:flex;align-items:flex-end;gap:2px;height:28px;margin-top:8px;">${bars}</div>`;
   }
@@ -8588,7 +8588,7 @@ async function loadDagRest(){
   renderDagRest(d);
 }
 function _restFarve(pct){          // dæmpet palette: lav = terracotta → rav → grøn → udsolgt = skovgrøn
-  return pct >= 100 ? '#2d5a2d' : pct >= 70 ? '#5d8f4e' : pct >= 40 ? '#b8943a' : '#c06a4a';
+  return pct >= 100 ? '#2d5a2d' : pct >= 70 ? '#5d8f4e' : pct >= 40 ? '#9db88f' : '#c06a4a';
 }
 function renderDagRest(d){
   const card = document.getElementById('dag-rest-card');

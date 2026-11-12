@@ -518,9 +518,9 @@ def _send_daily_notifications():
                 continue  # Intet af kundens favoritter i dag
 
             # Byg email
-            emne = f"🥐 Dine favoritter er friske i dag!"
+            emne = "🥐 Dine favoritter er klar til dig"
             liste_html = "\n".join([
-                f"<li><strong>{v}</strong> — {lager_dict[v.lower()]} stk tilgængelige</li>"
+                f"<li><strong>{v}</strong></li>"
                 for v in tilgaengelige[:3]
             ])
 
@@ -529,9 +529,9 @@ def _send_daily_notifications():
             <body style="background: #f5f5f5; padding: 20px;">
             <div style="max-width: 600px; background: white; padding: 30px; border-radius: 10px;">
                 <h2 style="color: #6B4226;">Hej {kundenavn}! 👋</h2>
-                <p>Dine favoritter er friske i dag hos Organic Market Greve:</p>
+                <p>Dine favoritter er klar til dig hos Organic Market Greve:</p>
                 <ul>{liste_html}</ul>
-                <p><strong>Butikken åbner kl. 06:30!</strong> Kom først for bedste udvalg.</p>
+                <p><strong>Butikken er åben kl. 06:30–20:00.</strong></p>
                 <p style="margin-top: 30px;">
                     <a href="https://organicmarket-greve.floot.app/stempelkort"
                        style="background: #d4a853; color: white; padding: 12px 24px;
@@ -618,9 +618,9 @@ async def lifespan(app: FastAPI):
         jobs.append("Loyalitet-sync: hvert 5. min")
     # Push-notifikationer: personaliserede email hver morgen (kun hvis Floot-nøgle er sat)
     if os.environ.get("FLOOT_API_KEY"):
-        _scheduler.add_job(_send_daily_notifications, "cron", hour=6, minute=29,
+        _scheduler.add_job(_send_daily_notifications, "cron", hour=7, minute=0,
                           timezone="Europe/Copenhagen")
-        jobs.append("Push-notifikationer: dagligt 06:29")
+        jobs.append("Push-notifikationer: dagligt 07:00")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")

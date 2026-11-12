@@ -494,8 +494,13 @@ def _send_daily_notifications():
             if not email or "@" not in email:
                 continue
 
+            # Kun kunder der har takket ja til mails/notifikationer
+            if not kunde.get("notifikationer"):
+                continue
+
             kundenavn = kunde.get("name") or email.split("@")[0]
             customer_id = kunde.get("id")
+            afmeld_url = f"https://organicmarket-greve.floot.app/afmeld?id={customer_id}"
 
             # Hent kundens top-varer fra køb-historie
             conn = database._conn()
@@ -541,7 +546,9 @@ def _send_daily_notifications():
                 </p>
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="font-size: 12px; color: #999;">
-                    Organic Market Greve · Ubemandet butik åben 06:30-20:00
+                    Organic Market Greve · Ubemandet butik åben 06:30-20:00<br>
+                    Du modtager denne mail, fordi du har takket ja til mails i stempelkortet.
+                    <a href="{afmeld_url}" style="color: #999;">Afmeld mails</a>
                 </p>
             </div>
             </body>

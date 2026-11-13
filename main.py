@@ -495,7 +495,8 @@ def _send_daily_notifications():
                 continue
 
             # Kun kunder der har takket ja til mails/notifikationer
-            if not kunde.get("notifikationer"):
+            # Kunder der kun vil have appen får også beskeden, men endpointet sender ingen mail til dem
+            if not (kunde.get("notifikationer") or kunde.get("kunApp")):
                 continue
 
             kundenavn = kunde.get("name") or email.split("@")[0]

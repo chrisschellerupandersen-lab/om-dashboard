@@ -586,6 +586,166 @@ def _send_daily_notifications():
         return {"ok": False, "fejl": str(e)[:200]}
 
 
+def _parse_mangler(tekst: str):
+    """Læser dato, klokkeslæt og beløb fra en "Mangler stempel"-mail. Returnerer (dato, tid, beløb)."""
+    import re
+    from datetime import date, time, timedelta, datetime
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Copenhagen")
+    t = (tekst or "").lower()
+    idag = datetime.now(tz).date()
+    dato_re = r"(\d{1,2})[./-](\d{1,2})(?:[./-](\d{4}|\d{2}))?"
+
+    dato = None
+    if "i dag" in t:
+        dato = idag
+    elif "i går" in t or "igår" in t:
+        dato = idag - timedelta(days=1)
+    # Første gyldige dato tælles; kun den fjernes, så klokkeslæt ikke forveksles med dato.
+    valgt = None
+    for mm in re.finditer(dato_re, t):
+        y = int(mm.group(3)) if mm.group(3) else idag.year
+        if y < 100:
+            y += 2000
+        try:
+            d = date(y, int(mm.group(2)), int(mm.group(1)))
+        except ValueError:
+            continue
+        valgt = mm
+        if dato is None:
+            dato = d
+        break
+    uden_dato = t if valgt is None else t[:valgt.start()] + " " + t[valgt.end():]
+
+    tid = None
+    mt = re.search(r"kl\.?\s*(\d{1,2})[:.](\d{2})", uden_dato) or re.search(r"(\d{1,2})[:.](\d{2})", uden_dato)
+    if mt and int(mt.group(1)) < 24 and int(mt.group(2)) < 60:
+        tid = time(int(mt.group(1)), int(mt.group(2)))
+
+    mb = re.search(r"(\d+)(?:[.,](\d{1,2}))?\s*(?:kr|dkk|kroner)", t)
+    beloeb = float(f"{mb.group(1)}.{(mb.group(2) or '0').ljust(2, '0')}") if mb else None
+    return dato, tid, beloeb
+
+
+def _mail_tekst(full: dict) -> str:
+    import base64
+
+    def find(part):
+        if part.get("mimeType") == "text/plain" and (part.get("body") or {}).get("data"):
+            return base64.urlsafe_b64decode(part["body"]["data"] + "==").decode("utf-8", "ignore")
+        for p in part.get("parts", []) or []:
+            t = find(p)
+            if t:
+                return t
+        return ""
+
+    return find(full.get("payload", {})) or full.get("snippet", "")
+
+
+def _bon_tid(b: dict, tz):
+    from datetime import datetime
+    v = b.get("crdate") or b.get("tstamp")
+    if v is None or v == "":
+        return None
+    try:
+        if isinstance(v, (int, float)) or str(v).isdigit():
+            n = float(v)
+            n = n / 1000 if n > 1e12 else n
+            return datetime.fromtimestamp(n, tz)
+        t = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+        return t if t.tzinfo else t.replace(tzinfo=tz)
+    except Exception:
+        return None
+
+
+def _kandidat_bonner(dato, tid, beloeb: float) -> list:
+    """Bonner i Shopbox UDEN kundemail, der passer på dato, klokkeslæt (±10 min) og beløb."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    import shopbox_sync
+    tz = ZoneInfo("Europe/Copenhagen")
+    maal = datetime.combine(dato, tid, tzinfo=tz)
+    ud = []
+    for side in range(1, 31):
+        j = shopbox_sync.api_get("/baskets") if side == 1 else shopbox_sync.api_get("/baskets", page=side)
+        data = (j.get("data") if isinstance(j, dict) else j) or []
+        if not data:
+            break
+        for b in data:
+            if b.get("customer") or b.get("canceled") or not b.get("order_hash"):
+                continue
+            t = _bon_tid(b, tz)
+            if t is None or abs((t - maal).total_seconds()) > 600:
+                continue
+            total = shopbox_sync._f(b.get("total_amount"), shopbox_sync.BELOEB_DIVISOR)
+            if abs(total - beloeb) > 0.5:
+                continue
+            ud.append({"orderHash": b.get("order_hash"), "tid": t.isoformat(), "total": total})
+    return ud
+
+
+def mangler_stempel_run() -> dict:
+    """Læser "Mangler stempel"-mails fra Gmail, finder bonen og sender sagen til loyalitets-appen,
+    som giver stemplet eller svarer kunden. Hver mail behandles kun én gang (appen husker den)."""
+    import requests
+    from email.utils import parseaddr
+    try:
+        import shopbox_sync
+        from googleapiclient.discovery import build
+        secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
+        if not secret:
+            return {"ok": False, "fejl": "SHOPBOX_INGEST_SECRET mangler"}
+        base = shopbox_sync.LOYALITET_URL
+        hdr = {"X-Webhook-Secret": secret}
+
+        service = build("gmail", "v1", credentials=_gmail_creds())
+        res = service.users().messages().list(
+            userId="me", q='subject:("Mangler stempel") newer_than:14d', maxResults=25
+        ).execute()
+
+        behandlet = 0
+        for m in res.get("messages", []):
+            mid = m["id"]
+            chk = requests.get(f"{base}/_api/stempel/sag", params={"msgId": mid}, headers=hdr, timeout=20).json()
+            if chk.get("finnes"):
+                continue
+
+            full = service.users().messages().get(userId="me", id=mid, format="full").execute()
+            headers = {h["name"]: h["value"] for h in full["payload"]["headers"]}
+            afsender = parseaddr(headers.get("From", ""))[1].lower()
+            dato, tid, beloeb = _parse_mangler(_mail_tekst(full))
+
+            kandidater = []
+            if dato and tid and beloeb and beloeb >= 50:
+                kandidater = _kandidat_bonner(dato, tid, beloeb)
+
+            payload = {
+                "msgId": mid,
+                "email": afsender,
+                "dato": dato.isoformat() if dato else "",
+                "tid": tid.strftime("%H:%M") if tid else "",
+                "beloeb": beloeb or 0,
+                "kandidater": kandidater,
+            }
+            r = requests.post(f"{base}/_api/stempel/sag", headers=hdr, json=payload, timeout=90)
+            if r.ok:
+                behandlet += 1
+                print(f"[Mangler stempel] {mid}: {r.json().get('status')}")
+            else:
+                print(f"[Mangler stempel] {mid}: HTTP {r.status_code} {r.text[:120]}")
+        return {"ok": True, "behandlet": behandlet, "fundet": len(res.get("messages", []))}
+    except Exception as e:
+        print(f"[Mangler stempel exception] {str(e)[:200]}")
+        return {"ok": False, "fejl": str(e)[:200]}
+
+
+def _planlagt_mangler_stempel():
+    try:
+        mangler_stempel_run()
+    except BaseException as e:
+        print(f"[Mangler stempel] {str(e)[:150]}")
+
+
 def _planlagt_loyalitet_sync():
     """Send Shopbox-bonner med kunde-mail til loyalitets-appen (stempler).
     Første kørsel efter opstart går længere tilbage for at fange det missede."""
@@ -725,6 +885,11 @@ async def lifespan(app: FastAPI):
             _scheduler.add_job(_planlagt_dobbelt_stempel, "cron", hour=_dobbelt_time, minute=0,
                                timezone="Europe/Copenhagen")
             jobs.append(f"Dobbelt stempel-tjek: dagligt {_dobbelt_time:02d}:00")
+        # "Mangler stempel"-mails fra Gmail: hvert 15. min kl. 6–22
+        if os.environ.get("GMAIL_TOKEN_JSON"):
+            _scheduler.add_job(_planlagt_mangler_stempel, "cron", hour="6-22", minute="*/15",
+                               max_instances=1, coalesce=True, timezone="Europe/Copenhagen")
+            jobs.append("Mangler stempel: hvert 15. min kl. 6-22")
     # Push-notifikationer: personaliserede email hver morgen (kun hvis Floot-nøgle er sat)
     if os.environ.get("FLOOT_API_KEY"):
         _scheduler.add_job(_send_daily_notifications, "cron", hour=7, minute=0,

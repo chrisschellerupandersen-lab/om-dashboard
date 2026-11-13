@@ -599,6 +599,100 @@ def _planlagt_loyalitet_sync():
         print(f"[Loyalitet-sync exception] {str(e)[:150]}")
 
 
+def _dobbelt_stempel_tjek(start: bool = False) -> dict:
+    """Dobbelt stempel-kampagne: skal den startes i dag?
+
+    Reglen: meget bagværk tilbage OG salget ligger under det normale for ugedagen.
+      - rest_pct  = dagens rest / dagens levering (uden kage)        >= DOBBELT_REST_PCT (50)
+      - salg_pct  = dagens omsætning / snit af samme ugedag de seneste
+                    4 uger frem til samme klokkeslæt                   <  DOBBELT_SALG_PCT (80)
+    Med start=True kaldes loyalitets-appen, som starter kampagnen og sender mails
+    (appen tillader højst én pr. dag og én automatisk pr. 7 dage).
+    Uden salgsdata i dag eller uden historik startes intet."""
+    try:
+        from datetime import datetime, timedelta
+        from zoneinfo import ZoneInfo
+        import requests
+        import shopbox_sync
+
+        nu = datetime.now(ZoneInfo("Europe/Copenhagen"))
+        idag = nu.strftime("%Y-%m-%d")
+        rest_graense = float(os.environ.get("DOBBELT_REST_PCT", "50"))
+        salg_graense = float(os.environ.get("DOBBELT_SALG_PCT", "80"))
+
+        d = database.hent_dagens_rest_kategori(idag) or {}
+        bestilt = rest = 0
+        for k in d.get("kategorier") or []:
+            if str(k.get("kategori") or "").strip().lower().startswith("kage"):
+                continue
+            bestilt += k.get("bestilt") or 0
+            rest += max(0, k.get("rest") or 0)
+        rest_pct = round(rest / bestilt * 100, 1) if bestilt > 0 else None
+
+        conn = database._conn()
+        try:
+            cur = conn.cursor()
+            cur.execute('SELECT COALESCE(SUM("omsætning"),0) FROM transaktioner WHERE dato=?', (idag,))
+            salg_idag = float(cur.fetchone()[0] or 0)
+            tidligere = []
+            for uger in range(1, 5):
+                dato = (nu - timedelta(days=7 * uger)).strftime("%Y-%m-%d")
+                cur.execute('SELECT COALESCE(SUM("omsætning"),0) FROM transaktioner '
+                            'WHERE dato=? AND time_start>=0 AND time_start<?', (dato, nu.hour))
+                v = float(cur.fetchone()[0] or 0)
+                if v > 0:
+                    tidligere.append(v)
+        finally:
+            conn.close()
+        norm = sum(tidligere) / len(tidligere) if tidligere else None
+        salg_pct = round(salg_idag / norm * 100, 1) if norm else None
+
+        ud = {
+            "ok": True, "dato": idag, "kl": nu.strftime("%H:%M"),
+            "bestilt": round(bestilt), "rest": round(rest), "rest_pct": rest_pct,
+            "salg_idag": round(salg_idag), "norm_salg": round(norm) if norm else None,
+            "norm_uger": len(tidligere), "salg_pct": salg_pct,
+            "graenser": {"rest_pct_min": rest_graense, "salg_pct_max": salg_graense},
+            "startet": False,
+        }
+        if rest_pct is None:
+            ud["beslutning"] = "ingen levering registreret i dag"
+        elif salg_idag <= 0:
+            ud["beslutning"] = "ingen salgsdata i dag endnu — starter ikke på et tomt grundlag"
+        elif salg_pct is None:
+            ud["beslutning"] = "ingen historik for ugedagen at sammenligne med"
+        elif rest_pct >= rest_graense and salg_pct < salg_graense:
+            ud["beslutning"] = "start: meget tilbage og salget under normalen"
+            ud["udloes"] = True
+        else:
+            ud["beslutning"] = "ingen kampagne: lager eller salg ligger inden for det normale"
+        ud.setdefault("udloes", False)
+
+        if start and ud["udloes"]:
+            secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
+            if not secret:
+                ud["fejl"] = "SHOPBOX_INGEST_SECRET mangler"
+                return ud
+            r = requests.post(f"{shopbox_sync.LOYALITET_URL}/_api/kampagne/start",
+                              headers={"X-Webhook-Secret": secret}, json={}, timeout=120)
+            try:
+                svar = r.json()
+            except Exception:
+                svar = {"error": r.text[:150]}
+            ud["startet"] = bool(r.ok and svar.get("ok"))
+            ud["app_svar"] = svar
+        if start:
+            print(f"[Dobbelt stempel] {ud}")
+        return ud
+    except Exception as e:
+        print(f"[Dobbelt stempel exception] {str(e)[:200]}")
+        return {"ok": False, "fejl": str(e)[:200]}
+
+
+def _planlagt_dobbelt_stempel():
+    _dobbelt_stempel_tjek(start=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     database.init_db()
@@ -623,6 +717,12 @@ async def lifespan(app: FastAPI):
         _scheduler.add_job(_planlagt_loyalitet_sync, "interval", minutes=5,
                            max_instances=1, coalesce=True)
         jobs.append("Loyalitet-sync: hvert 5. min")
+        # Dobbelt stempel-kampagne: dagligt tjek af lager og salg (slå fra med DOBBELT_AUTO=0)
+        if os.environ.get("DOBBELT_AUTO", "1").strip() != "0":
+            _dobbelt_time = int(os.environ.get("DOBBELT_TIME", "13"))
+            _scheduler.add_job(_planlagt_dobbelt_stempel, "cron", hour=_dobbelt_time, minute=0,
+                               timezone="Europe/Copenhagen")
+            jobs.append(f"Dobbelt stempel-tjek: dagligt {_dobbelt_time:02d}:00")
     # Push-notifikationer: personaliserede email hver morgen (kun hvis Floot-nøgle er sat)
     if os.environ.get("FLOOT_API_KEY"):
         _scheduler.add_job(_send_daily_notifications, "cron", hour=7, minute=0,
@@ -3188,6 +3288,15 @@ async def notifikation_test(request: Request):
         raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
     from starlette.concurrency import run_in_threadpool
     return await run_in_threadpool(_send_daily_notifications)
+
+
+@app.get("/api/kampagne/dobbelt/tjek")
+async def dobbelt_stempel_tjek(request: Request, secret: str = ""):
+    """Viser tallene bag dobbelt stempel-reglen lige nu — starter INTET og sender ingen mails."""
+    if secret != WEBHOOK_SECRET and request.headers.get("X-Webhook-Secret", "") != WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Ugyldig webhook secret")
+    from starlette.concurrency import run_in_threadpool
+    return await run_in_threadpool(_dobbelt_stempel_tjek, False)
 
 
 @app.post("/api/salg/ingest")

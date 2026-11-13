@@ -547,6 +547,7 @@ def _send_daily_notifications():
                 <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
                 <p style="font-size: 12px; color: #999;">
                     Organic Market Greve · Ubemandet butik åben 06:30-20:00<br>
+                    Tak fordi du støtter lokalt – Organic Market Greve<br>
                     Du modtager denne mail, fordi du har takket ja til mails i stempelkortet.
                     <a href="{afmeld_url}" style="color: #999;">Afmeld mails</a>
                 </p>

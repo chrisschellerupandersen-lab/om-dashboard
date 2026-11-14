@@ -555,56 +555,78 @@ def _nulstil_token():
     TOKEN = os.environ.get("SHOPBOX_TOKEN", "")
 
 
+_SKU_FELTER = ("sku", "product_number", "productNumber", "product_no", "item_number",
+               "number", "plu", "varenummer", "product_sku")
+
+
+def _er_gratis_broed(linje: dict) -> bool:
+    """Er linjen butikkens 0-kr.-vare for gratis brød?
+    Varen kendes på SKU (GRATIS_BROED_SKU, evt. flere adskilt med komma). Er SKU ikke
+    sat, bruges varenavnet (GRATIS_BROED_NAVN, standard "gratis brød"). Andre 0-kr.-linjer
+    (rabatter, gaver, velkomstkaffe) tæller ikke."""
+    skuer = {s.strip() for s in os.environ.get("GRATIS_BROED_SKU", "").split(",") if s.strip()}
+    if skuer:
+        for felt in _SKU_FELTER:
+            v = linje.get(felt)
+            if v is None or v == "":
+                continue
+            s = str(v).strip()
+            if s in skuer or s.split(".")[0] in skuer:   # "10500.0" ~ "10500"
+                return True
+        return False
+    navn = os.environ.get("GRATIS_BROED_NAVN", "gratis brød").strip().lower()
+    return bool(navn) and navn in str(linje.get("product_name") or linje.get("name") or "").lower()
+
+
 def _indloes_credits(bonner: list) -> dict:
-    """Detektér 0-kr varer (gratis brød) i bonner og registrér credit-indløsning i Floot.
-    Returnerer antal vellykket indløste credits."""
-    if not LOYALITET_API_KEY:
-        return {"ok": True, "indloest": 0, "fejl": "LOYALITET_API_KEY ikke sat"}
+    """Find bonner, hvor kunden har valgt 0-kr.-varen for gratis brød, og registrér
+    indløsningen i loyalitets-appen. Gælder også bonner med total 0 kr. (kun det gratis brød).
+    Appen trækker aldrig mere, end kunden har tilgode, og kun én gang pr. bon."""
+    secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip() or LOYALITET_API_KEY
+    if not secret:
+        return {"ok": True, "indloest": 0, "fejl": ["SHOPBOX_INGEST_SECRET mangler"]}
 
     indloest = 0
     fejl = []
 
     for b in bonner:
         oh = b.get("order_hash")
-        if not oh or oh in _INDLOEST_CREDITS:
-            continue
-        if b.get("canceled") or _f(b.get("total_amount"), BELOEB_DIVISOR) <= 0:
+        if not oh or oh in _INDLOEST_CREDITS or b.get("canceled"):
             continue
 
-        # Hent detaljer med customer-mail
         try:
             dj = api_get("/baskets/by-order-hash", orderHash=oh)
             db = dj.get("data") if isinstance(dj, dict) and "data" in dj else dj
             c = (db or {}).get("customer0") or {}
             mail = str(c.get("mail") or "").strip() if isinstance(c, dict) else ""
-            if "@" not in mail:
-                continue
-
-            # Tjek hvis der er 0-kr linjer (gratis brød)
             linjer = _linjer_i_basket(db or {})
-            gratis_antal = 0
+
+            gratis = []
             for l in linjer:
                 beloeb = _f(l.get("total") or l.get("amount") or 0, BELOEB_DIVISOR)
-                if beloeb == 0 and str(l.get("product_name") or "").strip():
-                    gratis_antal += int(_f(l.get("quantity") or 1))
+                antal = int(_f(l.get("quantity") or 1))
+                if beloeb == 0 and antal > 0 and _er_gratis_broed(l):
+                    gratis.append((l, antal))
+            gratis_antal = sum(a for _, a in gratis)
 
-            if gratis_antal > 0:
-                # Send credit-indløsning til Floot
-                payload = {
-                    "orderHash": oh,
-                    "mail": mail,
-                    "credits": gratis_antal,
-                    "varenavn": ",".join(str(l.get("product_name") or "") for l in linjer
-                                        if _f(l.get("total") or 0, BELOEB_DIVISOR) == 0),
-                }
-                r = requests.post(f"{LOYALITET_URL}/_api/kunde/indfri",
-                                headers={"X-Webhook-Secret": os.environ.get("SHOPBOX_INGEST_SECRET", "").strip() or LOYALITET_API_KEY},
-                                json=payload, timeout=30)
+            if gratis_antal == 0 or "@" not in mail:
+                _INDLOEST_CREDITS.add(oh)      # intet at indløse — tjek ikke bonen igen
+                continue
+
+            payload = {
+                "orderHash": oh,
+                "mail": mail,
+                "credits": gratis_antal,
+                "varenavn": ", ".join(str(l.get("product_name") or "") for l, _ in gratis),
+            }
+            r = requests.post(f"{LOYALITET_URL}/_api/kunde/indfri",
+                              headers={"X-Webhook-Secret": secret}, json=payload, timeout=30)
+            if r.ok or r.status_code == 404:   # 404 = mailen har intet stempelkort
                 if r.ok:
-                    indloest += gratis_antal
-                    _INDLOEST_CREDITS.add(oh)
-                else:
-                    fejl.append(f"{oh}: HTTP {r.status_code}")
+                    indloest += int((r.json() or {}).get("creditsRedeemed") or 0)
+                _INDLOEST_CREDITS.add(oh)
+            else:
+                fejl.append(f"{oh}: HTTP {r.status_code}")
         except SystemExit as e:
             fejl.append(f"{oh}: {str(e)[:80]}")
         except Exception as e:
@@ -655,6 +677,7 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     ud = {"ok": True, "bonner_set": 0, "med_kunde": 0, "uden_mail": 0, "sendt": 0}
 
     kandidater = []
+    indloes_kandidater = []     # bonner med kunde, også dem på 0 kr. (kun gratis brød)
     for side in range(1, sider + 1):
         j = api_get("/baskets") if side == 1 else api_get("/baskets", page=side)
         data = (j.get("data") if isinstance(j, dict) else j) or []
@@ -665,6 +688,8 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
             oh = b.get("order_hash")
             if not b.get("customer") or not oh or b.get("canceled"):
                 continue
+            if oh not in _INDLOEST_CREDITS and _f(b.get("total_amount")) >= 0:
+                indloes_kandidater.append(b)
             if _f(b.get("total_amount")) <= 0:      # returbon / 0-kr.-bon giver ikke stempel
                 continue
             ud["med_kunde"] += 1
@@ -704,7 +729,7 @@ def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     ud["lager_kategorier"] = len(lager["kategorier"]) if lager else 0
 
     # Indløs credits fra 0-kr varer (gratis brød)
-    credit_res = _indloes_credits(kandidater)
+    credit_res = _indloes_credits(indloes_kandidater)
     ud["credits_indloest"] = credit_res.get("indloest", 0)
     if credit_res.get("fejl"):
         ud.setdefault("credit_fejl", []).extend(credit_res["fejl"])

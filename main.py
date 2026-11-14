@@ -746,6 +746,24 @@ def _planlagt_mangler_stempel():
         print(f"[Mangler stempel] {str(e)[:150]}")
 
 
+def _planlagt_paamindelser():
+    """Kalder appen hvert 15. min: udløber gratis brød og sender påmindelser. Uafhængigt af Shopbox-synkroniseringen."""
+    try:
+        import requests
+        import shopbox_sync
+        secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
+        r = requests.post(f"{shopbox_sync.LOYALITET_URL}/_api/gratis/paamindelser",
+                          headers={"X-Webhook-Secret": secret}, json={}, timeout=90)
+        if not r.ok:
+            print(f"[Påmindelser] HTTP {r.status_code} {r.text[:120]}")
+            return
+        svar = r.json()
+        if svar.get("paamindelser") or svar.get("gensendt") or svar.get("udloebet"):
+            print(f"[Påmindelser] {svar}")
+    except BaseException as e:
+        print(f"[Påmindelser exception] {str(e)[:150]}")
+
+
 def _planlagt_loyalitet_sync():
     """Send Shopbox-bonner med kunde-mail til loyalitets-appen (stempler).
     Første kørsel efter opstart går længere tilbage for at fange det missede."""
@@ -879,6 +897,9 @@ async def lifespan(app: FastAPI):
         _scheduler.add_job(_planlagt_loyalitet_sync, "interval", minutes=5,
                            max_instances=1, coalesce=True)
         jobs.append("Loyalitet-sync: hvert 5. min")
+        # Påmindelser om gratis brød: hvert 15. min, uafhængigt af Shopbox-synkroniseringen
+        _scheduler.add_job(_planlagt_paamindelser, "interval", minutes=15, max_instances=1, coalesce=True)
+        jobs.append("Påmindelser gratis brød: hvert 15. min")
         # Dobbelt stempel-kampagne: dagligt tjek af lager og salg (slå fra med DOBBELT_AUTO=0)
         if os.environ.get("DOBBELT_AUTO", "1").strip() != "0":
             _dobbelt_time = int(os.environ.get("DOBBELT_TIME", "13"))

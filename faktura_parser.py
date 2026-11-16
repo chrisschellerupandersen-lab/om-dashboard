@@ -49,6 +49,7 @@ _PROD_MAP = {
     "24": "Brunsvigersnegl",            # udgået okt 2026 → erstattet af PROD-25
     "25": "Tebolle m. æblekompot & remonce",  # erstatter Brunsvigersnegl
     "26": "Bananbrød",
+    "27": "Klassisk snegl",             # portalnavn: "Klassisk kanelsnegl"
 }
 
 # Gentagne side-header/-footer-linjer der skal fjernes før varelinje-parsing, så en

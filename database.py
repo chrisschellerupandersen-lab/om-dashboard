@@ -8436,13 +8436,18 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
                 canon = _canon(r["varenummer"], r["varenavn"])
                 # Fra 1/9: spring gamle ikke-Organic konfekt-varer over i friskt salg.
                 # MEN behold bundles (faktor>1, fx "3 x wienerbrød") — ægte bagværks-forbrug.
-                if organic_uge and not canon and faktor <= 1:
+                # Kaffe-comboer ("Wienerbrød & varm valgfri kaffe" o.l.) og aftentilbuddet
+                # "18-20 wienerbrød" har intet katalog-SKU, men spiser et friskt stk → tæller.
+                _nl = (r["varenavn"] or "").lower()
+                _er_combo = ("kaffe" in _nl or "valgfri" in _nl or _nl.strip().startswith("18-20"))
+                if organic_uge and not canon and faktor <= 1 and not _er_combo:
                     continue
                 agg[kat]["frisk_stk"] += float(r["antal"]) * faktor   # bundle "N x" ganges op
                 agg[kat]["frisk_oms"] += float(r["oms"])
                 agg[kat]["frisk_db"]  += float(r["db"])
-                key = canon or ("navn:" + _norm(r["varenavn"]).lower())
-                p = prod[kat].setdefault(key, {"navn": canon or _norm(r["varenavn"]),
+                _vis = canon or _kombo_navn(_norm(r["varenavn"]))
+                key = canon or ("navn:" + _vis.lower())
+                p = prod[kat].setdefault(key, {"navn": _vis,
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
                 p["frisk"] += float(r["antal"]) * faktor
 

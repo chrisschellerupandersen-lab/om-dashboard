@@ -184,8 +184,17 @@ def _bageri_rolle(navn: str):
     if "frost" in n:
         if any(x in n for x in ("grillpøls", "pølse", " ost", "ostestang")):
             return None                                       # ikke bagværk
-        faktor = 5 if ("5x" in n or "5 x" in n) else 1
-        kat = "Brød" if "brød" in n else "Boller"
+        # Pakkestørrelse fra navnet: "Frost 4 x boller" = 4, "Frost - wienerbrød 2 stk" = 2,
+        # "Frost Brød - 1 stk" = 1. Uden tal = 1 stk.
+        mf = re.search(r"(\d+)\s*x\b", n) or re.search(r"(\d+)\s*stk", n)
+        faktor = int(mf.group(1)) if mf and 0 < int(mf.group(1)) <= 12 else 1
+        # Wienerbrød/snurrer/snegle FØR 'brød' (ellers fanges "wienerbrød" som Brød)
+        if any(x in n for x in ("wien", "snurre", "snegl", "croissant", "birkes")):
+            kat = "Wiener"
+        elif "brød" in n:
+            kat = "Brød"
+        else:
+            kat = "Boller"
         return ("reddet", kat, faktor)
     if "i går" in n or "igår" in n:
         kat = "Brød" if "brød" in n else ("Wiener" if "wien" in n else "Boller")

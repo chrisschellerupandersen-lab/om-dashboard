@@ -1803,7 +1803,10 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         res_day[dt] = round(db_day.get(dt, 0.0) - loen - 500.0 - levering)
         sp = 0.0
         if dt >= _ORGANIC_START:
-            sp = max(0.0, float(hent_dagens_spild_vaerdi(dt, detaljer=False) or 0) - float(frost_per.get(dt, 0.0)))
+            # Netto spild = værdi spild − frost-salg. INGEN dags-clamp: frost solgt i dag
+            # stammer fra tidligere dages rest, så en dag kan godt være negativ — ugens sum
+            # skal stemme med DB-Shopbox og spild-scoren (ét tal).
+            sp = float(hent_dagens_spild_vaerdi(dt, detaljer=False) or 0) - float(frost_per.get(dt, 0.0))
         spild_day[dt] = round(sp)
     wk: Dict = {}
     for r in rows:
@@ -8474,6 +8477,21 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
                                                "bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "type": "frisk"})
                 p["bestilt"] += float(r["stk"])
                 p["navn"] = canon or _norm(r["varenavn"])   # foretræk katalog-navn
+        _sen = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
+        _seneste_iso = str(_sen["d"])[:10] if _sen and _sen["d"] else ""
+
+    # Værdi spild (brutto, kr) pr. kategori = Σ dagens spild-værdi (samme model som
+    # DB-Shopbox/Ugeoversigt/spild-score) → netto = brutto − frost-salg. Ét tal overalt.
+    brutto_kat = {k: 0.0 for k in KATS}
+    if organic_uge and _seneste_iso:
+        for _i in range(7):
+            _iso = (mon + timedelta(days=_i)).isoformat()
+            if _iso > _seneste_iso:
+                break
+            if _iso >= _ORGANIC_START:
+                _sp = hent_dagens_spild_vaerdi(_iso, detaljer=True)
+                for k in KATS:
+                    brutto_kat[k] += float((_sp.get("kategorier") or {}).get(k, 0) or 0)
 
     rows, tot = [], {"bestilt": 0.0, "frisk": 0.0, "reddet": 0.0, "spild": 0.0,
                      "db": 0.0, "spild_kost": 0.0, "oms": 0.0}
@@ -8482,9 +8500,16 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
         bestilt = a["bestilt_stk"]
         solgt   = a["frisk_stk"] + a["reddet_stk"]
         spild_stk = max(0.0, bestilt - solgt) if bestilt > 0 else 0.0
-        spild_kost = spild_stk * kat_indkoeb.get(k, 0)
         db_sales   = a["frisk_db"] + a["reddet_db"]
-        reel_db    = db_sales - spild_kost
+        if organic_uge:
+            brutto_kr  = brutto_kat[k]
+            frost_kr   = a["reddet_oms"]
+            spild_kost = brutto_kr - frost_kr            # netto spild i kr (efter frost-salg)
+            reel_db    = a["frisk_db"] - spild_kost      # frost-salget er modregnet i netto spild
+        else:
+            spild_kost = spild_stk * kat_indkoeb.get(k, 0)
+            brutto_kr, frost_kr = spild_kost, 0.0
+            reel_db    = db_sales - spild_kost
         oms        = a["frisk_oms"] + a["reddet_oms"]
         _pl = list(prod[k].values())
         # Friske varer først (efter rest), derefter rednings-varer (frost / fra i går)
@@ -8511,10 +8536,14 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
             "reel_db":      round(reel_db),
             "reel_dg_pct":  round(reel_db / oms * 100, 1) if oms > 0 else None,
             "spild_kost":   round(spild_kost),
+            "spild_brutto_kr": round(brutto_kr),
+            "frost_kr":     round(frost_kr),
             "varer":        varer,
         })
         tot["bestilt"] += bestilt; tot["frisk"] += a["frisk_stk"]; tot["reddet"] += a["reddet_stk"]
-        tot["spild"] += spild_stk; tot["db"] += db_sales; tot["spild_kost"] += spild_kost
+        tot["spild"] += spild_stk; tot["db"] += (reel_db + spild_kost); tot["spild_kost"] += spild_kost
+        tot["brutto_kr"] = tot.get("brutto_kr", 0.0) + brutto_kr
+        tot["frost_kr"]  = tot.get("frost_kr", 0.0) + frost_kr
         tot["oms"] += oms
 
     reel_db_tot = tot["db"] - tot["spild_kost"]
@@ -8528,6 +8557,8 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
         "reel_db":     round(reel_db_tot),
         "reel_dg_pct": round(reel_db_tot / tot["oms"] * 100, 1) if tot["oms"] > 0 else None,
         "spild_kost":  round(tot["spild_kost"]),
+        "spild_brutto_kr": round(tot.get("brutto_kr", 0.0)),
+        "frost_kr":    round(tot.get("frost_kr", 0.0)),
     }
     # Kager: separat UGE-opsummering (bestilt vs. solgt over hele ugen) — IKKE spild,
     # da de sælges over 3-4 dage. Katalog-matchet via dag-sammenligningen.
@@ -11942,7 +11973,7 @@ def hent_spild_score(antal_uger: int = 10) -> dict:
                 frost_s += int(frost_stk_per.get(iso, 0))
                 frost_kr += float(frost_kr_per.get(iso, 0.0))
         spild_n = max(0, spild_b - frost_s)
-        spild_kr_netto = max(0.0, spild_kr - frost_kr)
+        spild_kr_netto = spild_kr - frost_kr
         pct_n = round(spild_n / bestilt * 100, 1) if bestilt > 0 else 0.0
         pct_b = round(spild_b / bestilt * 100, 1) if bestilt > 0 else 0.0
         resultat = db - (loen + omk + levering)

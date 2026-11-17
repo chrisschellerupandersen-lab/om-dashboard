@@ -2314,6 +2314,15 @@ async def api_bageri_spild(request: Request, uge: int, aar: int,
     return database.hent_bageri_spild(int(uge), int(aar), ekskl_manuel=bool(ekskl_manuel))
 
 
+@app.get("/api/bageri/spild-dag")
+async def api_bageri_spild_dag(request: Request, fra: Optional[str] = None,
+                               til: Optional[str] = None, secret: Optional[str] = None):
+    """Spild pr. dag pr. gruppe (brutto, frost, netto i kr). Login eller webhook-secret."""
+    if request.headers.get("X-Webhook-Secret") != WEBHOOK_SECRET and secret != WEBHOOK_SECRET:
+        _kræv_login(request)
+    return database.hent_spild_dag_serie(fra, til)
+
+
 @app.get("/api/bageri/spild-trend")
 async def api_bageri_spild_trend(request: Request, uger: int = 8, secret: Optional[str] = None):
     """Spild-trend over de seneste N uger. Login eller webhook-secret."""

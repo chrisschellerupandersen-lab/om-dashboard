@@ -8585,6 +8585,50 @@ def hent_bageri_spild(uge: int, aar: int, ekskl_manuel: bool = False) -> Dict:
             "kategorier": rows, "kager": kager, "total": total}
 
 
+def hent_spild_dag_serie(fra: str = None, til: str = None) -> Dict:
+    """Spild pr. dag pr. gruppe (Brød/Boller/Wiener), Organic-æra. Brutto = værdi spild
+    til kostpris (leveringsdagen); frost = frost-salg (100 % DB, ingen kostpris);
+    netto = brutto − frost. Samme model som ugeoversigt/spild-score."""
+    from datetime import date as _d, timedelta as _td
+    KATS = ["Brød", "Boller", "Wiener"]
+    with _conn() as conn:
+        sen = conn.execute("SELECT MAX(dato) AS d FROM v_transaktioner").fetchone()
+        seneste = str(sen["d"])[:10] if sen and sen["d"] else ""
+        start = max(fra or _ORGANIC_START, _ORGANIC_START)
+        slut = min(til or _d.today().isoformat(), seneste or "9999-12-31")
+        frost_rows = conn.execute("""
+            SELECT dato, varenavn, COALESCE(SUM(omsaetning_ex_moms),0) AS kr
+            FROM v_transaktioner WHERE dato>=? AND dato<=? AND LOWER(varenavn) LIKE '%rost%'
+            GROUP BY dato, varenavn""", (start, slut)).fetchall()
+    frost: Dict = {}
+    for r in frost_rows:
+        navn = r["varenavn"] or ""
+        rl = _bageri_rolle(navn)
+        if rl and rl[0] == "reddet" and "frost" in navn.lower():
+            k = (str(r["dato"])[:10], rl[1])
+            frost[k] = frost.get(k, 0.0) + float(r["kr"] or 0)
+    dage = []
+    cur = _d.fromisoformat(start)
+    end = _d.fromisoformat(slut) if slut and slut != "9999-12-31" else cur - _td(days=1)
+    while cur <= end:
+        iso = cur.isoformat()
+        sp = hent_dagens_spild_vaerdi(iso, detaljer=True)
+        kat_brutto = {k: float((sp.get("kategorier") or {}).get(k, 0) or 0) for k in KATS}
+        kat_frost = {k: float(frost.get((iso, k), 0.0)) for k in KATS}
+        kat_netto = {k: kat_brutto[k] - kat_frost[k] for k in KATS}
+        iy, iw, wd = cur.isocalendar()
+        dage.append({"dato": iso, "aar": iy, "uge": iw, "ugedag": wd,
+                     "bestilt_stk": int(sp.get("bestilt_stk", 0) or 0),
+                     "brutto_kr": {k: round(v) for k, v in kat_brutto.items()},
+                     "frost_kr": {k: round(v) for k, v in kat_frost.items()},
+                     "netto_kr": {k: round(v) for k, v in kat_netto.items()},
+                     "brutto_total": round(sum(kat_brutto.values())),
+                     "frost_total": round(sum(kat_frost.values())),
+                     "netto_total": round(sum(kat_netto.values()))})
+        cur += _td(days=1)
+    return {"fra": start, "til": slut, "kategorier": KATS, "dage": dage}
+
+
 def _trend_uge_fra_anbefaling(w: int, y: int) -> Dict:
     """Byg en 'kommende uge'-post ud fra Organic Bakery-anbefalingen (beregneren),
     så planlagte bestillinger vises som kommende uger i trenden."""

@@ -530,31 +530,20 @@ def _send_daily_notifications():
                 for v in tilgaengelige[:3]
             ])
 
+            # Kun indholdet: appen pakker mailen ind i den fælles skabelon (header, farver, footer).
             html = f"""
-            <html style="font-family: Arial, sans-serif; color: #333;">
-            <body style="background: #f5f5f5; padding: 20px;">
-            <div style="max-width: 600px; background: white; padding: 30px; border-radius: 10px;">
-                <h2 style="color: #6B4226;">Hej {kundenavn}! 👋</h2>
-                <p>Dine favoritter er klar til dig hos Organic Market Greve:</p>
-                <ul>{liste_html}</ul>
-                <p><strong>Butikken er åben kl. 06:30–20:00.</strong></p>
-                <p style="margin-top: 30px;">
-                    <a href="https://organicmarket-greve.floot.app/stempelkort"
-                       style="background: #d4a853; color: white; padding: 12px 24px;
-                              border-radius: 5px; text-decoration: none; display: inline-block;">
-                        Åbn appen
-                    </a>
-                </p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-                <p style="font-size: 12px; color: #999;">
-                    Organic Market Greve · Ubemandet butik åben 06:30-20:00<br>
-                    Tak fordi du støtter lokalt – Organic Market Greve<br>
-                    Du modtager denne mail, fordi du har takket ja til mails i stempelkortet.
-                    <a href="{afmeld_url}" style="color: #999;">Afmeld mails</a>
-                </p>
-            </div>
-            </body>
-            </html>
+            <h2 style="font-size:22px;margin:0 0 12px;">Hej {kundenavn}! 👋</h2>
+            <p style="margin:0 0 12px;">Dine favoritter er klar til dig hos Organic Market Greve:</p>
+            <ul style="margin:0 0 12px;padding-left:20px;">{liste_html}</ul>
+            <p style="margin:0 0 20px;"><strong>Butikken er åben kl. 06:30–20:00.</strong></p>
+            <a href="https://organicmarket-greve.floot.app/stempelkort"
+               style="display:inline-block;background:#626b59;color:#f2ede7;text-decoration:none;padding:12px 22px;border-radius:10px;font-weight:700;">
+                Åbn appen
+            </a>
+            <p style="font-size:12px;color:#9a9480;margin:24px 0 0;">
+                Du modtager denne mail, fordi du har takket ja til mails i stempelkortet.
+                <a href="{afmeld_url}" style="color:#9a9480;">Afmeld mails</a>
+            </p>
             """
 
             # Send email (via SMTP eller simpel POST)

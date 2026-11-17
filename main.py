@@ -555,6 +555,7 @@ def _send_daily_notifications():
                         "email": email,
                         "subject": emne,
                         "html": html,
+                        "kunApp": True,  # kun i appen: ingen daglig mail, beskeden ligger i indbakken
                     },
                     timeout=10
                 )

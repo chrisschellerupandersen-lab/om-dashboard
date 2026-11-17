@@ -100,6 +100,8 @@ _ORGANIC_BAKERY = [
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Klassisk snegl",          "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10516],
      "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — kassenavn "Klassisk kanelsnegl - Øko", SKU 10516 til solgt/spild; startbud ~25/uge, vægt weekend. Flyt 10516 til kilde når der er historik
+    {"navn": "Spandauer m. creme",       "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10520],
+     "seed": {"man": 1, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 5, "son": 4}},  # NY vare (uge 47) — Shopbox SKU 10520 (Produkt-ID 13051090), kategori Bagværk, 30 kr inkl. moms = 24 ex moms
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},

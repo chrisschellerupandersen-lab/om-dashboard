@@ -901,11 +901,12 @@ async def lifespan(app: FastAPI):
             _scheduler.add_job(_planlagt_mangler_stempel, "cron", hour="6-22", minute="*/15",
                                max_instances=1, coalesce=True, timezone="Europe/Copenhagen")
             jobs.append("Mangler stempel: hvert 15. min kl. 6-22")
-    # Push-notifikationer: personaliserede email hver morgen (kun hvis Floot-nøgle er sat)
-    if os.environ.get("FLOOT_API_KEY"):
-        _scheduler.add_job(_send_daily_notifications, "cron", hour=7, minute=0,
-                          timezone="Europe/Copenhagen")
-        jobs.append("Push-notifikationer: dagligt 07:00")
+    # Daglig favorit-besked er slået fra (for mange beskeder). Funktionen _send_daily_notifications
+    # findes stadig og kan køres manuelt via notifikation_test-endepunktet.
+    # if os.environ.get("FLOOT_API_KEY"):
+    #     _scheduler.add_job(_send_daily_notifications, "cron", hour=7, minute=0,
+    #                       timezone="Europe/Copenhagen")
+    #     jobs.append("Daglig favorit-besked: 07:00")
     if jobs:
         _scheduler.start()
         print(f"[Scheduler] {' · '.join(jobs)}")

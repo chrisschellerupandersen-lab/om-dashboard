@@ -8629,6 +8629,27 @@ def hent_spild_dag_serie(fra: str = None, til: str = None) -> Dict:
     return {"fra": start, "til": slut, "kategorier": KATS, "dage": dage}
 
 
+def hent_salg_tid_bageri(fra: str = None, til: str = None) -> Dict:
+    """Bagværks-salg pr. dag, klokkeslæt (hele timer) og vare. Friskt (SKU + combo)
+    og frost ('reddet') holdes adskilt. Rækker uden tid (time_start = -1) udelades."""
+    with _conn() as conn:
+        rows = conn.execute("""
+            SELECT dato, time_start AS t, varenavn, COALESCE(SUM(antal),0) AS antal
+            FROM transaktioner
+            WHERE dato >= ? AND dato <= ? AND time_start >= 0 AND varenavn != ''
+            GROUP BY dato, time_start, varenavn
+        """, (fra or _ORGANIC_START, til or "9999-12-31")).fetchall()
+    ud = []
+    for r in rows:
+        rl = _bageri_rolle(r["varenavn"])
+        if not rl:
+            continue
+        typ, kat, faktor = rl
+        ud.append({"dato": str(r["dato"])[:10], "time": int(r["t"]), "vare": _kombo_navn(r["varenavn"]),
+                   "typ": typ, "kat": kat, "stk": round(float(r["antal"] or 0) * faktor, 1)})
+    return {"fra": fra, "til": til, "rækker": ud}
+
+
 def _trend_uge_fra_anbefaling(w: int, y: int) -> Dict:
     """Byg en 'kommende uge'-post ud fra Organic Bakery-anbefalingen (beregneren),
     så planlagte bestillinger vises som kommende uger i trenden."""

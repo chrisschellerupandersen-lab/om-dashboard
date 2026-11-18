@@ -102,6 +102,14 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — kassenavn "Klassisk kanelsnegl - Øko", SKU 10516 til solgt/spild; startbud ~25/uge, vægt weekend. Flyt 10516 til kilde når der er historik
     {"navn": "Spandauer m. creme",       "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10520],
      "seed": {"man": 1, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 5, "son": 4}},  # NY vare (uge 47) — Shopbox SKU 10520 (Produkt-ID 13051090), kategori Bagværk, 30 kr inkl. moms = 24 ex moms
+    # Nye varer uge 48 (portal-ordre #1131). Ingen Shopbox-SKU endnu → salg kobles når SKU kendes.
+    # Priser = portalens ex moms-pris (indkøb); udsalg sat til 2× indkøb som de øvrige varer (skøn).
+    {"navn": "Brunkager",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Finskbrød",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Vaniljekranse",           "indkoeb": 21.6, "udsalg": 43.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Vanilla Chocolate Cookie", "indkoeb": 21.4, "udsalg": 42.8, "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Julebolle",               "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Julespandauer m. kirsebær", "indkoeb": 14.0, "udsalg": 28.0, "gruppe": "standard", "kilde": [], "salg_kilde": []},
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
@@ -223,13 +231,13 @@ def _kombo_navn(navn: str) -> str:
 def _organic_kat(navn: str) -> str:
     """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
     n = (navn or "").lower()
-    if any(k in n for k in ("gulerodskage", "cookie", "bananbrød", "bananbrod")):
+    if any(k in n for k in ("gulerodskage", "cookie", "bananbrød", "bananbrod", "brunkag", "kranse")):
         return "Kage"
     if "bolle" in n:                                   # tebolle + surdejsbolle
         return "Boller"
     if any(k in n for k in ("brød", "focaccia", "rugbrød")):
         return "Brød"
-    if any(k in n for k in ("tebirkes", "croissant", "snurre", "snegl", "brunsviger", "pain")):
+    if any(k in n for k in ("tebirkes", "croissant", "snurre", "snegl", "brunsviger", "pain", "spandauer")):
         return "Wiener"
     return ""
 

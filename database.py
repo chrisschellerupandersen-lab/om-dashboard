@@ -172,7 +172,7 @@ def _bakery_kat(n: str) -> Optional[str]:
         return None
     if any(k in n for k in ("gulerodskage", "cookie", "kage", "muffin", "brownie",
                             "romkugle", "træstamme", "kokostop", "hindbærsnitte", "napoleonshat",
-                            "bananbrød", "bananbrod")):
+                            "bananbrød", "bananbrod", "finskbrød", "finskbrod")):
         return "Kage"
     if "wien" in n:                                           # wienerbrød/wienerstang → Wiener (FØR 'brød')
         return "Wiener"

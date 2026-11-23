@@ -2440,9 +2440,17 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             "SUM(antal) AS ant FROM transaktioner WHERE dato=? GROUP BY varenavn, vn",
             (dato,)).fetchall()
     extra = {k: [] for k in KAT_ORDEN}   # kat → [{varenavn, antal}]
+    # Katalogvarer UDEN SKU (fx Julespandauer m. kirsebær) sælges under kassenavnet uden
+    # varenummer → skal lægges på varelinjen, ikke stå som en anonym combo-linje.
+    _katalog_navne = {p["navn"].strip().lower() for p in _ORGANIC_BAKERY}
+    navn_extra_solgt: Dict[str, int] = {}
     for r in alle_solgt:
         if r["vn"] in _sku_set:
             continue                       # allerede talt via katalog-SKU
+        if (r["varenavn"] or "").strip().lower() in _katalog_navne:
+            _nl = r["varenavn"].strip().lower()
+            navn_extra_solgt[_nl] = navn_extra_solgt.get(_nl, 0) + int(r["ant"] or 0)
+            continue
         rolle = _bageri_rolle(r["varenavn"])
         if rolle and rolle[0] == "frisk" and rolle[1] in extra:
             nm = _kombo_navn(r["varenavn"])
@@ -2467,6 +2475,7 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
             continue
         bestilt_p = int(b["ant"] or 0)
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(navn.strip().lower(), []))
+        solgt_p += navn_extra_solgt.get(navn.strip().lower(), 0)   # SKU-løs salg (samme vare)
         if bestilt_p <= 0 and solgt_p <= 0:
             continue
         rest_p = bestilt_p - solgt_p                        # signeret (kan være negativ)
@@ -2487,6 +2496,7 @@ def hent_dagens_rest_kategori(dato: str = None) -> Dict:
         if nl in _best_navne:
             continue
         solgt_p = sum(solgt_pr_sku.get(s, 0) for s in navn_skus.get(nl, []))
+        solgt_p += navn_extra_solgt.get(nl, 0)   # SKU-løs salg (samme vare)
         if solgt_p <= 0:
             continue
         navn = p["navn"]

@@ -50,6 +50,7 @@ _PROD_MAP = {
     "25": "Tebolle m. æblekompot & remonce",  # erstatter Brunsvigersnegl
     "26": "Bananbrød",
     "27": "Klassisk snegl",             # portalnavn: "Klassisk kanelsnegl"
+    "28": "Spandauer m. creme",         # faktura 134 (uge 47)
 }
 
 # Gentagne side-header/-footer-linjer der skal fjernes før varelinje-parsing, så en

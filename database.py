@@ -231,7 +231,7 @@ def _kombo_navn(navn: str) -> str:
 def _organic_kat(navn: str) -> str:
     """Kategori til gruppering i bestillingstabellen for Organic Bakery-varer."""
     n = (navn or "").lower()
-    if any(k in n for k in ("gulerodskage", "cookie", "bananbrød", "bananbrod", "brunkag", "kranse")):
+    if any(k in n for k in ("gulerodskage", "cookie", "bananbrød", "bananbrod", "brunkag", "kranse", "finsk")):
         return "Kage"
     if "bolle" in n:                                   # tebolle + surdejsbolle
         return "Boller"

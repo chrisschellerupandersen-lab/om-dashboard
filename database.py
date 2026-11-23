@@ -109,7 +109,7 @@ _ORGANIC_BAKERY = [
     {"navn": "Vaniljekranse",           "indkoeb": 21.6, "udsalg": 43.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
     {"navn": "Vanilla Chocolate Cookie", "indkoeb": 21.4, "udsalg": 42.8, "gruppe": "standard", "kilde": [], "salg_kilde": []},
     {"navn": "Julebolle",               "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Julespandauer m. kirsebær", "indkoeb": 14.0, "udsalg": 28.0, "gruppe": "standard", "kilde": [], "salg_kilde": []},
+    {"navn": "Julespandauer m. kirsebær", "indkoeb": 14.0, "udsalg": 28.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10524]},
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},

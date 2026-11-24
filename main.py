@@ -859,6 +859,17 @@ def _dobbelt_stempel_tjek(start: bool = False) -> dict:
         return {"ok": False, "fejl": str(e)[:200]}
 
 
+def _planlagt_lager_sync():
+    """Send dagens restlager til loyalitets-appen hvert 5. min, uafhængigt af bon-synken."""
+    try:
+        import shopbox_sync
+        res = shopbox_sync.send_lager_til_loyalitet()
+        if not res.get("ok"):
+            print(f"[Lager-sync] {res}")
+    except BaseException as e:
+        print(f"[Lager-sync exception] {str(e)[:150]}")
+
+
 def _planlagt_dobbelt_stempel():
     _dobbelt_stempel_tjek(start=True)
 
@@ -887,6 +898,10 @@ async def lifespan(app: FastAPI):
         _scheduler.add_job(_planlagt_loyalitet_sync, "interval", minutes=5,
                            max_instances=1, coalesce=True)
         jobs.append("Loyalitet-sync: hvert 5. min")
+        # Dagens lager: egen job, så det opdateres uanset om bon-synken lykkes
+        _scheduler.add_job(_planlagt_lager_sync, "interval", minutes=5,
+                           max_instances=1, coalesce=True)
+        jobs.append("Lager-sync: hvert 5. min")
         # Påmindelser om gratis brød: hvert 15. min, uafhængigt af Shopbox-synkroniseringen
         _scheduler.add_job(_planlagt_paamindelser, "interval", minutes=15, max_instances=1, coalesce=True)
         jobs.append("Påmindelser gratis brød: hvert 15. min")

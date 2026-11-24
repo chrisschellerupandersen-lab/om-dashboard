@@ -665,6 +665,28 @@ def _dagens_lager():
         return None
 
 
+def send_lager_til_loyalitet() -> dict:
+    """Send dagens restlager til loyalitets-appen uafhængigt af bon-synkroniseringen.
+    Er der intet lager i dag, sendes en tom liste, så appen ikke viser et gammelt tal."""
+    secret = os.environ.get("SHOPBOX_INGEST_SECRET", "").strip()
+    if not secret:
+        return {"ok": False, "fejl": "SHOPBOX_INGEST_SECRET mangler"}
+    lager = _dagens_lager()
+    if not lager:
+        from zoneinfo import ZoneInfo
+        lager = {"dato": datetime.now(ZoneInfo("Europe/Copenhagen")).strftime("%Y-%m-%d"),
+                 "kategorier": []}
+    try:
+        r = requests.post(f"{LOYALITET_URL}/_api/shopbox/kvittering",
+                          json={"kvitteringer": [], "lager": lager},
+                          headers={"X-Webhook-Secret": secret}, timeout=60)
+    except Exception as e:
+        return {"ok": False, "fejl": f"{type(e).__name__}: {str(e)[:150]}"}
+    if not r.ok:
+        return {"ok": False, "fejl": f"app svarede HTTP {r.status_code}: {r.text[:150]}"}
+    return {"ok": True, "kategorier": len(lager["kategorier"])}
+
+
 def send_kvitteringer_til_loyalitet(sider: int = 3, alle: bool = False) -> dict:
     """Find de seneste bonner med kunde (= mail tastet for kvittering) og aflevér
     dem til loyalitets-appen. Appen dedup'er på order_hash, så gentagelser er harmløse.

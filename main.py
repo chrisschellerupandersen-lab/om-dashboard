@@ -362,24 +362,6 @@ def _planlagt_gmail_sync():
     finally:
         loop.close()
 
-def _planlagt_tgtg_sync():
-    import subprocess
-    from pathlib import Path
-    script = Path(__file__).parent / "tgtg_sync.py"
-    try:
-        result = subprocess.run(
-            ["python", str(script)],
-            capture_output=True,
-            text=True,
-            timeout=120
-        )
-        if result.returncode == 0:
-            print(f"[TGTG auto-sync OK]")
-        else:
-            print(f"[TGTG auto-sync fejl] {result.stderr[:200]}")
-    except Exception as e:
-        print(f"[TGTG auto-sync exception] {str(e)[:100]}")
-
 
 def _planlagt_social_generering():
     """Generér dagens Facebook-opslag. Auto-publicér hvis SOCIAL_AUTO_PUBLICER=1
@@ -881,11 +863,6 @@ async def lifespan(app: FastAPI):
     if os.environ.get("GMAIL_TOKEN_JSON"):
         _scheduler.add_job(_planlagt_gmail_sync, "cron", day_of_week="mon,thu", hour=8, minute=0)
         jobs.append("Gmail auto-sync: man+tor 08:00")
-    # TGTG sync kl. 16, 19 og 20 hver dag
-    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=16, minute=0)
-    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=19, minute=0)
-    _scheduler.add_job(_planlagt_tgtg_sync, "cron", hour=20, minute=0)
-    jobs.append("TGTG auto-sync: dagligt 16:00 + 19:00 + 20:00")
     # Social selling: generér dagens opslag hver morgen kl. 06:30
     _scheduler.add_job(_planlagt_social_generering, "cron", hour=6, minute=30)
     jobs.append("Social opslag: dagligt 06:30")

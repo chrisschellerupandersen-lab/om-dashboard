@@ -515,7 +515,7 @@ def _send_daily_notifications():
             # Kun indholdet: appen pakker mailen ind i den fælles skabelon (header, farver, footer).
             html = f"""
             <h2 style="font-size:22px;margin:0 0 12px;">Hej {kundenavn}! 👋</h2>
-            <p style="margin:0 0 12px;">Dine favoritter er klar til dig hos Organic Market Greve:</p>
+            <p style="margin:0 0 12px;">Dine favoritter er klar til dig hos Organic market Greve:</p>
             <ul style="margin:0 0 12px;padding-left:20px;">{liste_html}</ul>
             <p style="margin:0 0 20px;"><strong>Butikken er åben kl. 06:30–20:00.</strong></p>
             <a href="https://organicmarket-greve.floot.app/stempelkort"

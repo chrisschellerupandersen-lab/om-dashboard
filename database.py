@@ -7861,7 +7861,8 @@ def hent_bestillings_uge_sellthrough(maal_uge: int, maal_aar: int,
 # så fx en stille efterårsferie ikke trækker forecastet for en normal uge skævt.
 # Data slettes IKKE — selve ferie-/helligdagsugen håndteres som event-faktor på MÅL-ugen
 # (_events_for_aar). Tøm sættet for at slå udelukkelsen fra. Nøgle = (iso_aar, iso_uge).
-_FERIE_UGER = {(2026, 42)}   # efterårsferie 2026
+_FERIE_UGER = {(2026, 42),   # efterårsferie 2026
+               (2026, 47)}   # rod i data + MobilePay-salg ikke korrekt registreret (uge 47 2026)
 
 def _uge_er_ferie(iso_aar: int, iso_uge: int) -> bool:
     return (iso_aar, iso_uge) in _FERIE_UGER

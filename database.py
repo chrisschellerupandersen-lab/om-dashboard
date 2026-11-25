@@ -104,12 +104,25 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 1, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 5, "son": 4}},  # NY vare (uge 47) — Shopbox SKU 10520 (Produkt-ID 13051090), kategori Bagværk, 30 kr inkl. moms = 24 ex moms
     # Nye varer uge 48 (portal-ordre #1131). Ingen Shopbox-SKU endnu → salg kobles når SKU kendes.
     # Priser = portalens ex moms-pris (indkøb); udsalg sat til 2× indkøb som de øvrige varer (skøn).
-    {"navn": "Brunkager",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Finskbrød",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Vaniljekranse",           "indkoeb": 21.6, "udsalg": 43.2,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Vanilla Chocolate Cookie", "indkoeb": 21.4, "udsalg": 42.8, "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Julebolle",               "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [], "salg_kilde": []},
-    {"navn": "Julespandauer m. kirsebær", "indkoeb": 14.0, "udsalg": 28.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10524]},
+    # Seeds = uge 48-bestilling (købes hver uge). Brunkager/Finskbrød/Vaniljekranse/VCC: 10 stk mandag.
+    {"navn": "Brunkager",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 10, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 0, "son": 0}},
+    {"navn": "Finskbrød",               "indkoeb": 20.6, "udsalg": 41.2,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 10, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 0, "son": 0}},
+    {"navn": "Vaniljekranse",           "indkoeb": 21.6, "udsalg": 43.2,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 10, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 0, "son": 0}},
+    {"navn": "Vanilla Chocolate Cookie", "indkoeb": 21.4, "udsalg": 42.8, "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 10, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 0, "son": 0}},
+    {"navn": "Julebolle",               "indkoeb": 10.0, "udsalg": 20.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 3, "tir": 3, "ons": 4, "tor": 4, "fre": 6, "loe": 8, "son": 10}},
+    {"navn": "Julespandauer m. kirsebær", "indkoeb": 14.0, "udsalg": 28.0, "gruppe": "standard", "kilde": [], "salg_kilde": [10524],
+     "seed": {"man": 4, "tir": 4, "ons": 2, "tor": 4, "fre": 6, "loe": 10, "son": 6}},
+    # Nye varer (uge 49, webshop-kurv). Ingen Shopbox-SKU endnu → salg matches på navn.
+    # Seed = første kurv (uge 49); priser = webshop ex moms; udsalg 2× indkøb (skøn).
+    {"navn": "Honningbombe",            "indkoeb": 19.6, "udsalg": 39.2,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 0, "tir": 10, "ons": 0, "tor": 0, "fre": 20, "loe": 0, "son": 0}},
+    {"navn": "Speltbrød m. kerner",     "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 4, "loe": 6, "son": 6}},
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
@@ -121,11 +134,11 @@ _ORGANIC_BAKERY = [
     # 10479). "udgaaet": True → anbefales/vises aldrig i fremtidige (ubestilte) uger.
     {"navn": "Brunsvigersnegl",         "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10479], "udgaaet": True,
      "seed": {"man": 4, "tir": 4, "ons": 4, "tor": 4, "fre": 8, "loe": 10, "son": 8}},
-    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414],
+    {"navn": "Gulerodskage 5-6 pers",   "indkoeb": 56.0, "udsalg": 112.0, "gruppe": "kage",     "kilde": [], "salg_kilde": [10414], "udgaaet": True,
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 0, "loe": 1, "son": 1}},  # nyt SKU 10414 til solgt/spild
     {"navn": "Cookie",                  "indkoeb": 11.2, "udsalg": 22.4,  "gruppe": "standard", "kilde": [10075, 10408],
      "kun_dage": ["tor", "son"], "kun_dage_saml": True},  # købes kun tor+søn (holder) → ugens efterspørgsel konsolideres på de to købsdage
-    {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [10508],
+    {"navn": "Bananbrød",               "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [10508], "udgaaet": True,
      "seed": {"man": 0, "tir": 2, "ons": 0, "tor": 0, "fre": 3, "loe": 0, "son": 0}},  # NY vare (uge 43, ordre #1079) — kassesalg på SKU 10508. udsalg 79,2 = 2× kost (bekræft rigtig pris)
 ]
 
@@ -237,7 +250,7 @@ def _organic_kat(navn: str) -> str:
         return "Boller"
     if any(k in n for k in ("brød", "focaccia", "rugbrød")):
         return "Brød"
-    if any(k in n for k in ("tebirkes", "croissant", "snurre", "snegl", "brunsviger", "pain", "spandauer")):
+    if any(k in n for k in ("tebirkes", "croissant", "snurre", "snegl", "brunsviger", "pain", "spandauer", "honningbombe")):
         return "Wiener"
     return ""
 

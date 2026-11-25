@@ -96,7 +96,7 @@ _ORGANIC_BAKERY = [
     {"navn": "Tebirkes",                "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10060, 10061, 10436, 10465]},  # 10465 = Tebirkessnegl m. Citron (variant). Tebirkessnegl UDGÅR uge 46 og erstattes af klassisk Tebirkes = SAMME linje (10465 beholdes for historik)
     {"navn": "Croissant",               "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "risiko",   "kilde": [10062, 10410]},
     {"navn": "Kardemommesnurre",        "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10067, 10065, 10420],
-     "weekend_kun": True, "hverdag_til": "Kanelsnurre"},  # bevidst sortiment: kun fre-søn; hverdags-snurre = kanel
+     },
     {"navn": "Kanelsnurre",             "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [10066, 10064, 10069, 10416]}, # + Kanel snegl + Høj Kanel snegl m. creme
     {"navn": "Klassisk snegl",          "indkoeb": 12.0, "udsalg": 24.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10516],
      "seed": {"man": 2, "tir": 2, "ons": 2, "tor": 2, "fre": 4, "loe": 7, "son": 6}},  # NY vare (uge 46) — kassenavn "Klassisk kanelsnegl - Øko", SKU 10516 til solgt/spild; startbud ~25/uge, vægt weekend. Flyt 10516 til kilde når der er historik

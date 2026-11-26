@@ -123,6 +123,12 @@ _ORGANIC_BAKERY = [
      "seed": {"man": 0, "tir": 10, "ons": 0, "tor": 0, "fre": 20, "loe": 0, "son": 0}},
     {"navn": "Speltbrød m. kerner",     "indkoeb": 22.0, "udsalg": 44.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [],
      "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 4, "loe": 6, "son": 6}},
+    # Nye varer (uge 49, portal-ordre #1149). Shopbox-SKU kommer når varerne er oprettet der → salg matches på navn indtil da.
+    # Seed = ordre #1149; indkøb = portalens ex moms-pris; udsalg 2× indkøb (skøn).
+    {"navn": "Christmas cremebolle m. kirsebær", "indkoeb": 20.6, "udsalg": 41.2, "gruppe": "standard", "kilde": [], "salg_kilde": [],
+     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 4, "loe": 6, "son": 6}},
+    {"navn": "Rasmus' Ølkage",          "indkoeb": 39.6, "udsalg": 79.2,  "gruppe": "kage",     "kilde": [], "salg_kilde": [],
+     "seed": {"man": 0, "tir": 0, "ons": 0, "tor": 0, "fre": 4, "loe": 0, "son": 0}},
     {"navn": "Pain au Chocolate",       "indkoeb": 14.0, "udsalg": 28.0,  "gruppe": "risiko",   "kilde": [10063, 10422]},
     {"navn": "Tebolle m. chokolade",    "indkoeb": 6.0,  "udsalg": 12.0,  "gruppe": "standard", "kilde": [], "salg_kilde": [10446],
      "seed": {"man": 3, "tir": 3, "ons": 2, "tor": 2, "fre": 5, "loe": 5, "son": 4}},
@@ -1812,6 +1818,8 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
     # Resultat (DB − løn − omk − levering), netto spild og resultat-e-spild pr. dag
     res_day: Dict[str, float] = {}
     spild_day: Dict[str, float] = {}
+    brutto_day: Dict[str, float] = {}
+    frost_day: Dict[str, float] = {}
     for r in rows:
         dt = str(r["dato"])[:10]
         dd = _d.fromisoformat(dt); wd0 = dd.weekday()
@@ -1824,13 +1832,17 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         leveret = (lov == 1) if lov is not None else _db_leveret_dag(dt, wd0)
         levering = _levering_pris(dt) if leveret else 0.0
         res_day[dt] = round(db_day.get(dt, 0.0) - loen - 500.0 - levering)
-        sp = 0.0
+        sp = 0.0; br = 0.0; fr = 0.0
         if dt >= _ORGANIC_START:
             # Netto spild = værdi spild − frost-salg. INGEN dags-clamp: frost solgt i dag
             # stammer fra tidligere dages rest, så en dag kan godt være negativ — ugens sum
             # skal stemme med DB-Shopbox og spild-scoren (ét tal).
-            sp = float(hent_dagens_spild_vaerdi(dt, detaljer=False) or 0) - float(frost_per.get(dt, 0.0))
+            br = float(hent_dagens_spild_vaerdi(dt, detaljer=False) or 0)
+            fr = float(frost_per.get(dt, 0.0))
+            sp = br - fr
         spild_day[dt] = round(sp)
+        brutto_day[dt] = round(br)
+        frost_day[dt] = round(fr)
     wk: Dict = {}
     for r in rows:
         dt = str(r["dato"])[:10]
@@ -1840,7 +1852,8 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
                                      "bons": [None] * 7, "oms_bag": [None] * 7,
                                      "stk_bag": [None] * 7, "db": [None] * 7,
                                      "db_bag": [None] * 7, "res_e_spild": [None] * 7,
-                                     "spild": [None] * 7})
+                                     "spild": [None] * 7, "brutto": [None] * 7,
+                                     "frost": [None] * 7})
         rec["oms"][wd - 1] = round(float(r["oms"] or 0))
         rec["bons"][wd - 1] = int(r["bons"] or 0)
         rec["oms_bag"][wd - 1] = round(oms_bag.get(dt, 0.0))
@@ -1848,6 +1861,8 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         rec["db"][wd - 1] = round(db_day.get(dt, 0.0))
         rec["db_bag"][wd - 1] = round(db_bag.get(dt, 0.0))
         rec["spild"][wd - 1] = spild_day.get(dt, 0)
+        rec["brutto"][wd - 1] = brutto_day.get(dt, 0)
+        rec["frost"][wd - 1] = frost_day.get(dt, 0)
         rec["res_e_spild"][wd - 1] = res_day.get(dt, 0) - spild_day.get(dt, 0)
     iso_i = _d.today().isocalendar()
     ud = []
@@ -1861,6 +1876,8 @@ def hent_omsaetning_matrix(uger: int = 16) -> Dict:
         rec["db_bag_total"] = round(sum(x for x in rec["db_bag"] if x))
         rec["res_e_spild_total"] = round(sum(x for x in rec["res_e_spild"] if x is not None))
         rec["spild_total"] = round(sum(x for x in rec["spild"] if x is not None))
+        rec["brutto_total"] = round(sum(x for x in rec["brutto"] if x is not None))
+        rec["frost_total"] = round(sum(x for x in rec["frost"] if x is not None))
         rec["indevaerende"] = (rec["aar"] == iso_i[0] and rec["uge"] == iso_i[1])
         # Mærkedag/begivenhed for ugen (mors dag, påske, fastelavn m.fl.) — så man
         # kan se hvorfor en dag stikker af. dage = ugedags-index (0=man) der påvirkes.

@@ -10956,7 +10956,7 @@ async function loadBagRegnskab(){
 // ── UGE × UGEDAG MATRIX ───────────────────────────────────────────────────────
 let _umxData = null, _umxScope = 'butik', _umxMeasure = 'db', _umxFarve = 'col', _umxUger = 16;
 const _UMX_MEASURES = {
-  butik: [['oms','Omsætning'],['db','DB'],['res_spild','Resultat e. spild'],['kunder','Kunder'],['kurv','Kurvstørrelse']],
+  butik: [['oms','Omsætning'],['db','DB'],['res_spild','Resultat e. spild'],['brutto','Brutto spild'],['netto','Netto spild'],['frost','Frost salg'],['kunder','Kunder'],['kurv','Kurvstørrelse']],
   bag:   [['db','DB'],['oms','Omsætning'],['antal','Antal stk']],
 };
 async function loadUgeMatrix(){
@@ -10989,6 +10989,9 @@ function _umxVal(rec,i){
   const oms = rec.oms[i], bons = rec.bons[i];
   if (_umxMeasure==='db') return rec.db ? rec.db[i] : null;
   if (_umxMeasure==='res_spild') return rec.res_e_spild ? rec.res_e_spild[i] : null;
+  if (_umxMeasure==='brutto') return rec.brutto ? rec.brutto[i] : null;
+  if (_umxMeasure==='netto') return rec.spild ? rec.spild[i] : null;
+  if (_umxMeasure==='frost') return rec.frost ? rec.frost[i] : null;
   if (_umxMeasure==='kunder') return bons;
   if (_umxMeasure==='kurv') return (oms&&bons) ? oms/bons : null;
   return oms;
@@ -10998,6 +11001,9 @@ function _umxWeekTotal(r){
   if (_umxScope==='bag') return _umxMeasure==='antal' ? r.stk_bag_total : (_umxMeasure==='db' ? r.db_bag_total : r.oms_bag_total);
   if (_umxMeasure==='db') return r.db_total;
   if (_umxMeasure==='res_spild') return r.res_e_spild_total;
+  if (_umxMeasure==='brutto') return r.brutto_total;
+  if (_umxMeasure==='netto') return r.spild_total;
+  if (_umxMeasure==='frost') return r.frost_total;
   if (_umxMeasure==='kunder') return r.bons_total;
   if (_umxMeasure==='kurv') return r.bons_total ? r.oms_total/r.bons_total : null;
   return r.oms_total;
@@ -11014,13 +11020,16 @@ function renderUgeMatrix(){
     colMin[i]=Math.min(colMin[i],v); colMax[i]=Math.max(colMax[i],v); colSum[i]+=v; colN[i]++;
     gMin=Math.min(gMin,v); gMax=Math.max(gMax,v); }
     if(r.spild&&r.spild[i]!=null){ spSum[i]+=r.spild[i]; spN[i]++; } } });
-  const visSpildCol=(_umxScope!=='bag');   // netto spild som egen kolonne pr. dag (butik)
+  const _spildMaal=['brutto','netto','frost'].includes(_umxMeasure);  // vælges selv → ingen ekstra ↯-kolonne
+  const visSpildCol=(_umxScope!=='bag') && !_spildMaal;   // netto spild som egen kolonne pr. dag (butik)
   const t=(v,i)=>{ if(v==null) return null; let mn,mx;
     if(_umxFarve==='col'){ mn=colMin[i]; mx=colMax[i]; } else { mn=gMin; mx=gMax; }
     return (mx>mn)?(v-mn)/(mx-mn):0.5; };
-  const heat=(v,i)=>{ const s=t(v,i); return s==null?'transparent':`rgba(47,90,48,${(0.06+0.66*s).toFixed(3)})`; };
+  const _rodSkala=(_umxMeasure==='brutto'||_umxMeasure==='netto');   // spild = rød skala (høj = dårligt)
+  const heat=(v,i)=>{ const s=t(v,i); if(s==null) return 'transparent';
+    const rgb=_rodSkala?'179,84,30':'47,90,48'; return `rgba(${rgb},${(0.06+0.66*s).toFixed(3)})`; };
   const txt =(v,i)=>{ const s=t(v,i); return s==null?'var(--ash)':(s>0.55?'#fff':'var(--ink)'); };
-  const totLbl=_umxScope==='bag'?(_umxMeasure==='antal'?'Bagv. stk':(_umxMeasure==='db'?'Bagv. DB':'Bagv. i alt')):(_umxMeasure==='db'?'DB i alt':(_umxMeasure==='res_spild'?'Res. e. spild':(_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv'))));
+  const totLbl=_umxScope==='bag'?(_umxMeasure==='antal'?'Bagv. stk':(_umxMeasure==='db'?'Bagv. DB':'Bagv. i alt')):(_umxMeasure==='db'?'DB i alt':(_umxMeasure==='res_spild'?'Res. e. spild':(_umxMeasure==='brutto'?'Brutto spild i alt':(_umxMeasure==='netto'?'Netto spild i alt':(_umxMeasure==='frost'?'Frost i alt':(_umxMeasure==='oms'?'Uge i alt':(_umxMeasure==='kunder'?'Kunder i alt':'Snit kurv')))))));
   const dSep=visSpildCol?'border-left:1px solid rgba(30,58,30,.16);':'';
   let head=`<tr><th style="text-align:left;padding:8px 6px;width:64px;">Uge</th>`
     +DAGE.map(d=>`<th class="num" style="padding:8px 10px;${dSep}">${d}</th>`+(visSpildCol?`<th class="num" style="padding:8px 4px;font-size:9px;color:#b3541e;" title="netto spild (kr)">↯</th>`:'')).join('')
@@ -11058,7 +11067,7 @@ function renderUgeMatrix(){
   const scopeTxt=_umxScope==='bag'?'kun bagværk':'hele butikken';
   const unit=_umxScope==='bag'
     ? (_umxMeasure==='antal'?'antal stk bagværk':(_umxMeasure==='db'?'kr bagværks-DB (ex moms)':'kr bagværks-omsætning (inkl. moms)'))
-    : (_umxMeasure==='db'?'kr dækningsbidrag (DB, ex moms)':(_umxMeasure==='res_spild'?'kr resultat efter spild (DB − løn − omk − levering − netto spild)':(_umxMeasure==='kunder'?'antal kunder (distinkte bons)':(_umxMeasure==='kurv'?'kr pr. kunde (omsætning ÷ kunder)':'kr omsætning (inkl. moms)'))));
+    : (_umxMeasure==='db'?'kr dækningsbidrag (DB, ex moms)':(_umxMeasure==='res_spild'?'kr resultat efter spild (DB − løn − omk − levering − netto spild)':(_umxMeasure==='brutto'?'kr brutto spild (værdi af rest, før frost-salg)':(_umxMeasure==='netto'?'kr netto spild (brutto − frost-salg)':(_umxMeasure==='frost'?'kr frost-salg (reddet spild, 100 % DB)':(_umxMeasure==='kunder'?'antal kunder (distinkte bons)':(_umxMeasure==='kurv'?'kr pr. kunde (omsætning ÷ kunder)':'kr omsætning (inkl. moms)')))))));
   const farveTxt=_umxFarve==='col'?'farve pr. ugedag (mandage mod mandage)':'farve på samlet skala';
   const evNavne=[...new Set(uger.filter(r=>r.event&&r.event.navn).map(r=>r.event.navn))];
   const legend=evNavne.length?`<div style="margin-bottom:6px;"><span style="color:var(--gold);">🎉 Begivenheder (guld-ramme = påvirket dag):</span> ${evNavne.join(' · ')}</div>`:'';
